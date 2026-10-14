@@ -59,7 +59,10 @@ export type Lang = "zh" | "ja" | "en";
 
 /** 通用设置（语言等，与具体服务无关）。 */
 interface GeneralConfig {
+  /** 界面语言（产品 UI）。 */
   lang: Lang;
+  /** momo 对话语言；"auto" = 跟随界面语言。 */
+  chatLang: Lang | "auto";
   /** 对话框背景不透明度 0–100（%）。 */
   dialogOpacity: number;
   /** TTS 语音播放音量 0–100（%）。 */

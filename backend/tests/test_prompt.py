@@ -60,6 +60,21 @@ def test_prompt_en_and_ja_templates():
     assert "日本語" in ja
 
 
+def test_prompt_chat_lang_overrides_ui_lang():
+    """对话语言独立于界面语言：chatLang=ja + lang=zh → ja 模板。"""
+    p = agent.build_system_prompt(
+        _state("zh", settings={"general": {"lang": "zh", "chatLang": "ja"}})
+    )
+    assert "あなたの名前はmomo" in p
+    assert "日本語" in p
+
+    # auto/缺失 → 回落界面语言
+    p2 = agent.build_system_prompt(
+        _state("ja", settings={"general": {"lang": "ja", "chatLang": "auto"}})
+    )
+    assert "あなたの名前はmomo" in p2
+
+
 def test_prompt_unknown_lang_falls_back_zh():
     p = agent.build_system_prompt(_state("fr"))
     assert "你的名字叫momo" in p

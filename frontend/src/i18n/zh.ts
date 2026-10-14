@@ -66,6 +66,8 @@ export const zh = {
       avatar: "形象 · Live2D",
     },
     langLabel: "界面语言",
+    chatLang: "对话语言",
+    langAuto: "跟随界面",
     dialogOpacity: "对话框透明度",
     voiceVolume: "语音音量",
     showStatus: "显示对话状态",

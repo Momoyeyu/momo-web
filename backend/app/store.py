@@ -21,6 +21,7 @@ DEFAULT_STATE: dict[str, Any] = {
     "settings": {
         "general": {
             "lang": "zh",
+            "chatLang": "auto",
             "dialogOpacity": 66,
             "voiceVolume": 100,
             "showStatus": True,

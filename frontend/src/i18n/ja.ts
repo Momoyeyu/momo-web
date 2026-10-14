@@ -66,6 +66,8 @@ export const ja: Dict = {
       avatar: "アバター · Live2D",
     },
     langLabel: "表示言語",
+    chatLang: "会話言語",
+    langAuto: "表示に従う",
     dialogOpacity: "テキストウィンドウ透明度",
     voiceVolume: "ボイス音量",
     showStatus: "ステータス表示",

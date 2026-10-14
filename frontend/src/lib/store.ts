@@ -23,6 +23,7 @@ export const AVATAR_BUILTIN = "builtin";
 const DEFAULT_SETTINGS: Settings = {
   general: {
     lang: "zh",
+    chatLang: "auto",
     dialogOpacity: 66,
     voiceVolume: 100,
     showStatus: true,

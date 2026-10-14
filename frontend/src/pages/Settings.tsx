@@ -300,6 +300,23 @@ export default function Settings() {
                       }
                     />
                   </OptRow>
+                  <OptRow label={t("settings.chatLang")}>
+                    <Select
+                      value={settings.general.chatLang}
+                      options={[
+                        { value: "auto", label: t("settings.langAuto") },
+                        ...LANGS.map((l) => ({
+                          value: l,
+                          label: t(`settings.langs.${l}`),
+                        })),
+                      ]}
+                      onChange={(v) =>
+                        patchGeneral({
+                          chatLang: v as SettingsData["general"]["chatLang"],
+                        })
+                      }
+                    />
+                  </OptRow>
                   <OptRow
                     label={t("settings.dialogOpacity")}
                     extra={`${settings.general.dialogOpacity}%`}

@@ -75,11 +75,13 @@ _T = {
 
 
 def _lang_of(state: dict[str, Any]) -> str:
-    lang = str(
-        (((state.get("settings") or {}).get("general") or {}).get("lang")) or "zh"
-    ).lower()
+    """momo 对话语言：general.chatLang（auto/缺失 → 回落界面语言 lang）。"""
+    g = (state.get("settings") or {}).get("general") or {}
+    raw = str(g.get("chatLang") or "").lower()
+    if not raw or raw == "auto":
+        raw = str(g.get("lang") or "zh").lower()
     for code in ("zh", "en", "ja"):
-        if lang.startswith(code):
+        if raw.startswith(code):
             return code
     return "zh"
 

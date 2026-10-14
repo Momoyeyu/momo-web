@@ -66,6 +66,8 @@ export const en: Dict = {
       avatar: "Avatar · Live2D",
     },
     langLabel: "Language",
+    chatLang: "Chat language",
+    langAuto: "Follow UI",
     dialogOpacity: "Dialog box opacity",
     voiceVolume: "Voice volume",
     showStatus: "Show chat status",
