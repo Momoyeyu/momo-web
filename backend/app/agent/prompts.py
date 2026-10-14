@@ -4,7 +4,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from ..store import DEFAULT_STATE
+
 _LANG_NAMES = {"zh": "中文", "en": "English", "ja": "日本語"}
+_DEFAULT_PERSONA: dict[str, Any] = DEFAULT_STATE["persona"]
 
 # 各语言模板片段；{...} 由 builder 注入
 _T = {
@@ -16,7 +19,7 @@ _T = {
         "lang_line": "你的主语言是{lang}，需要使用该语言与用户交流，除非用户特别要求使用其他语言。",
         "time_line": "目前你所在的时区是{tz}，现在的时间是{time24h}。",
         "mem": "关于记忆：\n以下是你的初始记忆：",
-        "tools": "你有以下工具：\n1. memory.add\n2. memory.search\n3. memory.delete\n4. common.time",
+        "tools": "你有以下工具：\n1. memory_add\n2. memory_search\n3. memory_delete\n4. common_time",
         "extra": {
             "oneLiner": "一句话简介",
             "likes": "你喜欢",
@@ -46,7 +49,7 @@ _T = {
         "lang_line": "Your primary language is {lang}; talk with the user in that language unless they explicitly ask for another one.",
         "time_line": "Your timezone is {tz}; the current time is {time24h}.",
         "mem": "About memory:\nThese are your initial memories:",
-        "tools": "You have the following tools:\n1. memory.add\n2. memory.search\n3. memory.delete\n4. common.time",
+        "tools": "You have the following tools:\n1. memory_add\n2. memory_search\n3. memory_delete\n4. common_time",
         "extra": {
             "oneLiner": "One-liner",
             "likes": "You like",
@@ -76,7 +79,7 @@ _T = {
         "lang_line": "あなたの主言語は{lang}です。ユーザーが特に指定しない限り、その言語で話してください。",
         "time_line": "現在のタイムゾーンは{tz}、時刻は{time24h}です。",
         "mem": "記憶について：\n以下はあなたの初期記憶です：",
-        "tools": "あなたは以下のツールを使えます：\n1. memory.add\n2. memory.search\n3. memory.delete\n4. common.time",
+        "tools": "あなたは以下のツールを使えます：\n1. memory_add\n2. memory_search\n3. memory_delete\n4. common_time",
         "extra": {
             "oneLiner": "ひとこと",
             "likes": "あなたの好きなもの",
@@ -118,7 +121,18 @@ def build_system_prompt(state: dict[str, Any]) -> str:
     """按契约模板组装 system prompt；末尾固定追加情绪指令段。"""
     lang = _lang_of(state)
     t = _T[lang]
-    persona = state.get("persona") or {}
+    # 空字段回落出厂人设：用户在设置里清空=回到初始状态，
+    # prompt 侧始终装配默认值（与前端 placeholder 显示一致）。
+    persona = dict(state.get("persona") or {})
+    for key in ("name", "identity", "personality"):
+        if not str(persona.get(key) or "").strip():
+            persona[key] = _DEFAULT_PERSONA[key]
+    if not isinstance(persona.get("age"), (int, float)) or isinstance(
+        persona.get("age"), bool
+    ):
+        persona["age"] = _DEFAULT_PERSONA["age"]
+    if not any(str(p).strip() for p in (persona.get("preferences") or [])):
+        persona["preferences"] = _DEFAULT_PERSONA["preferences"]
     pins = [
         p.strip()
         for p in (state.get("pins") or [])

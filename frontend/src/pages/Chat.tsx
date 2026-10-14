@@ -52,7 +52,7 @@ export default function Chat() {
             ? t("chat.errCfg")
             : e.failure === "unreachable"
               ? t("chat.errConn")
-              : `HTTP ${e.status}`;
+              : e.detail || `HTTP ${e.status}`;
         msg = t(`chat.errSvc.${e.service}`, { detail });
       }
       setError(msg);

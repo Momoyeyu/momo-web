@@ -33,7 +33,7 @@ def test_prompt_zh_fields_injected():
     assert "1. 用户的名称是夜羽" in p
     assert "2. 夜羽是我的创造者" in p
     # 工具列表
-    assert "1. memory.add" in p and "4. common.time" in p
+    assert "1. memory_add" in p and "4. common_time" in p
 
 
 def test_prompt_emotion_block_present_all_langs():
@@ -79,3 +79,24 @@ def test_prompt_extra_persona_fields():
 def test_prompt_unknown_lang_falls_back_zh():
     p = agent.build_system_prompt(_state("fr"))
     assert "你的名字叫momo" in p
+
+
+def test_prompt_empty_persona_falls_back_defaults():
+    """用户在设置页清空人设字段 → prompt 装配出厂默认值。"""
+    p = agent.build_system_prompt(
+        _state(
+            "zh",
+            persona={
+                "name": "",
+                "identity": "",
+                "age": None,
+                "personality": "",
+                "preferences": [],
+            },
+        )
+    )
+    assert "你的名字叫momo" in p
+    assert "你的身份是AI" in p
+    assert "你的年龄是16" in p
+    assert "你的性格是乖巧听话" in p
+    assert "1. 喜欢草莓蛋糕" in p

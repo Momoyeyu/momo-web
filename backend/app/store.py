@@ -27,12 +27,13 @@ DEFAULT_STATE: dict[str, Any] = {
         "asr": {"url": "", "key": ""},
         "tts": {"url": "", "key": "", "voice": "", "lang": "zh"},
     },
+    # 与前端 DEFAULT_PERSONA 保持一致：prompt 组装时空字段回落到这里。
     "persona": {
         "name": "momo",
         "identity": "AI",
         "age": 16,
-        "personality": "",
-        "preferences": [],
+        "personality": "乖巧听话",
+        "preferences": ["喜欢草莓蛋糕", "讨厌苦的食物"],
     },
     "pins": [],
     "avatars": [],

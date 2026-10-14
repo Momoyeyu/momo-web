@@ -24,7 +24,7 @@ def test_react_tool_then_text(monkeypatch):
             return {
                 "role": "assistant",
                 "content": None,
-                "tool_calls": [_tool_call("common.time")],
+                "tool_calls": [_tool_call("common_time")],
             }
         return {"role": "assistant", "content": "你好呀。#happy 今天很开心！"}
 
@@ -35,7 +35,7 @@ def test_react_tool_then_text(monkeypatch):
     # 按标点切段、保留标点
     assert deltas == ["你好呀。", "#happy 今天很开心！"]
 
-    # 第二轮 messages 带 tool 结果（common.time → iso+tz JSON）
+    # 第二轮 messages 带 tool 结果（common_time → iso+tz JSON）
     tool_msgs = [m for m in seen_messages[-1] if m.get("role") == "tool"]
     assert len(tool_msgs) == 1
     assert tool_msgs[0]["tool_call_id"] == "call_1"
@@ -65,7 +65,7 @@ def test_max_rounds_without_content(monkeypatch):
         return {
             "role": "assistant",
             "content": None,
-            "tool_calls": [_tool_call("common.time")],
+            "tool_calls": [_tool_call("common_time")],
         }
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
@@ -86,13 +86,13 @@ def test_tool_memory_ops_via_react(monkeypatch):
             return {
                 "role": "assistant",
                 "content": None,
-                "tool_calls": [_tool_call("memory.add", '{"content": "用户喜欢草莓"}', "c1")],
+                "tool_calls": [_tool_call("memory_add", '{"content": "用户喜欢草莓"}', "c1")],
             }
         if n == 2:
             return {
                 "role": "assistant",
                 "content": None,
-                "tool_calls": [_tool_call("memory.delete", '{"id": "nope"}', "c2")],
+                "tool_calls": [_tool_call("memory_delete", '{"id": "nope"}', "c2")],
             }
         return {"role": "assistant", "content": "记好了！"}
 

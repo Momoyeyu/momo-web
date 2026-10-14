@@ -35,7 +35,7 @@ LLM 配置不走 env，走 `state.settings.llm`（`{url}/v1/chat/completions`，
 
 - **PUT /api/state 旧数据**：body 里 `memories` 数组逐项导入普通记忆（跳过 `valid==False` 与非字符串 content，去重）；`user` 对象忽略。两个键导入/忽略后**不写回** state.json。
 - **GET /api/state**：文件缺失返回 `{}`；存在则返回 defaults 合并后的完整 state（旧 schema 容错，不强行纠正类型）。
-- **pin 参与 search**：pin 伪 id 为 `pin:<sha256(content)[:12]>`；`memory.delete` 收到 `pin:*` 或未知 id 返回「不可删除/不存在」说明文本。去重判定也覆盖 pin。
+- **pin 参与 search**：pin 伪 id 为 `pin:<sha256(content)[:12]>`；`memory_delete` 收到 `pin:*` 或未知 id 返回「不可删除/不存在」说明文本。去重判定也覆盖 pin。
 - **search 精排**：候选序 = 普通记忆文件序 + pin 序，`recency = (index+1)/总数`；embedding 降级时 bigram Jaccard 只返回 score>0 的 top-5。
 - **REST 错误码**：校验失败 400、去重冲突 409、id 不存在 404；tool 路径同构说明文本作为 tool result 回给模型（不 raise）。
 - **SSE**：成功回合 `delta*` + `done`；出错只发 `error`（不发 `done`）。`history` 在 LLM 返回最终 content 后先落盘再推流。

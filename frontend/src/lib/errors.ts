@@ -5,6 +5,8 @@ type ServiceKind = "llm" | "asr" | "tts";
 type ServiceFailure = "unconfigured" | "unreachable" | "http";
 
 export class ServiceError extends Error {
+  readonly detail?: string;
+
   constructor(
     readonly service: ServiceKind,
     readonly failure: ServiceFailure,
@@ -13,5 +15,6 @@ export class ServiceError extends Error {
   ) {
     super(detail ?? `${service} ${failure}${status ? ` ${status}` : ""}`);
     this.name = "ServiceError";
+    this.detail = detail;
   }
 }

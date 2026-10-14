@@ -1,4 +1,4 @@
-"""工具声明与执行：memory.add/search/delete + common.time。"""
+"""工具声明与执行：memory_add/search/delete + common_time。"""
 from __future__ import annotations
 
 import json
@@ -12,7 +12,7 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "memory.add",
+            "name": "memory_add",
             "description": "新增一条普通记忆（关于用户或对话的重要事实）",
             "parameters": {
                 "type": "object",
@@ -24,7 +24,7 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "memory.search",
+            "name": "memory_search",
             "description": "搜索相关记忆，返回 [{id, content}]",
             "parameters": {
                 "type": "object",
@@ -36,7 +36,7 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "memory.delete",
+            "name": "memory_delete",
             "description": "删除一条普通记忆（初始记忆 pin 不可删除）",
             "parameters": {
                 "type": "object",
@@ -48,7 +48,7 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
-            "name": "common.time",
+            "name": "common_time",
             "description": "获取 backend 本机当前时间",
             "parameters": {"type": "object", "properties": {}},
         },
@@ -59,16 +59,16 @@ TOOLS: list[dict[str, Any]] = [
 def execute_tool(name: str, args: dict[str, Any], pins: list[str]) -> str:
     """执行单个 tool call，返回字符串化结果（不向上抛）。"""
     try:
-        if name == "memory.add":
+        if name == "memory_add":
             mem = memory.add_memory(str(args.get("content") or ""), pins=pins)
             return json.dumps({"ok": True, "id": mem["id"]}, ensure_ascii=False)
-        if name == "memory.search":
+        if name == "memory_search":
             res = memory.search_memories(str(args.get("query") or ""), pins=pins)
             return json.dumps(res, ensure_ascii=False)
-        if name == "memory.delete":
+        if name == "memory_delete":
             memory.delete_memory(str(args.get("id") or ""))
             return json.dumps({"ok": True}, ensure_ascii=False)
-        if name == "common.time":
+        if name == "common_time":
             now = datetime.now().astimezone()
             return json.dumps(
                 {"iso": now.isoformat(timespec="seconds"), "tz": now.tzname() or ""},
