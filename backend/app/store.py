@@ -39,7 +39,7 @@ DEFAULT_STATE: dict[str, Any] = {
         "identity": "AI",
         "age": 16,
         "personality": "乖巧听话",
-        "preferences": ["喜欢草莓蛋糕", "讨厌苦的食物"],
+        "preferences": ["喜欢草莓蛋糕", "讨厌苦的东西"],
     },
     "pins": [],
     "avatars": [],

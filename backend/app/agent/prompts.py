@@ -20,16 +20,6 @@ _T = {
         "time_line": "目前你所在的时区是{tz}，现在的时间是{time24h}。",
         "mem": "关于记忆：\n以下是你的初始记忆：",
         "tools": "你有以下工具：\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
-        "extra": {
-            "oneLiner": "一句话简介",
-            "likes": "你喜欢",
-            "dislikes": "你讨厌",
-            "traits": "你的特点",
-            "tone": "你的语气",
-            "taboos": "你的禁忌",
-            "examples": "对话例子",
-        },
-        "user_label": "用户",
         "joiner": "，",
         "ender": "。",
         "emotion": (
@@ -50,16 +40,6 @@ _T = {
         "time_line": "Your timezone is {tz}; the current time is {time24h}.",
         "mem": "About memory:\nThese are your initial memories:",
         "tools": "You have the following tools:\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
-        "extra": {
-            "oneLiner": "One-liner",
-            "likes": "You like",
-            "dislikes": "You dislike",
-            "traits": "Your traits",
-            "tone": "Your tone",
-            "taboos": "Your taboos",
-            "examples": "Dialogue examples",
-        },
-        "user_label": "User",
         "joiner": ", ",
         "ender": ".",
         "emotion": (
@@ -80,16 +60,6 @@ _T = {
         "time_line": "現在のタイムゾーンは{tz}、時刻は{time24h}です。",
         "mem": "記憶について：\n以下はあなたの初期記憶です：",
         "tools": "あなたは以下のツールを使えます：\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
-        "extra": {
-            "oneLiner": "ひとこと",
-            "likes": "あなたの好きなもの",
-            "dislikes": "あなたの嫌いなもの",
-            "traits": "あなたの特徴",
-            "tone": "あなたの口調",
-            "taboos": "あなたの禁忌",
-            "examples": "会話例",
-        },
-        "user_label": "ユーザー",
         "joiner": "、",
         "ender": "。",
         "emotion": (
@@ -102,9 +72,6 @@ _T = {
         ),
     },
 }
-
-# 契约外但前端 persona card 可能携带的扩展字段，非空时并入「关于你自己」
-_EXTRA_ORDER = ["oneLiner", "likes", "dislikes", "traits", "tone", "taboos", "examples"]
 
 
 def _lang_of(state: dict[str, Any]) -> str:
@@ -143,7 +110,7 @@ def build_system_prompt(state: dict[str, Any]) -> str:
     tz = now.tzname() or ""
     time24h = now.strftime("%H:%M")
 
-    # 「关于你自己」：契约字段 + 扩展 persona 字段（空则跳过）
+    # 「关于你自己」：名称/身份/年龄一行，性格单独一句
     lines: list[str] = []
     values = [
         str(persona.get("name") or "").strip(),
@@ -160,24 +127,6 @@ def build_system_prompt(state: dict[str, Any]) -> str:
     personality = str(persona.get("personality") or "").strip()
     if personality:
         lines.append(t["personality"].format(v=personality))
-    for key in _EXTRA_ORDER:
-        v = persona.get(key)
-        label = t["extra"][key]
-        if key == "examples" and isinstance(v, list) and v:
-            name = values[0] or "momo"
-            ex = "\n\n".join(
-                f'{t["user_label"]}：{e.get("user", "")}\n{name}：{e.get("assistant", "")}'
-                for e in v
-                if isinstance(e, dict)
-            )
-            if ex:
-                lines.append(f"{label}：\n{ex}")
-        elif isinstance(v, list) and v:
-            items = "\n".join(f"- {s}" for s in v if str(s).strip())
-            if items:
-                lines.append(f"{label}：\n{items}")
-        elif isinstance(v, str) and v.strip():
-            lines.append(f"{label}：{v.strip()}")
     sections = [t["self"] + "\n" + "\n".join(lines)] if lines else []
 
     prefs = [str(p) for p in (persona.get("preferences") or []) if str(p).strip()]

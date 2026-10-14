@@ -60,22 +60,6 @@ def test_prompt_en_and_ja_templates():
     assert "日本語" in ja
 
 
-def test_prompt_extra_persona_fields():
-    p = agent.build_system_prompt(
-        _state("zh", persona={
-            "name": "momo",
-            "oneLiner": "嘴快爱吐槽",
-            "likes": ["抛梗接梗"],
-            "tone": "损友",
-            "examples": [{"user": "你是谁？", "assistant": "#happy 我是 momo"}],
-        })
-    )
-    assert "一句话简介：嘴快爱吐槽" in p
-    assert "- 抛梗接梗" in p
-    assert "你的语气：损友" in p
-    assert "用户：你是谁？" in p and "momo：#happy 我是 momo" in p
-
-
 def test_prompt_unknown_lang_falls_back_zh():
     p = agent.build_system_prompt(_state("fr"))
     assert "你的名字叫momo" in p
