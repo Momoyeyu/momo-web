@@ -11,8 +11,10 @@ import {
   getPersona,
   getPins,
   getSettings,
+  personaName,
   update,
 } from "../lib/store";
+import { getChatEngine } from "../chat/engine";
 import type { PersonaCard, Settings as SettingsData } from "../lib/types";
 import { fromRoute, navigate } from "../router";
 import { useT, LANGS } from "../i18n";
@@ -84,9 +86,13 @@ function rangeFill(pct: number): React.CSSProperties {
 function OptSwitch({
   on,
   onChange,
+  disabled,
+  title,
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
     <button
@@ -94,6 +100,8 @@ function OptSwitch({
       role="switch"
       aria-checked={on}
       className={`opt-switch${on ? " on" : ""}`}
+      disabled={disabled}
+      title={title}
       onClick={() => onChange(!on)}
     >
       <span className="knob" />
@@ -115,6 +123,15 @@ export default function Settings() {
   const [probes, setProbes] = useState<
     Partial<Record<EndpointSection, ProbeResult | "running">>
   >({});
+  // 语音输出开关：与 chat 工具条同一个开关（引擎运行时态，即时生效不入草稿）。
+  const [voiceMuted, setVoiceMuted] = useState(getChatEngine().muted);
+  const ttsConfigured = draft.settings.tts.url.trim() !== "";
+
+  const toggleVoice = (on: boolean): void => {
+    const eng = getChatEngine();
+    eng.setMuted(!on);
+    setVoiceMuted(eng.muted);
+  };
 
   const PROBES: Record<
     EndpointSection,
@@ -303,6 +320,38 @@ export default function Settings() {
                       onChange={(e) =>
                         patchGeneral({ dialogOpacity: Number(e.target.value) })
                       }
+                    />
+                  </OptRow>
+                  {/* 对话框透明度实时预览（草稿值直接喂 CSS 变量） */}
+                  <div
+                    className="dialog-preview"
+                    style={
+                      {
+                        "--dialog-alpha":
+                          draft.settings.general.dialogOpacity / 100,
+                      } as React.CSSProperties
+                    }
+                  >
+                    <div className="dialog-box">
+                      <div className="nameplate">
+                        {draft.persona.name || personaName()}
+                      </div>
+                      <div className="subtitle">
+                        {t("settings.previewSample")}
+                      </div>
+                    </div>
+                  </div>
+                  <OptRow
+                    label={t("settings.voiceOut")}
+                    extra={!ttsConfigured ? t("settings.voiceNeedTts") : undefined}
+                  >
+                    <OptSwitch
+                      on={ttsConfigured && !voiceMuted}
+                      disabled={!ttsConfigured}
+                      title={
+                        !ttsConfigured ? t("settings.voiceNeedTts") : undefined
+                      }
+                      onChange={toggleVoice}
                     />
                   </OptRow>
                   <OptRow

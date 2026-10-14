@@ -340,6 +340,24 @@ button.ghost.danger:hover {
   background: var(--accent);
 }
 
+.opt-switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --- 对话框透明度预览（复用 chat 的 dialog-box 外观） --- */
+
+.dialog-preview {
+  margin: -2px 0 6px;
+}
+
+.dialog-preview .dialog-box {
+  width: 100%;
+  min-height: 96px;
+  padding: 18px 18px 12px;
+  pointer-events: none;
+}
+
 /* --- 滑块（透明度/音量） --- */
 
 .opt-ctl input[type="range"] {
