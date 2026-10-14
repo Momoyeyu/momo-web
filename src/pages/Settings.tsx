@@ -103,13 +103,6 @@ export default function Settings() {
   const [draft, setDraft] = useState<Draft>(makeDraft);
   const [tab, setTab] = useState<Section>("general");
   const [confirmLeave, setConfirmLeave] = useState(false);
-  /** 弹窗定位：让「保存并离开」贴到「返回」的点击坐标。 */
-  const [modalPos, setModalPos] = useState<{
-    left: number;
-    top: number;
-  } | null>(null);
-  const clickPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-  const modalRef = useRef<HTMLDivElement | null>(null);
   const primaryRef = useRef<HTMLButtonElement | null>(null);
   const [showKey, setShowKey] = useState<Record<EndpointSection, boolean>>({
     llm: false,
@@ -117,33 +110,10 @@ export default function Settings() {
     tts: false,
   });
 
-  // 弹窗出现后：把「保存并离开」按钮中心平移到光标点击处
-  // （浏览器不能移动真实光标，等价做法是把按钮挪到光标下），
-  // 并聚焦主按钮（Enter 直接确认）。
+  // 弹窗居中弹出，主操作聚焦（Enter 直接确认）。
   useEffect(() => {
-    if (!confirmLeave) {
-      setModalPos(null);
-      return;
-    }
-    const modal = modalRef.current;
-    const btn = primaryRef.current;
-    if (!modal || !btn) return;
-    const mr = modal.getBoundingClientRect();
-    const br = btn.getBoundingClientRect();
-    const { x, y } = clickPos.current;
-    const pad = 12;
-    // 期望的 modal 偏移：主按钮中心 = 点击点
-    let left = mr.left + (x - (br.left + br.width / 2));
-    let top = mr.top + (y - (br.top + br.height / 2));
-    left = Math.max(pad, Math.min(window.innerWidth - mr.width - pad, left));
-    top = Math.max(pad, Math.min(window.innerHeight - mr.height - pad, top));
-    setModalPos({ left, top });
+    if (confirmLeave) primaryRef.current?.focus();
   }, [confirmLeave]);
-
-  // 定位落地后再聚焦主按钮（visibility:hidden 时 focus 无效）。
-  useEffect(() => {
-    if (modalPos) primaryRef.current?.focus();
-  }, [modalPos]);
 
   const dirty = isDirty(draft);
   // 返回目标与来源页一致：chat 进来回 chat，其余回 title。
@@ -184,9 +154,8 @@ export default function Settings() {
     }));
   };
 
-  const goBack = (e: React.MouseEvent): void => {
+  const goBack = (): void => {
     if (dirty) {
-      clickPos.current = { x: e.clientX, y: e.clientY };
       setConfirmLeave(true);
     } else {
       navigate(backRoute);
@@ -387,15 +356,7 @@ export default function Settings() {
 
       {confirmLeave && (
         <div className="modal-backdrop">
-          <div
-            className="modal panel"
-            ref={modalRef}
-            style={
-              modalPos
-                ? { position: "fixed", left: modalPos.left, top: modalPos.top }
-                : { visibility: "hidden" }
-            }
-          >
+          <div className="modal panel">
             <h2>{t("settings.unsavedTitle")}</h2>
             <p className="muted">{t("settings.unsavedBody")}</p>
             <div className="modal-ops">
@@ -408,7 +369,6 @@ export default function Settings() {
               >
                 {t("settings.discardLeave")}
               </button>
-              {/* 主操作放最右：贴光标定位时按钮离 modal 右缘最近 */}
               <button
                 ref={primaryRef}
                 onClick={() => {
