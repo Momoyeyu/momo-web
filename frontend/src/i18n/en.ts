@@ -85,7 +85,6 @@ export const en: Dict = {
     hideKey: "Hide",
     test: "Test connection",
     testNeedUrl: "fill in the URL first",
-    note: "Edits are staged as a draft; the bottom-right Save applies them instantly. Config is written to localStorage and the backend (/api/state).",
     unsavedTitle: "Unsaved changes",
     unsavedBody: "Save the current changes?",
     saveLeave: "Save & leave",

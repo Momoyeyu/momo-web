@@ -85,7 +85,6 @@ export const ja: Dict = {
     hideKey: "隠す",
     test: "接続テスト",
     testNeedUrl: "先にURLを入力",
-    note: "変更はまず下書きに保存され、右下の保存で即時反映されます。設定は localStorage と backend（/api/state）に書き込まれます。",
     unsavedTitle: "未保存の変更があります",
     unsavedBody: "変更を保存しますか？",
     saveLeave: "保存して戻る",

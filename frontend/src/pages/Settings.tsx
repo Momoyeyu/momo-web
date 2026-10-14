@@ -363,6 +363,7 @@ export default function Settings() {
                       min={0}
                       max={100}
                       step={1}
+                      disabled={voiceMuted || !ttsConfigured}
                       style={rangeFill(draft.settings.general.voiceVolume)}
                       value={draft.settings.general.voiceVolume}
                       onChange={(e) =>
@@ -423,8 +424,6 @@ export default function Settings() {
                   <AvatarPanel />
                 </div>
               )}
-
-              <p className="muted settings-note">{t("settings.note")}</p>
             </div>
           )}
         </div>

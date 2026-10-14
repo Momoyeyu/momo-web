@@ -373,6 +373,11 @@ button.ghost.danger:hover {
 }
 
 /* 菱形 thumb：与标题菜单 ◆ 饰标同一母题。 */
+.opt-ctl input[type="range"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .opt-ctl input[type="range"]::-webkit-slider-thumb {
   appearance: none;
   width: 13px;
@@ -394,11 +399,6 @@ button.ghost.danger:hover {
   transform: rotate(45deg);
 }
 
-.settings-note {
-  margin-top: 22px;
-  padding: 0 4px;
-  font-size: 13px;
-}
 
 /* --- 人格/记忆面板复用的双栏表单 --- */
 

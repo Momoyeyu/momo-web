@@ -85,7 +85,6 @@ export const zh = {
     hideKey: "隐藏",
     test: "测试连接",
     testNeedUrl: "先填写地址",
-    note: "修改先存为草稿，点击右下角保存后立即生效。配置同时写入 localStorage 与 backend（/api/state）。",
     unsavedTitle: "有未保存的修改",
     unsavedBody: "要保存当前修改吗？",
     saveLeave: "保存并离开",
