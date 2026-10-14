@@ -6,7 +6,6 @@ export const ja: Dict = {
     backTitle: "タイトルへ戻る",
     backChat: "会話へ戻る",
     save: "保存",
-    saved: "保存しました",
     cancel: "キャンセル",
     edit: "編集",
     del: "削除",

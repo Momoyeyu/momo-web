@@ -102,7 +102,6 @@ export default function Settings() {
   const t = useT();
   const [draft, setDraft] = useState<Draft>(makeDraft);
   const [tab, setTab] = useState<Section>("general");
-  const [saved, setSaved] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   /** 弹窗定位：让「保存并离开」贴到「返回」的点击坐标。 */
   const [modalPos, setModalPos] = useState<{
@@ -117,14 +116,6 @@ export default function Settings() {
     asr: false,
     tts: false,
   });
-  const savedTimer = useRef<number | null>(null);
-
-  useEffect(
-    () => () => {
-      if (savedTimer.current !== null) window.clearTimeout(savedTimer.current);
-    },
-    [],
-  );
 
   // 弹窗出现后：把「保存并离开」按钮中心平移到光标点击处
   // （浏览器不能移动真实光标，等价做法是把按钮挪到光标下），
@@ -165,7 +156,6 @@ export default function Settings() {
       ...d,
       settings: { ...d.settings, [sec]: { ...d.settings[sec], [key]: v } },
     }));
-    setSaved(false);
   };
 
   const patchGeneral = (p: Partial<SettingsData["general"]>): void => {
@@ -173,12 +163,10 @@ export default function Settings() {
       ...d,
       settings: { ...d.settings, general: { ...d.settings.general, ...p } },
     }));
-    setSaved(false);
   };
 
   const patchPersona = (p: Partial<PersonaCard>): void => {
     setDraft((d) => ({ ...d, persona: { ...d.persona, ...p } }));
-    setSaved(false);
   };
 
   const save = (): void => {
@@ -194,9 +182,6 @@ export default function Settings() {
       persona: structuredClone(persona),
       humanBlock: d.humanBlock.trim(),
     }));
-    setSaved(true);
-    if (savedTimer.current !== null) window.clearTimeout(savedTimer.current);
-    savedTimer.current = window.setTimeout(() => setSaved(false), 2000);
   };
 
   const goBack = (e: React.MouseEvent): void => {
@@ -252,10 +237,9 @@ export default function Settings() {
           ) : tab === "memory" ? (
             <MemoryPanel
               humanBlock={draft.humanBlock}
-              onHumanBlock={(v) => {
-                setDraft((d) => ({ ...d, humanBlock: v }));
-                setSaved(false);
-              }}
+              onHumanBlock={(v) =>
+                setDraft((d) => ({ ...d, humanBlock: v }))
+              }
             />
           ) : (
             <div className="settings-body panel">
@@ -394,7 +378,6 @@ export default function Settings() {
             <button className="ghost" onClick={goBack}>
               {backLabel}
             </button>
-            {saved && <span className="saved-hint">{t("common.saved")}</span>}
             <button onClick={save} disabled={!dirty}>
               {t("settings.saveBtn")}
             </button>

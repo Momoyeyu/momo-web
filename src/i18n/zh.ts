@@ -6,7 +6,6 @@ export const zh = {
     backTitle: "返回标题",
     backChat: "返回对话",
     save: "保存",
-    saved: "已保存",
     cancel: "取消",
     edit: "编辑",
     del: "删除",

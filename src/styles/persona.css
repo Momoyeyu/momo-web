@@ -56,10 +56,6 @@
   gap: 12px;
 }
 
-.saved-hint {
-  font-size: 13px;
-}
-
 .example-row {
   display: grid;
   grid-template-columns: 1fr 1fr auto;

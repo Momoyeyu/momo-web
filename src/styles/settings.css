@@ -28,10 +28,11 @@
 .stab {
   flex: 1;
   display: flex;
-  align-items: baseline;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 15px 8px 13px;
+  gap: 2px;
+  padding: 11px 8px 10px;
   border-radius: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
@@ -51,11 +52,15 @@
 .stab-label {
   font-size: 15px;
   font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .stab-sub {
-  font-size: 12px;
-  opacity: 0.7;
+  font-size: 11px;
+  line-height: 1.2;
+  opacity: 0.65;
+  white-space: nowrap;
 }
 
 .stab.active {
@@ -260,12 +265,6 @@
 
 .key-row input {
   flex: 1;
-}
-
-.saved-hint {
-  color: var(--ok);
-  font-size: 13px;
-  animation: modal-in 0.3s ease both;
 }
 
 /* --- 底部操作条（独立全宽容器） --- */

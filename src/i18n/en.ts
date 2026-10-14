@@ -6,7 +6,6 @@ export const en: Dict = {
     backTitle: "Back to Title",
     backChat: "Back to Chat",
     save: "Save",
-    saved: "Saved",
     cancel: "Cancel",
     edit: "Edit",
     del: "Delete",
