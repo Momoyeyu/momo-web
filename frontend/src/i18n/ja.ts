@@ -100,18 +100,18 @@ export const ja: Dict = {
   memory: {
     pinsTitle: "初期記憶",
     pinsDesc:
-      "momo が生まれつき知っていること（あなたの名前、二人の関係……）。保存後 system prompt に固定注入され、忘れたり書き換えられたりしません。",
+      "momo が生まれつき知っていること（あなたの名前、二人の関係……）。会話中は常に覚えていて、忘れたり書き換えられたりしません。",
     pinPh: "初期記憶を一行…",
     pinAdd: "+ 追加",
     normalTitle: "記憶",
     normalDesc:
-      "momo が会話の中で自分で記録した内容。ここで手動で追加・編集・削除もできます。backend に保存されます。",
+      "momo が会話の中で自分で記録した内容。ここで手動で追加・編集・削除もできます。",
     add: "追加",
     addPh: "記憶を手動追加…",
     searchPh: "記憶を検索…",
     empty: "一致する記憶がありません。",
     confirmDelete: "この記憶を削除しますか？",
-    loadFailed: "記憶の読み込みに失敗しました（backend 未起動？）",
+    loadFailed: "記憶の読み込みに失敗しました（サービス未起動？）",
   },
   avatar: {
     builtin: "内蔵",
@@ -121,12 +121,12 @@ export const ja: Dict = {
     importBtn: "モデルをインポート (.zip)",
     importing: "インポート中…",
     importHint: "zip 内に .model3.json と参照される全リソースが必要です",
-    pickManifest: "複数のマニフェストを検出 — インポート対象を選択",
+    pickManifest: "複数のモデル記述ファイルを検出 — インポート対象を選択",
     confirmImport: "インポート",
     errZip: "有効な zip ファイルではありません",
     errNoManifest: "zip 内に .model3.json がありません（Cubism 3/4 のみ対応）",
-    errManifest: "マニフェストの解析に失敗しました",
-    errMissing: "マニフェストが参照するファイルが zip 内にありません",
-    errStore: "モデルの保存に失敗しました（IndexedDB が使えませんか？）",
+    errManifest: "モデル記述ファイルの解析に失敗しました",
+    errMissing: "モデル記述ファイルが参照するファイルが zip 内にありません",
+    errStore: "モデルの保存に失敗しました（ブラウザのストレージが使えません）",
   },
 };

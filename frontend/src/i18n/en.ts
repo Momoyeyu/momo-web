@@ -100,18 +100,18 @@ export const en: Dict = {
   memory: {
     pinsTitle: "Pinned Memories",
     pinsDesc:
-      "Things momo knows from birth (your name, your relationship…). Saved into the system prompt permanently — never forgotten or rewritten.",
+      "Things momo knows from birth (your name, your relationship…). Always remembered in chats — never forgotten or rewritten.",
     pinPh: "A pinned memory…",
     pinAdd: "+ Add",
     normalTitle: "Memories",
     normalDesc:
-      "What momo noted down during chats; you can also add, edit or delete entries here. Stored in the backend.",
+      "What momo noted down during chats; you can also add, edit or delete entries here.",
     add: "Add",
     addPh: "Add a memory manually…",
     searchPh: "Search memories…",
     empty: "No matching memories.",
     confirmDelete: "Delete this memory?",
-    loadFailed: "Failed to load memories (backend not running?)",
+    loadFailed: "Failed to load memories (service not running?)",
   },
   avatar: {
     builtin: "Built-in",
@@ -121,12 +121,12 @@ export const en: Dict = {
     importBtn: "Import model (.zip)",
     importing: "Importing…",
     importHint: "The zip must contain a .model3.json and all referenced assets",
-    pickManifest: "Multiple manifests found — pick one to import",
+    pickManifest: "Multiple model descriptors found — pick one to import",
     confirmImport: "Import",
     errZip: "Not a valid zip file",
     errNoManifest: "No .model3.json found in zip (Cubism 3/4 models only)",
-    errManifest: "Failed to parse manifest",
-    errMissing: "Files referenced by the manifest are missing in the zip",
-    errStore: "Failed to store model (IndexedDB unavailable?)",
+    errManifest: "Failed to parse the model descriptor",
+    errMissing: "Files referenced by the model descriptor are missing in the zip",
+    errStore: "Failed to save model (browser storage unavailable)",
   },
 };

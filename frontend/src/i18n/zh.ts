@@ -100,18 +100,18 @@ export const zh = {
   memory: {
     pinsTitle: "初始记忆",
     pinsDesc:
-      "momo 天生就知道的事（你的名字、你们的关系……）。保存后固定注入 system prompt，不会被遗忘或改写。",
+      "momo 天生就知道的事（你的名字、你们的关系……）。对话中始终记得，不会被遗忘或改写。",
     pinPh: "一条初始记忆…",
     pinAdd: "+ 添加",
     normalTitle: "普通记忆",
     normalDesc:
-      "momo 在对话中自己记下的内容，也可以在这里手动增删改。保存在 backend。",
+      "momo 在对话中自己记下的内容，也可以在这里手动增删改。",
     add: "添加",
     addPh: "手动添加一条记忆…",
     searchPh: "检索记忆…",
     empty: "没有匹配的记忆。",
     confirmDelete: "删除这条记忆？",
-    loadFailed: "记忆加载失败（backend 未启动？）",
+    loadFailed: "记忆加载失败（服务未启动？）",
   },
   avatar: {
     builtin: "内置",
@@ -121,13 +121,13 @@ export const zh = {
     importBtn: "导入模型 (.zip)",
     importing: "导入中…",
     importHint: "zip 内需包含 .model3.json 及其引用的全部资源",
-    pickManifest: "检测到多个模型配置，选择要导入的 manifest",
+    pickManifest: "检测到多个模型描述文件，选择要导入的入口",
     confirmImport: "确认导入",
     errZip: "不是有效的 zip 文件",
     errNoManifest: "zip 内未找到 .model3.json（仅支持 Cubism 3/4 模型）",
-    errManifest: "manifest 解析失败",
-    errMissing: "manifest 引用的文件在 zip 中缺失",
-    errStore: "模型存储失败（浏览器不支持 IndexedDB？）",
+    errManifest: "模型描述文件解析失败",
+    errMissing: "模型描述文件引用的文件在 zip 中缺失",
+    errStore: "模型保存失败（浏览器存储不可用）",
   },
 };
 
