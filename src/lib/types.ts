@@ -90,6 +90,20 @@ export interface Memory {
   supersededBy?: string;
 }
 
+/** 导入的 Live2D 模型元信息（zip 本体存 IndexedDB，key=id）。 */
+export interface AvatarMeta {
+  id: string;
+  /** 显示名（manifest Name 或 zip 文件名）。 */
+  name: string;
+  /** 原始 zip 文件名。 */
+  fileName: string;
+  /** zip 内选定的 model3.json 路径。 */
+  manifest: string;
+  /** zip 体积（字节）。 */
+  size: number;
+  addedAt: string;
+}
+
 /** 用户身份：帮 momo 理解「对方是谁、你们什么关系」，注入 system prompt。 */
 export interface UserProfile {
   /** momo 对用户的称呼。 */

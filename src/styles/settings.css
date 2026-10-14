@@ -97,6 +97,152 @@
   padding: 0;
 }
 
+/* 模型配置页内分块标题（LLM/ASR/TTS/形象）。 */
+.opt-group {
+  margin: 22px 4px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--accent-strong);
+}
+
+.opt-group:first-child {
+  margin-top: 4px;
+}
+
+/* --- 形象（Live2D 模型管理）：缩略图卡片网格 --- */
+
+.avatar-panel {
+  padding: 4px;
+}
+
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.avatar-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel-hover);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.avatar-card.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-soft), 0 2px 14px var(--accent-glow);
+}
+
+.avatar-thumb {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  /* 纹理是全身立绘：对齐顶部只露头。 */
+  object-position: top;
+  border-radius: var(--r-sm);
+  background: var(--input-bg);
+}
+
+.avatar-thumb-empty {
+  border: 1px dashed var(--line);
+}
+
+.avatar-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.avatar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.badge-active {
+  color: var(--accent-strong);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.avatar-ops {
+  display: flex;
+  gap: 8px;
+}
+
+.avatar-meta {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.avatar-add {
+  flex-direction: column;
+  justify-content: center;
+  border-style: dashed;
+  color: var(--text-dim);
+  cursor: pointer;
+  min-height: 78px;
+}
+
+.avatar-add:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.avatar-add:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.avatar-add-plus {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.avatar-add-label {
+  font-size: 13px;
+}
+
+.avatar-pending {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.avatar-hint {
+  margin: 12px 4px 0;
+  font-size: 12px;
+}
+
+.avatar-error {
+  margin: 10px 4px 0;
+  font-size: 13px;
+  color: var(--danger-text);
+}
+
+button.ghost.danger:hover {
+  color: var(--danger-text);
+  border-color: var(--danger-line);
+}
+
 .opt-row {
   display: flex;
   align-items: center;

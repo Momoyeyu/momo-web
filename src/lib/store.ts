@@ -2,15 +2,22 @@
 // 所有跨页面共享状态（设置/人设/记忆/画像 block）的唯一入口；
 // 测试用 createMemoryStorage 注入内存实现。
 
-import type { Memory, PersonaCard, Settings, UserProfile } from "./types";
+import type { AvatarMeta, Memory, PersonaCard, Settings, UserProfile } from "./types";
 
 const STORAGE_KEY = "momo-demo.v1";
+
+/** 内置模型（Hiyori）的 avatarId 取值。 */
+export const AVATAR_BUILTIN = "builtin";
 
 export interface PersistedState {
   settings: Settings;
   persona: PersonaCard;
   user: UserProfile;
   memories: Memory[];
+  /** 用户导入的 Live2D 模型清单（blob 在 IndexedDB）。 */
+  avatars: AvatarMeta[];
+  /** 当前形象：AVATAR_BUILTIN 或 avatars[].id。 */
+  avatarId: string;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -66,6 +73,8 @@ function defaults(): PersistedState {
     persona: structuredClone(DEFAULT_PERSONA),
     user: structuredClone(DEFAULT_USER),
     memories: [],
+    avatars: [],
+    avatarId: AVATAR_BUILTIN,
   };
 }
 
@@ -113,6 +122,13 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
         d.user.note,
     },
     memories: parsed.memories ?? d.memories,
+    avatars: parsed.avatars ?? d.avatars,
+    avatarId:
+      parsed.avatarId &&
+      (parsed.avatarId === AVATAR_BUILTIN ||
+        (parsed.avatars ?? []).some((a) => a.id === parsed.avatarId))
+        ? parsed.avatarId
+        : AVATAR_BUILTIN,
   };
 }
 
@@ -213,6 +229,14 @@ export function getUser(): UserProfile {
 
 export function getMemories(): Memory[] {
   return state.memories;
+}
+
+export function getAvatars(): AvatarMeta[] {
+  return state.avatars;
+}
+
+export function getAvatarId(): string {
+  return state.avatarId;
 }
 
 /** 局部更新 + 持久化 + 通知订阅者。 */

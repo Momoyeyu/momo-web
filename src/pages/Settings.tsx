@@ -21,12 +21,13 @@ import type { ProbeResult } from "../lib/probe";
 import Select from "../ui/Select";
 import PersonaPanel, { cleanPersona } from "./Persona";
 import MemoryPanel from "./Memory";
+import AvatarPanel from "./Avatar";
 import "../styles/settings.css";
 
 type EndpointSection = "llm" | "asr" | "tts";
-type Section = "general" | EndpointSection | "persona" | "memory";
+type Section = "general" | "models" | "persona" | "memory";
 
-const TABS: Section[] = ["general", "llm", "asr", "tts", "persona", "memory"];
+const TABS: Section[] = ["general", "models", "persona", "memory"];
 
 interface Draft {
   settings: SettingsData;
@@ -334,8 +335,9 @@ export default function Settings() {
                 </div>
               )}
 
-              {tab === "llm" && (
+              {tab === "models" && (
                 <div className="opt-list">
+                  <h3 className="opt-group">{t("settings.groups.llm")}</h3>
                   {urlRow("llm", "settings.llmUrlPh")}
                   {keyRow("llm")}
                   <OptRow label={t("settings.model")}>
@@ -345,18 +347,12 @@ export default function Settings() {
                       onChange={(e) => patchEndpoint("llm", "model", e.target.value)}
                     />
                   </OptRow>
-                </div>
-              )}
 
-              {tab === "asr" && (
-                <div className="opt-list">
+                  <h3 className="opt-group">{t("settings.groups.asr")}</h3>
                   {urlRow("asr", "settings.asrUrlPh")}
                   {keyRow("asr")}
-                </div>
-              )}
 
-              {tab === "tts" && (
-                <div className="opt-list">
+                  <h3 className="opt-group">{t("settings.groups.tts")}</h3>
                   {urlRow("tts", "settings.ttsUrlPh")}
                   {keyRow("tts")}
                   <OptRow label={t("settings.voice")}>
@@ -378,6 +374,9 @@ export default function Settings() {
                       onChange={(v) => patchEndpoint("tts", "lang", v)}
                     />
                   </OptRow>
+
+                  <h3 className="opt-group">{t("settings.groups.avatar")}</h3>
+                  <AvatarPanel />
                 </div>
               )}
 

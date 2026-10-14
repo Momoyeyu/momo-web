@@ -6,7 +6,10 @@
 
 import * as PIXI from "pixi.js";
 import type { EmotionTag } from "../lib/types";
+import { AVATAR_BUILTIN, getAvatarId, getAvatars } from "../lib/store";
+import { getBlob } from "../lib/idb";
 import { EMOTION_MOTIONS } from "./emotions";
+import { makeAvatarSource, wireZipLoader } from "./avatarZip";
 
 // pixi-live2d-display 约定从全局读 PIXI（仅浏览器环境注入）。
 if (typeof window !== "undefined") {
@@ -92,6 +95,8 @@ export class Live2DStage {
   /** 加载中的 promise（去重并发/StrictMode 重复调用）。 */
   private loading: Promise<void> | null = null;
   private modelUrl: string | null = null;
+  /** 当前模型是否内置 Hiyori（情绪映射表只对它有效）。 */
+  private builtin = true;
 
   /** 模型是否已加载（口型/情绪写参前置检查）。 */
   get ready(): boolean {
@@ -123,24 +128,64 @@ export class Live2DStage {
     if (!this.app) throw new Error("stage not initialized");
     if (this.model && this.modelUrl === url) return;
     if (this.loading) return this.loading;
-    this.loading = this.doLoad(url).finally(() => {
+    this.loading = this.doLoad(() => url, url, true).finally(() => {
       this.loading = null;
     });
     return this.loading;
   }
 
-  private async doLoad(url: string): Promise<void> {
+  /**
+   * 按当前设置加载形象：内置 → URL；导入模型 → IndexedDB zip →
+   * Live2DModel.from([File])（库内 ZipLoader+FileLoader 解包映射）。
+   * 导入模型加载失败 → 静默回退内置 Hiyori，不阻断聊天。
+   */
+  async loadAvatar(): Promise<void> {
+    if (!this.app) return;
+    const id = getAvatarId();
+    if (id === AVATAR_BUILTIN) {
+      await this.loadModel(avatarModelUrl());
+      return;
+    }
+    const meta = getAvatars().find((a) => a.id === id);
+    const blob = meta ? await getBlob(id) : null;
+    if (!meta || !blob) {
+      await this.loadModel(avatarModelUrl());
+      return;
+    }
+    const key = `avatar:${id}`;
+    if (this.model && this.modelUrl === key) return;
+    if (this.loading) return this.loading;
+    this.loading = this.doLoad(
+      async (mod) => makeAvatarSource(mod, blob, meta),
+      key,
+      false,
+    )
+      .catch(() => this.doLoad(() => avatarModelUrl(), avatarModelUrl(), true))
+      .finally(() => {
+        this.loading = null;
+      });
+    return this.loading;
+  }
+
+  private async doLoad(
+    makeSource: (mod: any) => unknown | Promise<unknown>,
+    key: string,
+    isBuiltin: boolean,
+  ): Promise<void> {
     await ensureCubismCore();
     const mod: any = await import("pixi-live2d-display/cubism4");
     mod.config.sound = false;
-    const model = await mod.Live2DModel.from(url);
+    wireZipLoader(mod);
+    const source = await makeSource(mod);
+    const model = await mod.Live2DModel.from(source);
     if (this.model) {
       this.app?.stage.removeChild(this.model);
       this.model.destroy?.();
       this.model = null;
     }
     this.model = model;
-    this.modelUrl = url;
+    this.modelUrl = key;
+    this.builtin = isBuiltin;
     const b = model.getLocalBounds();
     this.bounds = { x: b.x, y: b.y, width: b.width, height: b.height };
     this.app?.stage.addChild(model);
@@ -171,16 +216,20 @@ export class Live2DStage {
     core.setParameterValueById("ParamMouthOpenY", clamped);
   }
 
-  /** 情绪 → Hiyori 表情/动作（motion group 播放或参数写入；未知 tag 忽略）。 */
+  /** 情绪 → 动作：内置模型走 EMOTION_MOTIONS 映射表；导入模型按
+   * 约定组名（motion group 名 == tag 名）尝试，缺失静默交给 Idle。 */
   playEmotion(tag: EmotionTag): void {
     if (!this.model) return;
-    const spec = EMOTION_MOTIONS[tag];
-    if (!spec) return; // neutral / 未映射：交给 Idle 自动轮播
     try {
-      const r = this.model.motion(spec.group, spec.index);
-      r?.catch?.(() => {}); // 动作资源缺失等：静默
+      if (this.builtin) {
+        const spec = EMOTION_MOTIONS[tag];
+        if (!spec) return; // neutral / 未映射：交给 Idle 自动轮播
+        this.model.motion(spec.group, spec.index)?.catch?.(() => {});
+      } else {
+        this.model.motion(tag)?.catch?.(() => {});
+      }
     } catch {
-      // 同上
+      // 动作资源缺失等：静默
     }
   }
 

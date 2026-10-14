@@ -3,7 +3,8 @@
 // 加载失败时静默降级（背景图仍在，面板可正常用）。
 
 import { useEffect, useRef } from "react";
-import { avatarModelUrl, getStage } from "./stage";
+import { getAvatarId, subscribe } from "../lib/store";
+import { getStage } from "./stage";
 
 export default function StageCanvas({ visible }: { visible: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -18,8 +19,17 @@ export default function StageCanvas({ visible }: { visible: boolean }) {
     } catch {
       return; // WebGL 不可用等：背景图兜底，页面照常可用
     }
-    // 加载失败静默降级；同 url 重复调用在 stage 内去重。
-    void stage.loadModel(avatarModelUrl()).catch(() => {});
+    // 加载当前形象并订阅切换（设置页换模型即时生效；
+    // 同模型重复调用在 stage 内去重，导入失败内部回退内置）。
+    let lastId: string | null = null;
+    const load = (): void => {
+      const id = getAvatarId();
+      if (id === lastId) return;
+      lastId = id;
+      void stage.loadAvatar().catch(() => {});
+    };
+    load();
+    return subscribe(load);
     // 不随组件卸载 dispose：舞台是应用级常驻单例。
   }, []);
 
