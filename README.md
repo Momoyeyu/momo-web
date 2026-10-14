@@ -65,3 +65,8 @@ pnpm build
 - 状态（设置/人设/记忆）双写：localStorage + 项目根 `.momo-state.json`（dev server 的 `/api/state` 端点读写，300ms 防抖；启动时文件优先恢复）。`.momo-state.json` 已 gitignore，含 key 不入库；非 dev 环境退化为纯 localStorage。
 - 对话历史仅存内存（应用级引擎单例），刷新清空。
 - Live2D Cubism Core 运行时从官方 CDN 加载（`VITE_MOMO_CUBISM_CORE_URL` 可换镜像）；Hiyori 为 Cubism 官方 sample，许可见 `public/live2d/hiyori/LICENSE.md`。
+
+## 已知限制（Tauri 迁移待办）
+
+- **未保存弹窗无法自动移动光标到「保存并离开」**：浏览器没有任何移动系统光标的 JS API（安全限制，防 clickjacking）。假光标替身方案被否——动画期间用户若移动鼠标会跳回真实位置，且光标未动时点击仍落在原位。迁移 Tauri 后用 `WebviewWindow.set_cursor_position()` 直接实现。
+
