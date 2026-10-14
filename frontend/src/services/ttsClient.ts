@@ -5,7 +5,7 @@
 import type { EmotionTag, TtsConfig } from "../lib/types";
 import { ServiceError } from "../lib/errors";
 
-export interface SpeakOptions {
+interface SpeakOptions {
   signal?: AbortSignal;
   /** 每个到达的 PCM 块。 */
   onChunk: (pcm: Uint8Array) => void;

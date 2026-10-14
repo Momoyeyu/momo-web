@@ -51,7 +51,7 @@ export interface TtsConfig {
 export type Lang = "zh" | "ja" | "en";
 
 /** 通用设置（语言等，与具体服务无关）。 */
-export interface GeneralConfig {
+interface GeneralConfig {
   lang: Lang;
   /** 对话框背景不透明度 0–100（%）。 */
   dialogOpacity: number;

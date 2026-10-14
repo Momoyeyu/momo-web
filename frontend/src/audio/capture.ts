@@ -4,7 +4,7 @@
 
 import { ASR_SAMPLE_RATE, S16leFramer } from "./pcm";
 
-export interface MicStreamOpts {
+interface MicStreamOpts {
   /** 设备断开 / worklet 失败等异步错误。 */
   onError?: (err: unknown) => void;
   /** 帧长毫秒（默认 50ms → 1600B@16kHz）。 */

@@ -22,7 +22,7 @@ import { streamSpeech } from "../services/ttsClient";
 import { chat } from "../services/chatClient";
 import { SentenceSplitter } from "./sentences";
 
-export interface ChatEngineEvents {
+interface ChatEngineEvents {
   onStatus(s: ChatStatus): void;
   /** 一条完整 user 消息落账（打字发送或 ASR final 转写）。 */
   onUserMessage(m: ChatMessage): void;

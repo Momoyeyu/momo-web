@@ -51,13 +51,13 @@ describe("checkManifest", () => {
     "m/motions/idle.motion3.json": "{}",
   };
 
-  it("引用齐全 → missing 为空，hasMotions/Name 正确", async () => {
+  it("引用齐全 → missing 为空，Name/texture 正确", async () => {
     const zip = await zipOf(files);
     const r = await checkManifest(zip, "m/M.model3.json");
     expect(r).toMatchObject({
       missing: [],
-      hasMotions: true,
       name: "TestModel",
+      texture: "m/M.2048/texture_00.png",
     });
   });
 
@@ -81,7 +81,7 @@ describe("checkManifest", () => {
     expect("error" in r).toBe(true);
   });
 
-  it("无 Motions 组 → hasMotions=false", async () => {
+  it("无 Motions 组 → 校验仍通过", async () => {
     const zip = await zipOf({
       "m/M.model3.json": JSON.stringify({
         Version: 3,
@@ -91,6 +91,6 @@ describe("checkManifest", () => {
       "m/t.png": "png",
     });
     const r = await checkManifest(zip, "m/M.model3.json");
-    expect(r).toMatchObject({ missing: [], hasMotions: false });
+    expect(r).toMatchObject({ missing: [] });
   });
 });

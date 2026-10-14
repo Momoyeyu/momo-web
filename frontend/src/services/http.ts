@@ -1,7 +1,7 @@
 // backend REST 共享助手：JSON 收发 + 非 2xx 抛错（带 status）。
 // 将来迁 Tauri 时只换这层实现为 invoke()。
 
-export class ApiError extends Error {
+class ApiError extends Error {
   constructor(
     public status: number,
     message: string,

@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-export type Route = "title" | "chat" | "settings" | "backlog";
+type Route = "title" | "chat" | "settings" | "backlog";
 
 const ROUTES: readonly Route[] = [
   "title",
@@ -11,7 +11,7 @@ const ROUTES: readonly Route[] = [
   "backlog",
 ];
 
-export function currentRoute(): Route {
+function currentRoute(): Route {
   const h = window.location.hash.replace(/^#\/?/, "");
   return (ROUTES as readonly string[]).includes(h) ? (h as Route) : "title";
 }

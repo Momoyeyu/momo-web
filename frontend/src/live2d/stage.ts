@@ -35,7 +35,7 @@ function cubismCoreUrl(): string {
 }
 
 /** 注入 live2dcubismcore.min.js：幂等、15s 超时、失败重置可重试。 */
-export function ensureCubismCore(): Promise<void> {
+function ensureCubismCore(): Promise<void> {
   const g = window as unknown as { Live2DCubismCore?: unknown };
   if (g.Live2DCubismCore) return Promise.resolve();
   corePromise ??= new Promise<void>((resolve, reject) => {
@@ -256,7 +256,7 @@ export function getStage(): Live2DStage {
 }
 
 /** 模型 url：默认 vendored Hiyori；VITE_MOMO_AVATAR_URL 可覆盖。 */
-export function avatarModelUrl(): string {
+function avatarModelUrl(): string {
   const v = import.meta.env.VITE_MOMO_AVATAR_URL;
   return typeof v === "string" && v.trim() ? v : DEFAULT_AVATAR_URL;
 }

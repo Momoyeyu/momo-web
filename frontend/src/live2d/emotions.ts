@@ -9,7 +9,7 @@
 import type { EmotionTag } from "../lib/types";
 
 /** 一条情绪 → 动作规则。 */
-export interface EmotionMotion {
+interface EmotionMotion {
   /** model3.json FileReferences.Motions 下的组名。 */
   group: "Idle" | "TapBody";
   /** 组内动作 index；省略时由库在组内随机挑选。 */

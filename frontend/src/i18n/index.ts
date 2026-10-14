@@ -12,7 +12,7 @@ import { en } from "./en";
 
 export type { Dict };
 
-export const DICTS: Record<Lang, Dict> = { zh, ja, en };
+const DICTS: Record<Lang, Dict> = { zh, ja, en };
 
 export const LANGS: readonly Lang[] = ["zh", "ja", "en"];
 

@@ -53,15 +53,8 @@ function referencedFiles(manifestDir: string, json: unknown): string[] {
   return files;
 }
 
-export interface ZipInspectResult {
-  /** 找到的 manifest 列表；为空说明不是 Cubism 3/4 模型包。 */
-  manifests: string[];
-  /** 首个 manifest 解析结果（供默认预检；多 manifest 时按所选重查）。 */
-  error?: string;
-}
-
 /** 读取并解析指定 manifest。 */
-export async function readManifest(
+async function readManifest(
   zip: JSZip,
   manifestPath: string,
 ): Promise<{ dir: string; json: unknown } | { error: string }> {
@@ -78,11 +71,9 @@ export async function readManifest(
   }
 }
 
-export interface ManifestCheck {
+interface ManifestCheck {
   /** manifest 声明但 zip 内不存在的文件。 */
   missing: string[];
-  /** 是否声明了动作组（无则情绪指令只有表情通道可用）。 */
-  hasMotions: boolean;
   /** manifest Name 字段（作为模型显示名候选）。 */
   name?: string;
   /** 第一张纹理的 zip 内路径（卡片缩略图用）。 */
@@ -99,14 +90,11 @@ export async function checkManifest(
   const namelist = new Set(
     Object.keys(zip.files).filter((p) => !zip.files[p].dir),
   );
-  const refs = (m.json as { FileReferences?: { Motions?: unknown } })
-    .FileReferences;
-  const textures = (refs as { Textures?: string[] } | undefined)
-    ?.Textures;
+  const textures = (
+    m.json as { FileReferences?: { Textures?: string[] } }
+  ).FileReferences?.Textures;
   return {
     missing: referencedFiles(m.dir, m.json).filter((p) => !namelist.has(p)),
-    hasMotions:
-      !!refs?.Motions && Object.keys(refs.Motions).length > 0,
     texture:
       typeof textures?.[0] === "string"
         ? resolvePath(m.dir, textures[0])

@@ -56,13 +56,6 @@
   gap: 12px;
 }
 
-.example-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
 /* 初始记忆条目：输入框 + 删除按钮一行。 */
 .pin-row {
   display: grid;
@@ -94,42 +87,9 @@ button.danger:hover {
   flex-wrap: wrap;
 }
 
-.chips {
-  display: flex;
-  gap: 6px;
-}
-
-.chip {
-  padding: 0.3em 0.9em;
-  font-size: 13px;
-  background: transparent;
-  color: var(--text-dim);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-}
-
-.chip.on {
-  background: var(--accent);
-  color: var(--on-accent);
-  border-color: var(--accent);
-}
-
 .mem-search {
   flex: 1;
   min-width: 140px;
-}
-
-.show-invalid {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-
-.show-invalid input {
-  width: auto;
 }
 
 .mem-item {
@@ -141,10 +101,6 @@ button.danger:hover {
   gap: 6px;
 }
 
-.mem-item.invalid {
-  opacity: 0.55;
-}
-
 .mem-head {
   display: flex;
   align-items: center;
@@ -152,43 +108,11 @@ button.danger:hover {
   font-size: 12px;
 }
 
-.badge {
-  padding: 0.1em 0.6em;
-  border-radius: var(--r-sm);
-  font-size: 11px;
-  font-weight: 600;
-  border: 1px solid var(--line);
-}
-
-.kind-semantic {
-  color: var(--info);
-  border-color: color-mix(in srgb, var(--info) 40%, transparent);
-}
-
-.kind-episodic {
-  color: var(--kind-episodic);
-  border-color: color-mix(in srgb, var(--kind-episodic) 40%, transparent);
-}
-
-.kind-procedural {
-  color: var(--kind-procedural);
-  border-color: color-mix(in srgb, var(--kind-procedural) 40%, transparent);
-}
-
-.badge-invalid {
-  color: var(--danger);
-  border-color: var(--danger-line);
-}
-
 .mem-content {
   font-size: 14px;
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-.superseded {
-  font-size: 12px;
 }
 
 .mem-ops {

@@ -9,7 +9,7 @@
 
 import { ServiceError } from "../lib/errors";
 
-export type ChatEvent =
+type ChatEvent =
   | { t: "delta"; text: string }
   | { t: "done" }
   | { t: "error"; message: string };

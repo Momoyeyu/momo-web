@@ -1,6 +1,5 @@
 // localStorage 持久化 + useSyncExternalStore 订阅。
-// 所有跨页面共享状态（设置/人设/初始记忆 pin/形象清单）的唯一入口；
-// 测试用 createMemoryStorage 注入内存实现。
+// 所有跨页面共享状态（设置/人设/初始记忆 pin/形象清单）的唯一入口。
 // 普通记忆与对话历史归 backend 管，不进本 store。
 
 import type {
@@ -21,7 +20,7 @@ const LEGACY_STORAGE_KEY = "momo-demo.v1";
 /** 内置模型（Hiyori）的 avatarId 取值。 */
 export const AVATAR_BUILTIN = "builtin";
 
-export const DEFAULT_SETTINGS: Settings = {
+const DEFAULT_SETTINGS: Settings = {
   general: { lang: "zh", dialogOpacity: 66, voiceVolume: 100, showStatus: true },
   llm: { url: "https://api.deepseek.com", key: "", model: "deepseek-chat" },
   asr: { url: "ws://127.0.0.1:7810/v1/listen", key: "" },
@@ -36,7 +35,7 @@ export const DEFAULT_PERSONA: PersonaCard = {
   preferences: ["喜欢草莓蛋糕", "讨厌苦的东西"],
 };
 
-export const DEFAULT_PINS: string[] = [
+const DEFAULT_PINS: string[] = [
   "用户的名称是夜羽",
   "夜羽是我的创造者",
 ];
@@ -51,14 +50,14 @@ function defaults(): PersistedState {
   };
 }
 
-/** 存储后端抽象：浏览器 localStorage / 测试内存实现。 */
-export interface StorageLike {
+/** 存储后端抽象：浏览器 localStorage / 无窗口环境内存实现。 */
+interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
 }
 
-export function createMemoryStorage(): StorageLike {
+function createMemoryStorage(): StorageLike {
   const map = new Map<string, string>();
   return {
     getItem: (k) => map.get(k) ?? null,
@@ -274,24 +273,6 @@ function persist(): void {
   remoteSave();
 }
 
-/** 测试注入内存后端；返回恢复函数。 */
-export function _setBackendForTest(b: StorageLike): () => void {
-  const prev = backend;
-  const prevState = state;
-  const prevLegacy = legacyMemories;
-  const prevPassthrough = passthrough;
-  backend = b;
-  legacyMemories = null;
-  passthrough = {};
-  state = load();
-  return () => {
-    backend = prev;
-    state = prevState;
-    legacyMemories = prevLegacy;
-    passthrough = prevPassthrough;
-  };
-}
-
 export function getState(): PersistedState {
   return state;
 }
@@ -300,17 +281,9 @@ export function getSettings(): Settings {
   return state.settings;
 }
 
-export function getPersona(): PersonaCard {
-  return state.persona;
-}
-
 /** 铭牌/说话人显示名：人设卡名留空时退回默认。 */
 export function personaName(): string {
   return state.persona.name || DEFAULT_PERSONA.name;
-}
-
-export function getPins(): string[] {
-  return state.pins;
 }
 
 export function getAvatars(): AvatarMeta[] {

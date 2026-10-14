@@ -7,7 +7,7 @@
 import type { AsrConfig } from "../lib/types";
 import { ServiceError } from "../lib/errors";
 
-export interface AsrEvents {
+interface AsrEvents {
   /** VAD 检测到说话开始（barge-in 触发点）。 */
   onSpeechStarted?: () => void;
   /** VAD 断句结束（一段话说完）。 */
@@ -27,7 +27,7 @@ const DEFAULT_QUERY: Record<string, string> = {
 };
 
 /** 规范关闭码：1000 正常 / 4400 参数非法 / 4401 鉴权失败 / 1011 内部错误。 */
-export const ASR_CLOSE_NORMAL = 1000;
+const ASR_CLOSE_NORMAL = 1000;
 
 /** CloseStream 发出后等服务端回声的超时。 */
 const CLOSE_TIMEOUT_MS = 800;
