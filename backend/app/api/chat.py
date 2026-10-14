@@ -1,4 +1,4 @@
-"""POST /api/chat：SSE 端点（ReAct 在 agent.py）。
+"""POST /api/chat：SSE 端点（ReAct 在 agent/ 包）。
 
 事件格式：`data: {...}\n\n`，事件见 docs/backend-api.md。
 成功回合末尾发 {"t":"done"}；失败发 {"t":"error"} 后直接结束（不发 done）。
