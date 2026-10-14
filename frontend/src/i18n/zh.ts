@@ -94,7 +94,8 @@ export const zh = {
     identity: "身份",
     age: "年龄",
     personality: "性格",
-    preferences: "偏好（每行一条）",
+    preferences: "偏好",
+    prefAdd: "+ 添加",
     preferencesPh: "例如：喜欢草莓蛋糕",
   },
   memory: {

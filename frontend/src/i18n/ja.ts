@@ -59,7 +59,7 @@ export const ja: Dict = {
       llm: "LLM · 対話モデル",
       asr: "ASR · 音声認識",
       tts: "TTS · 音声合成",
-      avatar: "形象 · Live2D",
+      avatar: "アバター · Live2D",
     },
     langLabel: "表示言語",
     dialogOpacity: "テキストウィンドウ透明度",
@@ -94,7 +94,8 @@ export const ja: Dict = {
     identity: "アイデンティティ",
     age: "年齢",
     personality: "性格",
-    preferences: "好み（一行一条）",
+    preferences: "好み",
+    prefAdd: "+ 追加",
     preferencesPh: "例：いちごケーキが好き",
   },
   memory: {

@@ -94,7 +94,8 @@ export const en: Dict = {
     identity: "Identity",
     age: "Age",
     personality: "Personality",
-    preferences: "Preferences (one per line)",
+    preferences: "Preferences",
+    prefAdd: "+ Add",
     preferencesPh: "e.g. likes strawberry cake",
   },
   memory: {

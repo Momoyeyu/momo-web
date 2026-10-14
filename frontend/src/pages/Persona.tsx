@@ -72,14 +72,43 @@ export default function PersonaPanel({
           </label>
           <label className="field span2">
             <span className="field-label">{t("persona.preferences")}</span>
-            <textarea
-              rows={5}
-              placeholder={t("persona.preferencesPh")}
-              value={value.preferences.join("\n")}
-              onChange={(e) =>
-                patch({ preferences: e.target.value.split("\n") })
-              }
-            />
+            <div className="field">
+              {value.preferences.map((p, i) => (
+                <div className="pin-row" key={i}>
+                  <input
+                    value={p}
+                    placeholder={t("persona.preferencesPh")}
+                    onChange={(e) =>
+                      patch({
+                        preferences: value.preferences.map((x, j) =>
+                          j === i ? e.target.value : x,
+                        ),
+                      })
+                    }
+                  />
+                  <button
+                    className="ghost small"
+                    onClick={() =>
+                      patch({
+                        preferences: value.preferences.filter(
+                          (_, j) => j !== i,
+                        ),
+                      })
+                    }
+                  >
+                    {t("common.del")}
+                  </button>
+                </div>
+              ))}
+              <button
+                className="ghost small"
+                onClick={() =>
+                  patch({ preferences: [...value.preferences, ""] })
+                }
+              >
+                {t("persona.prefAdd")}
+              </button>
+            </div>
           </label>
         </div>
       </section>
