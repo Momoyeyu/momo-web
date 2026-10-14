@@ -115,6 +115,10 @@ export class Live2DStage {
       resizeTo: window,
       backgroundAlpha: 0,
       antialias: true,
+      // Retina 清晰度：backbuffer 按 dpr 放大，CSS 尺寸保持逻辑像素——
+      // 否则高分屏 1x 渲染再放大显示，立绘明显发糊。
+      resolution: window.devicePixelRatio || 1,
+      autoDensity: true,
     });
     this.app.renderer.on("resize", () => this.fitModel());
     // 路由切换会改变 --dialog-zone-h（chat 页才有对话区）→ 重新落位。
