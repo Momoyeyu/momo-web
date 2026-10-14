@@ -315,7 +315,7 @@
 }
 
 .modal {
-  width: min(420px, 90%);
+  width: min(460px, 90%);
   padding: 26px 28px;
   animation: dialog-rise 0.25s ease both;
 }
@@ -331,9 +331,18 @@
   margin: 0;
 }
 
+/* 三键等宽均分（同 tab 的 flex:1 思路），文字居中、
+   长文案按语言自然折行，按钮高度一致。 */
 .modal-ops {
   display: flex;
-  justify-content: flex-end;
   gap: 10px;
   margin-top: 22px;
+}
+
+.modal-ops button {
+  flex: 1;
+  padding: 0.55em 0.6em;
+  text-align: center;
+  line-height: 1.35;
+  white-space: normal;
 }
