@@ -3,6 +3,8 @@ import type { Dict } from "./zh";
 export const en: Dict = {
   common: {
     back: "Back",
+    backTitle: "Back to Title",
+    backChat: "Back to Chat",
     save: "Save",
     saved: "Saved",
     cancel: "Cancel",
@@ -41,6 +43,7 @@ export const en: Dict = {
   },
   settings: {
     title: "Settings",
+    saveBtn: "Save Settings",
     tabs: {
       general: "General",
       llm: "LLM",

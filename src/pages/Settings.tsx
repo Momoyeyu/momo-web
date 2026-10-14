@@ -14,7 +14,7 @@ import {
   update,
 } from "../lib/store";
 import type { PersonaCard, Settings as SettingsData } from "../lib/types";
-import { navigate } from "../router";
+import { fromRoute, navigate } from "../router";
 import { useT, LANGS } from "../i18n";
 import Select from "../ui/Select";
 import PersonaPanel, { cleanPersona } from "./Persona";
@@ -155,6 +155,10 @@ export default function Settings() {
   }, [modalPos]);
 
   const dirty = isDirty(draft);
+  // 返回目标与来源页一致：chat 进来回 chat，其余回 title。
+  const backRoute = fromRoute() === "chat" ? ("chat" as const) : ("title" as const);
+  const backLabel =
+    backRoute === "chat" ? t("common.backChat") : t("common.backTitle");
 
   const patch = (sec: EndpointSection, key: string, v: string): void => {
     setDraft((d) => ({
@@ -200,7 +204,7 @@ export default function Settings() {
       clickPos.current = { x: e.clientX, y: e.clientY };
       setConfirmLeave(true);
     } else {
-      navigate("title");
+      navigate(backRoute);
     }
   };
 
@@ -388,11 +392,11 @@ export default function Settings() {
         <div className="footbar-inner">
           <div className="foot-right">
             <button className="ghost" onClick={goBack}>
-              {t("common.back")}
+              {backLabel}
             </button>
             {saved && <span className="saved-hint">{t("common.saved")}</span>}
             <button onClick={save} disabled={!dirty}>
-              {t("common.save")}
+              {t("settings.saveBtn")}
             </button>
           </div>
         </div>
@@ -417,7 +421,7 @@ export default function Settings() {
               </button>
               <button
                 className="ghost"
-                onClick={() => navigate("title")}
+                onClick={() => navigate(backRoute)}
               >
                 {t("settings.discardLeave")}
               </button>
@@ -426,7 +430,7 @@ export default function Settings() {
                 ref={primaryRef}
                 onClick={() => {
                   save();
-                  navigate("title");
+                  navigate(backRoute);
                 }}
               >
                 {t("settings.saveLeave")}

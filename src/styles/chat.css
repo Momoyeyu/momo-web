@@ -197,7 +197,7 @@
   height: var(--toolbar-h);
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 0 14px;
   border-top: 1px solid var(--panel-border);
   background: rgba(18, 14, 24, 0.6);

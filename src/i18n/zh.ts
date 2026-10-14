@@ -3,6 +3,8 @@
 export const zh = {
   common: {
     back: "返回",
+    backTitle: "返回标题",
+    backChat: "返回对话",
     save: "保存",
     saved: "已保存",
     cancel: "取消",
@@ -41,6 +43,7 @@ export const zh = {
   },
   settings: {
     title: "设置",
+    saveBtn: "保存设置",
     tabs: {
       general: "通用",
       llm: "LLM",

@@ -162,13 +162,8 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* 底部工具条：对照 VN 底部 icon 栏，承载导航与语音开关 */}
+      {/* 底部工具条：对照 VN 底部 icon 栏，操作聚拢右侧，返回标题收尾 */}
       <div className="chat-toolbar">
-        <div className="tb-side">
-          <button className="tb" onClick={() => navigate("title")}>
-            {t("common.back")}
-          </button>
-        </div>
         <div className="tb-side">
           <button className="tb" onClick={() => navigate("backlog")}>
             {t("chat.backlog")}
@@ -182,6 +177,9 @@ export default function Chat() {
           </button>
           <button className="tb" onClick={() => navigate("settings")}>
             {t("settings.title")}
+          </button>
+          <button className="tb" onClick={() => navigate("title")}>
+            {t("common.backTitle")}
           </button>
         </div>
       </div>

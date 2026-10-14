@@ -45,7 +45,7 @@ export default function Backlog() {
         <header className="backlog-head">
           <h1>{t("backlog.title")}</h1>
           <button className="ghost" onClick={() => navigate("chat")}>
-            {t("common.back")}
+            {t("common.backChat")}
           </button>
         </header>
 

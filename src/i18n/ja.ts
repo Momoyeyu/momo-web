@@ -3,6 +3,8 @@ import type { Dict } from "./zh";
 export const ja: Dict = {
   common: {
     back: "戻る",
+    backTitle: "タイトルへ戻る",
+    backChat: "会話へ戻る",
     save: "保存",
     saved: "保存しました",
     cancel: "キャンセル",
@@ -41,6 +43,7 @@ export const ja: Dict = {
   },
   settings: {
     title: "設定",
+    saveBtn: "設定を保存",
     tabs: {
       general: "一般",
       llm: "LLM",

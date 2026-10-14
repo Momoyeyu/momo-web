@@ -16,8 +16,17 @@ export function currentRoute(): Route {
   return (ROUTES as readonly string[]).includes(h) ? (h as Route) : "title";
 }
 
+/** 路由跳转前的来源页（仅记录编程式 navigate；直改 hash 时回落 title）。 */
+let from: Route | null = null;
+
 export function navigate(route: Route): void {
+  from = currentRoute();
   window.location.hash = `#/${route}`;
+}
+
+/** 当前页是从哪一页跳进来的（如 settings 区分「返回标题/返回对话」）。 */
+export function fromRoute(): Route {
+  return from ?? "title";
 }
 
 function subscribeHash(fn: () => void): () => void {
