@@ -48,7 +48,7 @@ export const ja: Dict = {
   },
   settings: {
     title: "設定",
-    saveBtn: "設定を保存",
+    invalidUrl: "URL の形式が不正です（http(s):// または ws(s):// が必要）",
     tabs: {
       general: "一般",
       models: "モデル",
@@ -85,10 +85,7 @@ export const ja: Dict = {
     hideKey: "隠す",
     test: "接続テスト",
     testNeedUrl: "先にURLを入力",
-    unsavedTitle: "未保存の変更があります",
-    unsavedBody: "変更を保存しますか？",
-    saveLeave: "保存して戻る",
-    discardLeave: "保存せず戻る",
+
   },
   persona: {
     card: "キャラ設定",

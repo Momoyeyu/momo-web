@@ -449,58 +449,8 @@ button.ghost.danger:hover {
   gap: 10px;
 }
 
-/* --- 未保存确认弹窗 --- */
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--backdrop);
-  backdrop-filter: blur(4px);
-  animation: modal-in 0.18s ease both;
-}
-
-@keyframes modal-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.modal {
-  width: min(460px, 90%);
-  padding: 26px 28px;
-  animation: dialog-rise 0.25s ease both;
-}
-
-.modal h2 {
-  margin: 0 0 8px;
-  font-size: 17px;
-  letter-spacing: 0.08em;
-  color: var(--text);
-}
-
-.modal p {
-  margin: 0;
-}
-
-/* 三键等宽均分（同 tab 的 flex:1 思路），文字居中、
-   长文案按语言自然折行，按钮高度一致。 */
-.modal-ops {
-  display: flex;
-  gap: 10px;
-  margin-top: 22px;
-}
-
-.modal-ops button {
-  flex: 1;
-  padding: 0.55em 0.6em;
-  text-align: center;
-  line-height: 1.35;
-  white-space: normal;
+/* URL 合法性检查：非法值红描边 + 行内红字提示。 */
+.opt-ctl input.invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 1px var(--danger-line);
 }

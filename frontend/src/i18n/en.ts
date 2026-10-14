@@ -48,7 +48,7 @@ export const en: Dict = {
   },
   settings: {
     title: "Settings",
-    saveBtn: "Save Settings",
+    invalidUrl: "Invalid URL (must be http(s):// or ws(s)://)",
     tabs: {
       general: "General",
       models: "Models",
@@ -85,10 +85,7 @@ export const en: Dict = {
     hideKey: "Hide",
     test: "Test connection",
     testNeedUrl: "fill in the URL first",
-    unsavedTitle: "Unsaved changes",
-    unsavedBody: "Save the current changes?",
-    saveLeave: "Save & leave",
-    discardLeave: "Leave without saving",
+
   },
   persona: {
     card: "Character Card",

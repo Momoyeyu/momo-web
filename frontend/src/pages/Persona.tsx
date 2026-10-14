@@ -1,25 +1,11 @@
 // 人格面板（设置页 tab）：人设卡编辑。受控组件——
-// 草稿与保存由设置页统一管理（底部统一保存 + 离开确认）。
+// 每次修改直接写 store 落盘（设置页即改即生效）。
 // schema 按人设设计：名称/身份/年龄/性格/偏好（system prompt 由 backend 组装）。
 
 import type { PersonaCard } from "../lib/types";
 import { DEFAULT_PERSONA } from "../lib/store";
 import { useT } from "../i18n";
 import "../styles/persona.css";
-
-/** 保存前清洗：trim、偏好去空行、年龄非法值回退默认。 */
-export function cleanPersona(p: PersonaCard): PersonaCard {
-  return {
-    name: p.name.trim(),
-    identity: p.identity.trim(),
-    age:
-      typeof p.age === "number" && Number.isFinite(p.age)
-        ? Math.trunc(p.age)
-        : 16,
-    personality: p.personality.trim(),
-    preferences: p.preferences.map((s) => s.trim()).filter(Boolean),
-  };
-}
 
 export default function PersonaPanel({
   value,

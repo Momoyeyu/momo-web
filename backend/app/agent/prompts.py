@@ -119,7 +119,11 @@ def build_system_prompt(state: dict[str, Any]) -> str:
     lang = _lang_of(state)
     t = _T[lang]
     persona = state.get("persona") or {}
-    pins = [p for p in (state.get("pins") or []) if isinstance(p, str)]
+    pins = [
+        p.strip()
+        for p in (state.get("pins") or [])
+        if isinstance(p, str) and p.strip()
+    ]
 
     now = datetime.now().astimezone()
     tz = now.tzname() or ""

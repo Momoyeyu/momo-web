@@ -48,7 +48,7 @@ export const zh = {
   },
   settings: {
     title: "设置",
-    saveBtn: "保存设置",
+    invalidUrl: "URL 格式不正确（需要 http(s):// 或 ws(s)://）",
     tabs: {
       general: "通用",
       models: "模型",
@@ -85,10 +85,7 @@ export const zh = {
     hideKey: "隐藏",
     test: "测试连接",
     testNeedUrl: "先填写地址",
-    unsavedTitle: "有未保存的修改",
-    unsavedBody: "要保存当前修改吗？",
-    saveLeave: "保存并离开",
-    discardLeave: "不保存离开",
+
   },
   persona: {
     card: "人设卡",
