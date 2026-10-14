@@ -1,0 +1,136 @@
+/* 全局基线：深色舞台 + 暖白文字 + 香槟金点缀（视觉小说式柔和配色，不用直白粉）。 */
+
+:root {
+  --bg: #15111b;
+  --panel: rgba(30, 25, 38, 0.66);
+  --panel-solid: #241e2e;
+  --panel-border: rgba(226, 197, 152, 0.22);
+  --panel-border-strong: rgba(226, 197, 152, 0.45);
+  --text: #f3ecdf;
+  --text-dim: #b0a48f;
+  --accent: #dfb877;
+  --accent-strong: #edcd97;
+  --accent-hover: #edcd97;
+  --accent-soft: rgba(223, 184, 119, 0.14);
+  --on-accent: #241a10;
+  --danger: #e07878;
+  --ok: #8ecf9a;
+  --radius: 12px;
+  font-size: 15px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system,
+    "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+
+/* 路由切换：淡入 + 轻微上浮（VN 换场感）。 */
+.page-wrap {
+  position: fixed;
+  inset: 0;
+  animation: page-in 0.34s cubic-bezier(0.22, 0.8, 0.36, 1) both;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: none;
+  border-radius: 999px;
+  padding: 0.55em 1.5em;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+button:hover {
+  background: var(--accent-hover);
+  box-shadow: 0 0 14px rgba(223, 184, 119, 0.35);
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+
+button.ghost {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border);
+  font-weight: 500;
+}
+
+button.ghost:hover {
+  background: var(--accent-soft);
+  border-color: var(--panel-border-strong);
+  color: var(--text);
+  box-shadow: none;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 0.5em 0.8em;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--panel-border-strong);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: rgba(176, 164, 143, 0.55);
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(14px);
+  padding: 20px;
+}
+
+.muted {
+  color: var(--text-dim);
+}
