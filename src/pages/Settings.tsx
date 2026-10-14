@@ -1,9 +1,10 @@
 // 设置页三段式（对照柚子社 config 结构）：
 //   顶部 tab 条——独立全宽容器，页签均分铺满；
 //   中部内容——行式设置项（左标签右控件，发丝线分隔）；
-//   底部操作条——独立全宽容器，左返回、右保存。
-// 统一草稿模型：所有修改先存草稿（不即时写库）；
-// 返回时若有未保存修改，弹窗询问（保存并离开/不保存离开/取消）。
+//   底部操作条——独立全宽容器，返回/保存聚拢右下角。
+// 草稿模型：修改先存草稿，右下「保存」统一落盘（防抖 300ms 写
+// .momo-state.json）；有未保存修改时点返回 → 弹窗（保存并离开/不保存
+// 离开/取消），弹窗的「保存并离开」贴到光标位置，二次点击即完成。
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -103,6 +104,14 @@ export default function Settings() {
   const [tab, setTab] = useState<Section>("general");
   const [saved, setSaved] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  /** 弹窗定位：让「保存并离开」贴到「返回」的点击坐标。 */
+  const [modalPos, setModalPos] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
+  const clickPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const primaryRef = useRef<HTMLButtonElement | null>(null);
   const [showKey, setShowKey] = useState<Record<EndpointSection, boolean>>({
     llm: false,
     asr: false,
@@ -116,6 +125,34 @@ export default function Settings() {
     },
     [],
   );
+
+  // 弹窗出现后：把「保存并离开」按钮中心平移到光标点击处
+  // （浏览器不能移动真实光标，等价做法是把按钮挪到光标下），
+  // 并聚焦主按钮（Enter 直接确认）。
+  useEffect(() => {
+    if (!confirmLeave) {
+      setModalPos(null);
+      return;
+    }
+    const modal = modalRef.current;
+    const btn = primaryRef.current;
+    if (!modal || !btn) return;
+    const mr = modal.getBoundingClientRect();
+    const br = btn.getBoundingClientRect();
+    const { x, y } = clickPos.current;
+    const pad = 12;
+    // 期望的 modal 偏移：主按钮中心 = 点击点
+    let left = mr.left + (x - (br.left + br.width / 2));
+    let top = mr.top + (y - (br.top + br.height / 2));
+    left = Math.max(pad, Math.min(window.innerWidth - mr.width - pad, left));
+    top = Math.max(pad, Math.min(window.innerHeight - mr.height - pad, top));
+    setModalPos({ left, top });
+  }, [confirmLeave]);
+
+  // 定位落地后再聚焦主按钮（visibility:hidden 时 focus 无效）。
+  useEffect(() => {
+    if (modalPos) primaryRef.current?.focus();
+  }, [modalPos]);
 
   const dirty = isDirty(draft);
 
@@ -158,8 +195,9 @@ export default function Settings() {
     savedTimer.current = window.setTimeout(() => setSaved(false), 2000);
   };
 
-  const goBack = (): void => {
+  const goBack = (e: React.MouseEvent): void => {
     if (dirty) {
+      clickPos.current = { x: e.clientX, y: e.clientY };
       setConfirmLeave(true);
     } else {
       navigate("title");
@@ -345,13 +383,13 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* 底部操作条：独立全宽容器，左返回 / 右保存 */}
+      {/* 底部操作条：独立全宽容器，返回/保存聚拢右下 */}
       <footer className="footbar">
         <div className="footbar-inner">
-          <button className="ghost" onClick={goBack}>
-            {t("common.back")}
-          </button>
           <div className="foot-right">
+            <button className="ghost" onClick={goBack}>
+              {t("common.back")}
+            </button>
             {saved && <span className="saved-hint">{t("common.saved")}</span>}
             <button onClick={save} disabled={!dirty}>
               {t("common.save")}
@@ -362,17 +400,20 @@ export default function Settings() {
 
       {confirmLeave && (
         <div className="modal-backdrop">
-          <div className="modal panel">
+          <div
+            className="modal panel"
+            ref={modalRef}
+            style={
+              modalPos
+                ? { position: "fixed", left: modalPos.left, top: modalPos.top }
+                : { visibility: "hidden" }
+            }
+          >
             <h2>{t("settings.unsavedTitle")}</h2>
             <p className="muted">{t("settings.unsavedBody")}</p>
             <div className="modal-ops">
-              <button
-                onClick={() => {
-                  save();
-                  navigate("title");
-                }}
-              >
-                {t("settings.saveLeave")}
+              <button className="ghost" onClick={() => setConfirmLeave(false)}>
+                {t("common.cancel")}
               </button>
               <button
                 className="ghost"
@@ -380,8 +421,15 @@ export default function Settings() {
               >
                 {t("settings.discardLeave")}
               </button>
-              <button className="ghost" onClick={() => setConfirmLeave(false)}>
-                {t("common.cancel")}
+              {/* 主操作放最右：贴光标定位时按钮离 modal 右缘最近 */}
+              <button
+                ref={primaryRef}
+                onClick={() => {
+                  save();
+                  navigate("title");
+                }}
+              >
+                {t("settings.saveLeave")}
               </button>
             </div>
           </div>

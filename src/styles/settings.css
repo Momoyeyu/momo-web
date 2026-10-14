@@ -276,7 +276,7 @@
 .footbar-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   width: min(1100px, calc(100% - 96px));
   margin: 0 auto;
   padding: 12px 0;
