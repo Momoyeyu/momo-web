@@ -1,7 +1,7 @@
 // system prompt 组装：persona card + 情绪标记指令 + [长期记忆] 段 + 对话历史。
 // 纯函数可测。
 
-import type { ChatMessage, PersonaCard } from "../lib/types";
+import type { ChatMessage, PersonaCard, UserProfile } from "../lib/types";
 import type { ChatMsg } from "./client";
 
 function listBlock(label: string, items: string[]): string {
@@ -17,6 +17,7 @@ function listBlock(label: string, items: string[]): string {
  */
 export function buildSystemPrompt(
   persona: PersonaCard,
+  user: UserProfile,
   memoryBlock: string,
 ): string {
   const sections: string[] = [];
@@ -38,6 +39,13 @@ export function buildSystemPrompt(
     card.push(`对话例子：\n${ex}`);
   }
   if (card.length) sections.push(`[人设]\n${card.join("\n")}`);
+
+  // 用户身份固定注入（不进召回段，不受截断影响）
+  const who: string[] = [];
+  if (user.name.trim()) who.push(`你称呼对方为「${user.name.trim()}」`);
+  if (user.relation.trim()) who.push(`你们的关系：${user.relation.trim()}`);
+  if (user.note.trim()) who.push(`关于对方：${user.note.trim()}`);
+  if (who.length) sections.push(`[对方是谁]\n${who.join("\n")}`);
 
   sections.push(
     "[情绪与动作指令]\n" +

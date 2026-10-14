@@ -2,7 +2,7 @@
 // add 去重（归一化全等 + bigram Jaccard>0.85）、invalidate/supersede、
 // 软删、关键词召回注入段。参考 momo feat/memory 的语义，简化实现。
 
-import { getHumanBlock, getMemories, newId, update } from "../lib/store";
+import { getMemories, newId, update } from "../lib/store";
 import type { Memory, MemoryKind } from "../lib/types";
 
 /** 召回注入段总长上限。 */
@@ -133,14 +133,13 @@ export function searchMemories(query: string): Memory[] {
 }
 
 /**
- * 召回注入段：human block + 近 N 条 semantic/procedural +
+ * 召回注入段：近 N 条 semantic/procedural +
  * 与 userText 有 token 重叠的 episodic top-K。无内容返回 ""。
- * 输出形如 "- 用户画像：…\n- …"（不含 "[长期记忆]" 标题，由 prompt.ts 加）。
+ * 输出形如 "- …\n- …"（不含 "[长期记忆]" 标题，由 prompt.ts 加）。
+ * 用户身份不在此——由 prompt.ts 的 [用户] 段固定注入，不受截断影响。
  */
 export function recallBlock(userText: string): string {
   const lines: string[] = [];
-  const hb = getHumanBlock().trim();
-  if (hb) lines.push(`- 用户画像：${hb}`);
 
   const valid = getMemories().filter((m) => m.valid);
   const recent = (kind: MemoryKind, n: number): Memory[] =>

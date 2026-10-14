@@ -108,10 +108,15 @@ export const zh = {
     exAdd: "+ 添加例子",
   },
   memory: {
-    hbTitle: "用户画像",
-    hbDesc:
-      "这里写你对用户的长期认知（称呼、背景、偏好等）。每个回合都会原样注入 system prompt 的最前面，帮 momo 记住「你是谁」。",
-    hbPh: "例如：叫阿明，程序员，喜欢猫，聊天喜欢被吐槽…",
+    userTitle: "关于你",
+    userDesc:
+      "告诉 momo 你是谁、你们是什么关系。会固定注入每个回合的 system prompt，不受记忆召回影响。",
+    userName: "momo 怎么称呼你",
+    userNamePh: "例如：阿明",
+    userRelation: "你们的关系",
+    userRelationPh: "例如：朋友、搭档、一起写代码的",
+    userNote: "补充画像（可选）",
+    userNotePh: "例如：程序员，喜欢猫，聊天喜欢被吐槽…",
     ltTitle: "长期记忆",
     filterAll: "全部",
     searchPh: "检索记忆…",

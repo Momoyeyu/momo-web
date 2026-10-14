@@ -90,6 +90,16 @@ export interface Memory {
   supersededBy?: string;
 }
 
+/** 用户身份：帮 momo 理解「对方是谁、你们什么关系」，注入 system prompt。 */
+export interface UserProfile {
+  /** momo 对用户的称呼。 */
+  name: string;
+  /** momo 与用户的关系（自由文本，如「朋友」「搭档」）。 */
+  relation: string;
+  /** 补充画像（原 humanBlock 自由文本）。 */
+  note: string;
+}
+
 /** 人设卡（persona 页可编辑；渲染进 system prompt）。 */
 export interface PersonaCard {
   name: string;

@@ -9,7 +9,7 @@ import { TtsPlayer } from "../audio/player";
 import { getStage } from "../live2d/stage";
 import type { Live2DStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
-import { getPersona, getSettings, newId, subscribe } from "../lib/store";
+import { getPersona, getSettings, getUser, newId, subscribe } from "../lib/store";
 import type {
   ChatMessage,
   ChatStatus,
@@ -352,7 +352,7 @@ export class ChatEngine {
     } catch {
       // 记忆召回失败不阻断回合
     }
-    const system = buildSystemPrompt(getPersona(), memoryBlock);
+    const system = buildSystemPrompt(getPersona(), getUser(), memoryBlock);
     // history 尾部窗口；刚落账的 user 消息由 buildMessages 的 userText 携带，排除防重复。
     const prior = this.history.slice(0, -1).slice(-HISTORY_WINDOW);
     const messages: ChatMsg[] = [

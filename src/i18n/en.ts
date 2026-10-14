@@ -108,10 +108,15 @@ export const en: Dict = {
     exAdd: "+ Add example",
   },
   memory: {
-    hbTitle: "User Profile",
-    hbDesc:
-      "Write your long-term knowledge about the user (name, background, preferences). It's injected verbatim at the top of the system prompt every turn so momo knows who you are.",
-    hbPh: "e.g. Ming, programmer, loves cats, enjoys banter…",
+    userTitle: "About You",
+    userDesc:
+      "Tell momo who you are and what your relationship is. Injected into the system prompt every turn, independent of memory recall.",
+    userName: "What momo calls you",
+    userNamePh: "e.g. Ming",
+    userRelation: "Your relationship",
+    userRelationPh: "e.g. friends, coding buddies",
+    userNote: "Extra notes (optional)",
+    userNotePh: "e.g. programmer, loves cats, enjoys banter…",
     ltTitle: "Long-term Memory",
     filterAll: "All",
     searchPh: "Search memories…",

@@ -1,10 +1,10 @@
-// 记忆面板（设置页 tab）：用户画像（受控草稿）+
+// 记忆面板（设置页 tab）：用户身份（称呼/关系/画像，受控草稿）+
 // 长期记忆列表（kind 过滤、检索、编辑、删除；可展开失效审计）。
-// 画像走设置页统一草稿；记忆条目级编辑/删除是即时操作（同游戏存档管理）。
+// 用户身份走设置页统一草稿；记忆条目级编辑/删除是即时操作（同游戏存档管理）。
 
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { getMemories, subscribe } from "../lib/store";
-import type { Memory, MemoryKind } from "../lib/types";
+import type { Memory, MemoryKind, UserProfile } from "../lib/types";
 import { MEMORY_KINDS } from "../lib/types";
 import {
   deleteMemory,
@@ -34,11 +34,11 @@ function formatTime(iso: string): string {
 }
 
 export default function MemoryPanel({
-  humanBlock,
-  onHumanBlock,
+  user,
+  onUser,
 }: {
-  humanBlock: string;
-  onHumanBlock: (v: string) => void;
+  user: UserProfile;
+  onUser: (u: UserProfile) => void;
 }) {
   const t = useT();
   const memories = useSyncExternalStore(subscribe, getMemories);
@@ -82,16 +82,37 @@ export default function MemoryPanel({
 
   return (
     <div className="persona-tab">
-      {/* 1. 用户画像 */}
+      {/* 1. 用户身份：称呼/关系/补充画像 */}
       <section className="panel persona-section">
-        <h2>{t("memory.hbTitle")}</h2>
-        <p className="muted">{t("memory.hbDesc")}</p>
-        <textarea
-          rows={4}
-          placeholder={t("memory.hbPh")}
-          value={humanBlock}
-          onChange={(e) => onHumanBlock(e.target.value)}
-        />
+        <h2>{t("memory.userTitle")}</h2>
+        <p className="muted">{t("memory.userDesc")}</p>
+        <div className="fields-grid">
+          <label className="field">
+            <span className="field-label">{t("memory.userName")}</span>
+            <input
+              value={user.name}
+              placeholder={t("memory.userNamePh")}
+              onChange={(e) => onUser({ ...user, name: e.target.value })}
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">{t("memory.userRelation")}</span>
+            <input
+              value={user.relation}
+              placeholder={t("memory.userRelationPh")}
+              onChange={(e) => onUser({ ...user, relation: e.target.value })}
+            />
+          </label>
+          <label className="field span2">
+            <span className="field-label">{t("memory.userNote")}</span>
+            <textarea
+              rows={3}
+              value={user.note}
+              placeholder={t("memory.userNotePh")}
+              onChange={(e) => onUser({ ...user, note: e.target.value })}
+            />
+          </label>
+        </div>
       </section>
 
       {/* 2. 长期记忆 */}

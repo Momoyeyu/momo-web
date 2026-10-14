@@ -3,7 +3,6 @@ import {
   _setBackendForTest,
   createMemoryStorage,
   getMemories,
-  update,
 } from "../lib/store";
 import {
   addMemory,
@@ -129,13 +128,11 @@ describe("recallBlock", () => {
     expect(recallBlock("随便说点啥")).toBe("");
   });
 
-  it("humanBlock 首行 + 各 kind 行", () => {
-    update({ humanBlock: "程序员，喜欢猫" });
+  it("各 kind 行注入（用户身份已由 prompt 固定段承担，不进召回）", () => {
     addMemory("semantic", "用户叫阿明", "t");
     addMemory("procedural", "回复别太长", "t");
     const block = recallBlock("今天怎么样");
     const lines = block.split("\n");
-    expect(lines[0]).toBe("- 用户画像：程序员，喜欢猫");
     expect(lines).toContain("- 用户叫阿明");
     expect(lines).toContain("- 回复别太长");
   });

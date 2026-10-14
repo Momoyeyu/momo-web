@@ -8,12 +8,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  getHumanBlock,
   getPersona,
   getSettings,
+  getUser,
   update,
 } from "../lib/store";
-import type { PersonaCard, Settings as SettingsData } from "../lib/types";
+import type { PersonaCard, Settings as SettingsData, UserProfile } from "../lib/types";
 import { fromRoute, navigate } from "../router";
 import { useT, LANGS } from "../i18n";
 import { probeAsr, probeLlm, probeTts } from "../lib/probe";
@@ -31,14 +31,14 @@ const TABS: Section[] = ["general", "llm", "asr", "tts", "persona", "memory"];
 interface Draft {
   settings: SettingsData;
   persona: PersonaCard;
-  humanBlock: string;
+  user: UserProfile;
 }
 
 function makeDraft(): Draft {
   return {
     settings: structuredClone(getSettings()),
     persona: structuredClone(getPersona()),
-    humanBlock: getHumanBlock(),
+    user: structuredClone(getUser()),
   };
 }
 
@@ -46,7 +46,7 @@ function isDirty(d: Draft): boolean {
   return (
     JSON.stringify(d.settings) !== JSON.stringify(getSettings()) ||
     JSON.stringify(d.persona) !== JSON.stringify(getPersona()) ||
-    d.humanBlock !== getHumanBlock()
+    JSON.stringify(d.user) !== JSON.stringify(getUser())
   );
 }
 
@@ -203,16 +203,21 @@ export default function Settings() {
 
   const save = (): void => {
     const persona = cleanPersona(draft.persona);
+    const user: UserProfile = {
+      name: draft.user.name.trim(),
+      relation: draft.user.relation.trim(),
+      note: draft.user.note.trim(),
+    };
     update({
       settings: structuredClone(draft.settings),
       persona,
-      humanBlock: draft.humanBlock.trim(),
+      user,
     });
-    // 清洗后的 persona 回写草稿，保持 dirty 状态一致。
+    // 清洗后的字段回写草稿，保持 dirty 状态一致。
     setDraft((d) => ({
       ...d,
       persona: structuredClone(persona),
-      humanBlock: d.humanBlock.trim(),
+      user,
     }));
   };
 
@@ -267,10 +272,8 @@ export default function Settings() {
             <PersonaPanel value={draft.persona} onChange={patchPersona} />
           ) : tab === "memory" ? (
             <MemoryPanel
-              humanBlock={draft.humanBlock}
-              onHumanBlock={(v) =>
-                setDraft((d) => ({ ...d, humanBlock: v }))
-              }
+              user={draft.user}
+              onUser={(u) => setDraft((d) => ({ ...d, user: u }))}
             />
           ) : (
             <div className="settings-body panel">

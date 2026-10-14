@@ -108,10 +108,15 @@ export const ja: Dict = {
     exAdd: "+ 例を追加",
   },
   memory: {
-    hbTitle: "ユーザー画像",
-    hbDesc:
-      "ユーザーの長期的な認知（呼び方、背景、好みなど）をここに書きます。毎ターン system prompt の先頭にそのまま注入され、momo が「あなたは誰か」を覚えます。",
-    hbPh: "例：あーみん、プログラマー、猫好き、ツッコミ好き…",
+    userTitle: "あなたについて",
+    userDesc:
+      "あなたの呼び方と二人の関係を教えてください。毎ターン system prompt に固定注入されます（記憶の召回には左右されません）。",
+    userName: "momo の呼び方",
+    userNamePh: "例：あーみん",
+    userRelation: "二人の関係",
+    userRelationPh: "例：友達、相棒、一緒にコードを書く仲間",
+    userNote: "補足プロフィール（任意）",
+    userNotePh: "例：プログラマー、猫好き、ツッコミ好き…",
     ltTitle: "長期記憶",
     filterAll: "すべて",
     searchPh: "記憶を検索…",
