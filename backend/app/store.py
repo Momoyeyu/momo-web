@@ -24,6 +24,8 @@ DEFAULT_STATE: dict[str, Any] = {
             "dialogOpacity": 66,
             "voiceVolume": 100,
             "showStatus": True,
+            "voiceInput": True,
+            "semanticSearch": True,
         },
         "llm": {"url": "", "key": "", "model": ""},
         "asr": {"url": "", "key": ""},

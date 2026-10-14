@@ -21,7 +21,14 @@ const LEGACY_STORAGE_KEY = "momo-demo.v1";
 export const AVATAR_BUILTIN = "builtin";
 
 const DEFAULT_SETTINGS: Settings = {
-  general: { lang: "zh", dialogOpacity: 66, voiceVolume: 100, showStatus: true },
+  general: {
+    lang: "zh",
+    dialogOpacity: 66,
+    voiceVolume: 100,
+    showStatus: true,
+    voiceInput: true,
+    semanticSearch: true,
+  },
   llm: { url: "https://api.deepseek.com", key: "", model: "deepseek-chat" },
   asr: { url: "ws://127.0.0.1:7810/v1/listen", key: "" },
   tts: { url: "http://127.0.0.1:7811", key: "", voice: "", lang: "zh" },

@@ -26,10 +26,12 @@ export const ja: Dict = {
     micOn: "マイク·オン",
     micTitleOn: "マイクを切る",
     micTitleOff: "マイクを入れる",
+    micNeedCfg: "先に設定で音声入力を設定・有効化してください",
     voiceOn: "ボイス·オン",
     voiceOff: "ボイス·オフ",
     voiceTitleOn: "音声出力を切る",
     voiceTitleOff: "音声出力を入れる",
+    voiceNeedCfg: "先に「モデル」タブで TTS を設定してください",
     stop: "停止",
     errDefault: "エラーが発生しました",
     errSvc: {
@@ -49,6 +51,7 @@ export const ja: Dict = {
   settings: {
     title: "設定",
     invalidUrl: "URL の形式が不正です（http(s):// または ws(s):// が必要）",
+    required: "必須",
     tabs: {
       general: "一般",
       models: "モデル",
@@ -67,7 +70,11 @@ export const ja: Dict = {
     voiceVolume: "ボイス音量",
     showStatus: "ステータス表示",
     voiceOut: "音声出力",
-    voiceNeedTts: "先に「模型」タブで TTS を設定してください",
+    voiceNeedTts: "先に「モデル」タブで TTS を設定してください",
+    voiceInput: "音声入力",
+    voiceNeedAsr: "先に「モデル」タブで ASR を設定してください",
+    semanticSearch: "意味検索",
+    embNeedCfg: "先に「モデル」タブで Embedding を設定してください",
     previewSample: "こんにちは、今日は何を話そうか？",
     langs: { zh: "中文", ja: "日本語", en: "English" },
     apiUrl: "API アドレス",

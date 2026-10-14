@@ -258,6 +258,12 @@ button.ghost.danger:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* 必填标记：标签/组标题后的 * */
+.req {
+  margin-left: 4px;
+  color: var(--danger);
+}
+
 .opt-ctl {
   flex: 1;
   display: flex;

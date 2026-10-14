@@ -26,10 +26,12 @@ export const en: Dict = {
     micOn: "Mic·On",
     micTitleOn: "Mute microphone",
     micTitleOff: "Enable microphone",
+    micNeedCfg: "Set up and enable voice input in Settings first",
     voiceOn: "Voice·On",
     voiceOff: "Voice·Off",
     voiceTitleOn: "Mute voice output",
     voiceTitleOff: "Unmute voice output",
+    voiceNeedCfg: "Set up TTS in the Models tab first",
     stop: "Stop",
     errDefault: "Something went wrong",
     errSvc: {
@@ -49,6 +51,7 @@ export const en: Dict = {
   settings: {
     title: "Settings",
     invalidUrl: "Invalid URL (must be http(s):// or ws(s)://)",
+    required: "Required",
     tabs: {
       general: "General",
       models: "Models",
@@ -68,6 +71,10 @@ export const en: Dict = {
     showStatus: "Show chat status",
     voiceOut: "Voice output",
     voiceNeedTts: "Set up TTS in the Models tab first",
+    voiceInput: "Voice input",
+    voiceNeedAsr: "Set up ASR in the Models tab first",
+    semanticSearch: "Semantic recall",
+    embNeedCfg: "Set up Embedding in the Models tab first",
     previewSample: "Hi there, what shall we talk about today?",
     langs: { zh: "中文", ja: "日本語", en: "English" },
     apiUrl: "API URL",

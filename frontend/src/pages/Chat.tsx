@@ -31,6 +31,11 @@ export default function Chat() {
   useSyncExternalStore(subscribe, getState);
   const name = personaName();
   const showStatus = getState().settings.general.showStatus;
+  // 语音输入开关 + ASR 配置双重门控（与设置页「通用」同一个开关）。
+  const micAllowed =
+    getState().settings.general.voiceInput &&
+    getState().settings.asr.url.trim() !== "";
+  const ttsConfigured = getState().settings.tts.url.trim() !== "";
   const [status, setStatus] = useState<ChatStatus>(getChatEngine().status);
   const [micOn, setMicOn] = useState(getChatEngine().listening);
   const [muted, setMuted] = useState(getChatEngine().muted);
@@ -156,7 +161,14 @@ export default function Chat() {
             <button
               className={micOn ? "mic-on" : "ghost"}
               onClick={toggleMic}
-              title={micOn ? t("chat.micTitleOn") : t("chat.micTitleOff")}
+              disabled={!micAllowed}
+              title={
+                !micAllowed
+                  ? t("chat.micNeedCfg")
+                  : micOn
+                    ? t("chat.micTitleOn")
+                    : t("chat.micTitleOff")
+              }
             >
               {micOn ? t("chat.micOn") : t("chat.mic")}
             </button>
@@ -179,9 +191,16 @@ export default function Chat() {
             {t("chat.backlog")}
           </button>
           <button
-            className={`tb${muted ? " tb-off" : ""}`}
+            className={`tb${muted || !ttsConfigured ? " tb-off" : ""}`}
             onClick={toggleVoice}
-            title={muted ? t("chat.voiceTitleOff") : t("chat.voiceTitleOn")}
+            disabled={!ttsConfigured}
+            title={
+              !ttsConfigured
+                ? t("chat.voiceNeedCfg")
+                : muted
+                  ? t("chat.voiceTitleOff")
+                  : t("chat.voiceTitleOn")
+            }
           >
             {muted ? t("chat.voiceOff") : t("chat.voiceOn")}
           </button>

@@ -241,9 +241,16 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 
 def _embed_cfg() -> dict[str, Any]:
-    """state.settings.embedding；state 缺失时 normalize 补出厂默认。"""
+    """state.settings.embedding；state 缺失时 normalize 补出厂默认。
+
+    设置页「通用-语义检索」关闭（general.semanticSearch=false）时返回 {}，
+    与 url 未配置等价——调用方走 lexical 兜底。
+    """
     state = store_mod.normalize_state(store_mod.read_state())
-    cfg = (state.get("settings") or {}).get("embedding")
+    settings = state.get("settings") or {}
+    if (settings.get("general") or {}).get("semanticSearch") is False:
+        return {}
+    cfg = settings.get("embedding")
     return cfg if isinstance(cfg, dict) else {}
 
 

@@ -56,17 +56,21 @@ function urlError(sec: EndpointSection, url: string): boolean {
 function OptRow({
   label,
   extra,
+  required,
   children,
 }: {
   label: string;
   /** 标签右侧小字（如滑块当前值）。 */
   extra?: React.ReactNode;
+  /** 必填项：标签后加 * 标记。 */
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="opt-row">
       <span className="opt-label">
         {label}
+        {required && <span className="req">*</span>}
         {extra && <span className="opt-extra">{extra}</span>}
       </span>
       <div className="opt-ctl">{children}</div>
@@ -126,11 +130,19 @@ export default function Settings() {
   // 语音输出开关：与 chat 工具条同一个开关（引擎运行时态）。
   const [voiceMuted, setVoiceMuted] = useState(getChatEngine().muted);
   const ttsConfigured = settings.tts.url.trim() !== "";
+  const asrConfigured = settings.asr.url.trim() !== "";
+  const embConfigured = settings.embedding.url.trim() !== "";
 
   const toggleVoice = (on: boolean): void => {
     const eng = getChatEngine();
     eng.setMuted(!on);
     setVoiceMuted(eng.muted);
+  };
+
+  const toggleVoiceInput = (on: boolean): void => {
+    patchGeneral({ voiceInput: on });
+    // 关掉时若正在聆听，同时收掉麦克风。
+    if (!on) getChatEngine().stopListening();
   };
 
   const PROBES: Record<
@@ -171,8 +183,12 @@ export default function Settings() {
   const urlRow = (
     sec: EndpointSection,
     phKey: string,
+    required = false,
   ): React.ReactNode => (
-    <OptRow label={sec === "llm" ? t("settings.apiUrl") : t("settings.svcUrl")}>
+    <OptRow
+      label={sec === "llm" ? t("settings.apiUrl") : t("settings.svcUrl")}
+      required={required}
+    >
       <input
         className={urlError(sec, settings[sec].url) ? "invalid" : undefined}
         value={settings[sec].url}
@@ -187,8 +203,13 @@ export default function Settings() {
       >
         {t("settings.test")}
       </button>
-      {urlError(sec, settings[sec].url) && (
+      {urlError(sec, settings[sec].url) ? (
         <span className="probe-err">{t("settings.invalidUrl")}</span>
+      ) : (
+        required &&
+        !settings[sec].url.trim() && (
+          <span className="probe-err">{t("settings.required")}</span>
+        )
       )}
       {probeText(sec)}
     </OptRow>
@@ -315,6 +336,19 @@ export default function Settings() {
                     </div>
                   </div>
                   <OptRow
+                    label={t("settings.voiceInput")}
+                    extra={!asrConfigured ? t("settings.voiceNeedAsr") : undefined}
+                  >
+                    <OptSwitch
+                      on={asrConfigured && settings.general.voiceInput}
+                      disabled={!asrConfigured}
+                      title={
+                        !asrConfigured ? t("settings.voiceNeedAsr") : undefined
+                      }
+                      onChange={toggleVoiceInput}
+                    />
+                  </OptRow>
+                  <OptRow
                     label={t("settings.voiceOut")}
                     extra={!ttsConfigured ? t("settings.voiceNeedTts") : undefined}
                   >
@@ -344,6 +378,19 @@ export default function Settings() {
                       }
                     />
                   </OptRow>
+                  <OptRow
+                    label={t("settings.semanticSearch")}
+                    extra={!embConfigured ? t("settings.embNeedCfg") : undefined}
+                  >
+                    <OptSwitch
+                      on={embConfigured && settings.general.semanticSearch}
+                      disabled={!embConfigured}
+                      title={
+                        !embConfigured ? t("settings.embNeedCfg") : undefined
+                      }
+                      onChange={(v) => patchGeneral({ semanticSearch: v })}
+                    />
+                  </OptRow>
                   <OptRow label={t("settings.showStatus")}>
                     <OptSwitch
                       on={settings.general.showStatus}
@@ -356,14 +403,20 @@ export default function Settings() {
               {tab === "models" && (
                 <div className="opt-list">
                   <h3 className="opt-group">{t("settings.groups.llm")}</h3>
-                  {urlRow("llm", "settings.llmUrlPh")}
+                  {urlRow("llm", "settings.llmUrlPh", true)}
                   {keyRow("llm")}
-                  <OptRow label={t("settings.model")}>
+                  <OptRow label={t("settings.model")} required>
                     <input
+                      className={
+                        settings.llm.model.trim() ? undefined : "invalid"
+                      }
                       value={settings.llm.model}
                       placeholder={t("settings.llmModelPh")}
                       onChange={(e) => patchEndpoint("llm", "model", e.target.value)}
                     />
+                    {!settings.llm.model.trim() && (
+                      <span className="probe-err">{t("settings.required")}</span>
+                    )}
                   </OptRow>
 
                   <h3 className="opt-group">{t("settings.groups.asr")}</h3>
@@ -407,7 +460,10 @@ export default function Settings() {
                     />
                   </OptRow>
 
-                  <h3 className="opt-group">{t("settings.groups.avatar")}</h3>
+                  <h3 className="opt-group">
+                    {t("settings.groups.avatar")}
+                    <span className="req">*</span>
+                  </h3>
                   <AvatarPanel />
                 </div>
               )}

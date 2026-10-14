@@ -26,10 +26,12 @@ export const zh = {
     micOn: "麦克风·开",
     micTitleOn: "关闭麦克风",
     micTitleOff: "打开麦克风",
+    micNeedCfg: "先在设置里配置并开启语音输入",
     voiceOn: "语音·开",
     voiceOff: "语音·关",
     voiceTitleOn: "关闭语音输出",
     voiceTitleOff: "打开语音输出",
+    voiceNeedCfg: "先在「模型」tab 配置 TTS",
     stop: "停止",
     errDefault: "发生错误",
     errSvc: {
@@ -49,6 +51,7 @@ export const zh = {
   settings: {
     title: "设置",
     invalidUrl: "URL 格式不正确（需要 http(s):// 或 ws(s)://）",
+    required: "必填",
     tabs: {
       general: "通用",
       models: "模型",
@@ -68,6 +71,10 @@ export const zh = {
     showStatus: "显示对话状态",
     voiceOut: "语音输出",
     voiceNeedTts: "先在「模型」tab 配置 TTS",
+    voiceInput: "语音输入",
+    voiceNeedAsr: "先在「模型」tab 配置 ASR",
+    semanticSearch: "语义检索",
+    embNeedCfg: "先在「模型」tab 配置 Embedding",
     previewSample: "你好呀，今天想聊点什么？",
     langs: { zh: "中文", ja: "日本語", en: "English" },
     apiUrl: "API 地址",

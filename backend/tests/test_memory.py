@@ -96,6 +96,20 @@ def test_edit_excludes_self_in_dedup():
     assert edited["content"].endswith("！")
 
 
+def test_semantic_search_switch(monkeypatch):
+    """设置页「语义检索」关掉 → _embed_cfg 返回 {}，与未配置等价。"""
+    from app import store
+
+    state = store.normalize_state(None)
+    state["settings"]["general"]["semanticSearch"] = False
+    store.write_state(state)
+    assert memory._embed_cfg() == {}
+
+    state["settings"]["general"]["semanticSearch"] = True
+    store.write_state(state)
+    assert memory._embed_cfg().get("url")
+
+
 def test_search_jaccard_fallback(monkeypatch):
     monkeypatch.setattr(embed, "embed", _no_embed)
     memory.add_memory("用户喜欢草莓蛋糕")

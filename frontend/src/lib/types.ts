@@ -66,6 +66,10 @@ interface GeneralConfig {
   voiceVolume: number;
   /** chat 页左上角是否显示对话状态条（空闲/聆听/思考/回应）。 */
   showStatus: boolean;
+  /** 语音输入（ASR 麦克风）；asr.url 未配置时强制为关。 */
+  voiceInput: boolean;
+  /** 记忆语义检索（embedding）；embedding.url 未配置时强制为关。 */
+  semanticSearch: boolean;
 }
 
 export interface Settings {
