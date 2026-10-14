@@ -1,5 +1,8 @@
-node_modules
-dist
-*.local
-.DS_Store
-.momo-state.json
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+backend/data/
+.playwright-mcp/
+.pytest_cache/

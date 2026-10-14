@@ -1,0 +1,197 @@
+/* 人格 tab（设置页内）：三块 panel（人设卡 / 用户画像 / 长期记忆）。 */
+/* 颜色与控件基线全部走 base.css 变量，这里只管排版。 */
+
+.persona-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.persona-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 24px;
+}
+
+.persona-section h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.persona-section p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-label {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.field input,
+.field textarea,
+.persona-section textarea,
+.mem-search {
+  width: 100%;
+}
+
+.field textarea,
+.persona-section > textarea,
+.mem-edit textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.example-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* 初始记忆条目：输入框 + 删除按钮一行。 */
+.pin-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+button.small {
+  padding: 0.35em 0.9em;
+  font-size: 13px;
+}
+
+button.danger {
+  color: var(--danger);
+  border-color: var(--danger-line);
+}
+
+button.danger:hover {
+  background: var(--danger-soft);
+}
+
+/* ---- 记忆区 ---- */
+
+.mem-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+}
+
+.chip {
+  padding: 0.3em 0.9em;
+  font-size: 13px;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.chip.on {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+}
+
+.mem-search {
+  flex: 1;
+  min-width: 140px;
+}
+
+.show-invalid {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+
+.show-invalid input {
+  width: auto;
+}
+
+.mem-item {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mem-item.invalid {
+  opacity: 0.55;
+}
+
+.mem-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.badge {
+  padding: 0.1em 0.6em;
+  border-radius: var(--r-sm);
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--line);
+}
+
+.kind-semantic {
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 40%, transparent);
+}
+
+.kind-episodic {
+  color: var(--kind-episodic);
+  border-color: color-mix(in srgb, var(--kind-episodic) 40%, transparent);
+}
+
+.kind-procedural {
+  color: var(--kind-procedural);
+  border-color: color-mix(in srgb, var(--kind-procedural) 40%, transparent);
+}
+
+.badge-invalid {
+  color: var(--danger);
+  border-color: var(--danger-line);
+}
+
+.mem-content {
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.superseded {
+  font-size: 12px;
+}
+
+.mem-ops {
+  display: flex;
+  gap: 8px;
+}
