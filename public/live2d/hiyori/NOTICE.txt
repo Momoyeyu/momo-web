@@ -1,0 +1,11 @@
+桃濑日和 Hiyori sample resources
+
+Official character page: https://www.live2d.com/en/learn/sample/momose-hiyori/
+Source: https://raw.githubusercontent.com/Live2D/CubismWebSamples/de9eb4bec4326b81fe67a54e84322fdc39bc7446/Samples/Resources/Hiyori/
+Repository commit: de9eb4bec4326b81fe67a54e84322fdc39bc7446
+Resource path: Samples/Resources/Hiyori/
+Modification: none. The official model, textures, manifest, physics, pose, user data, display data, and motions are retained byte-for-byte. The character design is not modified.
+
+This content uses sample data owned and copyrighted by Live2D Inc. The sample data are utilized in accordance with terms and conditions set by Live2D Inc. This content itself is created at the author’s sole discretion.
+
+Cubism Core is not included in this resource folder. The site loads the official hosted Core separately under the Live2D Proprietary Software License Agreement.
