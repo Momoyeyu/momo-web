@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asrUrl } from "./client";
+import { asrUrl } from "./asrClient";
 
 const KEYLESS = { key: "" };
 

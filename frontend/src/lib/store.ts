@@ -3,7 +3,16 @@
 // 测试用 createMemoryStorage 注入内存实现。
 // 普通记忆与对话历史归 backend 管，不进本 store。
 
-import type { AvatarMeta, Memory, PersonaCard, Settings } from "./types";
+import type {
+  AvatarMeta,
+  Memory,
+  PersistedState,
+  PersonaCard,
+  Settings,
+} from "./types";
+import { fetchState, putState } from "../services/stateClient";
+
+export type { PersistedState };
 
 const STORAGE_KEY = "momo-web.v1";
 /** momo-demo 时代的旧 key：首次读取时迁移（读旧→写新→删旧）。 */
@@ -11,17 +20,6 @@ const LEGACY_STORAGE_KEY = "momo-demo.v1";
 
 /** 内置模型（Hiyori）的 avatarId 取值。 */
 export const AVATAR_BUILTIN = "builtin";
-
-export interface PersistedState {
-  settings: Settings;
-  persona: PersonaCard;
-  /** 初始记忆（pin）：用户维护的常驻事实，backend 注入 system prompt。 */
-  pins: string[];
-  /** 用户导入的 Live2D 模型清单（blob 在 IndexedDB）。 */
-  avatars: AvatarMeta[];
-  /** 当前形象：AVATAR_BUILTIN 或 avatars[].id。 */
-  avatarId: string;
-}
 
 export const DEFAULT_SETTINGS: Settings = {
   general: { lang: "zh", dialogOpacity: 66, voiceVolume: 100, showStatus: true },
@@ -231,8 +229,6 @@ function load(): PersistedState {
   }
 }
 
-/** backend 状态端点（vite proxy /api → FastAPI）。 */
-const STATE_API = "/api/state";
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 const inBrowser = (): boolean =>
@@ -240,24 +236,14 @@ const inBrowser = (): boolean =>
 
 /**
  * 启动时从 backend 恢复配置（backend 权威，localStorage 仅离线缓存）。
- * backend 无数据（{}）或不可达时静默维持 localStorage 态。
+ * backend 无数据或不可达时静默维持 localStorage 态。
  */
 export async function bootPersist(): Promise<void> {
   if (!inBrowser()) return;
-  try {
-    const res = await fetch(STATE_API);
-    if (!res.ok) return;
-    const raw = await res.text();
-    if (!raw.trim()) return;
-    const parsed = JSON.parse(raw) as Partial<PersistedState>;
-    if (!parsed || typeof parsed !== "object" || !("settings" in parsed)) {
-      return;
-    }
-    state = merge(parsed);
-    persist();
-  } catch {
-    // backend 不可达 / 数据损坏：维持 localStorage 态
-  }
+  const remote = await fetchState();
+  if (!remote) return;
+  state = merge(remote);
+  persist();
 }
 
 /** 防抖 PUT /api/state；失败静默（localStorage 仍兜底）。
@@ -267,21 +253,15 @@ function remoteSave(): void {
   if (saveTimer !== null) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    const body = JSON.stringify({
+    const body: Record<string, unknown> = {
       ...passthrough,
       ...state,
       ...(legacyMemories ? { memories: legacyMemories } : {}),
+    };
+    void putState(body).then((ok) => {
+      // backend 已收到旧 memories（会自行导入），本地不再携带
+      if (ok) legacyMemories = null;
     });
-    void fetch(STATE_API, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body,
-    })
-      .then((res) => {
-        // backend 已收到旧 memories（会自行导入），本地不再携带
-        if (res.ok) legacyMemories = null;
-      })
-      .catch(() => {});
   }, 300);
 }
 

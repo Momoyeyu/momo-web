@@ -3,7 +3,7 @@
 // 打断（SpeechStarted / stop）= 停播放 + abort SSE/TTS。
 // 设置每次回合开始从 store 现读——setting 页改动无需重启即生效。
 
-import { AsrStream } from "../asr/client";
+import { AsrStream } from "../services/asrClient";
 import { MicStreamer } from "../audio/capture";
 import { TtsPlayer } from "../audio/player";
 import { getStage } from "../live2d/stage";
@@ -18,8 +18,8 @@ import type {
 } from "../lib/types";
 import { EmotionParser } from "../llm/emotion";
 import type { EmotionEvent } from "../llm/emotion";
-import { streamSpeech } from "../tts/client";
-import { chat } from "./chatApi";
+import { streamSpeech } from "../services/ttsClient";
+import { chat } from "../services/chatClient";
 import { SentenceSplitter } from "./sentences";
 
 export interface ChatEngineEvents {

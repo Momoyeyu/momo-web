@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceError } from "../lib/errors";
-import { speechUrl, streamSpeech } from "./client";
+import { speechUrl, streamSpeech } from "./ttsClient";
 
 const CFG = { key: "", voice: "", lang: "zh" };
 

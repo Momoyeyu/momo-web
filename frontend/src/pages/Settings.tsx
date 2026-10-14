@@ -16,8 +16,8 @@ import {
 import type { PersonaCard, Settings as SettingsData } from "../lib/types";
 import { fromRoute, navigate } from "../router";
 import { useT, LANGS } from "../i18n";
-import { probeAsr, probeLlm, probeTts } from "../lib/probe";
-import type { ProbeResult } from "../lib/probe";
+import { probeAsr, probeLlm, probeTts } from "../services/probe";
+import type { ProbeResult } from "../services/probe";
 import Select from "../ui/Select";
 import PersonaPanel, { cleanPersona } from "./Persona";
 import MemoryPanel from "./Memory";

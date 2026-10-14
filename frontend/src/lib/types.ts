@@ -110,3 +110,15 @@ export interface ChatMessage {
 }
 
 export type ChatStatus = "idle" | "listening" | "thinking" | "speaking";
+
+/** /api/state 持久化载荷（backend state.json ↔ localStorage 缓存共用 schema）。 */
+export interface PersistedState {
+  settings: Settings;
+  persona: PersonaCard;
+  /** 初始记忆（pin）：用户维护的常驻事实，backend 注入 system prompt。 */
+  pins: string[];
+  /** 用户导入的 Live2D 模型清单（blob 在 IndexedDB）。 */
+  avatars: AvatarMeta[];
+  /** 当前形象：内置 id 或 avatars[].id。 */
+  avatarId: string;
+}

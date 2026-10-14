@@ -2,9 +2,9 @@
 // 语义：拿到任何 HTTP/WS 响应都算「可达」，detail 记状态码或延迟；
 // 网络层失败/超时才算不可达。
 
-import type { AsrConfig, LlmConfig, TtsConfig } from "./types";
-import { asrUrl } from "../asr/client";
-import { speechUrl } from "../tts/client";
+import type { AsrConfig, LlmConfig, TtsConfig } from "../lib/types";
+import { asrUrl } from "./asrClient";
+import { speechUrl } from "./ttsClient";
 
 export interface ProbeResult {
   ok: boolean;

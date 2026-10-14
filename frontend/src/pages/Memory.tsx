@@ -4,11 +4,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Memory } from "../lib/types";
+import {
+  addMemory as apiAdd,
+  deleteMemory as apiDelete,
+  editMemory as apiEdit,
+  listMemories,
+} from "../services/memoryClient";
 import { useT, currentLang } from "../i18n";
 import "../styles/persona.css";
 import "../styles/controls.css";
-
-const API = "/api/memories";
 
 const LOCALE = { zh: "zh-CN", ja: "ja-JP", en: "en-US" } as const;
 
@@ -42,9 +46,7 @@ export default function MemoryPanel({
 
   const refresh = async (): Promise<void> => {
     try {
-      const res = await fetch(API);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setMemories((await res.json()) as Memory[]);
+      setMemories(await listMemories());
       setLoadFailed(false);
     } catch {
       setLoadFailed(true);
@@ -67,12 +69,7 @@ export default function MemoryPanel({
     const content = addDraft.trim();
     if (!content) return;
     try {
-      const res = await fetch(API, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await apiAdd(content);
       setAddDraft("");
       await refresh();
     } catch {
@@ -91,12 +88,7 @@ export default function MemoryPanel({
     setEditDraft("");
     if (!id) return;
     try {
-      const res = await fetch(`${API}/${id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content: editDraft.trim() }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await apiEdit(id, editDraft.trim());
       await refresh();
     } catch {
       setLoadFailed(true);
@@ -105,8 +97,7 @@ export default function MemoryPanel({
 
   const removeMemory = async (id: string): Promise<void> => {
     try {
-      const res = await fetch(`${API}/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await apiDelete(id);
       await refresh();
     } catch {
       setLoadFailed(true);
