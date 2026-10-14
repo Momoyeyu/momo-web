@@ -1,0 +1,47 @@
+// i18n：字典按语言分文件（zh 为 key 结构基准），t() 支持 {var} 插值。
+// 新增语言：创建 xx.ts（ satisfies Dict 同形 ）→ 在 DICTS 注册一行 →
+// settings.langs 字典加显示名即可。
+
+import { useSyncExternalStore } from "react";
+import { getSettings, subscribe } from "../lib/store";
+import type { Lang } from "../lib/types";
+import { zh } from "./zh";
+import type { Dict } from "./zh";
+import { ja } from "./ja";
+import { en } from "./en";
+
+export type { Dict };
+
+export const DICTS: Record<Lang, Dict> = { zh, ja, en };
+
+export const LANGS: readonly Lang[] = ["zh", "ja", "en"];
+
+export function currentLang(): Lang {
+  return getSettings().general.lang;
+}
+
+function lookup(dict: Dict, key: string): string | undefined {
+  let cur: unknown = dict;
+  for (const seg of key.split(".")) {
+    if (cur === null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string, unknown>)[seg];
+  }
+  return typeof cur === "string" ? cur : undefined;
+}
+
+/** 取翻译；缺失时回落中文，再回落 key 本身。{k} 用 vars 替换。 */
+export function t(key: string, vars?: Record<string, string>): string {
+  let s = lookup(DICTS[currentLang()], key) ?? lookup(zh, key) ?? key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      s = s.replaceAll(`{${k}}`, v);
+    }
+  }
+  return s;
+}
+
+/** React hook：语言变更触发重渲染。 */
+export function useT(): (key: string, vars?: Record<string, string>) => string {
+  useSyncExternalStore(subscribe, currentLang);
+  return t;
+}
