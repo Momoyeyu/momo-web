@@ -3,6 +3,7 @@
 // schema 按人设设计：名称/身份/年龄/性格/偏好（system prompt 由 backend 组装）。
 
 import type { PersonaCard } from "../lib/types";
+import { DEFAULT_PERSONA } from "../lib/store";
 import { useT } from "../i18n";
 import "../styles/persona.css";
 
@@ -39,6 +40,7 @@ export default function PersonaPanel({
             <span className="field-label">{t("persona.name")}</span>
             <input
               value={value.name}
+              placeholder={DEFAULT_PERSONA.name}
               onChange={(e) => patch({ name: e.target.value })}
             />
           </label>
@@ -46,14 +48,16 @@ export default function PersonaPanel({
             <span className="field-label">{t("persona.age")}</span>
             <input
               type="number"
-              value={value.age}
-              onChange={(e) => patch({ age: Number(e.target.value) })}
+              placeholder={String(DEFAULT_PERSONA.age)}
+              value={Number.isFinite(value.age) ? value.age : ""}
+              onChange={(e) => patch({ age: e.target.valueAsNumber })}
             />
           </label>
           <label className="field span2">
             <span className="field-label">{t("persona.identity")}</span>
             <input
               value={value.identity}
+              placeholder={DEFAULT_PERSONA.identity}
               onChange={(e) => patch({ identity: e.target.value })}
             />
           </label>
@@ -62,6 +66,7 @@ export default function PersonaPanel({
             <textarea
               rows={4}
               value={value.personality}
+              placeholder={DEFAULT_PERSONA.personality}
               onChange={(e) => patch({ personality: e.target.value })}
             />
           </label>

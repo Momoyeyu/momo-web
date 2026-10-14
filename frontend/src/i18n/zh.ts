@@ -55,12 +55,6 @@ export const zh = {
       persona: "人格",
       memory: "记忆",
     },
-    subs: {
-      general: "界面语言",
-      models: "服务与形象",
-      persona: "人设卡",
-      memory: "初始与普通记忆",
-    },
     groups: {
       llm: "LLM · 对话模型",
       asr: "ASR · 语音识别",

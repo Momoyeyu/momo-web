@@ -55,12 +55,6 @@ export const ja: Dict = {
       persona: "人格",
       memory: "記憶",
     },
-    subs: {
-      general: "表示言語",
-      models: "サービスと形象",
-      persona: "キャラ設定",
-      memory: "ピンと記憶",
-    },
     groups: {
       llm: "LLM · 対話モデル",
       asr: "ASR · 音声認識",

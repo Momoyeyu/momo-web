@@ -55,12 +55,6 @@ export const en: Dict = {
       persona: "Persona",
       memory: "Memory",
     },
-    subs: {
-      general: "Language",
-      models: "Services & avatar",
-      persona: "Character card",
-      memory: "Pins & memories",
-    },
     groups: {
       llm: "LLM · Chat model",
       asr: "ASR · Speech recognition",

@@ -56,21 +56,10 @@
   white-space: nowrap;
 }
 
-.stab-sub {
-  font-size: 11px;
-  line-height: 1.2;
-  opacity: 0.65;
-  white-space: nowrap;
-}
-
 .stab.active {
   color: var(--accent-strong);
   border-bottom-color: var(--accent);
   background: var(--accent-soft);
-}
-
-.stab.active .stab-sub {
-  opacity: 0.9;
 }
 
 /* --- 中部滚动内容 --- */

@@ -256,7 +256,6 @@ export default function Settings() {
               onClick={() => setTab(id)}
             >
               <span className="stab-label">{t(`settings.tabs.${id}`)}</span>
-              <span className="stab-sub">{t(`settings.subs.${id}`)}</span>
             </button>
           ))}
         </div>
