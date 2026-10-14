@@ -10,7 +10,7 @@ export const ja: Dict = {
     del: "削除",
   },
   title: {
-    tagline: "デスクトップに、応えてくれる存在を",
+    tagline: "チャットボット以上の存在",
     start: "はじめる",
     config: "設定",
   },

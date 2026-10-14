@@ -10,7 +10,7 @@ export const en: Dict = {
     del: "Delete",
   },
   title: {
-    tagline: "Someone on your desktop who answers back",
+    tagline: "More than a chat bot",
     start: "Start",
     config: "Config",
   },

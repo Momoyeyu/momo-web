@@ -10,7 +10,7 @@ export const zh = {
     del: "删除",
   },
   title: {
-    tagline: "让桌面多一个，懂得回应的存在",
+    tagline: "不只是聊天机器人",
     start: "开始",
     config: "设置",
   },
