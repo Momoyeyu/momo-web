@@ -16,6 +16,8 @@ import {
 import type { PersonaCard, Settings as SettingsData } from "../lib/types";
 import { fromRoute, navigate } from "../router";
 import { useT, LANGS } from "../i18n";
+import { probeAsr, probeLlm, probeTts } from "../lib/probe";
+import type { ProbeResult } from "../lib/probe";
 import Select from "../ui/Select";
 import PersonaPanel, { cleanPersona } from "./Persona";
 import MemoryPanel from "./Memory";
@@ -109,6 +111,66 @@ export default function Settings() {
     asr: false,
     tts: false,
   });
+  const [probes, setProbes] = useState<
+    Partial<Record<EndpointSection, ProbeResult | "running">>
+  >({});
+
+  const PROBES: Record<
+    EndpointSection,
+    (s: SettingsData) => Promise<ProbeResult>
+  > = {
+    llm: (s) => probeLlm(s.llm),
+    asr: (s) => probeAsr(s.asr),
+    tts: (s) => probeTts(s.tts),
+  };
+
+  /** 探测的是草稿里的地址——改了没保存也能测当前填的值。 */
+  const runProbe = (sec: EndpointSection): void => {
+    if (probes[sec] === "running") return;
+    setProbes((p) => ({ ...p, [sec]: "running" }));
+    void PROBES[sec](draft.settings).then((r) =>
+      setProbes((p) => ({ ...p, [sec]: r })),
+    );
+  };
+
+  const probeText = (sec: EndpointSection): React.ReactNode => {
+    const r = probes[sec];
+    if (!r) return null;
+    if (r === "running") return <span className="probe-info">…</span>;
+    const detail =
+      r.detail === "unconfigured"
+        ? t("settings.testNeedUrl")
+        : /^(unreachable|timeout|connect failed|bad url|closed)/.test(r.detail)
+          ? t("chat.errConn")
+          : r.detail;
+    return (
+      <span className={r.ok ? "probe-ok" : "probe-err"}>
+        {r.ok ? "✓" : "✗"} {detail}
+      </span>
+    );
+  };
+
+  const urlRow = (
+    sec: EndpointSection,
+    phKey: string,
+  ): React.ReactNode => (
+    <OptRow label={sec === "llm" ? t("settings.apiUrl") : t("settings.svcUrl")}>
+      <input
+        value={draft.settings[sec].url}
+        placeholder={t(phKey)}
+        onChange={(e) => patchEndpoint(sec, "url", e.target.value)}
+      />
+      <button
+        type="button"
+        className="ghost key-toggle"
+        onClick={() => runProbe(sec)}
+        disabled={probes[sec] === "running"}
+      >
+        {t("settings.test")}
+      </button>
+      {probeText(sec)}
+    </OptRow>
+  );
 
   // 弹窗居中弹出，主操作聚焦（Enter 直接确认）。
   useEffect(() => {
@@ -271,13 +333,7 @@ export default function Settings() {
 
               {tab === "llm" && (
                 <div className="opt-list">
-                  <OptRow label={t("settings.apiUrl")}>
-                    <input
-                      value={draft.settings.llm.url}
-                      placeholder={t("settings.llmUrlPh")}
-                      onChange={(e) => patchEndpoint("llm", "url", e.target.value)}
-                    />
-                  </OptRow>
+                  {urlRow("llm", "settings.llmUrlPh")}
                   {keyRow("llm")}
                   <OptRow label={t("settings.model")}>
                     <input
@@ -291,26 +347,14 @@ export default function Settings() {
 
               {tab === "asr" && (
                 <div className="opt-list">
-                  <OptRow label={t("settings.svcUrl")}>
-                    <input
-                      value={draft.settings.asr.url}
-                      placeholder={t("settings.asrUrlPh")}
-                      onChange={(e) => patchEndpoint("asr", "url", e.target.value)}
-                    />
-                  </OptRow>
+                  {urlRow("asr", "settings.asrUrlPh")}
                   {keyRow("asr")}
                 </div>
               )}
 
               {tab === "tts" && (
                 <div className="opt-list">
-                  <OptRow label={t("settings.svcUrl")}>
-                    <input
-                      value={draft.settings.tts.url}
-                      placeholder={t("settings.ttsUrlPh")}
-                      onChange={(e) => patchEndpoint("tts", "url", e.target.value)}
-                    />
-                  </OptRow>
+                  {urlRow("tts", "settings.ttsUrlPh")}
                   {keyRow("tts")}
                   <OptRow label={t("settings.voice")}>
                     <input

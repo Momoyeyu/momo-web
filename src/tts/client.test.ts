@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ServiceError } from "../lib/errors";
 import { speechUrl, streamSpeech } from "./client";
 
 const CFG = { key: "", voice: "", lang: "zh" };
@@ -71,7 +72,7 @@ describe("streamSpeech", () => {
     ]);
   });
 
-  it("throws '<status>: <message>' on OpenAI error envelope", async () => {
+  it("throws ServiceError(http) carrying status on OpenAI error envelope", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -81,9 +82,36 @@ describe("streamSpeech", () => {
           }),
       ),
     );
-    await expect(
-      streamSpeech({ url: "http://h", ...CFG }, "hi", undefined, { onChunk: () => {} }),
-    ).rejects.toThrow("400: voice not found");
+    const err = await streamSpeech(
+      { url: "http://h", ...CFG },
+      "hi",
+      undefined,
+      { onChunk: () => {} },
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ServiceError);
+    expect(err).toMatchObject({
+      service: "tts",
+      failure: "http",
+      status: 400,
+    });
+    expect((err as Error).message).toContain("voice not found");
+  });
+
+  it("throws ServiceError(unreachable) on network failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+    const err = await streamSpeech(
+      { url: "http://h", ...CFG },
+      "hi",
+      undefined,
+      { onChunk: () => {} },
+    ).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ServiceError);
+    expect(err).toMatchObject({ service: "tts", failure: "unreachable" });
   });
 
   it("sends Authorization only when key is set", async () => {

@@ -3,6 +3,7 @@
 // AbortSignal 即取消（断连取消在途合成，无单独取消端点）。
 
 import type { EmotionTag, TtsConfig } from "../lib/types";
+import { ServiceError } from "../lib/errors";
 
 export interface SpeakOptions {
   signal?: AbortSignal;
@@ -66,19 +67,19 @@ export async function streamSpeech(
     });
   } catch (err) {
     if (isAbort(err, opts.signal)) return;
-    throw err;
+    throw new ServiceError("tts", "unreachable");
   }
 
   if (!res.ok) {
     // OpenAI 错误信封 {error:{message}}；解析失败退回 statusText。
-    let message = res.statusText || "request failed";
+    let message = "";
     try {
       const body = (await res.json()) as { error?: { message?: string } } | null;
       if (body?.error?.message) message = body.error.message;
     } catch {
       // 非 JSON 错误体：用 statusText
     }
-    throw new Error(`${res.status}: ${message}`);
+    throw new ServiceError("tts", "http", res.status, message || res.statusText || undefined);
   }
   if (!res.body) return;
 

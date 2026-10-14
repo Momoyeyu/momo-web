@@ -8,6 +8,7 @@ import { MicStreamer } from "../audio/capture";
 import { TtsPlayer } from "../audio/player";
 import { getStage } from "../live2d/stage";
 import type { Live2DStage } from "../live2d/stage";
+import { ServiceError } from "../lib/errors";
 import { getPersona, getSettings, newId, subscribe } from "../lib/store";
 import type {
   ChatMessage,
@@ -50,6 +51,8 @@ interface TtsItem {
 interface Turn {
   id: string;
   abort: AbortController;
+  /** 只杀 TTS 合成不杀 LLM：静音时 abort 在途 speech 请求并跳过新句子。 */
+  audioAbort: AbortController;
   userText: string;
   llmCfg: LlmConfig;
   /** assistant 已产出全文（打断按此落账）。 */
@@ -125,6 +128,12 @@ export class ChatEngine {
     if (this.voiceMuted === m) return;
     this.voiceMuted = m;
     this.applyVolume();
+    if (m) {
+      this.turn?.audioAbort.abort();
+      this.safe(() => this.player.stop());
+    } else if (this.turn && this.turn.audioAbort.signal.aborted) {
+      this.turn.audioAbort = new AbortController();
+    }
   }
 
   /**
@@ -164,7 +173,7 @@ export class ChatEngine {
 
     const cfg = getSettings();
     if (!cfg.llm.url) {
-      this.events.onError(new Error("LLM not configured"));
+      this.events.onError(new ServiceError("llm", "unconfigured"));
       return;
     }
 
@@ -183,6 +192,7 @@ export class ChatEngine {
     const turn: Turn = {
       id: newId("m"),
       abort: new AbortController(),
+      audioAbort: new AbortController(),
       userText: trimmed,
       llmCfg: cfg.llm,
       text: "",
@@ -206,7 +216,7 @@ export class ChatEngine {
     if (this.disposed || this.micOn || this.micStarting) return;
     const cfg = getSettings();
     if (!cfg.asr.url) {
-      this.events.onError(new Error("ASR not configured"));
+      this.events.onError(new ServiceError("asr", "unconfigured"));
       return;
     }
     this.micStarting = true;
@@ -370,8 +380,9 @@ export class ChatEngine {
   /** 一句成句 → 立刻发 streamSpeech（并发合成），块入队列等序播放。 */
   private enqueueTts(turn: Turn, cfg: Settings, sentence: string): void {
     if (turn.finished) return;
+    if (this.voiceMuted || turn.audioAbort.signal.aborted) return;
     if (!cfg.tts.url) {
-      this.reportTtsOnce(turn, new Error("TTS not configured"));
+      this.reportTtsOnce(turn, new ServiceError("tts", "unconfigured"));
       return;
     }
     const item: TtsItem = { chunks: [], pushed: 0, done: false };
@@ -386,10 +397,13 @@ export class ChatEngine {
       this.maybeFinish(turn);
     };
 
+    // 任一条件触发即取消：回合被打断（abort）或语音被关掉（audioAbort）。
+    const signal = AbortSignal.any([turn.abort.signal, turn.audioAbort.signal]);
+
     let req: Promise<void>;
     try {
       req = streamSpeech(cfg.tts, sentence, turn.emotion, {
-        signal: turn.abort.signal,
+        signal,
         onChunk: (pcm) => {
           item.chunks.push(pcm);
           this.flushTts(turn);

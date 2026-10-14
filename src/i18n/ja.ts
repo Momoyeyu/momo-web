@@ -32,6 +32,13 @@ export const ja: Dict = {
     voiceTitleOff: "音声出力を入れる",
     stop: "停止",
     errDefault: "エラーが発生しました",
+    errSvc: {
+      llm: "会話モデルエラー（{detail}）",
+      asr: "音声認識エラー（{detail}）",
+      tts: "音声合成エラー（{detail}）",
+    },
+    errCfg: "未設定です。設定画面でURLを入力してください",
+    errConn: "サービスに接続できません",
     you: "あなた",
   },
   backlog: {
@@ -77,6 +84,8 @@ export const ja: Dict = {
     voicePh: "空欄ならサービス既定の音色",
     showKey: "表示",
     hideKey: "隠す",
+    test: "接続テスト",
+    testNeedUrl: "先にURLを入力",
     note: "変更はまず下書きに保存され、右下の保存で即時反映されます。設定は localStorage と .momo-state.json（dev 環境）に書き込まれます。",
     unsavedTitle: "未保存の変更があります",
     unsavedBody: "変更を保存しますか？",

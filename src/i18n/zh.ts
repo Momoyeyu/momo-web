@@ -32,6 +32,13 @@ export const zh = {
     voiceTitleOff: "打开语音输出",
     stop: "停止",
     errDefault: "发生错误",
+    errSvc: {
+      llm: "对话模型出错（{detail}）",
+      asr: "语音识别出错（{detail}）",
+      tts: "语音合成出错（{detail}）",
+    },
+    errCfg: "未配置，请到设置页填写服务地址",
+    errConn: "无法连接服务",
     you: "你",
   },
   backlog: {
@@ -77,6 +84,8 @@ export const zh = {
     voicePh: "留空使用服务默认音色",
     showKey: "显示",
     hideKey: "隐藏",
+    test: "测试连接",
+    testNeedUrl: "先填写地址",
     note: "修改先存为草稿，点击右下角保存后立即生效。配置同时写入 localStorage 与 .momo-state.json（dev 环境）。",
     unsavedTitle: "有未保存的修改",
     unsavedBody: "要保存当前修改吗？",

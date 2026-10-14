@@ -14,6 +14,7 @@ import type { EngineHandlers } from "../chat/engine";
 import type { ChatStatus } from "../lib/types";
 import { navigate } from "../router";
 import { useT } from "../i18n";
+import { ServiceError } from "../lib/errors";
 import { getState, personaName, subscribe } from "../lib/store";
 import "../styles/chat.css";
 
@@ -43,7 +44,17 @@ export default function Chat() {
 
   useEffect(() => {
     const engine = getChatEngine();
-    const showErr = (msg: string): void => {
+    const showErr = (e: Error): void => {
+      let msg = e.message || t("chat.errDefault");
+      if (e instanceof ServiceError) {
+        const detail =
+          e.failure === "unconfigured"
+            ? t("chat.errCfg")
+            : e.failure === "unreachable"
+              ? t("chat.errConn")
+              : `HTTP ${e.status}`;
+        msg = t(`chat.errSvc.${e.service}`, { detail });
+      }
       setError(msg);
       if (errTimer.current !== null) window.clearTimeout(errTimer.current);
       errTimer.current = window.setTimeout(() => setError(null), 3000);
@@ -67,7 +78,7 @@ export default function Chat() {
         setStreamActive(false);
         setStreamText("");
       },
-      onError: (e) => showErr(e.message || t("chat.errDefault")),
+      onError: (e) => showErr(e),
     };
     attachEngine(h);
     // 挂载即同步当前相位（可能已有回合在跑）。

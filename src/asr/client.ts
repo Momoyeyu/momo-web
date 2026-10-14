@@ -5,6 +5,7 @@
 // 断句在服务端 VAD；前端只转发 PCM 帧与消费事件。
 
 import type { AsrConfig } from "../lib/types";
+import { ServiceError } from "../lib/errors";
 
 export interface AsrEvents {
   /** VAD 检测到说话开始（barge-in 触发点）。 */
@@ -84,12 +85,12 @@ export class AsrStream {
         resolve();
       };
       ws.onmessage = (ev: MessageEvent) => this.onMessage(ev.data, events, ws);
-      ws.onerror = (ev) => {
+      ws.onerror = () => {
         if (!settled) {
           settled = true;
-          reject(new Error("asr websocket error"));
+          reject(new ServiceError("asr", "unreachable"));
         } else {
-          events.onError?.(ev);
+          events.onError?.(new ServiceError("asr", "unreachable"));
         }
       };
       ws.onclose = (ev) => {
@@ -98,7 +99,7 @@ export class AsrStream {
         if (this.ws === ws) this.ws = null;
         if (!settled) {
           settled = true;
-          reject(new Error(`asr websocket closed before open: ${ev.code}`));
+          reject(new ServiceError("asr", "unreachable", ev.code));
         }
         events.onClose?.(ev.code);
       };

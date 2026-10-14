@@ -144,6 +144,24 @@
   font-size: 12px;
 }
 
+/* 「测试连接」结果：内联在 URL 行右侧 */
+.probe-ok,
+.probe-err,
+.probe-info {
+  flex: none;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.probe-ok {
+  color: var(--ok);
+}
+.probe-err {
+  color: var(--danger);
+}
+.probe-info {
+  opacity: 0.6;
+}
+
 /* --- 开关（圆角矩形槽 + 圆角方块钮） --- */
 
 .opt-switch {

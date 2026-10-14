@@ -32,6 +32,13 @@ export const en: Dict = {
     voiceTitleOff: "Unmute voice output",
     stop: "Stop",
     errDefault: "Something went wrong",
+    errSvc: {
+      llm: "Chat model error ({detail})",
+      asr: "Speech recognition error ({detail})",
+      tts: "Speech synthesis error ({detail})",
+    },
+    errCfg: "not configured — fill in the address in Settings",
+    errConn: "cannot reach service",
     you: "You",
   },
   backlog: {
@@ -77,6 +84,8 @@ export const en: Dict = {
     voicePh: "Leave empty for service default voice",
     showKey: "Show",
     hideKey: "Hide",
+    test: "Test connection",
+    testNeedUrl: "fill in the URL first",
     note: "Edits are staged as a draft; the bottom-right Save applies them instantly. Config is written to localStorage and .momo-state.json (dev).",
     unsavedTitle: "Unsaved changes",
     unsavedBody: "Save the current changes?",
