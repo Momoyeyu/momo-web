@@ -14,10 +14,10 @@ import type { EngineHandlers } from "../chat/engine";
 import type { ChatStatus } from "../lib/types";
 import { navigate } from "../router";
 import { useT } from "../i18n";
-import { getPersona, getState, subscribe } from "../lib/store";
+import { getState, personaName, subscribe } from "../lib/store";
 import "../styles/chat.css";
 
-const STATUS_KEY: Record<ChatStatus, string> = {
+const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
   idle: "chat.idle",
   listening: "chat.listening",
   thinking: "chat.thinking",
@@ -28,7 +28,7 @@ export default function Chat() {
   const t = useT();
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
   useSyncExternalStore(subscribe, getState);
-  const name = getPersona().name || "momo";
+  const name = personaName();
   const showStatus = getState().settings.general.showStatus;
   const [status, setStatus] = useState<ChatStatus>(getChatEngine().status);
   const [micOn, setMicOn] = useState(getChatEngine().listening);
@@ -58,7 +58,6 @@ export default function Chat() {
           setStreamText("");
         }
       },
-      onUserMessage: () => {},
       onAssistantStart: () => {
         setStreamActive(true);
         setStreamText("");
@@ -81,9 +80,9 @@ export default function Chat() {
   }, []);
 
   const send = (): void => {
-    const t = input.trim();
-    if (!t) return;
-    getChatEngine().sendText(t);
+    const text = input.trim();
+    if (!text) return;
+    getChatEngine().sendText(text);
     setInput("");
   };
 
@@ -117,7 +116,7 @@ export default function Chat() {
       {showStatus && (
         <div className={`chat-status status-${status}`}>
           <span className="dot" />
-          {t(STATUS_KEY[status])}
+          {t(STATUS_LABEL_KEYS[status])}
         </div>
       )}
 

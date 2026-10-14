@@ -9,7 +9,7 @@ import {
   subscribeTranscript,
   transcriptVersion,
 } from "../chat/engine";
-import { getPersona, getState, subscribe } from "../lib/store";
+import { getState, personaName, subscribe } from "../lib/store";
 import { navigate } from "../router";
 import { useT } from "../i18n";
 import "../styles/backlog.css";
@@ -23,7 +23,7 @@ export default function Backlog() {
   const [replaying, setReplaying] = useState<string | null>(null);
   const engine = getChatEngine();
   const messages = engine.history;
-  const name = getPersona().name || "momo";
+  const name = personaName();
   const idle = engine.status === "idle";
 
   // 打开即滚到底部看最新一条。

@@ -91,7 +91,7 @@ export default function Select({
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onKey}
       >
-        <span className="sel-value">{current?.label ?? value}</span>
+        <span>{current?.label ?? value}</span>
         <span className="sel-arrow" />
       </button>
       {open && (

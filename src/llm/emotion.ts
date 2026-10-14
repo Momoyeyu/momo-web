@@ -18,7 +18,6 @@ const TAG_CHAR = /[a-z]/;
 type Pending = { kind: "#" | "["; buf: string } | null;
 
 export class EmotionParser {
-  /** 待合并的纯文本。 */
   private text = "";
   /** 未决指令缓冲（不含起始符）。 */
   private pending: Pending = null;
@@ -46,11 +45,6 @@ export class EmotionParser {
       }
       this.pending = null;
     };
-    /** '#' 后以字母终止：结算指令，terminator 字符重新走普通流程。 */
-    const resolveHash = (): void => {
-      resolve(this.pending?.buf ?? "");
-    };
-
     for (const ch of delta) {
       if (this.pending === null) {
         if (ch === "#" || ch === "[") {
@@ -67,7 +61,7 @@ export class EmotionParser {
           this.pending.buf += ch;
         } else {
           const wasEmpty = this.pending.buf.length === 0;
-          resolveHash();
+          resolve(this.pending.buf);
           if (wasEmpty) {
             // '#' 后不是字母（如 "#1"、空格）：'#' 本身退化为文本。
             this.text += "#";

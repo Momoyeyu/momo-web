@@ -136,8 +136,7 @@ button.ghost:hover {
 }
 
 input,
-textarea,
-select {
+textarea {
   font: inherit;
   color: var(--text);
   background: var(--input-bg);

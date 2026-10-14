@@ -133,14 +133,9 @@
 
 .opt-ctl input[type="text"],
 .opt-ctl input[type="password"],
-.opt-ctl input:not([type]),
-.opt-ctl select {
+.opt-ctl input:not([type]) {
   flex: 1;
   min-width: 0;
-}
-
-.opt-ctl select {
-  max-width: 320px;
 }
 
 .key-toggle {
@@ -258,14 +253,6 @@
   letter-spacing: 0.08em;
 }
 
-.key-row {
-  display: flex;
-  gap: 8px;
-}
-
-.key-row input {
-  flex: 1;
-}
 
 /* --- 底部操作条（独立全宽容器） --- */
 

@@ -42,8 +42,7 @@ type Phase = "idle" | "thinking" | "speaking";
 /** 一句的 TTS 队列项：合成可并发，块先攒本地，按句序统一补推/直通给 player。 */
 interface TtsItem {
   chunks: Uint8Array[];
-  /** 已 push 给 player 的块数（cursor < chunks.length 即有新块待推）。 */
-  cursor: number;
+  pushed: number;
   /** streamSpeech 流结束（成败都算——失败句直接跳过不占位）。 */
   done: boolean;
 }
@@ -66,7 +65,6 @@ interface Turn {
   queue: TtsItem[];
   /** 队头推进游标：queue[pushIndex] 是允许直通的当前句。 */
   pushIndex: number;
-  /** 未完成的 streamSpeech 请求数。 */
   inflight: number;
 }
 
@@ -78,7 +76,7 @@ function toError(e: unknown): Error {
 }
 
 export class ChatEngine {
-  private readonly ev: ChatEngineEvents;
+  private readonly events: ChatEngineEvents;
   private readonly player = new TtsPlayer();
 
   private phase: Phase = "idle";
@@ -96,7 +94,7 @@ export class ChatEngine {
   private unsubVolume: (() => void) | null = null;
 
   constructor(ev: ChatEngineEvents) {
-    this.ev = ev;
+    this.events = ev;
     this.applyVolume();
     this.unsubVolume = subscribe(() => this.applyVolume());
     this.player.onMouthOpen = (v) =>
@@ -166,7 +164,7 @@ export class ChatEngine {
 
     const cfg = getSettings();
     if (!cfg.llm.url) {
-      this.ev.onError(new Error("LLM not configured"));
+      this.events.onError(new Error("LLM not configured"));
       return;
     }
 
@@ -180,7 +178,7 @@ export class ChatEngine {
       at: new Date().toISOString(),
     };
     this.history.push(userMsg);
-    this.ev.onUserMessage(userMsg);
+    this.events.onUserMessage(userMsg);
 
     const turn: Turn = {
       id: newId("m"),
@@ -198,7 +196,7 @@ export class ChatEngine {
       inflight: 0,
     };
     this.turn = turn;
-    this.ev.onAssistantStart(turn.id);
+    this.events.onAssistantStart(turn.id);
     this.setPhase("thinking");
     void this.runTurn(turn, cfg, trimmed);
   }
@@ -208,7 +206,7 @@ export class ChatEngine {
     if (this.disposed || this.micOn || this.micStarting) return;
     const cfg = getSettings();
     if (!cfg.asr.url) {
-      this.ev.onError(new Error("ASR not configured"));
+      this.events.onError(new Error("ASR not configured"));
       return;
     }
     this.micStarting = true;
@@ -222,7 +220,7 @@ export class ChatEngine {
         onResult: (t) => {
           if (t.trim()) this.sendText(t);
         },
-        onError: (e) => this.ev.onError(toError(e)),
+        onError: (e) => this.events.onError(toError(e)),
         onClose: (_code) => {
           // 服务端断连：若我们认为还在听，收尾回到非监听态。
           if (this.asr === asr) {
@@ -236,7 +234,7 @@ export class ChatEngine {
       });
       // WS 就绪后再开采集，避免开头几帧静默丢弃。
       await mic.start((pcm) => asr.send(pcm), {
-        onError: (e) => this.ev.onError(toError(e)),
+        onError: (e) => this.events.onError(toError(e)),
       });
       this.mic = mic;
       this.asr = asr;
@@ -245,7 +243,7 @@ export class ChatEngine {
     } catch (e) {
       this.safe(() => mic.cancel());
       this.safe(() => asr.close());
-      this.ev.onError(toError(e));
+      this.events.onError(toError(e));
     } finally {
       this.micStarting = false;
     }
@@ -309,7 +307,7 @@ export class ChatEngine {
         at: new Date().toISOString(),
       };
       this.history.push(msg);
-      this.ev.onAssistantDone(msg);
+      this.events.onAssistantDone(msg);
     }
     this.setPhase("idle");
   }
@@ -328,7 +326,7 @@ export class ChatEngine {
           afterTag = false;
           if (!delta) continue;
           turn.text += delta;
-          this.ev.onAssistantDelta(turn.id, delta);
+          this.events.onAssistantDelta(turn.id, delta);
           for (const s of splitter.push(delta)) this.enqueueTts(turn, cfg, s);
         } else {
           turn.emotion = e.tag;
@@ -358,7 +356,7 @@ export class ChatEngine {
         onDelta: (d) => feedEvents(parser.push(d)),
       });
     } catch (err) {
-      if (this.turn === turn) this.ev.onError(toError(err));
+      if (this.turn === turn) this.events.onError(toError(err));
     }
     if (this.turn !== turn) return; // 已被打断，部分文本由 interruptNow 落账
 
@@ -376,7 +374,7 @@ export class ChatEngine {
       this.reportTtsOnce(turn, new Error("TTS not configured"));
       return;
     }
-    const item: TtsItem = { chunks: [], cursor: 0, done: false };
+    const item: TtsItem = { chunks: [], pushed: 0, done: false };
     turn.queue.push(item);
     turn.inflight += 1;
 
@@ -388,9 +386,9 @@ export class ChatEngine {
       this.maybeFinish(turn);
     };
 
-    let p: Promise<void>;
+    let req: Promise<void>;
     try {
-      p = streamSpeech(cfg.tts, sentence, turn.emotion, {
+      req = streamSpeech(cfg.tts, sentence, turn.emotion, {
         signal: turn.abort.signal,
         onChunk: (pcm) => {
           item.chunks.push(pcm);
@@ -401,13 +399,13 @@ export class ChatEngine {
       settle(err);
       return;
     }
-    p.then(() => settle(), (err: unknown) => settle(err));
+    req.then(() => settle(), (err: unknown) => settle(err));
   }
 
   private reportTtsOnce(turn: Turn, err: Error): void {
     if (this.turn !== turn || turn.ttsErrorReported) return;
     turn.ttsErrorReported = true;
-    this.ev.onError(err);
+    this.events.onError(err);
   }
 
   /**
@@ -416,12 +414,12 @@ export class ChatEngine {
    */
   private flushTts(turn: Turn): void {
     if (this.turn !== turn || turn.finished) return;
-    const q = turn.queue;
-    while (turn.pushIndex < q.length) {
-      const item = q[turn.pushIndex];
-      while (item.cursor < item.chunks.length) {
-        const pcm = item.chunks[item.cursor];
-        item.cursor += 1;
+    const queue = turn.queue;
+    while (turn.pushIndex < queue.length) {
+      const item = queue[turn.pushIndex];
+      while (item.pushed < item.chunks.length) {
+        const pcm = item.chunks[item.pushed];
+        item.pushed += 1;
         this.safe(() => this.player.push(pcm));
         turn.pushedAudio = true;
         if (this.phase === "thinking") this.setPhase("speaking");
@@ -451,7 +449,7 @@ export class ChatEngine {
         at: new Date().toISOString(),
       };
       this.history.push(msg);
-      this.ev.onAssistantDone(msg);
+      this.events.onAssistantDone(msg);
     }
     this.setPhase("idle");
     if (turn.text.trim()) {
@@ -487,7 +485,7 @@ export class ChatEngine {
     const s = this.status;
     if (s !== this.reported) {
       this.reported = s;
-      this.ev.onStatus(s);
+      this.events.onStatus(s);
     }
   }
 

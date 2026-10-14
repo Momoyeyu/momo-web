@@ -3,8 +3,8 @@
 //   中部内容——行式设置项（左标签右控件，发丝线分隔）；
 //   底部操作条——独立全宽容器，返回/保存聚拢右下角。
 // 草稿模型：修改先存草稿，右下「保存」统一落盘（防抖 300ms 写
-// .momo-state.json）；有未保存修改时点返回 → 弹窗（保存并离开/不保存
-// 离开/取消），弹窗的「保存并离开」贴到光标位置，二次点击即完成。
+// .momo-state.json）；有未保存修改时点返回 → 居中弹窗
+// （保存并离开/不保存离开/取消，主操作自动聚焦）。
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -121,7 +121,7 @@ export default function Settings() {
   const backLabel =
     backRoute === "chat" ? t("common.backChat") : t("common.backTitle");
 
-  const patch = (sec: EndpointSection, key: string, v: string): void => {
+  const patchEndpoint = (sec: EndpointSection, key: string, v: string): void => {
     setDraft((d) => ({
       ...d,
       settings: { ...d.settings, [sec]: { ...d.settings[sec], [key]: v } },
@@ -168,7 +168,7 @@ export default function Settings() {
         type={showKey[sec] ? "text" : "password"}
         value={draft.settings[sec].key}
         placeholder={t("settings.keyPh")}
-        onChange={(e) => patch(sec, "key", e.target.value)}
+        onChange={(e) => patchEndpoint(sec, "key", e.target.value)}
       />
       <button
         type="button"
@@ -275,7 +275,7 @@ export default function Settings() {
                     <input
                       value={draft.settings.llm.url}
                       placeholder={t("settings.llmUrlPh")}
-                      onChange={(e) => patch("llm", "url", e.target.value)}
+                      onChange={(e) => patchEndpoint("llm", "url", e.target.value)}
                     />
                   </OptRow>
                   {keyRow("llm")}
@@ -283,7 +283,7 @@ export default function Settings() {
                     <input
                       value={draft.settings.llm.model}
                       placeholder={t("settings.llmModelPh")}
-                      onChange={(e) => patch("llm", "model", e.target.value)}
+                      onChange={(e) => patchEndpoint("llm", "model", e.target.value)}
                     />
                   </OptRow>
                 </div>
@@ -295,7 +295,7 @@ export default function Settings() {
                     <input
                       value={draft.settings.asr.url}
                       placeholder={t("settings.asrUrlPh")}
-                      onChange={(e) => patch("asr", "url", e.target.value)}
+                      onChange={(e) => patchEndpoint("asr", "url", e.target.value)}
                     />
                   </OptRow>
                   {keyRow("asr")}
@@ -308,7 +308,7 @@ export default function Settings() {
                     <input
                       value={draft.settings.tts.url}
                       placeholder={t("settings.ttsUrlPh")}
-                      onChange={(e) => patch("tts", "url", e.target.value)}
+                      onChange={(e) => patchEndpoint("tts", "url", e.target.value)}
                     />
                   </OptRow>
                   {keyRow("tts")}
@@ -316,7 +316,7 @@ export default function Settings() {
                     <input
                       value={draft.settings.tts.voice}
                       placeholder={t("settings.voicePh")}
-                      onChange={(e) => patch("tts", "voice", e.target.value)}
+                      onChange={(e) => patchEndpoint("tts", "voice", e.target.value)}
                     />
                   </OptRow>
                   <OptRow label={t("settings.speechLang")}>
@@ -328,7 +328,7 @@ export default function Settings() {
                         { value: "ja", label: "日本語" },
                         { value: "auto", label: "auto" },
                       ]}
-                      onChange={(v) => patch("tts", "lang", v)}
+                      onChange={(v) => patchEndpoint("tts", "lang", v)}
                     />
                   </OptRow>
                 </div>

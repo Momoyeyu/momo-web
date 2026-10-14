@@ -2,7 +2,6 @@
 
 export const zh = {
   common: {
-    back: "返回",
     backTitle: "返回标题",
     backChat: "返回对话",
     save: "保存",

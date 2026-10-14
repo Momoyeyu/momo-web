@@ -190,6 +190,11 @@ export function getPersona(): PersonaCard {
   return state.persona;
 }
 
+/** 铭牌/说话人显示名：人设卡名留空时退回默认。 */
+export function personaName(): string {
+  return state.persona.name || DEFAULT_PERSONA.name;
+}
+
 export function getHumanBlock(): string {
   return state.humanBlock;
 }

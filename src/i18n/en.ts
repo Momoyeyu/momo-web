@@ -2,7 +2,6 @@ import type { Dict } from "./zh";
 
 export const en: Dict = {
   common: {
-    back: "Back",
     backTitle: "Back to Title",
     backChat: "Back to Chat",
     save: "Save",

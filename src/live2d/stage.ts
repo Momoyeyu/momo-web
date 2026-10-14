@@ -17,7 +17,6 @@ const DEFAULT_CORE_URL =
   "https://cubism.live2d.com/sdk-web/core/05/live2dcubismcore.min.js";
 const DEFAULT_AVATAR_URL = "/live2d/hiyori/Hiyori.model3.json";
 const CORE_TIMEOUT_MS = 15000;
-/** --dialog-zone-h 缺省值（px）。 */
 const FALLBACK_DIALOG_ZONE_H = 140;
 /** 模型高度占可用高度（窗口高 - 对话框区）的比例。 */
 const MODEL_HEIGHT_FRAC = 0.85;

@@ -2,9 +2,7 @@
 // 环形缓冲排播；worklet 上报输出 RMS → 平滑 → onMouthOpen(0..1) 驱动口型；
 // 队列播空上报 drain → onDrain。
 
-/** PCM s16le → Float32；与 pcm.ts 的 s16leToFloat32 同语义（避免循环依赖可重导出）。 */
 import { s16leToFloat32 } from "./pcm";
-export { s16leToFloat32 } from "./pcm";
 
 /** 口型平滑系数：张开快（attack）、收拢慢（release）。 */
 const MOUTH_ATTACK = 0.6;
