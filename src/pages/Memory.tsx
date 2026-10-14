@@ -14,6 +14,7 @@ import {
 } from "../memory/store";
 import { useT, currentLang } from "../i18n";
 import "../styles/persona.css";
+import "../styles/controls.css";
 
 type KindFilter = MemoryKind | "all";
 
@@ -117,6 +118,7 @@ export default function MemoryPanel({
           <label className="show-invalid">
             <input
               type="checkbox"
+              className="ckbox"
               checked={showInvalid}
               onChange={(e) => setShowInvalid(e.target.checked)}
             />

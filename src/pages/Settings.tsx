@@ -15,6 +15,7 @@ import {
 import type { PersonaCard, Settings as SettingsData } from "../lib/types";
 import { navigate } from "../router";
 import { useT, LANGS } from "../i18n";
+import Select from "../ui/Select";
 import PersonaPanel, { cleanPersona } from "./Persona";
 import MemoryPanel from "./Memory";
 import "../styles/settings.css";
@@ -66,6 +67,13 @@ function OptRow({
       <div className="opt-ctl">{children}</div>
     </div>
   );
+}
+
+/** 滑块已填充段着色：0–100 → 左金右灰的轨道渐变。 */
+function rangeFill(pct: number): React.CSSProperties {
+  return {
+    background: `linear-gradient(90deg, var(--accent) 0%, var(--accent) ${pct}%, rgba(226,197,152,0.16) ${pct}%, rgba(226,197,152,0.16) 100%)`,
+  };
 }
 
 /** 开关行控件：pill switch。 */
@@ -212,21 +220,18 @@ export default function Settings() {
               {tab === "general" && (
                 <div className="opt-list">
                   <OptRow label={t("settings.langLabel")}>
-                    <select
+                    <Select
                       value={draft.settings.general.lang}
-                      onChange={(e) =>
+                      options={LANGS.map((l) => ({
+                        value: l,
+                        label: t(`settings.langs.${l}`),
+                      }))}
+                      onChange={(v) =>
                         patchGeneral({
-                          lang: e.target
-                            .value as SettingsData["general"]["lang"],
+                          lang: v as SettingsData["general"]["lang"],
                         })
                       }
-                    >
-                      {LANGS.map((l) => (
-                        <option key={l} value={l}>
-                          {t(`settings.langs.${l}`)}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </OptRow>
                   <OptRow
                     label={t("settings.dialogOpacity")}
@@ -237,6 +242,7 @@ export default function Settings() {
                       min={0}
                       max={100}
                       step={1}
+                      style={rangeFill(draft.settings.general.dialogOpacity)}
                       value={draft.settings.general.dialogOpacity}
                       onChange={(e) =>
                         patchGeneral({ dialogOpacity: Number(e.target.value) })
@@ -252,6 +258,7 @@ export default function Settings() {
                       min={0}
                       max={100}
                       step={1}
+                      style={rangeFill(draft.settings.general.voiceVolume)}
                       value={draft.settings.general.voiceVolume}
                       onChange={(e) =>
                         patchGeneral({ voiceVolume: Number(e.target.value) })
@@ -318,15 +325,16 @@ export default function Settings() {
                     />
                   </OptRow>
                   <OptRow label={t("settings.speechLang")}>
-                    <select
+                    <Select
                       value={draft.settings.tts.lang}
-                      onChange={(e) => patch("tts", "lang", e.target.value)}
-                    >
-                      <option value="zh">中文</option>
-                      <option value="en">English</option>
-                      <option value="ja">日本語</option>
-                      <option value="auto">auto</option>
-                    </select>
+                      options={[
+                        { value: "zh", label: "中文" },
+                        { value: "en", label: "English" },
+                        { value: "ja", label: "日本語" },
+                        { value: "auto", label: "auto" },
+                      ]}
+                      onChange={(v) => patch("tts", "lang", v)}
+                    />
                   </OptRow>
                 </div>
               )}

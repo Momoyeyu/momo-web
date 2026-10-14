@@ -1,0 +1,158 @@
+/* ===== 自绘控件（统一设计语言：深底 + 香槟描边 + 暖白字）===== */
+
+/* --- 下拉选择 --- */
+
+.sel {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  max-width: 320px;
+}
+
+.sel-face {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 0.5em 0.9em;
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  color: var(--text);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.sel-face:hover {
+  background: rgba(0, 0, 0, 0.28);
+  border-color: var(--panel-border-strong);
+  box-shadow: none;
+}
+
+.sel.open .sel-face,
+.sel-face:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(223, 184, 119, 0.18);
+}
+
+/* 三角箭头：描边小菱形向下，open 时翻转。 */
+.sel-arrow {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid var(--text-dim);
+  border-bottom: 1.6px solid var(--text-dim);
+  transform: rotate(45deg) translateY(-2px);
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.sel.open .sel-arrow {
+  transform: rotate(225deg) translateY(-2px);
+  border-color: var(--accent);
+}
+
+.sel-list {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 10px;
+  background: var(--panel-solid);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  animation: sel-pop 0.16s ease both;
+}
+
+@keyframes sel-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.sel-opt {
+  display: block;
+  width: 100%;
+  padding: 8px 12px 8px 16px;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  text-align: left;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.sel-opt.hl,
+.sel-opt:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.sel-opt.on {
+  color: var(--accent-strong);
+  border-left-color: var(--accent);
+}
+
+/* --- 自绘复选框（小方框 + 对勾，用于行内勾选） --- */
+
+.ckbox {
+  appearance: none;
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  position: relative;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.ckbox:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.ckbox:checked::after {
+  content: "";
+  position: absolute;
+  left: 4.5px;
+  top: 1.5px;
+  width: 4px;
+  height: 8px;
+  border-right: 2px solid var(--on-accent);
+  border-bottom: 2px solid var(--on-accent);
+  transform: rotate(45deg);
+}
+
+.ckbox:focus-visible {
+  box-shadow: 0 0 0 2px rgba(223, 184, 119, 0.25);
+  outline: none;
+}

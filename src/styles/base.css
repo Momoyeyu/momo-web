@@ -113,9 +113,9 @@ select {
 }
 
 input:focus,
-textarea:focus,
-select:focus {
-  border-color: var(--panel-border-strong);
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(223, 184, 119, 0.15);
 }
 
 input::placeholder,
