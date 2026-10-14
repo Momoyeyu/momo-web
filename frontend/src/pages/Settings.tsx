@@ -16,7 +16,12 @@ import { getChatEngine } from "../chat/engine";
 import type { Settings as SettingsData } from "../lib/types";
 import { fromRoute, navigate } from "../router";
 import { useT, LANGS } from "../i18n";
-import { probeAsr, probeLlm, probeTts } from "../services/probe";
+import {
+  probeAsr,
+  probeEmbedding,
+  probeLlm,
+  probeTts,
+} from "../services/probe";
 import type { ProbeResult } from "../services/probe";
 import Select from "../ui/Select";
 import PersonaPanel from "./Persona";
@@ -24,7 +29,7 @@ import MemoryPanel from "./Memory";
 import AvatarPanel from "./Avatar";
 import "../styles/settings.css";
 
-type EndpointSection = "llm" | "asr" | "tts";
+type EndpointSection = "llm" | "asr" | "tts" | "embedding";
 type Section = "general" | "models" | "persona" | "memory";
 
 const TABS: Section[] = ["general", "models", "persona", "memory"];
@@ -33,6 +38,7 @@ const URL_SCHEMES: Record<EndpointSection, string[]> = {
   llm: ["http:", "https:"],
   tts: ["http:", "https:"],
   asr: ["ws:", "wss:"],
+  embedding: ["http:", "https:"],
 };
 
 /** URL 合法性：空为未配置（不算错），非空必须能解析且协议匹配。 */
@@ -112,6 +118,7 @@ export default function Settings() {
     llm: false,
     asr: false,
     tts: false,
+    embedding: false,
   });
   const [probes, setProbes] = useState<
     Partial<Record<EndpointSection, ProbeResult | "running">>
@@ -133,6 +140,7 @@ export default function Settings() {
     llm: (s) => probeLlm(s.llm),
     asr: (s) => probeAsr(s.asr),
     tts: (s) => probeTts(s.tts),
+    embedding: (s) => probeEmbedding(s.embedding),
   };
 
   const runProbe = (sec: EndpointSection): void => {
@@ -203,7 +211,7 @@ export default function Settings() {
     });
   };
 
-  const keyRow = (sec: EndpointSection) => (
+  const keyRow = (sec: "llm" | "asr" | "tts") => (
     <OptRow label={t("settings.apiKey")}>
       <input
         type={showKey[sec] ? "text" : "password"}
@@ -382,6 +390,20 @@ export default function Settings() {
                         { value: "auto", label: "auto" },
                       ]}
                       onChange={(v) => patchEndpoint("tts", "lang", v)}
+                    />
+                  </OptRow>
+
+                  <h3 className="opt-group">
+                    {t("settings.groups.embedding")}
+                  </h3>
+                  {urlRow("embedding", "settings.embUrlPh")}
+                  <OptRow label={t("settings.model")}>
+                    <input
+                      value={settings.embedding.model}
+                      placeholder={t("settings.embModelPh")}
+                      onChange={(e) =>
+                        patchEndpoint("embedding", "model", e.target.value)
+                      }
                     />
                   </OptRow>
 

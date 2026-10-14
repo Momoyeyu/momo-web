@@ -47,6 +47,13 @@ export interface TtsConfig {
   lang: string;
 }
 
+/** 语义检索 embedding 端点（http(s)://…，POST /v1/embeddings，OpenAI 对齐）。
+ *  由 backend 记忆检索消费；url 留空 = 只用词面召回。 */
+export interface EmbeddingConfig {
+  url: string;
+  model: string;
+}
+
 /** 界面语言（i18n）；新增语言同时在 i18n/ 注册字典。 */
 export type Lang = "zh" | "ja" | "en";
 
@@ -66,6 +73,7 @@ export interface Settings {
   llm: LlmConfig;
   asr: AsrConfig;
   tts: TtsConfig;
+  embedding: EmbeddingConfig;
 }
 
 /** 普通记忆条目（backend /api/memories 返回；pin 不在此列）。 */

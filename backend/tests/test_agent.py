@@ -109,3 +109,27 @@ def test_tool_memory_ops_via_react(monkeypatch):
     from app import memory
 
     assert memory.list_memories()[0]["content"] == "用户喜欢草莓"
+
+
+def test_tool_memory_update_dispatch():
+    """memory_update 走 edit_memory：更新成功 / pin:* → not_found 说明文本。"""
+    from app import memory
+    from app.agent.tools import run_call
+
+    mem = memory.add_memory("旧事实")
+    msg = run_call(
+        _tool_call(
+            "memory_update",
+            json.dumps({"id": mem["id"], "content": "新事实"}),
+            "c1",
+        ),
+        pins=[],
+    )
+    assert json.loads(msg["content"])["ok"] is True
+    assert memory.list_memories()[0]["content"] == "新事实"
+
+    msg = run_call(
+        _tool_call("memory_update", '{"id": "pin:abc", "content": "x"}', "c2"),
+        pins=[],
+    )
+    assert "不存在" in msg["content"]

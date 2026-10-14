@@ -2,7 +2,12 @@
 // 语义：拿到任何 HTTP/WS 响应都算「可达」，detail 记状态码或延迟；
 // 网络层失败/超时才算不可达。
 
-import type { AsrConfig, LlmConfig, TtsConfig } from "../lib/types";
+import type {
+  AsrConfig,
+  EmbeddingConfig,
+  LlmConfig,
+  TtsConfig,
+} from "../lib/types";
 import { asrUrl } from "./asrClient";
 import { speechUrl } from "./ttsClient";
 
@@ -12,7 +17,7 @@ export interface ProbeResult {
 }
 
 /** base-URL 语义：补 /v1；已含完整资源路径（最后一段非 vN）则原样返回 base。 */
-function llmApiBase(cfg: LlmConfig): URL {
+function llmApiBase(cfg: { url: string }): URL {
   const u = new URL(cfg.url);
   const p = u.pathname.replace(/\/+$/, "");
   if (p.endsWith("/chat/completions")) {
@@ -24,7 +29,7 @@ function llmApiBase(cfg: LlmConfig): URL {
 }
 
 /** 规范化 models url：GET {base}/models，健康探测用。 */
-function modelsUrl(cfg: LlmConfig): string {
+function modelsUrl(cfg: { url: string }): string {
   const u = llmApiBase(cfg);
   u.pathname = `${u.pathname.replace(/\/+$/, "")}/models`;
   return u.toString();
@@ -69,6 +74,13 @@ export async function probeLlm(cfg: LlmConfig): Promise<ProbeResult> {
   const headers: Record<string, string> = {};
   if (cfg.key) headers.Authorization = `Bearer ${cfg.key}`;
   return get(modelsUrl(cfg), headers);
+}
+
+export async function probeEmbedding(
+  cfg: EmbeddingConfig,
+): Promise<ProbeResult> {
+  if (!cfg.url) return { ok: false, detail: "unconfigured" };
+  return get(modelsUrl(cfg));
 }
 
 export async function probeTts(cfg: TtsConfig): Promise<ProbeResult> {

@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS: Settings = {
   llm: { url: "https://api.deepseek.com", key: "", model: "deepseek-chat" },
   asr: { url: "ws://127.0.0.1:7810/v1/listen", key: "" },
   tts: { url: "http://127.0.0.1:7811", key: "", voice: "", lang: "zh" },
+  embedding: { url: "http://10.106.130.222:11434", model: "bge-m3" },
 };
 
 export const DEFAULT_PERSONA: PersonaCard = {
@@ -191,6 +192,7 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
       llm: { ...d.settings.llm, ...s?.llm },
       asr: { ...d.settings.asr, ...s?.asr },
       tts: { ...d.settings.tts, ...s?.tts },
+      embedding: { ...d.settings.embedding, ...s?.embedding },
     },
     persona: migratePersona(parsed.persona, d.persona),
     pins: migratePins(parsed as Record<string, unknown>, d.pins),

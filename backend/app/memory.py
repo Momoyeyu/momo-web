@@ -5,7 +5,8 @@
   pin 的结果 id 形如 "pin:<sha256[:12]>"。
 - embedding 缓存：data/memory-embeddings.json，key = sha256(content)，
   普通记忆与 pin 共用；缺失条目在搜索时懒算并落盘。
-- 归一化/Jaccard 语义对齐前端 src/memory/store.ts。
+- embedding 端点取 state.settings.embedding（embed.py），未配置/不可达
+  时 search 降级 bigram Jaccard。
 """
 from __future__ import annotations
 
@@ -18,6 +19,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from . import embed as embed_mod
+from . import store as store_mod
 from .store import DATA_DIR
 
 MEMORIES_PATH = DATA_DIR / "memories.json"
@@ -137,20 +139,29 @@ def _validate(content: str) -> str:
 
 def _find_duplicate(
     content: str, pins: Iterable[str] = (), exclude_id: str | None = None
-) -> str | None:
-    """去重判定：归一化全等或 bigram Jaccard>0.85。返回冲突的已有内容。"""
+) -> dict[str, str] | None:
+    """去重判定：归一化全等或 bigram Jaccard>0.85。
+
+    命中返回冲突条目 {id, content}（pin 的 id 是 pin:* 伪 id）——
+    设计约定判重时把 id 一并回给模型，下一轮可直接 memory_update 修正。
+    """
     nc = normalize(content)
     cb = bigrams(content)
-    candidates = [(m["content"], m.get("id")) for m in _load()]
-    candidates += [(p, None) for p in pins]
+    candidates = [(str(m["content"]), str(m.get("id"))) for m in _load()]
+    candidates += [(p, pin_id(p)) for p in pins if isinstance(p, str)]
     for text, mid in candidates:
-        if mid is not None and mid == exclude_id:
+        if mid == exclude_id:
             continue
-        if normalize(str(text)) == nc:
-            return str(text)
-        if cb and jaccard(cb, bigrams(str(text))) > DUP_JACCARD:
-            return str(text)
+        if normalize(text) == nc or (cb and jaccard(cb, bigrams(text)) > DUP_JACCARD):
+            return {"id": mid, "content": text}
     return None
+
+
+def _dup_error(dup: dict[str, str]) -> MemoryError:
+    return MemoryError(
+        f"与已有记忆重复：id={dup['id']} content={dup['content']}",
+        kind="duplicate",
+    )
 
 
 def add_memory(content: str, pins: Iterable[str] = ()) -> dict[str, Any]:
@@ -158,7 +169,7 @@ def add_memory(content: str, pins: Iterable[str] = ()) -> dict[str, Any]:
     c = _validate(content)
     dup = _find_duplicate(c, pins)
     if dup is not None:
-        raise MemoryError(f"与已有记忆重复：{dup[:40]}", kind="duplicate")
+        raise _dup_error(dup)
     mem = {"id": _new_id(), "content": c, "createdAt": _now_iso()}
     mems = _load()
     mems.append(mem)
@@ -169,14 +180,17 @@ def add_memory(content: str, pins: Iterable[str] = ()) -> dict[str, Any]:
 def edit_memory(
     mem_id: str, content: str, pins: Iterable[str] = ()
 ) -> dict[str, Any]:
-    """原地编辑（保留 id/createdAt）；缓存按内容 hash，旧 embedding 自动失效。"""
+    """原地编辑（保留 id/createdAt）；缓存按内容 hash，旧 embedding 自动失效。
+
+    pin:* 不在普通记忆中 → not_found（设计：pin 只能在设置页手动维护）。
+    """
     c = _validate(content)
     mems = _load()
     for i, m in enumerate(mems):
         if m.get("id") == mem_id:
             dup = _find_duplicate(c, pins, exclude_id=mem_id)
             if dup is not None:
-                raise MemoryError(f"与已有记忆重复：{dup[:40]}", kind="duplicate")
+                raise _dup_error(dup)
             mems[i] = {"id": mem_id, "content": c, "createdAt": m.get("createdAt") or _now_iso()}
             _save(mems)
             return mems[i]
@@ -226,6 +240,13 @@ def _cosine(a: list[float], b: list[float]) -> float:
     return dot / (na * nb)
 
 
+def _embed_cfg() -> dict[str, Any]:
+    """state.settings.embedding；state 缺失时 normalize 补出厂默认。"""
+    state = store_mod.normalize_state(store_mod.read_state())
+    cfg = (state.get("settings") or {}).get("embedding")
+    return cfg if isinstance(cfg, dict) else {}
+
+
 def search_memories(
     query: str, pins: Iterable[str] = ()
 ) -> list[dict[str, str]]:
@@ -233,7 +254,7 @@ def search_memories(
 
     embedding 可用：cosine 粗排 top-15 → 0.7*cosine+0.3*recency 精排 top-5
     （recency = 候选序号(1-based)/总数，候选序 = 普通记忆文件序 + pin 序）。
-    embedding 不可用：bigram Jaccard 排序（score>0）top-5。
+    embedding 未配置/不可达：bigram Jaccard 排序（score>0）top-5。
     """
     q = (query or "").strip()
     items: list[dict[str, str]] = [
@@ -244,7 +265,8 @@ def search_memories(
     if not q or not items:
         return []
 
-    qv = embed_mod.embed(q)
+    cfg = _embed_cfg()
+    qv = embed_mod.embed(q, cfg)
     n = len(items)
 
     if qv is not None:
@@ -255,7 +277,7 @@ def search_memories(
             h = _hash(it["content"])
             vec = cache.get(h)
             if vec is None:
-                vec = embed_mod.embed(it["content"])  # 懒算并落盘
+                vec = embed_mod.embed(it["content"], cfg)  # 懒算并落盘
                 if vec is not None:
                     cache[h] = vec
                     dirty = True

@@ -19,7 +19,7 @@ _T = {
         "lang_line": "你的主语言是{lang}，需要使用该语言与用户交流，除非用户特别要求使用其他语言。",
         "time_line": "目前你所在的时区是{tz}，现在的时间是{time24h}。",
         "mem": "关于记忆：\n以下是你的初始记忆：",
-        "tools": "你有以下工具：\n1. memory_add\n2. memory_search\n3. memory_delete\n4. common_time",
+        "tools": "你有以下工具：\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
         "extra": {
             "oneLiner": "一句话简介",
             "likes": "你喜欢",
@@ -49,7 +49,7 @@ _T = {
         "lang_line": "Your primary language is {lang}; talk with the user in that language unless they explicitly ask for another one.",
         "time_line": "Your timezone is {tz}; the current time is {time24h}.",
         "mem": "About memory:\nThese are your initial memories:",
-        "tools": "You have the following tools:\n1. memory_add\n2. memory_search\n3. memory_delete\n4. common_time",
+        "tools": "You have the following tools:\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
         "extra": {
             "oneLiner": "One-liner",
             "likes": "You like",
@@ -79,7 +79,7 @@ _T = {
         "lang_line": "あなたの主言語は{lang}です。ユーザーが特に指定しない限り、その言語で話してください。",
         "time_line": "現在のタイムゾーンは{tz}、時刻は{time24h}です。",
         "mem": "記憶について：\n以下はあなたの初期記憶です：",
-        "tools": "あなたは以下のツールを使えます：\n1. memory_add\n2. memory_search\n3. memory_delete\n4. common_time",
+        "tools": "あなたは以下のツールを使えます：\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
         "extra": {
             "oneLiner": "ひとこと",
             "likes": "あなたの好きなもの",

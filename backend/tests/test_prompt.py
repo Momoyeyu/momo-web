@@ -33,7 +33,7 @@ def test_prompt_zh_fields_injected():
     assert "1. 用户的名称是夜羽" in p
     assert "2. 夜羽是我的创造者" in p
     # 工具列表
-    assert "1. memory_add" in p and "4. common_time" in p
+    assert "1. memory_add" in p and "5. common_time" in p
 
 
 def test_prompt_emotion_block_present_all_langs():

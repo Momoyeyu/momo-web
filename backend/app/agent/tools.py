@@ -1,4 +1,4 @@
-"""工具声明与执行：memory_add/search/delete + common_time。"""
+"""工具声明与执行：memory_add/search/update/delete + common_time。"""
 from __future__ import annotations
 
 import json
@@ -36,6 +36,21 @@ TOOLS: list[dict[str, Any]] = [
     {
         "type": "function",
         "function": {
+            "name": "memory_update",
+            "description": "更新一条已有普通记忆的内容（id 由 memory_search 或判重错误给出；初始记忆 pin 不可更新）",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "content": {"type": "string"},
+                },
+                "required": ["id", "content"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
             "name": "memory_delete",
             "description": "删除一条普通记忆（初始记忆 pin 不可删除）",
             "parameters": {
@@ -65,6 +80,11 @@ def execute_tool(name: str, args: dict[str, Any], pins: list[str]) -> str:
         if name == "memory_search":
             res = memory.search_memories(str(args.get("query") or ""), pins=pins)
             return json.dumps(res, ensure_ascii=False)
+        if name == "memory_update":
+            memory.edit_memory(
+                str(args.get("id") or ""), str(args.get("content") or ""), pins=pins
+            )
+            return json.dumps({"ok": True}, ensure_ascii=False)
         if name == "memory_delete":
             memory.delete_memory(str(args.get("id") or ""))
             return json.dumps({"ok": True}, ensure_ascii=False)

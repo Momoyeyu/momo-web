@@ -6,7 +6,7 @@ import pytest
 from app import embed, memory
 
 
-def _no_embed(text: str):
+def _no_embed(text: str, cfg=None):
     return None
 
 
@@ -50,6 +50,17 @@ def test_dedup_against_pins():
     with pytest.raises(memory.MemoryError) as e:
         memory.add_memory("用户叫夜羽", pins=["用户叫夜羽"])
     assert e.value.kind == "duplicate"
+    # 设计要求判重返回冲突 id + content：pin 冲突给 pin:* 伪 id
+    assert "pin:" in str(e.value)
+
+
+def test_dedup_returns_conflict_id():
+    """判重报错带回冲突记忆 id+content，模型可直接 memory_update 修正。"""
+    mem = memory.add_memory("用户喜欢草莓蛋糕")
+    with pytest.raises(memory.MemoryError) as e:
+        memory.add_memory("用户喜欢草莓蛋糕")
+    assert mem["id"] in str(e.value)
+    assert "用户喜欢草莓蛋糕" in str(e.value)
 
 
 def test_edit_and_delete():
@@ -65,6 +76,10 @@ def test_edit_and_delete():
     with pytest.raises(memory.MemoryError) as e:
         memory.delete_memory("pin:abc123")
     assert e.value.kind == "invalid"  # pin 不可删
+
+    with pytest.raises(memory.MemoryError) as e:
+        memory.edit_memory("pin:abc123", "改写")
+    assert e.value.kind == "not_found"  # pin:* 不在普通记忆 → not_found
 
     memory.delete_memory(mem["id"])
     assert memory.list_memories() == []
@@ -103,7 +118,7 @@ def test_search_embedding_path_and_lazy_cache(monkeypatch):
     }
     calls = []
 
-    def fake_embed(text):
+    def fake_embed(text, cfg=None):
         calls.append(text)
         return vecs.get(text)
 
