@@ -1,21 +1,57 @@
-/* 全局基线：深色舞台 + 暖白文字 + 香槟金点缀（视觉小说式柔和配色，不用直白粉）。 */
+/* 全局基线：深色舞台 + 暖白文字 + 柠檬金点缀（LLLJ 系配色）。
+   设计语言两条硬约束：
+   1. 圆角只用圆角矩形——禁止 999px/50% 的胶囊与半圆端头，
+      曲度只许引用下面的 --r-* token；
+   2. 颜色只许引用 --* token——分散的 rgba 字面量已全部收敛，
+      新增颜色请先在 :root 登记。 */
 
 :root {
-  --bg: #15111b;
-  --panel: rgba(30, 25, 38, 0.66);
-  --panel-solid: #241e2e;
-  --panel-border: rgba(226, 197, 152, 0.22);
-  --panel-border-strong: rgba(226, 197, 152, 0.45);
+  /* —— 曲度（圆角矩形体系）—— */
+  --r-xs: 3px; /* 饰标、菱形、tag */
+  --r-sm: 6px; /* 小控件：chip、badge、复选框、下拉项、工具条钮 */
+  --r-md: 10px; /* 标准控件：按钮、输入框、下拉、记忆卡、状态条 */
+  --r-lg: 14px; /* 大面板：对话框、modal、panel */
+
+  /* —— 底色与描边 —— */
+  --bg: #16121a;
+  --panel-rgb: 28, 23, 34;
+  --panel: rgba(var(--panel-rgb), 0.68);
+  --panel-solid: #231d2c;
+  --panel-hover: rgba(40, 33, 50, 0.78);
+  --chrome: rgba(16, 12, 20, 0.62); /* 顶/底横条 */
+  --input-bg: rgba(0, 0, 0, 0.28);
+  --backdrop: rgba(12, 9, 16, 0.62);
+  --line: rgba(234, 190, 100, 0.22);
+  --line-strong: rgba(234, 190, 100, 0.45);
+  --line-soft: rgba(234, 190, 100, 0.12);
+  --line-faint: rgba(234, 190, 100, 0.07);
+
+  /* —— 文字 —— */
   --text: #f3ecdf;
   --text-dim: #b0a48f;
-  --accent: #dfb877;
-  --accent-strong: #edcd97;
-  --accent-hover: #edcd97;
-  --accent-soft: rgba(223, 184, 119, 0.14);
-  --on-accent: #241a10;
-  --danger: #e07878;
-  --ok: #8ecf9a;
-  --radius: 12px;
+  --text-faint: rgba(176, 164, 143, 0.55);
+
+  /* —— 唯一强调色：柠檬金 —— */
+  --accent: #eab654;
+  --accent-strong: #f6d488;
+  --accent-hover: #f6d488;
+  --accent-soft: rgba(234, 182, 84, 0.14);
+  --accent-glow: rgba(234, 182, 84, 0.35);
+  --accent-ring: rgba(234, 182, 84, 0.18);
+  --on-accent: #241a08;
+
+  /* —— 语义色 —— */
+  --ok: #93d39e;
+  --warn: #f0c46c;
+  --danger: #e2828a;
+  --danger-soft: rgba(226, 130, 138, 0.12);
+  --danger-line: rgba(226, 130, 138, 0.4);
+  --danger-bg: rgba(140, 44, 54, 0.85);
+  --danger-text: #ffd9de;
+  --info: #8fd0ff;
+  --kind-episodic: #ffc48f;
+  --kind-procedural: #b6f0a8;
+
   font-size: 15px;
 }
 
@@ -58,7 +94,7 @@ button {
   font: inherit;
   cursor: pointer;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--r-md);
   padding: 0.55em 1.5em;
   background: var(--accent);
   color: var(--on-accent);
@@ -72,7 +108,7 @@ button {
 
 button:hover {
   background: var(--accent-hover);
-  box-shadow: 0 0 14px rgba(223, 184, 119, 0.35);
+  box-shadow: 0 0 14px var(--accent-glow);
 }
 
 button:active {
@@ -88,13 +124,13 @@ button:disabled {
 button.ghost {
   background: transparent;
   color: var(--text-dim);
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--line);
   font-weight: 500;
 }
 
 button.ghost:hover {
   background: var(--accent-soft);
-  border-color: var(--panel-border-strong);
+  border-color: var(--line-strong);
   color: var(--text);
   box-shadow: none;
 }
@@ -104,9 +140,9 @@ textarea,
 select {
   font: inherit;
   color: var(--text);
-  background: rgba(0, 0, 0, 0.28);
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
   padding: 0.5em 0.8em;
   outline: none;
   transition: border-color 0.15s ease;
@@ -115,18 +151,18 @@ select {
 input:focus,
 textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(223, 184, 119, 0.15);
+  box-shadow: 0 0 0 2px var(--accent-ring);
 }
 
 input::placeholder,
 textarea::placeholder {
-  color: rgba(176, 164, 143, 0.55);
+  color: var(--text-faint);
 }
 
 .panel {
   background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
   backdrop-filter: blur(14px);
   padding: 20px;
 }

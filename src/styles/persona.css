@@ -74,11 +74,11 @@ button.small {
 
 button.danger {
   color: var(--danger);
-  border-color: rgba(255, 107, 107, 0.35);
+  border-color: var(--danger-line);
 }
 
 button.danger:hover {
-  background: rgba(255, 107, 107, 0.12);
+  background: var(--danger-soft);
 }
 
 /* ---- 记忆区 ---- */
@@ -100,13 +100,13 @@ button.danger:hover {
   font-size: 13px;
   background: transparent;
   color: var(--text-dim);
-  border: 1px solid var(--panel-border);
-  border-radius: 999px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
 }
 
 .chip.on {
   background: var(--accent);
-  color: #1d1220;
+  color: var(--on-accent);
   border-color: var(--accent);
 }
 
@@ -129,8 +129,8 @@ button.danger:hover {
 }
 
 .mem-item {
-  border: 1px solid var(--panel-border);
-  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
@@ -150,30 +150,30 @@ button.danger:hover {
 
 .badge {
   padding: 0.1em 0.6em;
-  border-radius: 999px;
+  border-radius: var(--r-sm);
   font-size: 11px;
   font-weight: 600;
-  border: 1px solid var(--panel-border);
+  border: 1px solid var(--line);
 }
 
 .kind-semantic {
-  color: #8fd0ff;
-  border-color: rgba(143, 208, 255, 0.4);
+  color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 40%, transparent);
 }
 
 .kind-episodic {
-  color: #ffc48f;
-  border-color: rgba(255, 196, 143, 0.4);
+  color: var(--kind-episodic);
+  border-color: color-mix(in srgb, var(--kind-episodic) 40%, transparent);
 }
 
 .kind-procedural {
-  color: #b6f0a8;
-  border-color: rgba(182, 240, 168, 0.4);
+  color: var(--kind-procedural);
+  border-color: color-mix(in srgb, var(--kind-procedural) 40%, transparent);
 }
 
 .badge-invalid {
   color: var(--danger);
-  border-color: rgba(255, 107, 107, 0.4);
+  border-color: var(--danger-line);
 }
 
 .mem-content {

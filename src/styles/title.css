@@ -40,7 +40,6 @@
   width: 3.2em;
   height: 2px;
   margin: 10px 0 12px;
-  border-radius: 2px;
   background: linear-gradient(90deg, var(--accent), transparent);
 }
 
@@ -71,8 +70,8 @@
   gap: 12px;
   width: 100%;
   padding: 0.8em 1.5em;
-  border: 1px solid var(--panel-border);
-  border-radius: 999px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
   background: var(--panel);
   backdrop-filter: blur(14px);
   color: var(--text);
@@ -104,7 +103,7 @@
   flex: none;
   width: 7px;
   height: 7px;
-  border-radius: 1px;
+  border-radius: var(--r-xs);
   background: var(--accent);
   transform: rotate(45deg);
   opacity: 0.75;
@@ -132,17 +131,17 @@
 
 .menu-item:hover {
   transform: translateX(-8px);
-  border-color: var(--panel-border-strong);
-  background: rgba(40, 33, 50, 0.78);
+  border-color: var(--line-strong);
+  background: var(--panel-hover);
   box-shadow:
-    0 0 18px rgba(223, 184, 119, 0.18),
-    inset 0 0 0 1px rgba(223, 184, 119, 0.12);
+    0 0 18px var(--accent-ring),
+    inset 0 0 0 1px var(--line-soft);
 }
 
 .menu-item:hover .mi-orn {
   width: 16px;
   height: 3px;
-  border-radius: 2px;
+  border-radius: var(--r-xs);
   transform: none;
   opacity: 1;
 }

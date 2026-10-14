@@ -14,8 +14,8 @@
 
 .tabstrip {
   flex: none;
-  border-bottom: 1px solid var(--panel-border);
-  background: rgba(18, 14, 24, 0.6);
+  border-bottom: 1px solid var(--line);
+  background: var(--chrome);
   backdrop-filter: blur(12px);
 }
 
@@ -97,7 +97,7 @@
   align-items: center;
   gap: 28px;
   padding: 15px 4px;
-  border-bottom: 1px solid rgba(226, 197, 152, 0.1);
+  border-bottom: 1px solid var(--line-soft);
 }
 
 .opt-row:last-child {
@@ -144,7 +144,7 @@
   font-size: 12px;
 }
 
-/* --- pill 开关 --- */
+/* --- 开关（圆角矩形槽 + 圆角方块钮） --- */
 
 .opt-switch {
   position: relative;
@@ -152,9 +152,9 @@
   width: 46px;
   height: 25px;
   padding: 0;
-  border-radius: 999px;
-  border: 1px solid var(--panel-border);
-  background: rgba(226, 197, 152, 0.14);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--line-soft);
   transition:
     background 0.18s ease,
     border-color 0.18s ease;
@@ -162,11 +162,11 @@
 
 .opt-switch .knob {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 19px;
-  height: 19px;
-  border-radius: 50%;
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: var(--r-sm);
   background: var(--text-dim);
   transition:
     left 0.18s ease,
@@ -183,7 +183,7 @@
 }
 
 .opt-switch.on .knob {
-  left: 23px;
+  left: 24px;
   background: var(--accent);
 }
 
@@ -195,28 +195,32 @@
   height: 6px;
   padding: 0;
   border: none;
-  border-radius: 999px;
-  background: rgba(226, 197, 152, 0.16);
+  border-radius: var(--r-sm);
+  background: var(--line);
   outline: none;
   cursor: pointer;
 }
 
+/* 菱形 thumb：与标题菜单 ◆ 饰标同一母题。 */
 .opt-ctl input[type="range"]::-webkit-slider-thumb {
   appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  width: 13px;
+  height: 13px;
+  margin-top: 0;
+  border-radius: var(--r-xs);
   background: var(--accent);
-  border: 2px solid var(--on-accent);
-  box-shadow: 0 0 8px rgba(223, 184, 119, 0.5);
+  border: none;
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .opt-ctl input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+  width: 13px;
+  height: 13px;
+  border-radius: var(--r-xs);
   background: var(--accent);
-  border: 2px solid var(--on-accent);
+  border: none;
+  transform: rotate(45deg);
 }
 
 .settings-note {
@@ -268,8 +272,8 @@
 
 .footbar {
   flex: none;
-  border-top: 1px solid var(--panel-border);
-  background: rgba(18, 14, 24, 0.6);
+  border-top: 1px solid var(--line);
+  background: var(--chrome);
   backdrop-filter: blur(12px);
 }
 
@@ -297,7 +301,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(10, 8, 14, 0.6);
+  background: var(--backdrop);
   backdrop-filter: blur(4px);
   animation: modal-in 0.18s ease both;
 }

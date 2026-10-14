@@ -73,7 +73,7 @@ function OptRow({
 /** 滑块已填充段着色：0–100 → 左金右灰的轨道渐变。 */
 function rangeFill(pct: number): React.CSSProperties {
   return {
-    background: `linear-gradient(90deg, var(--accent) 0%, var(--accent) ${pct}%, rgba(226,197,152,0.16) ${pct}%, rgba(226,197,152,0.16) 100%)`,
+    background: `linear-gradient(90deg, var(--accent) 0%, var(--accent) ${pct}%, var(--line) ${pct}%, var(--line) 100%)`,
   };
 }
 
