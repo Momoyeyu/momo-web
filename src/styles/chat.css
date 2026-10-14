@@ -1,0 +1,234 @@
+/* 对话页：底部视觉小说式对话框（铭牌 + 字幕 + 快捷栏 + 输入行），
+   不遮挡 Live2D 人物主体。历史在 backlog 子页，不在本页展开。 */
+
+/* 对话区高度只在对话页生效（StageCanvas 用它定位人物底边）。
+   = 对话框高度 208 + 底部工具条 46。 */
+:root:has(.chat-page) {
+  --dialog-zone-h: 254px;
+  --toolbar-h: 46px;
+}
+
+.chat-page {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* 空白处点击穿透到舞台，只有交互控件吃事件。 */
+.chat-page button,
+.chat-page input {
+  pointer-events: auto;
+}
+
+.chat-status {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  backdrop-filter: blur(12px);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.chat-status .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.chat-status.status-listening {
+  color: var(--text);
+}
+
+.chat-status.status-listening .dot {
+  background: var(--ok);
+  animation: chat-pulse 1.2s ease-in-out infinite;
+}
+
+.chat-status.status-thinking .dot {
+  background: #ffd479;
+  animation: chat-pulse 0.9s ease-in-out infinite;
+}
+
+.chat-status.status-speaking {
+  color: var(--text);
+}
+
+.chat-status.status-speaking .dot {
+  background: var(--accent);
+  animation: chat-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes chat-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.chat-error {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(560px, 90vw);
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: rgba(140, 40, 60, 0.85);
+  border: 1px solid rgba(224, 120, 120, 0.4);
+  color: #ffd9de;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* —— VN 对话框 —— */
+
+.dialog-zone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--toolbar-h);
+  height: calc(var(--dialog-zone-h) - var(--toolbar-h));
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0 16px 18px;
+  pointer-events: none;
+  animation: dialog-rise 0.4s ease 0.05s both;
+}
+
+@keyframes dialog-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.dialog-box {
+  position: relative;
+  width: min(880px, 94vw);
+  min-height: 148px;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 22px 16px;
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  background: rgba(30, 25, 38, var(--dialog-alpha, 0.66));
+  backdrop-filter: blur(16px);
+  pointer-events: auto;
+  /* VN 式内描边：外侧细金线内侧再一线。 */
+  box-shadow:
+    inset 0 0 0 1px rgba(223, 184, 119, 0.07),
+    0 10px 40px rgba(0, 0, 0, 0.45);
+}
+
+/* 角色铭牌：压在对话框上缘。 */
+.nameplate {
+  position: absolute;
+  top: -13px;
+  left: 20px;
+  padding: 3px 16px;
+  border: 1px solid var(--panel-border-strong);
+  border-radius: 999px;
+  background: var(--panel-solid);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+/* 字幕：左侧对齐的台词区，占两行高度。 */
+.subtitle {
+  flex: 1;
+  min-height: 3.4em;
+  padding: 2px 4px 10px;
+  font-size: 16.5px;
+  line-height: 1.8;
+  letter-spacing: 0.02em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 输入行：与字幕间一道发丝线。 */
+.input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(226, 197, 152, 0.12);
+}
+
+.input-row input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 999px;
+}
+
+.input-row button {
+  flex: none;
+}
+
+.input-row .mic-on {
+  background: var(--accent);
+  box-shadow: 0 0 12px rgba(223, 184, 119, 0.5);
+}
+
+/* —— 底部工具条：贴底全宽横条（对照 VN 底部 icon 栏）—— */
+
+.chat-toolbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: var(--toolbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  border-top: 1px solid var(--panel-border);
+  background: rgba(18, 14, 24, 0.6);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+.tb-side {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.chat-toolbar .tb {
+  padding: 5px 14px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+.chat-toolbar .tb:hover {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  box-shadow: none;
+}
+
+.chat-toolbar .tb-off {
+  color: var(--muted, var(--text-dim));
+  opacity: 0.55;
+}

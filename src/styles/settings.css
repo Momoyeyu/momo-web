@@ -1,0 +1,336 @@
+/* ===== 设置页三段式（对照柚子社 config）=====
+   顶部 tab 条 | 中部滚动内容 | 底部操作条——三层各自是独立全宽容器，
+   tab 不与内容面板粘连。桌面横屏限定。 */
+
+.settings-page {
+  position: relative;
+  z-index: 1;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- 顶部 tab 条（独立容器，铺满顶部） --- */
+
+.tabstrip {
+  flex: none;
+  border-bottom: 1px solid var(--panel-border);
+  background: rgba(18, 14, 24, 0.6);
+  backdrop-filter: blur(12px);
+}
+
+.tabstrip-inner {
+  display: flex;
+  width: min(1200px, calc(100% - 64px));
+  margin: 0 auto;
+}
+
+.stab {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  padding: 15px 8px 13px;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.stab:hover {
+  color: var(--accent-strong);
+  box-shadow: none;
+}
+
+.stab-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.stab-sub {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.stab.active {
+  color: var(--accent-strong);
+  border-bottom-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.stab.active .stab-sub {
+  opacity: 0.9;
+}
+
+/* --- 中部滚动内容 --- */
+
+.settings-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.settings-content {
+  width: min(1100px, calc(100% - 96px));
+  margin: 0 auto;
+  padding: 26px 0 36px;
+}
+
+.settings-body {
+  padding: 8px 26px 22px;
+}
+
+/* --- 行式设置项：左标签右控件，发丝线分隔 --- */
+
+.opt-list {
+  padding: 0;
+}
+
+.opt-row {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 15px 4px;
+  border-bottom: 1px solid rgba(226, 197, 152, 0.1);
+}
+
+.opt-row:last-child {
+  border-bottom: none;
+}
+
+.opt-label {
+  flex: none;
+  width: 180px;
+  font-size: 14px;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+}
+
+.opt-extra {
+  margin-left: 10px;
+  color: var(--accent-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.opt-ctl {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.opt-ctl input[type="text"],
+.opt-ctl input[type="password"],
+.opt-ctl input:not([type]),
+.opt-ctl select {
+  flex: 1;
+  min-width: 0;
+}
+
+.opt-ctl select {
+  max-width: 320px;
+}
+
+.key-toggle {
+  flex: none;
+  padding: 0.5em 1em;
+  font-size: 12px;
+}
+
+/* --- pill 开关 --- */
+
+.opt-switch {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 25px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: rgba(226, 197, 152, 0.14);
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.opt-switch .knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition:
+    left 0.18s ease,
+    background 0.18s ease;
+}
+
+.opt-switch:hover {
+  box-shadow: none;
+}
+
+.opt-switch.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.opt-switch.on .knob {
+  left: 23px;
+  background: var(--accent);
+}
+
+/* --- 滑块（透明度/音量） --- */
+
+.opt-ctl input[type="range"] {
+  appearance: none;
+  flex: 1;
+  height: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(226, 197, 152, 0.16);
+  outline: none;
+  cursor: pointer;
+}
+
+.opt-ctl input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--on-accent);
+  box-shadow: 0 0 8px rgba(223, 184, 119, 0.5);
+}
+
+.opt-ctl input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--on-accent);
+}
+
+.settings-note {
+  margin-top: 22px;
+  padding: 0 4px;
+  font-size: 13px;
+}
+
+/* --- 人格/记忆面板复用的双栏表单 --- */
+
+.fields-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 28px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field.span2 {
+  grid-column: span 2;
+}
+
+.field-label {
+  font-size: 13px;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+}
+
+.key-row {
+  display: flex;
+  gap: 8px;
+}
+
+.key-row input {
+  flex: 1;
+}
+
+.saved-hint {
+  color: var(--ok);
+  font-size: 13px;
+  animation: modal-in 0.3s ease both;
+}
+
+/* --- 底部操作条（独立全宽容器） --- */
+
+.footbar {
+  flex: none;
+  border-top: 1px solid var(--panel-border);
+  background: rgba(18, 14, 24, 0.6);
+  backdrop-filter: blur(12px);
+}
+
+.footbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: min(1100px, calc(100% - 96px));
+  margin: 0 auto;
+  padding: 12px 0;
+}
+
+.foot-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- 未保存确认弹窗 --- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 8, 14, 0.6);
+  backdrop-filter: blur(4px);
+  animation: modal-in 0.18s ease both;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal {
+  width: min(420px, 90%);
+  padding: 26px 28px;
+  animation: dialog-rise 0.25s ease both;
+}
+
+.modal h2 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.modal p {
+  margin: 0;
+}
+
+.modal-ops {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
