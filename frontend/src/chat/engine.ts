@@ -4,7 +4,7 @@
 // 已落账历史随时可通过 engine.history 读取。
 // transcript 版本号：任何消息事件 +1，供 React 外部存储订阅（backlog 页用）。
 
-import type { ChatMessage, ChatStatus } from "../lib/types";
+import type { ChatMessage, ChatStatus, SessionMessage } from "../lib/types";
 import { ChatEngine } from "./turn";
 
 export interface EngineHandlers {
@@ -42,6 +42,12 @@ export function attachEngine(h: EngineHandlers): void {
 
 export function detachEngine(h: EngineHandlers): void {
   if (handlers === h) handlers = {};
+}
+
+/** 读档：存档 messages 灌进引擎内存转写，并通知 transcript 订阅者刷新。 */
+export function loadTranscript(messages: SessionMessage[]): void {
+  getChatEngine().loadHistory(messages);
+  bump();
 }
 
 let engine: ChatEngine | null = null;

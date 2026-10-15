@@ -7,8 +7,9 @@ from __future__ import annotations
 
 import copy
 import json
+import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .embed import DEFAULT_MODEL, DEFAULT_URL
 
@@ -76,6 +77,8 @@ DEFAULT_STATE: dict[str, Any] = {
     "avatars": [_BUILTIN_AVATAR],
     "avatarId": "builtin",
     "history": [],
+    # 上下文压缩摘要：后台压缩任务把最旧若干回合滚入此段（无则不注入上下文）
+    "summary": "",
 }
 
 
@@ -130,10 +133,30 @@ def get_state() -> dict[str, Any]:
     return normalize_state(raw)
 
 
+# state.json 读-改-写锁：append_history / 会话 load / 后台压缩写回共用，
+# 保证回合落盘与压缩截断不互相丢数据。
+_STATE_LOCK = threading.Lock()
+
+
+def update_state(mutate: Callable[[dict[str, Any]], Any]) -> Any:
+    """锁内 read-modify-write state.json，返回 mutate 的结果。
+
+    mutate 返回 False 时跳过写盘（用于「前提不成立则放弃」的原子检查）。
+    """
+    with _STATE_LOCK:
+        state = normalize_state(read_state())
+        result = mutate(state)
+        if result is not False:
+            write_state(state)
+        return result
+
+
 def append_history(entries: list[dict[str, Any]], cap: int = 100) -> None:
     """追加对话历史（cap 100）并落盘。"""
-    state = normalize_state(read_state())
-    history = list(state.get("history") or [])
-    history.extend(entries)
-    state["history"] = history[-cap:]
-    write_state(state)
+
+    def _mutate(state: dict[str, Any]) -> None:
+        history = list(state.get("history") or [])
+        history.extend(entries)
+        state["history"] = history[-cap:]
+
+    update_state(_mutate)

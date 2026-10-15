@@ -5,8 +5,14 @@ import { navigate } from "../router";
 import { useT } from "../i18n";
 import "../styles/title.css";
 
-const MENU: { route: "chat" | "settings"; labelKey: string; hint: string }[] = [
+const MENU: {
+  route: "chat" | "sessions" | "settings";
+  labelKey: string;
+  hint: string;
+}[] = [
   { route: "chat", labelKey: "title.start", hint: "start" },
+  { route: "sessions", labelKey: "sessions.save", hint: "save" },
+  { route: "sessions", labelKey: "sessions.load", hint: "load" },
   { route: "settings", labelKey: "title.config", hint: "config" },
 ];
 

@@ -10,7 +10,12 @@ import { getStage } from "../live2d/stage";
 import type { Live2DStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
 import { getSettings, newId, subscribe } from "../lib/store";
-import type { ChatMessage, ChatStatus, Settings } from "../lib/types";
+import type {
+  ChatMessage,
+  ChatStatus,
+  SessionMessage,
+  Settings,
+} from "../lib/types";
 import { DirectiveParser } from "../llm/directives";
 import type { DirectiveEvent } from "../llm/directives";
 import { streamSpeech } from "../services/ttsClient";
@@ -90,6 +95,13 @@ const DISPLAY_TICK_MS = 40;
 
 function toError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e));
+}
+
+/** 末句提取：整段过句切器，取最后一句（读档字幕用）。 */
+function lastSentence(text: string): string {
+  const sp = new SentenceSplitter();
+  const parts = sp.push(text);
+  return sp.flush() ?? parts[parts.length - 1] ?? "";
 }
 
 export class ChatEngine {
@@ -183,6 +195,31 @@ export class ChatEngine {
 
   /** 已落账对话历史（system prompt 组装用）。 */
   readonly history: ChatMessage[] = [];
+
+  /**
+   * 读档灌入：用存档 messages 整体替换内存转写（backlog/字幕显示它）。
+   * 在途回合先打断（其部分落账随旧转写一起被覆盖）；字幕 = 最后一条
+   * assistant 的末句，无则空。调用方负责 bumpTranscript 通知订阅者。
+   */
+  loadHistory(messages: SessionMessage[]): void {
+    if (this.turn) this.interruptNow();
+    this.safe(() => this.player.stop());
+    this.history.length = 0;
+    for (const m of messages) {
+      if (m.role !== "user" && m.role !== "assistant") continue;
+      this.history.push({
+        id: newId("m"),
+        role: m.role,
+        text: String(m.text ?? ""),
+        at: String(m.at ?? ""),
+      });
+    }
+    const last = [...this.history]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    this.lastDisplay = last ? lastSentence(last.text) : "";
+    this.events.onDisplay(this.lastDisplay);
+  }
 
   /** 发送一条用户文本并跑一回合（thinking→speaking→idle）。 */
   sendText(text: string): void {

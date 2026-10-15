@@ -345,6 +345,23 @@ export function getState(): PersistedState {
   return state;
 }
 
+/**
+ * 外部改动 backend state 后（如读档覆盖了 history）重拉 passthrough。
+ * 不做的话旧 history 会随下一次防抖 PUT 盖回刚加载的会话。
+ * 先掐掉在途防抖写：它携带的仍是读档前的 passthrough。
+ */
+export async function resyncPassthrough(): Promise<void> {
+  if (!inBrowser()) return;
+  if (saveTimer !== null) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  const remote = await fetchState();
+  if (!remote) return;
+  passthrough = {};
+  capturePassthrough(remote as Record<string, unknown>);
+}
+
 export function getSettings(): Settings {
   return state.settings;
 }

@@ -1,14 +1,15 @@
-// 极简 hash 路由：#/title | #/chat | #/settings | #/backlog。
+// 极简 hash 路由：#/title | #/chat | #/settings | #/backlog | #/sessions。
 
 import { useSyncExternalStore } from "react";
 
-type Route = "title" | "chat" | "settings" | "backlog";
+type Route = "title" | "chat" | "settings" | "backlog" | "sessions";
 
 const ROUTES: readonly Route[] = [
   "title",
   "chat",
   "settings",
   "backlog",
+  "sessions",
 ];
 
 function currentRoute(): Route {
