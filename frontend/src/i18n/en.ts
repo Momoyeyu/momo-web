@@ -121,6 +121,7 @@ export const en: Dict = {
       "Registered MCP servers expose their tools to momo from the next turn on; unreachable servers are simply not injected.",
     extAdd: "＋ Add extension",
     extUnnamed: "(unnamed)",
+    extSelectHint: "← Select an entry on the left to edit, or add one",
     extName: "Name",
     extNamePh: "e.g. tavily",
     extTransport: "Transport",
@@ -137,6 +138,7 @@ export const en: Dict = {
   },
   persona: {
     card: "Character Card",
+    basic: "Basic Info",
     name: "Name",
     identity: "Identity",
     age: "Age",

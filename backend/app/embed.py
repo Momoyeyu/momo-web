@@ -1,6 +1,6 @@
 """OpenAI 兼容 embeddings client。
 
-配置来自 state.settings.embedding（{url, model}，设置页可改）；
+配置来自 state.settings.embedding（{url, key, model}，设置页可改）；
 DEFAULT_URL/DEFAULT_MODEL 是出厂默认（可被 env 覆盖），
 store.py 拿它们填 DEFAULT_STATE。
 url 为空 = 未配置 → 返回 None；其余失败（超时/不可达/坏响应）
@@ -27,10 +27,15 @@ def embed(text: str, cfg: dict[str, Any] | None = None) -> list[float] | None:
     if not url:
         return None
     model = str(cfg.get("model") or "") or DEFAULT_MODEL
+    headers: dict[str, str] = {}
+    key = str(cfg.get("key") or "")
+    if key:
+        headers["Authorization"] = f"Bearer {key}"
     try:
         resp = httpx.post(
             f"{url}/v1/embeddings",
             json={"model": model, "input": text},
+            headers=headers,
             timeout=TIMEOUT,
         )
         resp.raise_for_status()

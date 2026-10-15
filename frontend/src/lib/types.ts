@@ -25,6 +25,7 @@ export interface TtsConfig {
  *  由 backend 记忆检索消费；url 留空 = 只用词面召回。 */
 export interface EmbeddingConfig {
   url: string;
+  key: string;
   model: string;
 }
 

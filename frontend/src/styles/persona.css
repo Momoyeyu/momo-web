@@ -25,6 +25,13 @@
   line-height: 1.6;
 }
 
+/* fields-grid 内的单列容器：基本信息面板左右两列各一列字段。 */
+.fields-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .field {
   display: flex;
   flex-direction: column;

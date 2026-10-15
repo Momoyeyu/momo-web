@@ -12,6 +12,7 @@ import {
 } from "../services/memoryClient";
 import { useT, currentLang } from "../i18n";
 import "../styles/persona.css";
+import "../styles/settings.css";
 import "../styles/controls.css";
 
 const LOCALE = { zh: "zh-CN", ja: "ja-JP", en: "en-US" } as const;
@@ -149,40 +150,45 @@ export default function MemoryPanel() {
     );
 
   return (
-    <div className="persona-tab">
+    /* 双栏：初始记忆 | 普通记忆；添加行钉在各面板底缘。 */
+    <div className="settings-cols">
       {/* 1. 初始记忆（pin）：常驻事实，保存后进 system prompt 的「初始记忆」段 */}
-      <section className="panel persona-section">
+      <section className="panel persona-section settings-col">
         <h2>{t("memory.pinsTitle")}</h2>
         <p className="muted">{t("memory.pinsDesc")}</p>
-        <div className="row">
-          <input
-            className="mem-search"
-            placeholder={t("memory.pinPh")}
-            value={pinDraft}
-            onChange={(e) => setPinDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                void add(pinDraft, true);
-              }
-            }}
-          />
-          <button
-            className="small"
-            onClick={() => void add(pinDraft, true)}
-            disabled={!pinDraft.trim()}
-          >
-            {t("memory.pinAdd")}
-          </button>
+        <div className="col-grow">
+          {pins.map((m) => (
+            <div className="mem-item" key={m.id}>
+              {editRow(m)}
+            </div>
+          ))}
         </div>
-        {pins.map((m) => (
-          <div className="mem-item" key={m.id}>
-            {editRow(m)}
+        <div className="col-foot">
+          <div className="row">
+            <input
+              className="mem-search"
+              placeholder={t("memory.pinPh")}
+              value={pinDraft}
+              onChange={(e) => setPinDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  void add(pinDraft, true);
+                }
+              }}
+            />
+            <button
+              className="small"
+              onClick={() => void add(pinDraft, true)}
+              disabled={!pinDraft.trim()}
+            >
+              {t("memory.pinAdd")}
+            </button>
           </div>
-        ))}
+        </div>
       </section>
 
       {/* 2. 普通记忆：agent 工具写入 + 手动维护，数据在 backend */}
-      <section className="panel persona-section">
+      <section className="panel persona-section settings-col">
         <h2>{t("memory.normalTitle")}</h2>
         <p className="muted">{t("memory.normalDesc")}</p>
         <div className="mem-toolbar">
@@ -193,37 +199,40 @@ export default function MemoryPanel() {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <div className="row">
-          <input
-            className="mem-search"
-            placeholder={t("memory.addPh")}
-            value={addDraft}
-            onChange={(e) => setAddDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                void add(addDraft, false);
-              }
-            }}
-          />
-          <button
-            className="small"
-            onClick={() => void add(addDraft, false)}
-            disabled={!addDraft.trim()}
-          >
-            {t("memory.add")}
-          </button>
+        <div className="col-grow">
+          {loadFailed && <p className="muted">{t("memory.loadFailed")}</p>}
+          {!loadFailed && shown.length === 0 && (
+            <p className="muted">{t("memory.empty")}</p>
+          )}
+
+          {shown.map((m) => (
+            <div className="mem-item" key={m.id}>
+              {editRow(m)}
+            </div>
+          ))}
         </div>
-
-        {loadFailed && <p className="muted">{t("memory.loadFailed")}</p>}
-        {!loadFailed && shown.length === 0 && (
-          <p className="muted">{t("memory.empty")}</p>
-        )}
-
-        {shown.map((m) => (
-          <div className="mem-item" key={m.id}>
-            {editRow(m)}
+        <div className="col-foot">
+          <div className="row">
+            <input
+              className="mem-search"
+              placeholder={t("memory.addPh")}
+              value={addDraft}
+              onChange={(e) => setAddDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                  void add(addDraft, false);
+                }
+              }}
+            />
+            <button
+              className="small"
+              onClick={() => void add(addDraft, false)}
+              disabled={!addDraft.trim()}
+            >
+              {t("memory.add")}
+            </button>
           </div>
-        ))}
+        </div>
       </section>
     </div>
   );

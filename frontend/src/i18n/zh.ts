@@ -121,6 +121,7 @@ export const zh = {
       "登记外部 MCP server 后，它的工具会从下一轮对话起对 momo 可用；连不上的 server 不会注入工具。",
     extAdd: "＋ 添加拓展",
     extUnnamed: "（未命名）",
+    extSelectHint: "← 在左侧选择一条进行编辑，或点「添加」",
     extName: "名称",
     extNamePh: "如 tavily",
     extTransport: "连接方式",
@@ -137,6 +138,7 @@ export const zh = {
   },
   persona: {
     card: "人设卡",
+    basic: "基本信息",
     name: "名称",
     identity: "身份",
     age: "年龄",

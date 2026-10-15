@@ -121,6 +121,7 @@ export const ja: Dict = {
       "外部 MCP サーバーを登録すると、そのツールは次のターンから momo が使えます。接続できないサーバーは注入されません。",
     extAdd: "＋ 拡張を追加",
     extUnnamed: "（無名）",
+    extSelectHint: "← 左の一覧から選択して編集、または追加",
     extName: "名前",
     extNamePh: "例：tavily",
     extTransport: "接続方式",
@@ -137,6 +138,7 @@ export const ja: Dict = {
   },
   persona: {
     card: "キャラ設定",
+    basic: "基本情報",
     name: "名前",
     identity: "アイデンティティ",
     age: "年齢",

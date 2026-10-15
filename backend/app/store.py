@@ -63,7 +63,7 @@ DEFAULT_STATE: dict[str, Any] = {
         "asr": {"url": "", "key": ""},
         "tts": {"url": "", "key": "", "voice": "", "lang": "zh"},
         # 语义检索端点（设置页「模型」tab 可改）；url 留空 = 只用词面召回
-        "embedding": {"url": DEFAULT_URL, "model": DEFAULT_MODEL},
+        "embedding": {"url": DEFAULT_URL, "key": "", "model": DEFAULT_MODEL},
         # MCP 拓展清单（{name,transport,command?,endpoint?,apiKey?,enabled}）
         "extensions": [],
     },

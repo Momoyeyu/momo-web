@@ -80,7 +80,9 @@ export async function probeEmbedding(
   cfg: EmbeddingConfig,
 ): Promise<ProbeResult> {
   if (!cfg.url) return { ok: false, detail: "unconfigured" };
-  return get(modelsUrl(cfg));
+  const headers: Record<string, string> = {};
+  if (cfg.key) headers.Authorization = `Bearer ${cfg.key}`;
+  return get(modelsUrl(cfg), headers);
 }
 
 export async function probeTts(cfg: TtsConfig): Promise<ProbeResult> {

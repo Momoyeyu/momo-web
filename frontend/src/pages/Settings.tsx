@@ -1,6 +1,6 @@
 // 设置页三段式（对照柚子社 config 结构）：
 //   顶部 tab 条——独立全宽容器，页签均分铺满；
-//   中部内容——行式设置项（左标签右控件，发丝线分隔）；
+//   中部内容——双栏面板（底边对齐：底部行为钉底、中段留白为弹性区）；
 //   底部操作条——返回按钮聚拢右下。
 // 即改即生效：每次修改直接 update() 落盘（localStorage + 防抖 PUT
 // /api/state），无草稿/保存概念——语言切换等立即生效。
@@ -116,7 +116,10 @@ function OptSwitch({
       className={`opt-switch${on ? " on" : ""}`}
       disabled={disabled}
       title={title}
-      onClick={() => onChange(!on)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onChange(!on);
+      }}
     >
       <span className="knob" />
     </button>
@@ -364,7 +367,7 @@ export default function Settings() {
       ? d.command.trim() !== ""
       : d.endpoint.trim() !== "" && !extEndpointError(d.endpoint));
 
-  const keyRow = (sec: "llm" | "asr" | "tts") => (
+  const keyRow = (sec: EndpointSection) => (
     <OptRow label={t("settings.apiKey")}>
       <input
         type={showKey[sec] ? "text" : "password"}
@@ -412,9 +415,10 @@ export default function Settings() {
           ) : tab === "memory" ? (
             <MemoryPanel />
           ) : (
-            <div className="settings-body panel">
+            <div className="settings-body">
               {tab === "general" && (
-                <div className="opt-list">
+                <div className="settings-cols">
+                <section className="panel settings-col opt-list">
                   <OptRow label={t("settings.langLabel")}>
                     <Select
                       value={settings.general.lang}
@@ -446,65 +450,6 @@ export default function Settings() {
                       }
                     />
                   </OptRow>
-                  <h3 className="opt-group">
-                    {t("settings.groups.dialog")}
-                  </h3>
-                  <OptRow
-                    label={t("settings.dialogOpacity")}
-                    extra={`${settings.general.dialogOpacity}%`}
-                  >
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      style={rangeFill(settings.general.dialogOpacity)}
-                      value={settings.general.dialogOpacity}
-                      onChange={(e) =>
-                        patchGeneral({ dialogOpacity: Number(e.target.value) })
-                      }
-                    />
-                  </OptRow>
-                  <OptRow
-                    label={t("settings.textSpeed")}
-                    extra={`${settings.general.textSpeed}%`}
-                  >
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      style={rangeFill(settings.general.textSpeed)}
-                      value={settings.general.textSpeed}
-                      onChange={(e) =>
-                        patchGeneral({ textSpeed: Number(e.target.value) })
-                      }
-                    />
-                  </OptRow>
-                  <OptRow
-                    label={t("settings.sentenceSpeed")}
-                    extra={`${settings.general.sentenceSpeed}%`}
-                  >
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      style={rangeFill(settings.general.sentenceSpeed)}
-                      value={settings.general.sentenceSpeed}
-                      onChange={(e) =>
-                        patchGeneral({ sentenceSpeed: Number(e.target.value) })
-                      }
-                    />
-                  </OptRow>
-                  {/* 对话框实时预览：多句循环，逐字上屏 + 按切句速度换句 */}
-                  <DialogPreview
-                    name={state.persona.name || personaName()}
-                    sample={t("settings.previewSample")}
-                    opacity={settings.general.dialogOpacity}
-                    textSpeed={settings.general.textSpeed}
-                    sentenceSpeed={settings.general.sentenceSpeed}
-                  />
                   <OptRow
                     label={t("settings.voiceInput")}
                     extra={!asrConfigured ? t("settings.voiceNeedAsr") : undefined}
@@ -567,11 +512,80 @@ export default function Settings() {
                       onChange={(v) => patchGeneral({ showStatus: v })}
                     />
                   </OptRow>
+                </section>
+                {/* 对话框设置子组：三滑块 + 预览同组联动，预览钉在面板底缘。 */}
+                <section className="panel settings-col">
+                  <h3 className="opt-group">
+                    {t("settings.groups.dialog")}
+                  </h3>
+                  <div className="opt-list">
+                  <OptRow
+                    label={t("settings.dialogOpacity")}
+                    extra={`${settings.general.dialogOpacity}%`}
+                  >
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      style={rangeFill(settings.general.dialogOpacity)}
+                      value={settings.general.dialogOpacity}
+                      onChange={(e) =>
+                        patchGeneral({ dialogOpacity: Number(e.target.value) })
+                      }
+                    />
+                  </OptRow>
+                  <OptRow
+                    label={t("settings.textSpeed")}
+                    extra={`${settings.general.textSpeed}%`}
+                  >
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      style={rangeFill(settings.general.textSpeed)}
+                      value={settings.general.textSpeed}
+                      onChange={(e) =>
+                        patchGeneral({ textSpeed: Number(e.target.value) })
+                      }
+                    />
+                  </OptRow>
+                  <OptRow
+                    label={t("settings.sentenceSpeed")}
+                    extra={`${settings.general.sentenceSpeed}%`}
+                  >
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      style={rangeFill(settings.general.sentenceSpeed)}
+                      value={settings.general.sentenceSpeed}
+                      onChange={(e) =>
+                        patchGeneral({ sentenceSpeed: Number(e.target.value) })
+                      }
+                    />
+                  </OptRow>
+                  </div>
+                  {/* 对话框实时预览：多句循环，逐字上屏 + 按切句速度换句 */}
+                  <div className="col-foot">
+                    <DialogPreview
+                      name={state.persona.name || personaName()}
+                      sample={t("settings.previewSample")}
+                      opacity={settings.general.dialogOpacity}
+                      textSpeed={settings.general.textSpeed}
+                      sentenceSpeed={settings.general.sentenceSpeed}
+                    />
+                  </div>
+                </section>
                 </div>
               )}
 
               {tab === "models" && (
-                <div className="opt-list">
+                <>
+                <div className="settings-cols">
+                <section className="panel settings-col opt-list">
                   <h3 className="opt-group">{t("settings.groups.llm")}</h3>
                   {urlRow("llm", "settings.llmUrlPh", true)}
                   {keyRow("llm")}
@@ -589,6 +603,22 @@ export default function Settings() {
                     )}
                   </OptRow>
 
+                  <h3 className="opt-group">
+                    {t("settings.groups.embedding")}
+                  </h3>
+                  {urlRow("embedding", "settings.embUrlPh")}
+                  {keyRow("embedding")}
+                  <OptRow label={t("settings.model")}>
+                    <input
+                      value={settings.embedding.model}
+                      placeholder={t("settings.embModelPh")}
+                      onChange={(e) =>
+                        patchEndpoint("embedding", "model", e.target.value)
+                      }
+                    />
+                  </OptRow>
+                </section>
+                <section className="panel settings-col opt-list">
                   <h3 className="opt-group">{t("settings.groups.asr")}</h3>
                   {urlRow("asr", "settings.asrUrlPh")}
                   {keyRow("asr")}
@@ -616,84 +646,94 @@ export default function Settings() {
                     />
                   </OptRow>
 
-                  <h3 className="opt-group">
-                    {t("settings.groups.embedding")}
-                  </h3>
-                  {urlRow("embedding", "settings.embUrlPh")}
-                  <OptRow label={t("settings.model")}>
-                    <input
-                      value={settings.embedding.model}
-                      placeholder={t("settings.embModelPh")}
-                      onChange={(e) =>
-                        patchEndpoint("embedding", "model", e.target.value)
-                      }
-                    />
-                  </OptRow>
-
+                </section>
+                </div>
+                <section className="panel settings-full">
                   <h3 className="opt-group">
                     {t("settings.groups.avatar")}
                     <span className="req">*</span>
                   </h3>
                   <AvatarPanel />
-                </div>
+                </section>
+                </>
               )}
 
               {tab === "extend" && (
-                <div className="opt-list">
+                <div className="settings-cols">
+                {/* 左栏：MCP server 列表（点击行 → 右栏编辑） */}
+                <section className="panel settings-col">
                   <h3 className="opt-group">
                     {t("settings.groups.extensions")}
                   </h3>
-                  {extEditing === null || !extDraft ? (
-                    <>
+                  <div className="opt-list col-grow">
+                    {settings.extensions.length === 0 && (
                       <p className="muted">{t("settings.extHint")}</p>
-                      {settings.extensions.map((ext, i) => (
-                        <OptRow
-                          key={i}
-                          label={ext.name || t("settings.extUnnamed")}
-                          extra={t(`settings.extTransports.${ext.transport}`)}
-                        >
-                          <OptSwitch
-                            on={ext.enabled}
-                            onChange={(v) =>
-                              patchExtensions(
-                                settings.extensions.map((x, j) =>
-                                  j === i ? { ...x, enabled: v } : x,
-                                ),
-                              )
-                            }
-                          />
-                          <button
-                            type="button"
-                            className="ghost key-toggle"
-                            onClick={() => startEditExt(i)}
-                          >
-                            {t("common.edit")}
-                          </button>
-                          <button
-                            type="button"
-                            className="ghost key-toggle danger"
-                            onClick={() =>
-                              patchExtensions(
-                                settings.extensions.filter((_, j) => j !== i),
-                              )
-                            }
-                          >
-                            {t("common.del")}
-                          </button>
-                        </OptRow>
-                      ))}
-                      <OptRow label="">
+                    )}
+                    {settings.extensions.map((ext, i) => (
+                      <div
+                        key={i}
+                        className={`ext-row${extEditing === i ? " selected" : ""}`}
+                        onClick={() => startEditExt(i)}
+                      >
+                        <span className="ext-name">
+                          {ext.name || t("settings.extUnnamed")}
+                        </span>
+                        <span className="ext-transport muted">
+                          {t(`settings.extTransports.${ext.transport}`)}
+                        </span>
+                        <OptSwitch
+                          on={ext.enabled}
+                          onChange={(v) =>
+                            patchExtensions(
+                              settings.extensions.map((x, j) =>
+                                j === i ? { ...x, enabled: v } : x,
+                              ),
+                            )
+                          }
+                        />
                         <button
                           type="button"
-                          className="ghost"
-                          onClick={() => startEditExt(-1)}
+                          className="ghost key-toggle danger"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            patchExtensions(
+                              settings.extensions.filter((_, j) => j !== i),
+                            );
+                            if (extEditing === i) {
+                              setExtEditing(null);
+                              setExtDraft(null);
+                            }
+                          }}
                         >
-                          {t("settings.extAdd")}
+                          {t("common.del")}
                         </button>
-                      </OptRow>
-                    </>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="col-foot">
+                    <button
+                      type="button"
+                      className="ghost"
+                      onClick={() => startEditExt(-1)}
+                    >
+                      {t("settings.extAdd")}
+                    </button>
+                  </div>
+                </section>
+                {/* 右栏：编辑面板（master-detail）；未选中 = 空态 */}
+                <section className="panel settings-col">
+                  {extEditing === null || !extDraft ? (
+                    <div className="ext-empty muted">
+                      {t("settings.extSelectHint")}
+                    </div>
                   ) : (
                     <>
+                    <h3 className="opt-group">
+                      {extEditing < 0
+                        ? t("settings.extAdd")
+                        : extDraft.name || t("settings.extUnnamed")}
+                    </h3>
+                    <div className="opt-list col-grow">
                       <OptRow label={t("settings.extName")} required>
                         <input
                           value={extDraft.name}
@@ -800,15 +840,8 @@ export default function Settings() {
                           onChange={(v) => patchExtDraft({ enabled: v })}
                         />
                       </OptRow>
-                      <OptRow label="">
-                        <button
-                          type="button"
-                          className="key-toggle"
-                          disabled={!extDraftValid(extDraft)}
-                          onClick={saveExt}
-                        >
-                          {t("common.save")}
-                        </button>
+                    </div>
+                    <div className="ext-actions col-foot">
                         <button
                           type="button"
                           className="ghost key-toggle"
@@ -819,9 +852,18 @@ export default function Settings() {
                         >
                           {t("common.cancel")}
                         </button>
-                      </OptRow>
+                        <button
+                          type="button"
+                          className="key-toggle"
+                          disabled={!extDraftValid(extDraft)}
+                          onClick={saveExt}
+                        >
+                          {t("common.save")}
+                        </button>
+                    </div>
                     </>
                   )}
+                </section>
                 </div>
               )}
             </div>
