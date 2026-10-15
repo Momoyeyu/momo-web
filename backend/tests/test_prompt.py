@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from app import agent, store
 
+_PINS = ["用户的名称是夜羽", "夜羽是我的创造者"]
+
 
 def _state(lang: str, **over):
     return store.normalize_state(
@@ -15,14 +17,17 @@ def _state(lang: str, **over):
                 "personality": "乖巧听话",
                 "preferences": ["喜欢草莓蛋糕", "讨厌苦的东西"],
             },
-            "pins": ["用户的名称是夜羽", "夜羽是我的创造者"],
             **over,
         }
     )
 
 
+def _prompt(lang: str, pins=_PINS, **over) -> str:
+    return agent.build_system_prompt(_state(lang, **over), pins)
+
+
 def test_prompt_zh_fields_injected():
-    p = agent.build_system_prompt(_state("zh"))
+    p = _prompt("zh")
     assert "# 人格配置" in p and "## 你的基本信息" in p
     assert "- 你的名字叫momo" in p
     assert "- 你的身份是AI" in p
@@ -44,7 +49,7 @@ def test_prompt_zh_fields_injected():
 
 def test_prompt_no_pins_section_when_empty():
     """pins 为空 → 初始记忆段不出现，记忆使用策略仍在。"""
-    p = agent.build_system_prompt(_state("zh", pins=[]))
+    p = _prompt("zh", pins=[])
     assert "## 你的初始记忆" not in p
     assert "## 记忆使用策略" in p
 
@@ -52,12 +57,12 @@ def test_prompt_no_pins_section_when_empty():
 def test_prompt_directive_sections_all_langs():
     """默认内置形象（Hiyori：无表情、10 个动作）→ 只注入动作段。"""
     for lang in ("zh", "en", "ja"):
-        p = agent.build_system_prompt(_state(lang))
+        p = _prompt(lang)
         assert "<motion>" in p and "Idle/4" in p
         assert "<exp>" not in p  # Hiyori 无表情文件 → 表情段不注入
         # 行为配置是最后一节，末尾是动作控制小节 + 容错说明
         assert p.split("\n\n")[-1].startswith("##")
-    zh = agent.build_system_prompt(_state("zh"))
+    zh = _prompt("zh")
     assert "# 行为配置" in zh
     assert "## 动作控制策略" in zh
     assert "## 表情控制策略" not in zh
@@ -67,23 +72,21 @@ def test_prompt_directive_sections_all_langs():
 
 def test_prompt_directive_sections_with_expressions():
     """导入模型带表情资源 → 表情段注入，名称-描述成行。"""
-    p = agent.build_system_prompt(
-        _state(
-            "zh",
-            avatarId="av_x",
-            avatars=[
-                {
-                    "id": "av_x",
-                    "resources": {
-                        "expressions": [
-                            {"name": "star_eyes", "desc": "非常期待"},
-                            {"name": "fukidashi", "desc": ""},
-                        ],
-                        "motions": [{"name": "Tap/0", "desc": ""}],
-                    },
-                }
-            ],
-        )
+    p = _prompt(
+        "zh",
+        avatarId="av_x",
+        avatars=[
+            {
+                "id": "av_x",
+                "resources": {
+                    "expressions": [
+                        {"name": "star_eyes", "desc": "非常期待"},
+                        {"name": "fukidashi", "desc": ""},
+                    ],
+                    "motions": [{"name": "Tap/0", "desc": ""}],
+                },
+            }
+        ],
     )
     assert "## 表情控制策略" in p
     assert "- star_eyes — 非常期待" in p
@@ -93,58 +96,54 @@ def test_prompt_directive_sections_with_expressions():
 
 def test_prompt_no_directive_section_when_no_resources():
     """当前形象没有资源清单 → 整个行为配置节不出现。"""
-    p = agent.build_system_prompt(
-        _state("zh", avatarId="av_x", avatars=[{"id": "av_x"}])
-    )
+    p = _prompt("zh", avatarId="av_x", avatars=[{"id": "av_x"}])
     assert "<exp>" not in p and "<motion>" not in p
     assert "# 行为配置" not in p
 
 
 def test_prompt_en_and_ja_templates():
-    en = agent.build_system_prompt(_state("en"))
+    en = _prompt("en")
     assert "Your name is momo" in en
     assert "## Your initial memories" in en
     assert "- 用户的名称是夜羽" in en
     assert "English" in en
 
-    ja = agent.build_system_prompt(_state("ja"))
+    ja = _prompt("ja")
     assert "あなたの名前はmomo" in ja
     assert "日本語" in ja
 
 
 def test_prompt_chat_lang_overrides_ui_lang():
     """对话语言独立于界面语言：chatLang=ja + lang=zh → ja 模板。"""
-    p = agent.build_system_prompt(
-        _state("zh", settings={"general": {"lang": "zh", "chatLang": "ja"}})
+    p = _prompt(
+        "zh", settings={"general": {"lang": "zh", "chatLang": "ja"}}
     )
     assert "あなたの名前はmomo" in p
     assert "日本語" in p
 
     # auto/缺失 → 回落界面语言
-    p2 = agent.build_system_prompt(
-        _state("ja", settings={"general": {"lang": "ja", "chatLang": "auto"}})
+    p2 = _prompt(
+        "ja", settings={"general": {"lang": "ja", "chatLang": "auto"}}
     )
     assert "あなたの名前はmomo" in p2
 
 
 def test_prompt_unknown_lang_falls_back_zh():
-    p = agent.build_system_prompt(_state("fr"))
+    p = _prompt("fr")
     assert "你的名字叫momo" in p
 
 
 def test_prompt_empty_persona_falls_back_defaults():
     """用户在设置页清空人设字段 → prompt 装配出厂默认值。"""
-    p = agent.build_system_prompt(
-        _state(
-            "zh",
-            persona={
-                "name": "",
-                "identity": "",
-                "age": None,
-                "personality": "",
-                "preferences": [],
-            },
-        )
+    p = _prompt(
+        "zh",
+        persona={
+            "name": "",
+            "identity": "",
+            "age": None,
+            "personality": "",
+            "preferences": [],
+        },
     )
     assert "你的名字叫momo" in p
     assert "你的身份是由夜羽开发的AI" in p

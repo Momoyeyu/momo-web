@@ -1,4 +1,4 @@
-"""/api/memories CRUD：普通记忆（id/content/createdAt）。"""
+"""/api/memories CRUD：长期记忆（含 pinned=初始记忆，设置页手动维护）。"""
 from __future__ import annotations
 
 from typing import Any
@@ -6,16 +6,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 
-from .. import memory, store
+from .. import memory
 
 router = APIRouter()
-
-
-def _pins() -> list[str]:
-    pins = store.get_state().get("pins")
-    if not isinstance(pins, list):
-        return []
-    return [p for p in pins if isinstance(p, str)]
 
 
 def _raise_http(e: memory.MemoryError) -> None:
@@ -26,26 +19,32 @@ def _raise_http(e: memory.MemoryError) -> None:
 
 class MemoryIn(BaseModel):
     content: str
+    pinned: bool = False
+
+
+class MemoryPatch(BaseModel):
+    content: str
 
 
 @router.get("/api/memories")
 def list_memories() -> list[dict[str, Any]]:
+    """全部记忆（含 pinned 标记；前端按 pinned 拆「初始/普通」两个区块）。"""
     return memory.list_memories()
 
 
 @router.post("/api/memories", status_code=201)
 def create_memory(body: MemoryIn) -> dict[str, Any]:
     try:
-        mem = memory.add_memory(body.content, pins=_pins())
+        mem = memory.add_memory(body.content, pinned=body.pinned)
     except memory.MemoryError as e:
         _raise_http(e)
-    return {"id": mem["id"]}
+    return {"id": mem["id"], "pinned": mem["pinned"]}
 
 
 @router.patch("/api/memories/{mem_id}")
-def update_memory(mem_id: str, body: MemoryIn) -> dict[str, Any]:
+def update_memory(mem_id: str, body: MemoryPatch) -> dict[str, Any]:
     try:
-        return memory.edit_memory(mem_id, body.content, pins=_pins())
+        return memory.edit_memory(mem_id, body.content)
     except memory.MemoryError as e:
         _raise_http(e)
 

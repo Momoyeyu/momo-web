@@ -1,4 +1,4 @@
-// 记忆客户端：/api/memories CRUD（普通记忆；pins 走 /api/state）。
+// 记忆客户端：/api/memories CRUD（含 pinned 初始记忆，momo.db 持久化）。
 
 import { apiFetch, apiJson, jsonInit } from "./http";
 import type { Memory } from "../lib/types";
@@ -9,8 +9,15 @@ export function listMemories(): Promise<Memory[]> {
   return apiJson<Memory[]>(API);
 }
 
-export async function addMemory(content: string): Promise<string> {
-  const res = await apiJson<{ id: string }>(API, jsonInit("POST", { content }));
+/** pinned=true 即初始记忆：常驻注入 system prompt、不可经本 API 删除。 */
+export async function addMemory(
+  content: string,
+  pinned = false,
+): Promise<string> {
+  const res = await apiJson<{ id: string }>(
+    API,
+    jsonInit("POST", { content, pinned }),
+  );
   return res.id;
 }
 

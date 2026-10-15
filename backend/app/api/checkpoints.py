@@ -39,6 +39,15 @@ def create_checkpoint(body: CheckpointIn | None = None) -> dict[str, Any]:
     return {"id": entry["id"], "slot": entry["slot"]}
 
 
+@router.get("/api/checkpoints/live")
+def live_transcript() -> dict[str, Any]:
+    """当前会话（live 行）全文：前端启动时恢复字幕/backlog 用。"""
+    return {
+        "summary": checkpoint.live_summary(),
+        "messages": checkpoint.live_messages(),
+    }
+
+
 @router.get("/api/checkpoints/{sid}")
 def get_checkpoint(sid: str) -> dict[str, Any]:
     """存档全文（含 messages）。"""

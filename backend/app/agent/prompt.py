@@ -168,8 +168,14 @@ def _resource_lines(items: Any) -> list[str]:
     return lines
 
 
-def build_system_prompt(state: dict[str, Any]) -> str:
-    """按契约模板组装 system prompt；初始记忆/表情/动作段按条件注入。"""
+def build_system_prompt(
+    state: dict[str, Any], pins: list[str] | None = None
+) -> str:
+    """按契约模板组装 system prompt；初始记忆/表情/动作段按条件注入。
+
+    pins：初始记忆文本列表（momo.db memories.pinned=1；由调用方注入，
+    state 里已不含 pin 数据）。
+    """
     lang = _lang_of(state)
     t = _T[lang]
     # 空字段回落出厂人设：用户在设置里清空=回到初始状态，
@@ -185,9 +191,7 @@ def build_system_prompt(state: dict[str, Any]) -> str:
     if not any(str(p).strip() for p in (persona.get("preferences") or [])):
         persona["preferences"] = _DEFAULT_PERSONA["preferences"]
     pins = [
-        p.strip()
-        for p in (state.get("pins") or [])
-        if isinstance(p, str) and p.strip()
+        p.strip() for p in (pins or []) if isinstance(p, str) and p.strip()
     ]
 
     tinfo = now_info()

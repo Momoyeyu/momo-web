@@ -1,7 +1,8 @@
 """ReAct 循环：LLM ↔ 工具调用，直到拿到正文。
 
 run_turn(text) 是生成器：yield SSE 事件 dict（delta/error）。
-history 由本模块在回合结束时追加并落盘（cap 100）。
+回合落账走 checkpoint live 行：开始记代际并写 user 消息，拿到正文后
+commit_reply 校验代际——读档/打断使在途回合的写入作废。
 """
 from __future__ import annotations
 
@@ -9,7 +10,7 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Iterator
 
-from .. import llm, store
+from .. import checkpoint, llm, memory, store
 from . import compress, extend
 from .prompt import build_system_prompt
 from .capability import TOOLS, run_call
@@ -57,14 +58,14 @@ def run_turn(text: str) -> Iterator[dict[str, Any]]:
     无 tool_calls 的 content 切段作为 delta；5 轮仍无 content → error。
     """
     state = store.normalize_state(store.read_state())
-    pins = [p for p in (state.get("pins") or []) if isinstance(p, str)]
+    pins = memory.pins()
     llm_cfg = (state.get("settings") or {}).get("llm") or {}
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": build_system_prompt(state)}
+        {"role": "system", "content": build_system_prompt(state, pins)}
     ]
     # 压缩摘要存在时单独一条 system 消息承载：context = system + 摘要 + 最近窗口
-    summary = str(state.get("summary") or "").strip()
+    summary = checkpoint.live_summary().strip()
     if summary:
         messages.append(
             {
@@ -73,11 +74,17 @@ def run_turn(text: str) -> Iterator[dict[str, Any]]:
                 + summary,
             }
         )
-    for h in (state.get("history") or [])[-HISTORY_WINDOW:]:
+    for h in checkpoint.live_messages()[-HISTORY_WINDOW:]:
         role = h.get("role")
         if role in ("user", "assistant"):
             messages.append({"role": role, "content": str(h.get("text") or "")})
     messages.append({"role": "user", "content": text})
+
+    # 代际快照 + user 落账：读档/打断会把代际 +1，之后的 commit 作废
+    at = datetime.now(timezone.utc).isoformat()
+    gen = checkpoint.generation()
+    if not checkpoint.begin_turn(text, gen, at):
+        return  # 会话已被读档/重置，本回合静默作废
 
     # 拓展：连接 enabled 的 MCP server（连不上即不注入，失败不拖垮回合），
     # 工具以 {server}_{tool} 注入；turn 结束统一关闭连接。
@@ -105,7 +112,7 @@ def run_turn(text: str) -> Iterator[dict[str, Any]]:
             if tool_calls:
                 messages.append(msg)  # assistant（含 tool_calls）原样回传
                 for call in tool_calls:
-                    messages.append(run_call(call, pins, ext_tools))
+                    messages.append(run_call(call, ext_tools))
                 continue
 
             content = str(msg.get("content") or "")
@@ -120,14 +127,10 @@ def run_turn(text: str) -> Iterator[dict[str, Any]]:
             }
             return
 
-        # 回合结束：user/assistant（指令剥离后）追加进 history（cap 100）并落盘，再推流
-        at = datetime.now(timezone.utc).isoformat()
-        store.append_history(
-            [
-                {"role": "user", "text": text, "at": at},
-                {"role": "assistant", "text": _clean_reply(content), "at": at},
-            ]
-        )
+        # 回合结束：assistant（指令剥离后）落账——代际漂移（load/打断）则丢弃，
+        # 前端那边已经被打断，本回合静默收尾不再推流。
+        if not checkpoint.commit_reply(_clean_reply(content), gen, at):
+            return
         # 用量达阈值 → 后台压缩最旧段（不阻塞本回合推流）
         compress.maybe_compress(usage.get("prompt_tokens"))
         for seg in split_segments(content):

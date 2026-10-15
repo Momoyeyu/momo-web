@@ -1,6 +1,6 @@
-// 记忆面板（设置页 tab）：初始记忆（pin，受控草稿）+
+// 记忆面板（设置页 tab）：初始记忆（pin，momo.db pinned 行）+
 // 普通记忆列表（backend /api/memories REST，检索/手动加/编辑/删除）。
-// pin 走设置页统一草稿保存；普通记忆条目级操作直达 backend（同游戏存档管理）。
+// 两类记忆都是真实行 id，条目级操作直达 backend。
 
 import { useEffect, useMemo, useState } from "react";
 import type { Memory } from "../lib/types";
@@ -27,20 +27,14 @@ function formatTime(iso: string): string {
   });
 }
 
-export default function MemoryPanel({
-  pins,
-  onPins,
-}: {
-  pins: string[];
-  onPins: (pins: string[]) => void;
-}) {
+export default function MemoryPanel() {
   const t = useT();
 
-  // ---- 普通记忆（backend REST）----
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
   const [query, setQuery] = useState("");
   const [addDraft, setAddDraft] = useState("");
+  const [pinDraft, setPinDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
 
@@ -57,20 +51,23 @@ export default function MemoryPanel({
     void refresh();
   }, []);
 
+  const pins = useMemo(() => memories.filter((m) => m.pinned), [memories]);
+
   const shown = useMemo<Memory[]>(() => {
     const q = query.trim().toLowerCase();
-    const list = q
-      ? memories.filter((m) => m.content.toLowerCase().includes(q))
-      : memories;
+    const list = memories
+      .filter((m) => !m.pinned)
+      .filter((m) => !q || m.content.toLowerCase().includes(q));
     return [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [memories, query]);
 
-  const addMemory = async (): Promise<void> => {
-    const content = addDraft.trim();
-    if (!content) return;
+  const add = async (content: string, pinned: boolean): Promise<void> => {
+    const c = content.trim();
+    if (!c) return;
     try {
-      await apiAdd(content);
-      setAddDraft("");
+      await apiAdd(c, pinned);
+      if (pinned) setPinDraft("");
+      else setAddDraft("");
       await refresh();
     } catch {
       setLoadFailed(true);
@@ -95,7 +92,7 @@ export default function MemoryPanel({
     }
   };
 
-  const removeMemory = async (id: string): Promise<void> => {
+  const remove = async (id: string): Promise<void> => {
     try {
       await apiDelete(id);
       await refresh();
@@ -104,37 +101,84 @@ export default function MemoryPanel({
     }
   };
 
+  const editRow = (m: Memory) =>
+    editingId === m.id ? (
+      <div className="mem-edit">
+        <textarea
+          rows={3}
+          value={editDraft}
+          onChange={(e) => setEditDraft(e.target.value)}
+        />
+        <div className="row">
+          <button className="small" onClick={() => void commitEdit()}>
+            {t("common.save")}
+          </button>
+          <button
+            className="ghost small"
+            onClick={() => {
+              setEditingId(null);
+              setEditDraft("");
+            }}
+          >
+            {t("common.cancel")}
+          </button>
+        </div>
+      </div>
+    ) : (
+      <>
+        <div className="mem-head">
+          <span className="muted">{formatTime(m.createdAt)}</span>
+        </div>
+        <div className="mem-content">{m.content}</div>
+        <div className="mem-ops">
+          <button className="ghost small" onClick={() => startEdit(m)}>
+            {t("common.edit")}
+          </button>
+          <button
+            className="ghost small danger"
+            onClick={() => {
+              if (window.confirm(t("memory.confirmDelete"))) {
+                void remove(m.id);
+              }
+            }}
+          >
+            {t("common.del")}
+          </button>
+        </div>
+      </>
+    );
+
   return (
     <div className="persona-tab">
       {/* 1. 初始记忆（pin）：常驻事实，保存后进 system prompt 的「初始记忆」段 */}
       <section className="panel persona-section">
         <h2>{t("memory.pinsTitle")}</h2>
         <p className="muted">{t("memory.pinsDesc")}</p>
-        <div className="field">
-          {pins.map((p, i) => (
-            <div className="pin-row" key={i}>
-              <input
-                value={p}
-                placeholder={t("memory.pinPh")}
-                onChange={(e) =>
-                  onPins(pins.map((x, j) => (j === i ? e.target.value : x)))
-                }
-              />
-              <button
-                className="ghost small"
-                onClick={() => onPins(pins.filter((_, j) => j !== i))}
-              >
-                {t("common.del")}
-              </button>
-            </div>
-          ))}
+        <div className="row">
+          <input
+            className="mem-search"
+            placeholder={t("memory.pinPh")}
+            value={pinDraft}
+            onChange={(e) => setPinDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                void add(pinDraft, true);
+              }
+            }}
+          />
           <button
-            className="ghost small"
-            onClick={() => onPins([...pins, ""])}
+            className="small"
+            onClick={() => void add(pinDraft, true)}
+            disabled={!pinDraft.trim()}
           >
             {t("memory.pinAdd")}
           </button>
         </div>
+        {pins.map((m) => (
+          <div className="mem-item" key={m.id}>
+            {editRow(m)}
+          </div>
+        ))}
       </section>
 
       {/* 2. 普通记忆：agent 工具写入 + 手动维护，数据在 backend */}
@@ -157,13 +201,13 @@ export default function MemoryPanel({
             onChange={(e) => setAddDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                void addMemory();
+                void add(addDraft, false);
               }
             }}
           />
           <button
             className="small"
-            onClick={() => void addMemory()}
+            onClick={() => void add(addDraft, false)}
             disabled={!addDraft.trim()}
           >
             {t("memory.add")}
@@ -177,51 +221,7 @@ export default function MemoryPanel({
 
         {shown.map((m) => (
           <div className="mem-item" key={m.id}>
-            {editingId === m.id ? (
-              <div className="mem-edit">
-                <textarea
-                  rows={3}
-                  value={editDraft}
-                  onChange={(e) => setEditDraft(e.target.value)}
-                />
-                <div className="row">
-                  <button className="small" onClick={() => void commitEdit()}>
-                    {t("common.save")}
-                  </button>
-                  <button
-                    className="ghost small"
-                    onClick={() => {
-                      setEditingId(null);
-                      setEditDraft("");
-                    }}
-                  >
-                    {t("common.cancel")}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="mem-head">
-                  <span className="muted">{formatTime(m.createdAt)}</span>
-                </div>
-                <div className="mem-content">{m.content}</div>
-                <div className="mem-ops">
-                  <button className="ghost small" onClick={() => startEdit(m)}>
-                    {t("common.edit")}
-                  </button>
-                  <button
-                    className="ghost small danger"
-                    onClick={() => {
-                      if (window.confirm(t("memory.confirmDelete"))) {
-                        void removeMemory(m.id);
-                      }
-                    }}
-                  >
-                    {t("common.del")}
-                  </button>
-                </div>
-              </>
-            )}
+            {editRow(m)}
           </div>
         ))}
       </section>

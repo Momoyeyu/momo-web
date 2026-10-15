@@ -74,21 +74,26 @@ TOOLS: list[dict[str, Any]] = [
 ]
 
 
-def execute_tool(name: str, args: dict[str, Any], pins: list[str]) -> str:
+def execute_tool(name: str, args: dict[str, Any]) -> str:
     """执行单个 tool call，返回字符串化结果（不向上抛）。"""
     try:
         if name == "memory_add":
-            mem = memory.add_memory(str(args.get("content") or ""), pins=pins)
+            mem = memory.add_memory(str(args.get("content") or ""))
             return json.dumps({"ok": True, "id": mem["id"]}, ensure_ascii=False)
         if name == "memory_search":
-            res = memory.search_memories(str(args.get("query") or ""), pins=pins)
+            res = memory.search_memories(str(args.get("query") or ""))
             return json.dumps(res, ensure_ascii=False)
         if name == "memory_update":
+            # 初始记忆是 memories 表的 pinned 行：工具不可改，只能设置页维护
+            if memory.is_pinned(str(args.get("id") or "")):
+                return "初始记忆（pin）不可通过记忆能力修改，请在设置中维护"
             memory.edit_memory(
-                str(args.get("id") or ""), str(args.get("content") or ""), pins=pins
+                str(args.get("id") or ""), str(args.get("content") or "")
             )
             return json.dumps({"ok": True}, ensure_ascii=False)
         if name == "memory_delete":
+            if memory.is_pinned(str(args.get("id") or "")):
+                return "初始记忆（pin）不可删除"
             memory.delete_memory(str(args.get("id") or ""))
             return json.dumps({"ok": True}, ensure_ascii=False)
         if name == "common_time":
@@ -101,7 +106,7 @@ def execute_tool(name: str, args: dict[str, Any], pins: list[str]) -> str:
 
 
 def run_call(
-    call: dict[str, Any], pins: list[str], ext: ExtTools | None = None
+    call: dict[str, Any], ext: ExtTools | None = None
 ) -> dict[str, Any]:
     """执行一条 tool_calls 元素，返回 role=tool 的消息。
 
@@ -124,7 +129,7 @@ def run_call(
     if ext is not None and ext.has(name):
         content = ext.call(name, args)
     else:
-        content = execute_tool(name, args, pins)
+        content = execute_tool(name, args)
     return {
         "role": "tool",
         "tool_call_id": call.get("id") or "",

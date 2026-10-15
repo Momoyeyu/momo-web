@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from app import embed, memory
+from app import db, embed, memory
 
 
 def _no_embed(text: str, cfg=None):
@@ -13,6 +13,7 @@ def _no_embed(text: str, cfg=None):
 def test_add_validate_and_list():
     mem = memory.add_memory("  用户喜欢草莓蛋糕  ")
     assert mem["content"] == "用户喜欢草莓蛋糕"  # strip
+    assert mem["pinned"] is False
     assert len(mem["id"]) == 12
     assert memory.list_memories()[0]["id"] == mem["id"]
 
@@ -23,6 +24,17 @@ def test_add_validate_and_list():
     with pytest.raises(memory.MemoryError) as e:
         memory.add_memory("x" * 501)
     assert e.value.kind == "invalid"
+
+
+def test_pinned_rows():
+    """初始记忆 = pinned=1 的记忆行：pins() 只列文本，列表带标记。"""
+    pin = memory.add_memory("用户的名称是夜羽", pinned=True)
+    memory.add_memory("用户是程序员")
+    assert memory.pins() == ["用户的名称是夜羽"]
+    assert memory.is_pinned(pin["id"])
+    assert not memory.is_pinned("不存在")
+    by_flag = memory.list_memories(pinned=True)
+    assert [m["id"] for m in by_flag] == [pin["id"]]
 
 
 def test_dedup_normalized_equal():
@@ -47,11 +59,12 @@ def test_dedup_jaccard():
 
 
 def test_dedup_against_pins():
+    """pin 与普通记忆同表：撞 pin 也判重，返回的是真实行 id。"""
+    pin = memory.add_memory("用户叫夜羽", pinned=True)
     with pytest.raises(memory.MemoryError) as e:
-        memory.add_memory("用户叫夜羽", pins=["用户叫夜羽"])
+        memory.add_memory("用户叫夜羽")
     assert e.value.kind == "duplicate"
-    # 设计要求判重返回冲突 id + content：pin 冲突给 pin:* 伪 id
-    assert "pin:" in str(e.value)
+    assert pin["id"] in str(e.value)
 
 
 def test_dedup_returns_conflict_id():
@@ -73,20 +86,29 @@ def test_edit_and_delete():
         memory.edit_memory("nonexistent", "x")
     assert e.value.kind == "not_found"
 
-    with pytest.raises(memory.MemoryError) as e:
-        memory.delete_memory("pin:abc123")
-    assert e.value.kind == "invalid"  # pin 不可删
-
-    with pytest.raises(memory.MemoryError) as e:
-        memory.edit_memory("pin:abc123", "改写")
-    assert e.value.kind == "not_found"  # pin:* 不在普通记忆 → not_found
-
     memory.delete_memory(mem["id"])
     assert memory.list_memories() == []
 
     with pytest.raises(memory.MemoryError) as e:
         memory.delete_memory(mem["id"])
     assert e.value.kind == "not_found"
+
+
+def test_pin_crud_via_rest_not_tool():
+    """pin 行：REST/存储层可改删（设置页维护），能力层拦截。"""
+    from app.agent.capability import execute_tool
+
+    pin = memory.add_memory("用户叫夜羽", pinned=True)
+    # 工具路径：pin 不可删/改
+    msg = execute_tool("memory_delete", {"id": pin["id"]})
+    assert "不可删除" in msg or "pin" in msg
+    msg = execute_tool("memory_update", {"id": pin["id"], "content": "x"})
+    assert "pin" in msg
+    assert memory.pins() == ["用户叫夜羽"]  # 未被改动
+    # 存储层（REST 走这层）可以直接维护
+    memory.edit_memory(pin["id"], "夜羽大人")
+    memory.delete_memory(pin["id"])
+    assert memory.pins() == []
 
 
 def test_edit_excludes_self_in_dedup():
@@ -122,7 +144,7 @@ def test_search_jaccard_fallback(monkeypatch):
     assert "今天天气很好" not in [r["content"] for r in res]
 
 
-def test_search_embedding_path_and_lazy_cache(monkeypatch):
+def test_search_embedding_path_and_lazy_fill(monkeypatch):
     vecs = {
         "query": [1.0, 0.0],
         "苹果": [0.0, 1.0],
@@ -140,23 +162,23 @@ def test_search_embedding_path_and_lazy_cache(monkeypatch):
     m1 = memory.add_memory("苹果")
     m2 = memory.add_memory("香蕉")
     memory.add_memory("西瓜")
+    pin = memory.add_memory("用户叫夜羽", pinned=True)
 
-    res = memory.search_memories("query", pins=["用户叫夜羽"])
+    res = memory.search_memories("query")
     assert len(res) <= 5
-    # pin cosine 最高 → 第一
-    assert res[0]["id"].startswith("pin:")
+    # pin cosine 最高 → 第一（pin 也是真实行 id）
+    assert res[0]["id"] == pin["id"]
     assert res[0]["content"] == "用户叫夜羽"
     ids = [r["id"] for r in res]
     assert m2["id"] in ids  # 香蕉 cosine 次高
 
-    # 懒算落盘：cache 文件已写，含各内容 hash
-    cache = memory._load_cache()
-    assert memory._hash("香蕉") in cache
-    assert memory._hash("用户叫夜羽") in cache
+    # 懒算补写：memory_vec 已有候选项的向量
+    vec_ids = {r["id"] for r in db.query("SELECT id FROM memory_vec")}
+    assert {m1["id"], m2["id"], pin["id"]} <= vec_ids
 
     # 二次搜索命中缓存，不再重复算内容向量
     calls.clear()
-    memory.search_memories("query", pins=["用户叫夜羽"])
+    memory.search_memories("query")
     assert calls == ["query"]
 
 

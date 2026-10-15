@@ -1,29 +1,21 @@
-"""普通记忆存储：data/memories.json。
+"""长期记忆存储：data/momo.db 的 memories 表 + memory_vec 向量表。
 
-- 条目 schema：{id, content, createdAt}，id = uuid4 hex 前 12 位。
-- pin（初始记忆）存在 state.pins，不在此文件；search 时合并参与召回，
-  pin 的结果 id 形如 "pin:<sha256[:12]>"。
-- embedding 缓存：data/memory-embeddings.json，key = sha256(content)，
-  普通记忆与 pin 共用；缺失条目在搜索时懒算并落盘。
-- embedding 端点取 state.settings.embedding（embed.py），未配置/不可达
-  时 search 降级 bigram Jaccard。
+- 条目 schema：{id, content, createdAt, pinned}；pinned=1 即初始记忆
+  （原 state.pins 迁入，伪 id pin:* 废弃——所有记忆都是真实行 id）。
+- 向量检索走 sqlite-vec vec0（cosine KNN）；候选向量缺失时懒算补写，
+  embedding 未配置/不可达 → 降级 bigram Jaccard。
+- 写路径走 db.tx()；能力层（capability）负责「pin 不可被工具改/删」的拦截，
+  存储层与 REST 不区分（设置页手动维护 pin 走 REST）。
 """
 from __future__ import annotations
 
-import hashlib
 import json
 import math
 import unicodedata
-import uuid
-from datetime import datetime, timezone
-from typing import Any, Iterable
+from typing import Any
 
-from . import embed as embed_mod
+from . import db, embed as embed_mod
 from . import store as store_mod
-from .store import DATA_DIR
-
-MEMORIES_PATH = DATA_DIR / "memories.json"
-EMBEDDINGS_PATH = DATA_DIR / "memory-embeddings.json"
 
 MAX_CONTENT_LEN = 500
 DUP_JACCARD = 0.85
@@ -47,12 +39,8 @@ class MemoryError(Exception):
         self.not_found = kind == "not_found"
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def _new_id() -> str:
-    return uuid.uuid4().hex[:12]
+_now_iso = db._now_iso
+_new_id = db._new_id
 
 
 # ---------- 文本归一化 / bigram Jaccard（对齐前端 normalize/bigrams） ----------
@@ -80,53 +68,47 @@ def jaccard(a: set[str], b: set[str]) -> float:
     return 1.0 if union == 0 else inter / union
 
 
-# ---------- 文件读写 ----------
+# ---------- 行读取 ----------
 
-def _load() -> list[dict[str, Any]]:
-    try:
-        data = json.loads(MEMORIES_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        return []
-    return [m for m in data if isinstance(m, dict)] if isinstance(data, list) else []
+def _row(r: Any) -> dict[str, Any]:
+    return {
+        "id": r["id"],
+        "content": r["content"],
+        "createdAt": r["created_at"],
+        "pinned": bool(r["pinned"]),
+    }
 
 
-def _save(mems: list[dict[str, Any]]) -> None:
-    MEMORIES_PATH.parent.mkdir(parents=True, exist_ok=True)
-    MEMORIES_PATH.write_text(
-        json.dumps(mems, ensure_ascii=False, indent=2), encoding="utf-8"
+def _all() -> list[dict[str, Any]]:
+    return [_row(r) for r in db.query("SELECT * FROM memories ORDER BY rowid")]
+
+
+def list_memories(pinned: bool | None = None) -> list[dict[str, Any]]:
+    """记忆列表；pinned 过滤（None=全部）。pin 的 id 也是真实行 id。"""
+    if pinned is None:
+        return _all()
+    rows = db.query(
+        "SELECT * FROM memories WHERE pinned=? ORDER BY rowid",
+        (1 if pinned else 0,),
     )
+    return [_row(r) for r in rows]
 
 
-def _load_cache() -> dict[str, list[float]]:
-    try:
-        data = json.loads(EMBEDDINGS_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return data if isinstance(data, dict) else {}
+def pins() -> list[str]:
+    """初始记忆文本列表（prompt 注入用）。"""
+    return [m["content"] for m in list_memories(pinned=True)]
 
 
-def _save_cache(cache: dict[str, list[float]]) -> None:
-    EMBEDDINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    EMBEDDINGS_PATH.write_text(
-        json.dumps(cache, ensure_ascii=False), encoding="utf-8"
-    )
+def is_pinned(mem_id: str) -> bool:
+    rows = db.query("SELECT pinned FROM memories WHERE id=?", (mem_id,))
+    return bool(rows and rows[0]["pinned"])
 
 
-def _hash(content: str) -> str:
-    return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-
-def pin_id(content: str) -> str:
-    """pin 在 search 结果里的伪 id。"""
-    return "pin:" + _hash(content)[:12]
+def _exists(mem_id: str) -> bool:
+    return bool(db.query("SELECT 1 FROM memories WHERE id=?", (mem_id,)))
 
 
 # ---------- CRUD ----------
-
-def list_memories() -> list[dict[str, Any]]:
-    """普通记忆列表（不含 pin）。"""
-    return _load()
-
 
 def _validate(content: str) -> str:
     c = (content or "").strip()
@@ -138,20 +120,20 @@ def _validate(content: str) -> str:
 
 
 def _find_duplicate(
-    content: str, pins: Iterable[str] = (), exclude_id: str | None = None
+    content: str, exclude_id: str | None = None
 ) -> dict[str, str] | None:
-    """去重判定：归一化全等或 bigram Jaccard>0.85。
+    """去重判定：归一化全等或 bigram Jaccard>0.85（候选含 pin 行）。
 
-    命中返回冲突条目 {id, content}（pin 的 id 是 pin:* 伪 id）——
-    设计约定判重时把 id 一并回给模型，下一轮可直接 memory_update 修正。
+    命中返回冲突条目 {id, content}——设计约定判重时把 id 一并回给
+    模型，下一轮可直接 memory_update 修正。
     """
     nc = normalize(content)
     cb = bigrams(content)
-    candidates = [(str(m["content"]), str(m.get("id"))) for m in _load()]
-    candidates += [(p, pin_id(p)) for p in pins if isinstance(p, str)]
-    for text, mid in candidates:
+    for m in _all():
+        mid = str(m["id"])
         if mid == exclude_id:
             continue
+        text = str(m["content"])
         if normalize(text) == nc or (cb and jaccard(cb, bigrams(text)) > DUP_JACCARD):
             return {"id": mid, "content": text}
     return None
@@ -164,50 +146,58 @@ def _dup_error(dup: dict[str, str]) -> MemoryError:
     )
 
 
-def add_memory(content: str, pins: Iterable[str] = ()) -> dict[str, Any]:
-    """新增普通记忆；校验/去重失败抛 MemoryError（agent 转成 tool result）。"""
+def add_memory(content: str, pinned: bool = False) -> dict[str, Any]:
+    """新增记忆（pinned=True 即初始记忆）；校验/去重失败抛 MemoryError。"""
     c = _validate(content)
-    dup = _find_duplicate(c, pins)
+    dup = _find_duplicate(c)
     if dup is not None:
         raise _dup_error(dup)
-    mem = {"id": _new_id(), "content": c, "createdAt": _now_iso()}
-    mems = _load()
-    mems.append(mem)
-    _save(mems)
-    return mem
+    mem_id = _new_id()
+    with db.tx() as conn:
+        conn.execute(
+            "INSERT INTO memories(id,content,created_at,pinned) VALUES(?,?,?,?)",
+            (mem_id, c, _now_iso(), 1 if pinned else 0),
+        )
+    return {
+        "id": mem_id,
+        "content": c,
+        "createdAt": _now_iso(),
+        "pinned": pinned,
+    }
 
 
-def edit_memory(
-    mem_id: str, content: str, pins: Iterable[str] = ()
-) -> dict[str, Any]:
-    """原地编辑（保留 id/createdAt）；缓存按内容 hash，旧 embedding 自动失效。
-
-    pin:* 不在普通记忆中 → not_found（设计：pin 只能在设置页手动维护）。
-    """
+def edit_memory(mem_id: str, content: str) -> dict[str, Any]:
+    """原地编辑（保留 id/createdAt）；向量按行 id 关联，编辑后旧向量失效懒算。"""
     c = _validate(content)
-    mems = _load()
-    for i, m in enumerate(mems):
-        if m.get("id") == mem_id:
-            dup = _find_duplicate(c, pins, exclude_id=mem_id)
-            if dup is not None:
-                raise _dup_error(dup)
-            mems[i] = {"id": mem_id, "content": c, "createdAt": m.get("createdAt") or _now_iso()}
-            _save(mems)
-            return mems[i]
+    if not _exists(mem_id):
+        raise MemoryError("记忆不存在", kind="not_found")
+    dup = _find_duplicate(c, exclude_id=mem_id)
+    if dup is not None:
+        raise _dup_error(dup)
+    with db.tx() as conn:
+        conn.execute(
+            "UPDATE memories SET content=? WHERE id=?", (c, mem_id)
+        )
+        if db._vec_table_dim() is not None:
+            conn.execute("DELETE FROM memory_vec WHERE id=?", (mem_id,))
+    for r in _all():
+        if r["id"] == mem_id:
+            return r
     raise MemoryError("记忆不存在", kind="not_found")
 
 
 def delete_memory(mem_id: str) -> dict[str, Any]:
-    """删除普通记忆；pin:* 与未知 id 抛 MemoryError。"""
-    if str(mem_id).startswith("pin:"):
-        raise MemoryError("初始记忆（pin）不可删除", kind="invalid")
-    mems = _load()
-    for i, m in enumerate(mems):
-        if m.get("id") == mem_id:
-            gone = mems.pop(i)
-            _save(mems)
-            return gone
-    raise MemoryError("记忆不存在或不可删除", kind="not_found")
+    """删除一条记忆（REST/存储层不区分 pin；能力层另行拦截 pin）。"""
+    with db.tx() as conn:
+        row = conn.execute(
+            "SELECT * FROM memories WHERE id=?", (mem_id,)
+        ).fetchone()
+        if row is None:
+            raise MemoryError("记忆不存在或不可删除", kind="not_found")
+        conn.execute("DELETE FROM memories WHERE id=?", (mem_id,))
+        if db._vec_table_dim() is not None:
+            conn.execute("DELETE FROM memory_vec WHERE id=?", (mem_id,))
+    return _row(row)
 
 
 def import_legacy(items: list[Any]) -> int:
@@ -229,16 +219,21 @@ def import_legacy(items: list[Any]) -> int:
     return count
 
 
+def import_pins(items: list[Any]) -> int:
+    """旧版 state.pins 一次性导入为 pinned 行（PUT /api/state 兼容路径）。"""
+    count = 0
+    for p in items:
+        if not isinstance(p, str) or not p.strip():
+            continue
+        try:
+            add_memory(p, pinned=True)
+            count += 1
+        except MemoryError:
+            pass
+    return count
+
+
 # ---------- 搜索 ----------
-
-def _cosine(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(y * y for y in b))
-    if na == 0 or nb == 0:
-        return 0.0
-    return dot / (na * nb)
-
 
 def _embed_cfg() -> dict[str, Any]:
     """state.settings.embedding；state 缺失时 normalize 补出厂默认。
@@ -254,21 +249,37 @@ def _embed_cfg() -> dict[str, Any]:
     return cfg if isinstance(cfg, dict) else {}
 
 
-def search_memories(
-    query: str, pins: Iterable[str] = ()
-) -> list[dict[str, str]]:
-    """RAG 召回 top-5 [{id,content}]（普通记忆 + pin 合并排序）。
+def _vec_ids() -> set[str]:
+    rows = db.query("SELECT id FROM memory_vec")
+    return {r["id"] for r in rows}
 
-    embedding 可用：cosine 粗排 top-15 → 0.7*cosine+0.3*recency 精排 top-5
-    （recency = 候选序号(1-based)/总数，候选序 = 普通记忆文件序 + pin 序）。
+
+def _fill_vectors(items: list[dict[str, Any]], cfg: dict[str, Any]) -> None:
+    """候选中缺向量的懒算补写（逐条 embed，失败跳过本轮）。"""
+    have = _vec_ids()
+    missing = [it for it in items if it["id"] not in have]
+    if not missing:
+        return
+    dim = db._vec_table_dim()
+    with db.tx() as conn:
+        for it in missing:
+            vec = embed_mod.embed(str(it["content"]), cfg)
+            if vec is not None and len(vec) == dim:
+                conn.execute(
+                    "INSERT OR REPLACE INTO memory_vec(id,vec) VALUES(?,?)",
+                    (it["id"], json.dumps(vec)),
+                )
+
+
+def search_memories(query: str) -> list[dict[str, str]]:
+    """RAG 召回 top-5 [{id,content}]（pin 与普通记忆合并排序）。
+
+    embedding 可用：memory_vec cosine KNN 粗排 top-15
+    → 0.7*cosine+0.3*recency 精排 top-5（recency = 候选序号(1-based)/总数）。
     embedding 未配置/不可达：bigram Jaccard 排序（score>0）top-5。
     """
     q = (query or "").strip()
-    items: list[dict[str, str]] = [
-        {"id": str(m.get("id")), "content": str(m.get("content", ""))}
-        for m in _load()
-    ]
-    items += [{"id": pin_id(p), "content": p} for p in pins if isinstance(p, str)]
+    items = _all()
     if not q or not items:
         return []
 
@@ -276,38 +287,40 @@ def search_memories(
     qv = embed_mod.embed(q, cfg)
     n = len(items)
 
-    if qv is not None:
-        cache = _load_cache()
-        dirty = False
-        scored: list[tuple[float, int, dict[str, str]]] = []
-        for i, it in enumerate(items):
-            h = _hash(it["content"])
-            vec = cache.get(h)
-            if vec is None:
-                vec = embed_mod.embed(it["content"], cfg)  # 懒算并落盘
-                if vec is not None:
-                    cache[h] = vec
-                    dirty = True
-            cos = _cosine(qv, vec) if vec else 0.0
-            scored.append((cos, i, it))
-        if dirty:
-            _save_cache(cache)
-        coarse = sorted(scored, key=lambda x: (x[0], x[1]), reverse=True)[:COARSE_TOP]
+    if qv is not None and db.ensure_vec(len(qv)):
+        _fill_vectors(items, cfg)
+        knn = db.query(
+            "SELECT id, distance FROM memory_vec"
+            " WHERE vec MATCH ? AND k = ? ORDER BY distance",
+            (json.dumps([float(x) for x in qv]), min(COARSE_TOP, n)),
+        )
+        # cosine distance → cosine 相似度；按候选序取 recency 分
+        order = {it["id"]: i for i, it in enumerate(items)}
+        content_of = {it["id"]: str(it["content"]) for it in items}
+        coarse = [
+            (1.0 - float(r["distance"]), order[r["id"]], r["id"])
+            for r in knn
+            if r["id"] in order
+        ]
         ranked = sorted(
             coarse,
             key=lambda x: W_SEMANTIC * x[0] + W_RECENCY * ((x[1] + 1) / n),
             reverse=True,
         )[:FINAL_TOP]
-        return [{"id": it["id"], "content": it["content"]} for _, _, it in ranked]
+        return [{"id": mid, "content": content_of[mid]} for _, _, mid in ranked]
 
     # lexical 降级：bigram Jaccard
     qb = bigrams(q)
     scored = [
-        (jaccard(qb, bigrams(it["content"])), i, it) for i, it in enumerate(items)
+        (jaccard(qb, bigrams(str(it["content"]))), i, it)
+        for i, it in enumerate(items)
     ]
     ranked = sorted(
         (s for s in scored if s[0] > 0),
         key=lambda x: (x[0], x[1]),
         reverse=True,
     )[:FINAL_TOP]
-    return [{"id": it["id"], "content": it["content"]} for _, _, it in ranked]
+    return [
+        {"id": str(it["id"]), "content": str(it["content"])}
+        for _, _, it in ranked
+    ]

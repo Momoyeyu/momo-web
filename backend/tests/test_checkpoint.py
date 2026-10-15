@@ -1,23 +1,35 @@
-"""会话存档 REST + 上下文压缩：CRUD / auto 槽 / load 往返 / 压缩触发与组装。"""
+"""会话存档 REST + 上下文压缩 + 打断/代际竞态：CRUD / auto 槽 / load 往返 / 压缩。"""
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from app import agent, llm, store
+from app import agent, checkpoint, db, llm, store
 from app.agent import compress
 from app.main import app
 
+from conftest import add_turn
 
-def _seed(turns: int, prefix: str = "") -> list[dict]:
-    """往当前会话追加 turns 个完整回合，返回追加的条目列表。"""
-    entries = []
+
+def _seed(turns: int, prefix: str = "") -> None:
+    """往当前会话追加 turns 个完整回合。"""
     for i in range(turns):
-        entries.append({"role": "user", "text": f"{prefix}问{i}", "at": f"{prefix}t{i}a"})
-        entries.append(
-            {"role": "assistant", "text": f"{prefix}答{i}", "at": f"{prefix}t{i}b"}
+        add_turn(f"{prefix}问{i}", f"{prefix}答{i}", at=f"{prefix}t{i}")
+
+
+def _live_texts() -> list[str]:
+    return [m["text"] for m in checkpoint.live_messages()]
+
+
+def _set_summary(text: str) -> None:
+    with db.tx() as c:
+        c.execute(
+            "UPDATE sessions SET summary=? WHERE id=?",
+            (text, db.LIVE_ID),
         )
-    store.append_history(entries)
-    return entries
+
+
+def _live_summary() -> str:
+    return checkpoint.live_summary()
 
 
 class _InlineThread:
@@ -104,30 +116,43 @@ def test_delete_and_404():
     assert client.post(f"/api/checkpoints/{sid}/load").status_code == 404
 
 
+def test_live_transcript_endpoint():
+    client = TestClient(app)
+    _seed(1, "甲")
+    r = client.get("/api/checkpoints/live")
+    assert r.status_code == 200
+    body = r.json()
+    assert [m["text"] for m in body["messages"]] == ["甲问0", "甲答0"]
+    # live 不出现在存档列表里
+    assert client.get("/api/checkpoints").json() == []
+
+
 def test_load_roundtrip_and_auto_slot():
     client = TestClient(app)
-    entries_a = _seed(2, "甲")
+    _seed(2, "甲")
     sid_a = client.post("/api/checkpoints", json={"title": "A"}).json()["id"]
-    entries_b = _seed(1, "乙")  # 当前 = A + 一回合
+    _seed(1, "乙")  # 当前 = A + 一回合
     sid_b = client.post("/api/checkpoints", json={"title": "B"}).json()["id"]
 
     r = client.post(f"/api/checkpoints/{sid_a}/load")
     assert r.status_code == 200
-    assert store.get_state()["history"] == entries_a  # 回到 A 时点
+    assert _live_texts() == ["甲问0", "甲答0", "甲问1", "甲答1"]  # 回到 A 时点
 
     # load 前现场进 auto 槽
     autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos) == 1
     auto_full = client.get(f"/api/checkpoints/{autos[0]['id']}").json()
-    assert auto_full["messages"] == entries_a + entries_b
+    assert [m["text"] for m in auto_full["messages"]] == [
+        "甲问0", "甲答0", "甲问1", "甲答1", "乙问0", "乙答0",
+    ]
 
     # 再 load B：auto 槽原地覆盖，不新增
     assert client.post(f"/api/checkpoints/{sid_b}/load").status_code == 200
     autos2 = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos2) == 1 and autos2[0]["id"] == autos[0]["id"]
-    assert store.get_state()["history"] == entries_a + entries_b
+    assert _live_texts() == ["甲问0", "甲答0", "甲问1", "甲答1", "乙问0", "乙答0"]
 
-    # load auto 槽自己 → 还原被 B 顶掉的现场（load 前 = A，又进 auto 槽）
+    # load auto 槽自己 → 还原被 B 顶掉的现场
     auto_id = autos[0]["id"]
     assert client.post(f"/api/checkpoints/{auto_id}/load").status_code == 200
     autos3 = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
@@ -137,20 +162,31 @@ def test_load_roundtrip_and_auto_slot():
 def test_load_with_summary_roundtrip():
     client = TestClient(app)
     _seed(1)
-    store.update_state(lambda st: st.__setitem__("summary", "旧摘要"))
+    _set_summary("旧摘要")
     sid = client.post("/api/checkpoints", json={}).json()["id"]
-    store.write_state({"history": [], "summary": ""})
+    _set_summary("")
     client.post(f"/api/checkpoints/{sid}/load")
-    assert store.get_state()["summary"] == "旧摘要"
+    assert _live_summary() == "旧摘要"
 
 
 def test_load_empty_current_skips_auto():
     client = TestClient(app)
     _seed(1)
     sid = client.post("/api/checkpoints", json={}).json()["id"]
-    store.write_state({"history": []})
+    # 清空当前会话 → load 不写 auto 槽
+    with db.tx() as c:
+        c.execute("DELETE FROM messages WHERE session_id=?", (db.LIVE_ID,))
     client.post(f"/api/checkpoints/{sid}/load")
     assert all(not s["auto"] for s in client.get("/api/checkpoints").json())
+
+
+def test_live_id_not_addressable():
+    client = TestClient(app)
+    assert client.get("/api/checkpoints/live").status_code == 200
+    # live 不能被当存档读/删/覆盖/载入
+    assert client.delete("/api/checkpoints/live").status_code == 404
+    assert client.put("/api/checkpoints/live", json={}).status_code == 404
+    assert client.post("/api/checkpoints/live/load").status_code == 404
 
 
 # ---------- 槽位号 ----------
@@ -186,12 +222,23 @@ def test_slot_out_of_range_and_occupied():
     assert r.status_code == 409
 
 
-def test_slot_migration_legacy_entries():
-    """旧 sessions.json 无 slot 字段：读取时按文件序补号，auto 槽不占号。"""
+def test_auto_slot_not_deletable():
+    client = TestClient(app)
+    _seed(1)
+    sid = client.post("/api/checkpoints", json={}).json()["id"]
+    _seed(1, "乙")
+    client.post(f"/api/checkpoints/{sid}/load")
+    autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
+    assert len(autos) == 1
+    assert client.delete(f"/api/checkpoints/{autos[0]['id']}").status_code == 400
+
+
+def test_slot_migration_legacy_entries(tmp_path, monkeypatch):
+    """旧 checkpoints.json 无 slot 字段：导入 DB 时按文件序补号，auto 不占号。"""
     import json as _json
 
-    from app import checkpoint
-
+    legacy_dir = tmp_path / "legacy"
+    legacy_dir.mkdir()
     legacy = [
         {
             "id": "legacy01",
@@ -221,9 +268,13 @@ def test_slot_migration_legacy_entries():
             "messages": [{"role": "assistant", "text": "二", "at": "t"}],
         },
     ]
-    checkpoint.CHECKPOINTS_PATH.write_text(
+    (legacy_dir / "checkpoints.json").write_text(
         _json.dumps(legacy, ensure_ascii=False), encoding="utf-8"
     )
+    monkeypatch.setattr(store, "DATA_DIR", legacy_dir)
+    db.reset()
+    db.migrate_legacy()
+
     lst = TestClient(app).get("/api/checkpoints").json()
     by_id = {s["id"]: s for s in lst}
     assert by_id["legacy01"]["slot"] == 1
@@ -232,6 +283,50 @@ def test_slot_migration_legacy_entries():
     assert lst[0]["id"] == "legacyauto"  # auto 置顶
     # 迁移后新建接最小编号空槽
     assert TestClient(app).post("/api/checkpoints", json={}).json()["slot"] == 3
+
+
+def test_state_json_migration(tmp_path, monkeypatch):
+    """旧 state.json 的 pins/history/summary 首启导入 DB 并从文件剥离。"""
+    import json as _json
+
+    legacy_dir = tmp_path / "state-legacy"
+    legacy_dir.mkdir()
+    (legacy_dir / "state.json").write_text(
+        _json.dumps(
+            {
+                "pins": ["用户的名称是夜羽"],
+                "history": [
+                    {"role": "user", "text": "你好", "at": "t1"},
+                    {"role": "assistant", "text": "你好呀", "at": "t2"},
+                ],
+                "summary": "旧摘要",
+                "persona": {"name": "momo"},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(store, "DATA_DIR", legacy_dir)
+    monkeypatch.setattr(store, "STATE_PATH", legacy_dir / "state.json")
+    db.reset()
+    db.migrate_legacy()
+
+    assert memory_pins() == ["用户的名称是夜羽"]
+    assert _live_texts() == ["你好", "你好呀"]
+    assert _live_summary() == "旧摘要"
+    # 已迁键剥离出 state.json，persona 等配置保留
+    raw = _json.loads((legacy_dir / "state.json").read_text(encoding="utf-8"))
+    assert "pins" not in raw and "history" not in raw and "summary" not in raw
+    assert raw["persona"]["name"] == "momo"
+    # 幂等：再跑一次不翻倍
+    db.migrate_legacy()
+    assert _live_texts() == ["你好", "你好呀"]
+
+
+def memory_pins() -> list[str]:
+    from app import memory
+
+    return memory.pins()
 
 
 def test_preview_uses_last_message():
@@ -252,10 +347,101 @@ def test_auto_slot_has_no_slot_number():
     assert len(autos) == 1 and autos[0]["slot"] is None
 
 
+# ---------- 打断 / 代际 ----------
+
+def test_interrupt_truncates_committed_reply():
+    """回复已落账后打断：assistant 行截到用户看到的部分。"""
+    add_turn("在吗", "很长很长的完整回复")
+    checkpoint.interrupt_turn("在吗", "很长")
+    assert _live_texts() == ["在吗", "很长"]
+
+
+def test_interrupt_empty_display_deletes_reply():
+    """打断时一个字都没看到：assistant 行删除，保留 user。"""
+    add_turn("在吗", "完整回复")
+    checkpoint.interrupt_turn("在吗", "")
+    assert _live_texts() == ["在吗"]
+
+
+def test_interrupt_kills_pending_commit():
+    """打断先于回复落账：代际 +1 使在途 commit_reply 作废。"""
+    gen = checkpoint.generation()
+    assert checkpoint.begin_turn("在吗", gen, "t")
+    checkpoint.interrupt_turn("在吗", "")
+    assert checkpoint.commit_reply("完整回复", gen, "t") is False
+    assert _live_texts() == ["在吗"]  # 回复没落库
+
+
+def test_interrupt_pending_with_seen_text():
+    """打断在生成中且用户已看到部分文本：user 已落账 → 补写看到的部分。"""
+    gen = checkpoint.generation()
+    assert checkpoint.begin_turn("在吗", gen, "t")
+    checkpoint.interrupt_turn("在吗", "看到了一半")
+    assert checkpoint.commit_reply("完整回复", gen, "t") is False
+    assert _live_texts() == ["在吗", "看到了一半"]
+
+
+def test_interrupt_turn_never_reached_backend():
+    """SSE 没到 backend 就被打断：尾对不匹配 → 按所见补写整对。"""
+    _seed(1, "旧")
+    checkpoint.interrupt_turn("新问", "看到一点")
+    assert _live_texts() == ["旧问0", "旧答0", "新问", "看到一点"]
+
+
+def test_interrupt_idempotent_no_double_user():
+    """重复打断同一回合不产生重复 user 行。"""
+    add_turn("在吗", "完整回复")
+    checkpoint.interrupt_turn("在吗", "看到")
+    checkpoint.interrupt_turn("在吗", "看到")
+    assert _live_texts() == ["在吗", "看到"]
+
+
+def test_load_invalidates_inflight_turn(monkeypatch):
+    """回合进行中 load：commit 代际校验失败 → 不写入新会话、不推流。"""
+    _seed(1, "甲")
+    client = TestClient(app)
+    sid = client.post("/api/checkpoints", json={}).json()["id"]
+    _seed(1, "乙")
+    gen = checkpoint.generation()
+    assert checkpoint.begin_turn("途中的问题", gen, "t9")
+    client.post(f"/api/checkpoints/{sid}/load")  # 代际 +1
+    assert checkpoint.commit_reply("迟到回复", gen, "t9") is False
+    assert _live_texts() == ["甲问0", "甲答0"]  # 迟到回复没落进新会话
+    # auto 槽里留有被顶掉的现场（含途中 user 消息）
+    autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
+    auto = client.get(f"/api/checkpoints/{autos[0]['id']}").json()
+    assert auto["messages"][-1]["text"] == "途中的问题"
+
+
+def test_run_turn_skips_stream_when_gen_stale(monkeypatch):
+    """load 后的在途 run_turn：commit 失败 → 不 yield delta。"""
+    _seed(1, "甲")
+    client = TestClient(app)
+    sid = client.post("/api/checkpoints", json={}).json()["id"]
+
+    def fake(llm_cfg, messages, tools=None, usage_out=None):
+        client.post(f"/api/checkpoints/{sid}/load")  # LLM 返回前发生读档
+        return {"role": "assistant", "content": "迟到回复"}
+
+    monkeypatch.setattr(llm, "chat_completion", fake)
+    events = list(agent.run_turn("hi"))
+    assert [e for e in events if e["t"] == "delta"] == []
+
+
+def test_interrupt_endpoint():
+    client = TestClient(app)
+    add_turn("在吗", "完整回复哦")
+    r = client.post(
+        "/api/chat/interrupt", json={"user": "在吗", "assistant": "完整"}
+    )
+    assert r.status_code == 204
+    assert _live_texts() == ["在吗", "完整"]
+
+
 # ---------- 上下文压缩 ----------
 
 def test_compress_trigger_and_assembly(monkeypatch):
-    """用量达阈值：回合末后台压缩最旧一半 → summary 落盘 + history 截断；
+    """用量达阈值：回合末后台压缩最旧一半 → summary 落盘 + messages 截断；
     下一回合上下文 = system + 摘要 + 最近窗口。"""
     _seed(4)  # 8 条
     monkeypatch.setattr(compress, "Thread", _InlineThread)
@@ -266,11 +452,10 @@ def test_compress_trigger_and_assembly(monkeypatch):
     events = list(agent.run_turn("继续"))
     assert any(e["t"] == "delta" for e in events)
 
-    state = store.get_state()
-    assert state["summary"] == "摘要一"
+    assert _live_summary() == "摘要一"
     # 落盘后 10 条 → 折 4 条（完整回合取整）→ 剩 6
-    assert len(state["history"]) == 6
-    assert state["history"][0]["text"] == "问2"
+    assert len(checkpoint.live_messages()) == 6
+    assert _live_texts()[0] == "问2"
 
     # 下一回合：摘要作为独立 system 消息注入，最近窗口照旧
     seen = []
@@ -290,7 +475,7 @@ def test_compress_trigger_and_assembly(monkeypatch):
 def test_compress_rolls_old_summary(monkeypatch):
     """已有摘要时把旧摘要连同新折叠段一起滚入新摘要。"""
     _seed(4)
-    store.update_state(lambda st: st.__setitem__("summary", "旧摘要"))
+    _set_summary("旧摘要")
     got = []
 
     def fake(llm_cfg, messages, tools=None, usage_out=None):
@@ -300,8 +485,8 @@ def test_compress_rolls_old_summary(monkeypatch):
     monkeypatch.setattr(llm, "chat_completion", fake)
     assert compress.compress_once() is True
     assert "旧摘要" in got[-1]  # 旧摘要被喂给 LLM 滚入
-    assert store.get_state()["summary"] == "新摘要"
-    assert len(store.get_state()["history"]) == 4
+    assert _live_summary() == "新摘要"
+    assert len(checkpoint.live_messages()) == 4
 
 
 def test_compress_below_threshold_noop(monkeypatch):
@@ -309,8 +494,8 @@ def test_compress_below_threshold_noop(monkeypatch):
     monkeypatch.setattr(compress, "Thread", _InlineThread)
     monkeypatch.setattr(llm, "chat_completion", _fake_chat("好。", prompt_tokens=1))
     list(agent.run_turn("hi"))
-    assert store.get_state()["summary"] == ""
-    assert len(store.get_state()["history"]) == 10
+    assert _live_summary() == ""
+    assert len(checkpoint.live_messages()) == 10
 
 
 def test_compress_single_flight():
@@ -331,23 +516,20 @@ def test_compress_failure_silent(monkeypatch):
 
     monkeypatch.setattr(llm, "chat_completion", boom)
     assert compress.maybe_compress(10**9) is True
-    assert store.get_state()["summary"] == ""
+    assert _live_summary() == ""
     assert compress._lock.acquire(blocking=False)
     compress._lock.release()
 
 
-def test_compress_aborts_when_history_moved(monkeypatch):
-    """压缩进行期间 history 被整体换掉（如 load）→ 放弃写回，不破坏新会话。"""
+def test_compress_aborts_when_generation_moved(monkeypatch):
+    """压缩进行期间会话被 load/打断（代际变更）→ 放弃写回，不破坏新会话。"""
     _seed(4)
 
     def fake(llm_cfg, messages, tools=None, usage_out=None):
-        store.write_state(
-            {"history": [{"role": "user", "text": "x", "at": "t"}]}
-        )
+        checkpoint.interrupt_turn("", "")  # 代际 +1（等价 load 效果）
         return {"role": "assistant", "content": "摘要"}
 
     monkeypatch.setattr(llm, "chat_completion", fake)
     assert compress.compress_once() is False
-    state = store.get_state()
-    assert state["summary"] == ""
-    assert state["history"][0]["text"] == "x"
+    assert _live_summary() == ""
+    assert len(checkpoint.live_messages()) == 8

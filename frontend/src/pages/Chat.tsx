@@ -80,6 +80,8 @@ export default function Chat() {
       onError: (e) => showErr(e),
     };
     attachEngine(h);
+    // 回到 chat 页：恢复离开前挂起的麦克风监听。
+    engine.resumeMic();
     // 挂载即同步当前相位与字幕（可能已有回合在跑）。
     setStatus(engine.status);
     setMicOn(engine.listening);
@@ -87,6 +89,8 @@ export default function Chat() {
     setStreamText(engine.display);
     return () => {
       detachEngine(h);
+      // 离开 chat 页：暂停麦克风/ASR（避免在别的页面还在听）。
+      engine.suspendMic();
       if (errTimer.current !== null) window.clearTimeout(errTimer.current);
     };
   }, []);
@@ -188,6 +192,8 @@ export default function Chat() {
           </button>
           <button
             className="tb"
+            disabled={busy}
+            title={busy ? t("checkpoint.busySave") : undefined}
             onClick={() => navigate("checkpoint", { checkpointMode: "save" })}
           >
             {t("checkpoint.save")}

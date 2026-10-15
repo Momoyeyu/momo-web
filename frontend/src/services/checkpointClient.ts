@@ -2,12 +2,26 @@
 // 保存 = 快照 backend 当前会话；读取 = 存档覆盖当前会话（返回全文供引擎灌入）。
 
 import { apiFetch, apiJson, jsonInit } from "./http";
-import type { CheckpointMeta, CheckpointSave } from "../lib/types";
+import type {
+  CheckpointMessage,
+  CheckpointMeta,
+  CheckpointSave,
+} from "../lib/types";
 
 const API = "/api/checkpoints";
 
 export function listCheckpoints(): Promise<CheckpointMeta[]> {
   return apiJson<CheckpointMeta[]>(API);
+}
+
+/** 当前 live 会话全文：启动时恢复 backlog/字幕（backend momo.db 权威）。 */
+export function liveTranscript(): Promise<{
+  summary: string;
+  messages: CheckpointMessage[];
+}> {
+  return apiJson<{ summary: string; messages: CheckpointMessage[] }>(
+    `${API}/live`,
+  );
 }
 
 /** 新建存档：slot 指定目标空槽（1–120），未指定由 backend 取最小编号空槽。 */

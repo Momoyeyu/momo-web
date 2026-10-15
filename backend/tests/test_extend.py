@@ -107,7 +107,7 @@ def test_run_call_forwards_to_mcp_server(monkeypatch):
             "arguments": json.dumps({"q": "天气"}),
         },
     }
-    msg = run_call(call, pins=[], ext=ext)
+    msg = run_call(call, ext=ext)
     assert msg["role"] == "tool" and msg["tool_call_id"] == "c1"
     assert msg["content"] == "结果A\n结果B"
     assert seen["session"] is session
@@ -123,7 +123,6 @@ def test_run_call_mcp_failure_becomes_tool_text(monkeypatch):
     ext = _ext_with(_source())
     msg = run_call(
         {"id": "c2", "function": {"name": "tavily_search", "arguments": "{}"}},
-        pins=[],
         ext=ext,
     )
     assert "工具执行失败" in msg["content"]
@@ -137,7 +136,6 @@ def test_run_call_ext_present_builtin_still_works(monkeypatch):
     ext = _ext_with(_source())
     msg = run_call(
         {"id": "c3", "function": {"name": "common_time", "arguments": "{}"}},
-        pins=[],
         ext=ext,
     )
     assert "utc" in json.loads(msg["content"])

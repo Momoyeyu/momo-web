@@ -80,11 +80,12 @@ export interface Settings {
   extensions: McpExtension[];
 }
 
-/** 普通记忆条目（backend /api/memories 返回；pin 不在此列）。 */
+/** 记忆条目（backend /api/memories 返回；pinned=true 即初始记忆 pin）。 */
 export interface Memory {
   id: string;
   content: string;
   createdAt: string;
+  pinned: boolean;
 }
 
 /** Live2D 资源语义层条目：资源名 + 可编辑的含义描述（写给 LLM 看）。 */
@@ -167,12 +168,11 @@ export interface CheckpointSave extends CheckpointMeta {
   messages: CheckpointMessage[];
 }
 
-/** /api/state 持久化载荷（backend state.json ↔ localStorage 缓存共用 schema）。 */
+/** /api/state 持久化载荷（backend state.json ↔ localStorage 缓存共用 schema）。
+ *  初始记忆（pin）与会话历史已迁 momo.db，不在此 schema。 */
 export interface PersistedState {
   settings: Settings;
   persona: PersonaCard;
-  /** 初始记忆（pin）：用户维护的常驻事实，backend 注入 system prompt。 */
-  pins: string[];
   /** Live2D 模型清单（含内置条目；导入模型 blob 在 IndexedDB）。 */
   avatars: AvatarMeta[];
   /** 当前形象：avatars[].id。 */

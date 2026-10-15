@@ -1,18 +1,19 @@
-"""上下文压缩：后台把最旧若干完整回合折叠成摘要（state.summary）。
+"""上下文压缩：后台把最旧若干完整回合折叠成摘要（sessions.live.summary）。
 
 - 触发：回合结束落盘后，上一回合 usage.prompt_tokens ≥ 阈值 → daemon 线程，
   不占回合一拍（摘要就绪前上下文仍按窗口截断，用户无感）。
 - 折叠单位是完整 user→assistant 对：一次折掉最旧 ~一半；已有摘要随新段滚入。
 - 单飞：非阻塞锁保证同时至多一个压缩任务；失败静默（下回合重试）。
-- 竞态：写回走 store.update_state 锁内 read-modify-write，仅当 history
-  前缀仍是当初快照的折叠段时才替换——期间被 load/append 动过就放弃。
+- 竞态：写回在一个事务里校验 live.generation 未变（期间 load/打断
+  换过会话就放弃折叠）再删 folded 段 + 写 summary。
 """
 from __future__ import annotations
 
 from threading import Lock, Thread
 from typing import Any
 
-from .. import llm, store
+from .. import db, llm, store
+from ..db import LIVE_ID
 
 # ~64k 窗口的 70%：在真正撑爆上下文之前压一轮
 COMPRESS_TOKEN_THRESHOLD = 45_000
@@ -61,15 +62,23 @@ def _fold_count(history: list[Any]) -> int:
 def compress_once() -> bool:
     """同步压缩一次（后台 worker 与测试共用）。成功写回 → True。"""
     state = store.normalize_state(store.read_state())
-    history = [m for m in (state.get("history") or []) if isinstance(m, dict)]
+    gen = db.query(
+        "SELECT generation, summary FROM sessions WHERE id=?", (LIVE_ID,)
+    )
+    gen_n = int(gen[0]["generation"]) if gen else 0
+    old_summary = str(gen[0]["summary"] or "").strip() if gen else ""
+    rows = db.query(
+        "SELECT seq, role, text FROM messages WHERE session_id=? ORDER BY seq",
+        (LIVE_ID,),
+    )
+    history = [dict(r) for r in rows]
     fold_n = _fold_count(history)
     if fold_n < 2:
         return False
     seg = history[:fold_n]
     llm_cfg = (state.get("settings") or {}).get("llm") or {}
-    old_summary = str(state.get("summary") or "").strip()
 
-    lines = [f"{m.get('role')}: {m.get('text') or ''}" for m in seg]
+    lines = [f"{m['role']}: {m['text']}" for m in seg]
     if old_summary:
         user = (
             f"已有摘要：\n{old_summary}\n\n"
@@ -88,13 +97,20 @@ def compress_once() -> bool:
     if not new_summary:
         return False
 
-    def _mutate(st: dict[str, Any]) -> bool:
-        cur = list(st.get("history") or [])
-        # 压缩期间被 load/追加截断动过前缀 → 放弃（下回合基于新 history 重试）
-        if cur[:fold_n] != seg:
+    max_seq = seg[-1]["seq"]
+    with db.tx() as c:
+        cur = c.execute(
+            "SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)
+        ).fetchone()
+        # 压缩期间 load/打断换过会话 → 放弃（下回合基于新上下文重试）
+        if cur is None or int(cur["generation"]) != gen_n:
             return False
-        st["history"] = cur[fold_n:]
-        st["summary"] = new_summary
-        return True
-
-    return bool(store.update_state(_mutate))
+        c.execute(
+            "DELETE FROM messages WHERE session_id=? AND seq<=?",
+            (LIVE_ID, max_seq),
+        )
+        c.execute(
+            "UPDATE sessions SET summary=? WHERE id=?",
+            (new_summary, LIVE_ID),
+        )
+    return True

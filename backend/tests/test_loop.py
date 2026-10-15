@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from app import agent, llm, store
+from app import agent, checkpoint, llm
 
 
 def _tool_call(name: str, args: str = "{}", call_id: str = "call_1"):
@@ -43,7 +43,7 @@ def test_react_tool_then_text(monkeypatch):
     assert "utc" in payload and "tz" in payload
 
     # history 追加并落盘（指令/旧 #tag 已剥离，SSE delta 仍推原始文本）
-    h = store.get_state()["history"]
+    h = checkpoint.live_messages()
     assert [m["role"] for m in h] == ["user", "assistant"]
     assert h[0]["text"] == "在吗"
     assert h[1]["text"] == "你好呀。今天很开心！"
@@ -112,7 +112,7 @@ def test_tool_memory_ops_via_react(monkeypatch):
 
 
 def test_tool_memory_update_dispatch():
-    """memory_update 走 edit_memory：更新成功 / pin:* → not_found 说明文本。"""
+    """memory_update 走 edit_memory：更新成功 / pinned 行 → 拒绝文本。"""
     from app import memory
     from app.agent.capability import run_call
 
@@ -123,13 +123,16 @@ def test_tool_memory_update_dispatch():
             json.dumps({"id": mem["id"], "content": "新事实"}),
             "c1",
         ),
-        pins=[],
     )
     assert json.loads(msg["content"])["ok"] is True
     assert memory.list_memories()[0]["content"] == "新事实"
 
+    pin = memory.add_memory("用户叫夜羽", pinned=True)
     msg = run_call(
-        _tool_call("memory_update", '{"id": "pin:abc", "content": "x"}', "c2"),
-        pins=[],
+        _tool_call(
+            "memory_update",
+            json.dumps({"id": pin["id"], "content": "x"}),
+            "c2",
+        ),
     )
-    assert "不存在" in msg["content"]
+    assert "pin" in msg["content"]

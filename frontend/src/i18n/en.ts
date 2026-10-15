@@ -12,6 +12,7 @@ export const en: Dict = {
   title: {
     tagline: "More than a chat bot",
     start: "Start",
+    continue: "Continue",
     config: "Config",
   },
   chat: {
@@ -58,6 +59,7 @@ export const en: Dict = {
     confirmLoad: "Load \"{title}\"? Current progress will be stored in the auto save first.",
     confirmOverwrite: "Overwrite \"{title}\" with the current session?",
     confirmDelete: "Delete save \"{title}\"?",
+    busySave: "Reply in progress — save after it finishes",
     loadFailed: "Save operation failed (service not running?)",
   },
   settings: {
@@ -69,6 +71,7 @@ export const en: Dict = {
       models: "Models",
       persona: "Persona",
       memory: "Memory",
+      extend: "Extensions",
     },
     groups: {
       llm: "LLM · Chat model",

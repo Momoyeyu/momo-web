@@ -1,34 +1,84 @@
 // 主页：左上品牌 + 右侧视觉小说式菜单（胶囊按钮、悬停饰标、错峰入场）。
 // 透明区域点击穿透到 Live2D 画布（模型可点）。
+// 菜单：开始（进对话页）/ 继续（读最新档进对话页，无存档置灰）/ 读档 / 设置。
+// 存档入口只在对话页——标题页没有可保存的现场。
 
-import { navigate, type CheckpointMode } from "../router";
+import { useEffect, useState } from "react";
+import { navigate } from "../router";
 import { useT } from "../i18n";
+import {
+  listCheckpoints,
+  loadCheckpoint,
+} from "../services/checkpointClient";
+import { resyncPassthrough } from "../lib/store";
+import { loadTranscript } from "../chat/engine";
+import type { CheckpointMeta } from "../lib/types";
 import "../styles/title.css";
-
-const MENU: {
-  route: "chat" | "checkpoint" | "settings";
-  labelKey: string;
-  hint: string;
-  checkpointMode?: CheckpointMode;
-}[] = [
-  { route: "chat", labelKey: "title.start", hint: "start" },
-  {
-    route: "checkpoint",
-    labelKey: "checkpoint.save",
-    hint: "save",
-    checkpointMode: "save",
-  },
-  {
-    route: "checkpoint",
-    labelKey: "checkpoint.load",
-    hint: "load",
-    checkpointMode: "load",
-  },
-  { route: "settings", labelKey: "title.config", hint: "config" },
-];
 
 export default function Title() {
   const t = useT();
+  const [saves, setSaves] = useState<CheckpointMeta[] | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    listCheckpoints()
+      .then(setSaves)
+      .catch(() => setSaves([]));
+  }, []);
+
+  // 最新档：updatedAt 最大的槽（含 auto）——继续 = 回到最近一次现场。
+  const latest =
+    saves && saves.length
+      ? saves.reduce((a, b) => (a.updatedAt >= b.updatedAt ? a : b))
+      : null;
+
+  const cont = async (): Promise<void> => {
+    if (!latest || busy) return;
+    setBusy(true);
+    try {
+      const save = await loadCheckpoint(latest.id);
+      await resyncPassthrough(); // 旧 history 不得随下次 PUT 盖回
+      loadTranscript(save.messages ?? []);
+      navigate("chat");
+    } catch {
+      setBusy(false);
+    }
+  };
+
+  const items: {
+    key: string;
+    labelKey: string;
+    hint: string;
+    disabled?: boolean;
+    onClick: () => void;
+  }[] = [
+    {
+      key: "start",
+      labelKey: "title.start",
+      hint: "start",
+      onClick: () => navigate("chat"),
+    },
+    {
+      key: "continue",
+      labelKey: "title.continue",
+      hint: "continue",
+      disabled: !latest || busy,
+      onClick: () => void cont(),
+    },
+    {
+      key: "load",
+      labelKey: "checkpoint.load",
+      hint: "load",
+      onClick: () => navigate("checkpoint", { checkpointMode: "load" }),
+    },
+    {
+      key: "config",
+      labelKey: "title.config",
+      hint: "config",
+      onClick: () => navigate("settings"),
+    },
+  ];
+
   return (
     <div className="title-screen">
       <header className="title-brand">
@@ -38,17 +88,13 @@ export default function Title() {
       </header>
 
       <nav className="title-menu">
-        {MENU.map((m, i) => (
+        {items.map((m, i) => (
           <button
-            key={m.labelKey}
+            key={m.key}
             className="menu-item"
             style={{ animationDelay: `${0.12 + i * 0.08}s` }}
-            onClick={() =>
-              navigate(
-                m.route,
-                m.checkpointMode ? { checkpointMode: m.checkpointMode } : undefined,
-              )
-            }
+            disabled={m.disabled}
+            onClick={m.onClick}
           >
             <span className="mi-orn" />
             <span className="mi-label">{t(m.labelKey)}</span>

@@ -8,17 +8,24 @@ from __future__ import annotations
 import json
 from typing import Any, Iterator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from .. import agent
+from .. import agent, checkpoint
 
 router = APIRouter()
 
 
 class ChatIn(BaseModel):
     text: str
+
+
+class InterruptIn(BaseModel):
+    """打断回传：本回合的用户输入 + 用户实际看到的 assistant 文本（可空）。"""
+
+    user: str = ""
+    assistant: str = ""
 
 
 def _sse(ev: dict[str, Any]) -> str:
@@ -44,3 +51,14 @@ def chat(req: ChatIn) -> StreamingResponse:
             yield _sse({"t": "done"})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@router.post("/api/chat/interrupt", status_code=204)
+def interrupt(req: InterruptIn) -> Response:
+    """打断：作废在途回合的落账，并把 live 尾对修正为用户实际看到的部分。
+
+    幂等且与回合写入无序敏感——无论打断先于/后于回合落账到达，
+    最终后端记录 = 前端展示。
+    """
+    checkpoint.interrupt_turn(req.user, req.assistant)
+    return Response(status_code=204)

@@ -44,7 +44,7 @@ _BUILTIN_AVATAR: dict[str, Any] = {
     },
 }
 
-# 缺省 state：仅覆盖后端消费的字段（settings/persona/pins/history/avatars），
+# 缺省 state：仅覆盖后端消费的字段（settings/persona/avatars），
 # 其余前端字段由 PUT body 透传。
 DEFAULT_STATE: dict[str, Any] = {
     "settings": {
@@ -75,12 +75,10 @@ DEFAULT_STATE: dict[str, Any] = {
         "personality": "乖巧听话",
         "preferences": ["喜欢草莓蛋糕", "讨厌苦的东西"],
     },
-    "pins": [],
     "avatars": [_BUILTIN_AVATAR],
     "avatarId": "builtin",
-    "history": [],
-    # 上下文压缩摘要：后台压缩任务把最旧若干回合滚入此段（无则不注入上下文）
-    "summary": "",
+    # pins/history/summary 已迁 momo.db（memories.pinned / live 会话行），
+    # 不再走 state.json。
 }
 
 
@@ -135,8 +133,7 @@ def get_state() -> dict[str, Any]:
     return normalize_state(raw)
 
 
-# state.json 读-改-写锁：append_history / 会话 load / 后台压缩写回共用，
-# 保证回合落盘与压缩截断不互相丢数据。
+# state.json 读-改-写锁：保给将来需要原子 read-modify-write 的配置字段。
 _STATE_LOCK = threading.Lock()
 
 
@@ -151,14 +148,3 @@ def update_state(mutate: Callable[[dict[str, Any]], Any]) -> Any:
         if result is not False:
             write_state(state)
         return result
-
-
-def append_history(entries: list[dict[str, Any]], cap: int = 100) -> None:
-    """追加对话历史（cap 100）并落盘。"""
-
-    def _mutate(state: dict[str, Any]) -> None:
-        history = list(state.get("history") or [])
-        history.extend(entries)
-        state["history"] = history[-cap:]
-
-    update_state(_mutate)

@@ -85,16 +85,10 @@ export const DEFAULT_PERSONA: PersonaCard = {
   preferences: ["喜欢草莓蛋糕", "讨厌苦的东西"],
 };
 
-const DEFAULT_PINS: string[] = [
-  "用户的名称是夜羽",
-  "夜羽是我的创造者",
-];
-
 function defaults(): PersistedState {
   return {
     settings: structuredClone(DEFAULT_SETTINGS),
     persona: structuredClone(DEFAULT_PERSONA),
-    pins: [...DEFAULT_PINS],
     avatars: [builtinAvatar()],
     avatarId: AVATAR_BUILTIN,
   };
@@ -125,11 +119,13 @@ let backend: StorageLike = defaultBackend();
 
 /** 旧 schema 遗留的普通记忆：随下一次 PUT /api/state 透传给 backend 导入一次，随后丢弃。 */
 let legacyMemories: Memory[] | null = null;
+/** 旧 schema 的 pins/user：同样一次性透传给 backend 导入 momo.db（pinned 行）。 */
+let legacyPins: string[] | null = null;
 
 /**
- * schema 外顶层字段（backend 维护的 history、以及将来的新字段）：
+ * schema 外顶层字段（backend 维护的旧 history、以及将来的新字段）：
  * 读取时记下、PUT 时原样带上——PUT 是整体替换，不透传会把它们抹掉。
- * user/memories/humanBlock 属旧 schema，被 migrate 消费，不透传。
+ * user/memories/humanBlock/pins 属旧 schema，被 migrate 消费，不透传。
  */
 let passthrough: Record<string, unknown> = {};
 const KNOWN_KEYS = new Set([
@@ -184,8 +180,8 @@ function migratePersona(raw: unknown, d: PersonaCard): PersonaCard {
 }
 
 /**
- * pins 归一化：新 schema 原样采用；旧版 user{name,relation,note} 迁移为
- * `用户的名称是${name}` + relation/note 原文各一条（空字段跳过）。
+ * pins 归一化（仅作旧 schema 迁移用：pins 数组或旧版
+ * user{name,relation,note} → 透传给 backend 导入 momo.db 的 pinned 行）。
  */
 function migratePins(raw: Record<string, unknown>, d: string[]): string[] {
   if (Array.isArray(raw.pins)) return strArr(raw.pins);
@@ -270,6 +266,12 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
   const s = parsed.settings;
   captureLegacyMemories(parsed as Record<string, unknown>);
   capturePassthrough(parsed as Record<string, unknown>);
+  // 旧 schema 的 pins/user：迁入 backend momo.db（透传一次后丢弃）。
+  const raw = parsed as Record<string, unknown>;
+  if (Array.isArray(raw.pins) || raw.user) {
+    const migrated = migratePins(raw, []);
+    if (migrated.length) legacyPins = migrated;
+  }
   const avatars = migrateAvatars(parsed.avatars ?? d.avatars);
   return {
     settings: {
@@ -281,7 +283,6 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
       extensions: migrateExtensions(s?.extensions),
     },
     persona: migratePersona(parsed.persona, d.persona),
-    pins: migratePins(parsed as Record<string, unknown>, d.pins),
     avatars,
     avatarId:
       parsed.avatarId && avatars.some((a) => a.id === parsed.avatarId)
@@ -332,7 +333,7 @@ export async function bootPersist(): Promise<void> {
 }
 
 /** 防抖 PUT /api/state；失败静默（localStorage 仍兜底）。
- *  带一次旧版 memories 透传：首个成功 PUT 后丢弃该字段。 */
+ *  带一次旧版 memories/pins 透传：首个成功 PUT 后丢弃该字段。 */
 function remoteSave(): void {
   if (!inBrowser()) return;
   if (saveTimer !== null) clearTimeout(saveTimer);
@@ -342,10 +343,14 @@ function remoteSave(): void {
       ...passthrough,
       ...state,
       ...(legacyMemories ? { memories: legacyMemories } : {}),
+      ...(legacyPins ? { pins: legacyPins } : {}),
     };
     void putState(body).then((ok) => {
-      // backend 已收到旧 memories（会自行导入），本地不再携带
-      if (ok) legacyMemories = null;
+      // backend 已收到旧 memories/pins（会自行导入），本地不再携带
+      if (ok) {
+        legacyMemories = null;
+        legacyPins = null;
+      }
     });
   }, 300);
 }

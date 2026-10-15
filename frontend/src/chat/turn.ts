@@ -19,7 +19,7 @@ import type {
 import { DirectiveParser } from "../llm/directives";
 import type { DirectiveEvent } from "../llm/directives";
 import { streamSpeech } from "../services/ttsClient";
-import { chat } from "../services/chatClient";
+import { chat, interrupt as sendInterrupt } from "../services/chatClient";
 import { SentenceSplitter } from "./sentences";
 import { dueDirs } from "./dirs";
 import type { PendingDir } from "./dirs";
@@ -125,6 +125,9 @@ export class ChatEngine {
   private asr: AsrStream | null = null;
   private micOn = false;
   private micStarting = false;
+  /** 离开 chat 页的挂起标记；micIntended 记录挂起前用户开着麦（回来恢复）。 */
+  private micSuspended = false;
+  private micIntended = false;
 
   private lastInterruptAt = 0;
   private disposed = false;
@@ -211,7 +214,7 @@ export class ChatEngine {
    * assistant 的末句，无则空。调用方负责 bumpTranscript 通知订阅者。
    */
   loadHistory(messages: CheckpointMessage[]): void {
-    if (this.turn) this.interruptNow();
+    if (this.turn) this.interruptNow(false);
     this.safe(() => this.player.stop());
     this.history.length = 0;
     for (const m of messages) {
@@ -236,7 +239,7 @@ export class ChatEngine {
     const trimmed = text.trim();
     if (!trimmed) return;
     // 新输入隐式打断在途回合（绕过防抖，保证打断一定生效）。
-    if (this.phase !== "idle") this.interruptNow();
+    if (this.phase !== "idle") this.interruptNow(true);
 
     const cfg = getSettings();
     if (!cfg.llm.url) {
@@ -285,6 +288,7 @@ export class ChatEngine {
   /** 开启麦克风 → ASR 流；SpeechStarted 在 speaking 时触发 barge-in。幂等。 */
   async startListening(): Promise<void> {
     if (this.disposed || this.micOn || this.micStarting) return;
+    this.micIntended = true;
     const cfg = getSettings();
     if (!cfg.asr.url) {
       this.events.onError(new ServiceError("asr", "unconfigured"));
@@ -330,8 +334,23 @@ export class ChatEngine {
     }
   }
 
+  /** 离开 chat 页：停麦停 ASR（记住意向，回来恢复）。幂等。 */
+  suspendMic(): void {
+    if (this.micSuspended) return;
+    this.micSuspended = true;
+    if (this.micOn || this.micStarting) this.stopListening();
+  }
+
+  /** 回到 chat 页：挂起前麦是开着的 → 恢复监听。幂等。 */
+  resumeMic(): void {
+    if (!this.micSuspended) return;
+    this.micSuspended = false;
+    if (this.micIntended) void this.startListening();
+  }
+
   /** 关麦（释放 ASR 连接与采集）。 */
   stopListening(): void {
+    if (!this.micSuspended) this.micIntended = false;
     this.micOn = false;
     const mic = this.mic;
     const asr = this.asr;
@@ -342,7 +361,9 @@ export class ChatEngine {
     this.emitStatus();
   }
 
-  /** 打断：停播放、abort 在途 LLM/TTS、当前 assistant 消息按已产出部分落账。
+  /** 打断：停播放、abort 在途 LLM/TTS、当前 assistant 消息按已产出部分落账，
+   *  并回传 backend 截断持久化（两侧一致）。persist=false 用于读档等
+   *  无需回传的场景（live 即将被整体覆盖）。
    *  300ms 防抖——重复触发（SpeechStarted + 手动停止）忽略。 */
   interrupt(): void {
     if (!this.turn) {
@@ -352,21 +373,34 @@ export class ChatEngine {
     const now = Date.now();
     if (now - this.lastInterruptAt < INTERRUPT_DEBOUNCE_MS) return;
     this.lastInterruptAt = now;
-    this.interruptNow();
+    this.interruptNow(true);
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.unsubVolume?.();
-    this.interruptNow();
+    this.interruptNow(false);
     this.stopListening();
     this.safe(() => this.player.dispose());
   }
 
   // ---------- 内部 ----------
 
-  private interruptNow(): void {
+  /** 用户实际看到的文本：已播完句全文 + 当前展示位的已显露字符
+   *  （当前位是未断句尾部时取 tail 的已显露前缀）。 */
+  private seenText(turn: Turn): string {
+    const parts = turn.sentences
+      .slice(0, Math.min(turn.disp.idx, turn.sentences.length))
+      .map((s) => s.text);
+    const active = turn.sentences[turn.disp.idx];
+    const cur = active ? active.text : turn.tail.trimStart();
+    const n = Math.min(cur.length, Math.floor(turn.disp.reveal));
+    if (n > 0) parts.push(cur.slice(0, n));
+    return parts.join("");
+  }
+
+  private interruptNow(persist: boolean): void {
     const turn = this.turn;
     if (!turn) {
       this.safe(() => this.player.stop());
@@ -378,6 +412,10 @@ export class ChatEngine {
     turn.inflight = 0;
     this.safe(() => this.player.stop());
     this.turn = null;
+    // 后端截断：把用户实际看到的部分回传，backend 修正 live 尾对（幂等）。
+    if (persist) {
+      sendInterrupt(turn.userText, this.seenText(turn));
+    }
     if (turn.text.trim()) {
       const msg: ChatMessage = {
         id: turn.id,

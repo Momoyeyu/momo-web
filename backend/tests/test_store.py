@@ -1,7 +1,6 @@
-"""state 读写 + 默认值归一化 + 旧 memories 导入。"""
+"""state 读写 + 默认值归一化 + 旧 schema 导入（memories/pins → momo.db）。"""
 from __future__ import annotations
 
-import pytest
 from fastapi.testclient import TestClient
 
 from app import memory, store
@@ -24,7 +23,8 @@ def test_write_then_read_normalized():
     assert s["persona"]["name"] == "momo"
     # 未知字段透传
     assert s["custom"] == {"x": 1}
-    assert s["history"] == []
+    # 已迁 momo.db 的键不再出现在 state
+    assert "history" not in s and "summary" not in s and "pins" not in s
 
 
 def test_normalize_tolerates_junk():
@@ -33,20 +33,13 @@ def test_normalize_tolerates_junk():
     assert s["pins"] == "oops"  # 非 None 值原样透传（容错，不强行纠正类型）
 
 
-def test_append_history_cap():
-    store.append_history(
-        [{"role": "user", "text": str(i), "at": "t"} for i in range(120)]
-    )
-    h = store.get_state()["history"]
-    assert len(h) == 100
-    assert h[-1]["text"] == "119"
-
-
 def test_put_state_legacy_import_and_strip():
     client = TestClient(app)
     body = {
         "pins": ["用户叫夜羽"],
         "user": {"name": "夜羽"},  # 旧 schema，应被忽略且不写回
+        "history": [{"role": "user", "text": "旧话", "at": "t"}],  # 忽略
+        "summary": "旧摘要",  # 忽略
         "memories": [
             {"content": "用户喜欢草莓蛋糕"},
             {"content": "用户喜欢草莓蛋糕"},  # 重复 → 只入一条
@@ -59,17 +52,24 @@ def test_put_state_legacy_import_and_strip():
     assert r.status_code == 204
 
     mems = memory.list_memories()
-    assert [m["content"] for m in mems] == ["用户喜欢草莓蛋糕"]
-    assert len(mems[0]["id"]) == 12
-    assert mems[0]["createdAt"]
+    normal = [m for m in mems if not m["pinned"]]
+    assert [m["content"] for m in normal] == ["用户喜欢草莓蛋糕"]
+    assert len(normal[0]["id"]) == 12
+    assert normal[0]["createdAt"]
+
+    # pins → pinned 行
+    assert memory.pins() == ["用户叫夜羽"]
 
     stored = store.read_state()
     assert "memories" not in stored
     assert "user" not in stored
+    assert "pins" not in stored
+    assert "history" not in stored
+    assert "summary" not in stored
 
     r = client.get("/api/state")
     assert r.status_code == 200
-    assert r.json()["pins"] == ["用户叫夜羽"]
+    assert "pins" not in r.json()
 
 
 def test_get_state_endpoint_empty():

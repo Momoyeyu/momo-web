@@ -1,10 +1,15 @@
 // 存档槽位页（#/checkpoint）：视觉小说式 3×4 槽位网格，存档/读档双模式。
-// 保存 = 快照当前会话（backend state.json）；读取 = 存档覆盖当前会话并回对话页。
+// 保存 = 快照当前会话（backend momo.db live 行）；读取 = 存档覆盖当前会话并回对话页。
 // auto 槽是 load 前的自动备份（不占 120 手动槽位），固定置顶网格上方、只可读。
-// 模式由入口决定（标题菜单/对话工具条的「存档」「读档」），页内亦可切换；
+// 模式由入口决定（标题菜单「读档」/对话工具条的「存档」「读档」），页内不可切换；
 // 返回键按来源页回退。
 
-import { useEffect, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import type { CheckpointMeta } from "../lib/types";
 import {
   createCheckpoint,
@@ -14,7 +19,12 @@ import {
   overwriteCheckpoint,
 } from "../services/checkpointClient";
 import { resyncPassthrough } from "../lib/store";
-import { loadTranscript } from "../chat/engine";
+import {
+  getChatEngine,
+  loadTranscript,
+  subscribeTranscript,
+  transcriptVersion,
+} from "../chat/engine";
 import {
   navigate,
   fromRoute,
@@ -48,11 +58,17 @@ const slotNo = (n: number): string => `No.${String(n).padStart(3, "0")}`;
 
 export default function Checkpoint() {
   const t = useT();
-  const [mode, setMode] = useState<CheckpointMode>(checkpointEntryMode());
+  // 模式由进入入口决定（checkpointEntryMode 通道），页内不提供切换。
+  const [mode] = useState<CheckpointMode>(checkpointEntryMode());
   const [slots, setSlots] = useState<CheckpointMeta[]>([]);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pageIdx, setPageIdx] = useState(0);
+  // 引擎状态变化（回合开始/结束）时重渲染，驱动「回合中禁存档」。
+  useSyncExternalStore(subscribeTranscript, transcriptVersion);
+  const turnActive = getChatEngine().status !== "idle";
+  // 存档模式：回合进行中禁保存（快照会截到半条回复）。
+  const saveBlocked = mode === "save" && turnActive;
 
   const refresh = async (): Promise<void> => {
     try {
@@ -137,7 +153,7 @@ export default function Checkpoint() {
   };
 
   const openCell = (c: SlotCell): void => {
-    if (busy) return;
+    if (busy || saveBlocked) return;
     if (mode === "save") {
       void (c.save ? overwrite(c.save) : saveTo(c.slot));
     } else if (c.save) {
@@ -161,20 +177,6 @@ export default function Checkpoint() {
       <div className={`checkpoint-panel checkpoint-${mode}`}>
         <header className="checkpoint-head">
           <h1>{t(`checkpoint.${mode}`)}</h1>
-          <div className="checkpoint-mode" role="tablist">
-            <button
-              className={`seg${mode === "save" ? " seg-on" : ""}`}
-              onClick={() => setMode("save")}
-            >
-              {t("checkpoint.save")}
-            </button>
-            <button
-              className={`seg${mode === "load" ? " seg-on" : ""}`}
-              onClick={() => setMode("load")}
-            >
-              {t("checkpoint.load")}
-            </button>
-          </div>
           <button className="ghost" onClick={back}>
             {t(fromRoute() === "chat" ? "common.backChat" : "common.backTitle")}
           </button>
@@ -183,6 +185,11 @@ export default function Checkpoint() {
         <div className="checkpoint-body">
           {failed && (
             <div className="muted checkpoint-empty">{t("checkpoint.loadFailed")}</div>
+          )}
+          {saveBlocked && (
+            <div className="muted checkpoint-empty">
+              {t("checkpoint.busySave")}
+            </div>
           )}
 
           {/* AUTO 自动存档槽：置顶于网格上方、独立于分页，只读不写 */}
@@ -206,7 +213,7 @@ export default function Checkpoint() {
                 <div
                   key={c.slot}
                   className={`slot-card slot-filled${
-                    !busy ? " slot-clickable" : ""
+                    !busy && !saveBlocked ? " slot-clickable" : ""
                   }`}
                   onClick={() => openCell(c)}
                 >
@@ -228,7 +235,9 @@ export default function Checkpoint() {
                 <div
                   key={c.slot}
                   className={`slot-card slot-empty${
-                    mode === "save" && !busy ? " slot-clickable" : ""
+                    mode === "save" && !busy && !saveBlocked
+                      ? " slot-clickable"
+                      : ""
                   }`}
                   onClick={() => openCell(c)}
                 >

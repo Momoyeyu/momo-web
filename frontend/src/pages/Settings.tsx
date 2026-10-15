@@ -35,9 +35,15 @@ import AvatarPanel from "./Avatar";
 import "../styles/settings.css";
 
 type EndpointSection = "llm" | "asr" | "tts" | "embedding";
-type Section = "general" | "models" | "persona" | "memory";
+type Section = "general" | "models" | "persona" | "memory" | "extend";
 
-const TABS: Section[] = ["general", "models", "persona", "memory"];
+const TABS: Section[] = [
+  "general",
+  "models",
+  "persona",
+  "memory",
+  "extend",
+];
 
 const URL_SCHEMES: Record<EndpointSection, string[]> = {
   llm: ["http:", "https:"],
@@ -404,10 +410,7 @@ export default function Settings() {
               }
             />
           ) : tab === "memory" ? (
-            <MemoryPanel
-              pins={state.pins}
-              onPins={(pins) => update({ pins })}
-            />
+            <MemoryPanel />
           ) : (
             <div className="settings-body panel">
               {tab === "general" && (
@@ -632,7 +635,11 @@ export default function Settings() {
                     <span className="req">*</span>
                   </h3>
                   <AvatarPanel />
+                </div>
+              )}
 
+              {tab === "extend" && (
+                <div className="opt-list">
                   <h3 className="opt-group">
                     {t("settings.groups.extensions")}
                   </h3>

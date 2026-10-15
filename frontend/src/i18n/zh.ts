@@ -12,6 +12,7 @@ export const zh = {
   title: {
     tagline: "不只是聊天机器人",
     start: "开始",
+    continue: "继续",
     config: "设置",
   },
   chat: {
@@ -58,6 +59,7 @@ export const zh = {
     confirmLoad: "读取「{title}」？当前进度会先存入自动存档。",
     confirmOverwrite: "用当前会话覆盖「{title}」？",
     confirmDelete: "删除存档「{title}」？",
+    busySave: "回复进行中——结束后再存档",
     loadFailed: "存档操作失败（服务未启动？）",
   },
   settings: {
@@ -69,6 +71,7 @@ export const zh = {
       models: "模型",
       persona: "人格",
       memory: "记忆",
+      extend: "拓展",
     },
     groups: {
       llm: "LLM · 对话模型",

@@ -12,6 +12,7 @@ export const ja: Dict = {
   title: {
     tagline: "チャットボット以上の存在",
     start: "はじめる",
+    continue: "つづきから",
     config: "設定",
   },
   chat: {
@@ -58,6 +59,7 @@ export const ja: Dict = {
     confirmLoad: "「{title}」をロードしますか？現在の進行は先にオートセーブへ保存されます。",
     confirmOverwrite: "「{title}」を現在の会話で上書きしますか？",
     confirmDelete: "「{title}」を削除しますか？",
+    busySave: "応答中です——終了してから保存してください",
     loadFailed: "セーブ操作に失敗しました（サービス未起動？）",
   },
   settings: {
@@ -69,6 +71,7 @@ export const ja: Dict = {
       models: "モデル",
       persona: "人格",
       memory: "記憶",
+      extend: "拡張",
     },
     groups: {
       llm: "LLM · 対話モデル",
