@@ -1,19 +1,20 @@
-"""data/state.json 读写与默认值归一化。
+"""data/momo.yaml 读写与默认值归一化。
 
-state.json 是配置层持久化（gitignored）。读取时做 defaults 深合并：
+momo.yaml 是配置层持久化（gitignored）。读取时做 defaults 深合并：
 缺失键补默认值，多余键原样透传（前端字段后端不消费的也保留）。
 """
 from __future__ import annotations
 
 import copy
-import json
 from pathlib import Path
 from typing import Any
+
+import yaml
 
 from .embed import DEFAULT_MODEL, DEFAULT_URL
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-STATE_PATH = DATA_DIR / "state.json"
+STATE_PATH = DATA_DIR / "momo.yaml"
 
 # 内置 Hiyori 的资源清单（与前端 BUILTIN_RESOURCES 保持一致；
 # 前端 manifest 解析才是权威源，这里是后端兜底默认）。
@@ -106,19 +107,20 @@ def normalize_state(state: dict[str, Any] | None) -> dict[str, Any]:
 
 
 def read_state() -> dict[str, Any] | None:
-    """读原始 state；文件不存在或 JSON 损坏返回 None。"""
+    """读原始 state；文件不存在或 YAML 损坏返回 None。"""
     try:
-        data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+        data = yaml.safe_load(STATE_PATH.read_text(encoding="utf-8"))
     except Exception:
         return None
     return data if isinstance(data, dict) else None
 
 
 def write_state(state: dict[str, Any]) -> None:
-    """整体写入 state.json（不做归一化，读取时再合并默认值）。"""
+    """整体写入 momo.yaml（不做归一化，读取时再合并默认值）。"""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     STATE_PATH.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8"
+        yaml.safe_dump(state, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
     )
 
 

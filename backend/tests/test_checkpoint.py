@@ -1,6 +1,7 @@
 """会话存档 REST + 上下文压缩 + 打断/代际竞态：CRUD / auto 槽 / load 往返 / 压缩。"""
 from __future__ import annotations
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app import agent, checkpoint, db, llm
@@ -231,6 +232,42 @@ def test_auto_slot_not_deletable():
     autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos) == 1
     assert client.delete(f"/api/checkpoints/{autos[0]['id']}").status_code == 400
+
+
+def test_auto_slot_not_overwritable():
+    """PUT 覆盖 auto 槽与删除同规则：400 invalid，内容不被改动。"""
+    client = TestClient(app)
+    _seed(1, "甲")
+    sid = client.post("/api/checkpoints", json={}).json()["id"]
+    _seed(1, "乙")
+    client.post(f"/api/checkpoints/{sid}/load")  # 现场进 auto 槽
+    autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
+    assert len(autos) == 1
+    auto_id = autos[0]["id"]
+    before = client.get(f"/api/checkpoints/{auto_id}").json()["messages"]
+
+    assert client.put(f"/api/checkpoints/{auto_id}", json={}).status_code == 400
+    r = client.put(f"/api/checkpoints/{auto_id}", json={"title": "改名"})
+    assert r.status_code == 400
+    after = client.get(f"/api/checkpoints/{auto_id}").json()
+    assert after["messages"] == before  # 未被覆盖
+    assert after["title"] == autos[0]["title"]  # 标题未被改
+
+
+def test_overwrite_auto_direct_raises_invalid():
+    """存储层直连：覆盖 auto 槽抛 CheckpointError(kind='invalid')，同 delete。"""
+    _seed(1)
+    sid = checkpoint.create_checkpoint()["id"]
+    _seed(1, "乙")
+    checkpoint.load_checkpoint(sid)  # 现场进 auto 槽
+    auto_id = db.query(
+        "SELECT id FROM sessions WHERE auto=1 AND id != ?", (db.LIVE_ID,)
+    )[0]["id"]
+    with pytest.raises(checkpoint.CheckpointError) as ei:
+        checkpoint.overwrite_checkpoint(auto_id)
+    assert ei.value.kind == "invalid"
+
+
 def test_preview_uses_last_message():
     client = TestClient(app)
     _seed(3, "丙")
@@ -435,3 +472,50 @@ def test_compress_aborts_when_generation_moved(monkeypatch):
     assert compress.compress_once() is False
     assert _live_summary() == ""
     assert len(checkpoint.live_messages()) == 8
+
+
+# ---------- live.messages 上限（cap 100） ----------
+
+def test_live_cap_under_limit_no_trim():
+    """不足 100 条不裁剪；恰好 100 条也不动。"""
+    _seed(49)
+    assert len(checkpoint.live_messages()) == 98
+    add_turn("问49", "答49")
+    msgs = checkpoint.live_messages()
+    assert len(msgs) == 100
+    assert msgs[0]["text"] == "问0"  # 一条未删
+
+
+def test_live_cap_trims_oldest_turns():
+    """超界后保留最新 100 条，最旧的完整回合被裁掉。"""
+    _seed(51)  # 102 条 → 末次 commit 触发裁剪
+    msgs = checkpoint.live_messages()
+    assert len(msgs) == 100
+    assert msgs[0]["role"] == "user"
+    assert _live_texts()[:2] == ["问1", "答1"]  # 问0/答0 整对删除
+
+
+def test_live_cap_boundary_never_splits_turn():
+    """裁剪点落在 assistant 上 → 多留一条，剩余最早一条仍是 user。"""
+    _seed(50)  # 100 条
+    gen = checkpoint.generation()
+    # 两条连续 user 把总数顶成奇数（实际场景可由打断/删除造成），
+    # 使 103 - 100 = 3 的裁剪点落在「答1」（assistant）上
+    checkpoint.begin_turn("落单的问1", gen, "t")
+    checkpoint.begin_turn("落单的问2", gen, "t")
+    assert checkpoint.commit_reply("答", gen, "t") is True
+    msgs = checkpoint.live_messages()
+    assert len(msgs) == 101  # 多留一条
+    assert msgs[0]["role"] == "user"  # 回合不被从中间切开
+    assert _live_texts()[:2] == ["问1", "答1"]  # 问0/答0 整对删除
+
+
+def test_live_cap_trim_happens_in_commit_tx():
+    """裁剪与落账同一事务：commit 成功后立即满足上限，外部读不到超界状态。"""
+    _seed(50)
+    add_turn("问50", "答50")  # 102 → commit 内部即裁剪
+    # 用独立 query 再查一次，落账与裁剪已原子生效
+    n = db.query(
+        "SELECT COUNT(*) AS n FROM messages WHERE session_id=?", (db.LIVE_ID,)
+    )[0]["n"]
+    assert n == 100

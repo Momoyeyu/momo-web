@@ -1,6 +1,7 @@
-"""state 读写 + 默认值归一化。"""
+"""state 读写 + 默认值归一化（持久化文件 = data/momo.yaml）。"""
 from __future__ import annotations
 
+import yaml
 from fastapi.testclient import TestClient
 
 from app import store
@@ -55,3 +56,34 @@ def test_get_state_endpoint_empty():
     r = client.get("/api/state")
     assert r.status_code == 200
     assert r.json() == {}
+
+
+def test_state_persisted_as_momo_yaml():
+    """PUT 落盘为 data/momo.yaml（YAML 明文）；HTTP 层载荷仍是 JSON。"""
+    assert store.STATE_PATH.name == "momo.yaml"
+    client = TestClient(app)
+    r = client.put(
+        "/api/state",
+        json={"persona": {"name": "桃"}, "custom": {"x": 1}},
+    )
+    assert r.status_code == 204
+    raw = store.STATE_PATH.read_text(encoding="utf-8")
+    assert "name: 桃" in raw  # YAML 明文
+    assert yaml.safe_load(raw) == {"persona": {"name": "桃"}, "custom": {"x": 1}}
+    # 读回走同一文件
+    assert store.get_state()["persona"]["name"] == "桃"
+
+
+def test_read_state_tolerates_corrupt_yaml():
+    store.STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    store.STATE_PATH.write_text("a: [1, 2", encoding="utf-8")  # 非法 YAML
+    assert store.read_state() is None
+    assert store.get_state() == {}
+
+
+def test_read_state_non_mapping_returns_none():
+    """YAML 合法但顶层不是 mapping（如裸列表/字符串）→ 视为无数据。"""
+    store.STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    store.STATE_PATH.write_text("- just\n- a\n- list\n", encoding="utf-8")
+    assert store.read_state() is None
+    assert store.get_state() == {}

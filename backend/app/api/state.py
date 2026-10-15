@@ -1,4 +1,4 @@
-"""GET/PUT /api/state：整体读写 state.json。"""
+"""GET/PUT /api/state：整体读写 data/momo.yaml（HTTP 层载荷仍是 JSON）。"""
 from __future__ import annotations
 
 from typing import Any

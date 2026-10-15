@@ -9,7 +9,7 @@ from app import checkpoint, db, store
 @pytest.fixture(autouse=True)
 def isolated_data(tmp_path, monkeypatch):
     monkeypatch.setattr(store, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(store, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(store, "STATE_PATH", tmp_path / "momo.yaml")
     db.reset()
     yield
     db.reset()

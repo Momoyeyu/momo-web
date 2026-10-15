@@ -16,6 +16,7 @@ from . import db
 
 PREVIEW_LEN = 40
 MAX_SLOT = 120  # 手动存档槽位上限（12 格/页 × 10 页）
+LIVE_HISTORY_MAX = 100  # live 会话行消息数上限（超出截尾，边界不拆回合）
 LIVE_ID = db.LIVE_ID
 
 
@@ -95,7 +96,10 @@ def begin_turn(text: str, gen: int, at: str) -> bool:
 
 
 def commit_reply(text: str, gen: int, at: str) -> bool:
-    """assistant 落账：代际一致才写入；读档/打断后 gen 漂移 → 丢弃。"""
+    """assistant 落账：代际一致才写入；读档/打断后 gen 漂移 → 丢弃。
+
+    写入成功后同事务内裁剪 live.messages 至上限。
+    """
     with db.tx() as c:
         cur = c.execute(
             "SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)
@@ -109,7 +113,29 @@ def commit_reply(text: str, gen: int, at: str) -> bool:
         c.execute(
             "UPDATE sessions SET updated_at=? WHERE id=?", (at, LIVE_ID)
         )
+        _trim_live(c)
         return True
+
+
+def _trim_live(c: Any) -> None:
+    """live.messages 保留最新 LIVE_HISTORY_MAX 条，删除更旧的。
+
+    裁剪边界不拆散完整回合：剩余的最早一条必须是 role='user'——
+    切在 assistant 上则向前回退到最近的 user 边界（多留若干条）。
+    """
+    rows = c.execute(
+        "SELECT seq, role FROM messages WHERE session_id=? ORDER BY seq",
+        (LIVE_ID,),
+    ).fetchall()
+    if len(rows) <= LIVE_HISTORY_MAX:
+        return
+    cut = len(rows) - LIVE_HISTORY_MAX
+    while cut > 0 and rows[cut]["role"] != "user":
+        cut -= 1
+    c.execute(
+        "DELETE FROM messages WHERE session_id=? AND seq<?",
+        (LIVE_ID, rows[cut]["seq"]),
+    )
 
 
 def interrupt_turn(user: str, assistant: str) -> None:
@@ -344,6 +370,8 @@ def overwrite_checkpoint(sid: str, title: str | None = None) -> dict[str, Any]:
         r = c.execute("SELECT * FROM sessions WHERE id=?", (sid,)).fetchone()
         if r is None:
             raise CheckpointError("存档不存在", kind="not_found")
+        if r["auto"]:
+            raise CheckpointError("自动存档槽不可覆盖", kind="invalid")
         now = _now_iso()
         t = (title or "").strip()
         c.execute(
