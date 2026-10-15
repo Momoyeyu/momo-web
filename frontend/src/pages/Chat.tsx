@@ -186,10 +186,16 @@ export default function Chat() {
           <button className="tb" onClick={() => navigate("backlog")}>
             {t("chat.backlog")}
           </button>
-          <button className="tb" onClick={() => navigate("sessions")}>
+          <button
+            className="tb"
+            onClick={() => navigate("sessions", { sessionsMode: "save" })}
+          >
             {t("sessions.save")}
           </button>
-          <button className="tb" onClick={() => navigate("sessions")}>
+          <button
+            className="tb"
+            onClick={() => navigate("sessions", { sessionsMode: "load" })}
+          >
             {t("sessions.load")}
           </button>
           <button
