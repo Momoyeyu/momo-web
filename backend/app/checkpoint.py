@@ -1,4 +1,4 @@
-"""会话存档：data/sessions.json 槽位制 Save/Load。
+"""会话存档 checkpoint：data/checkpoints.json 槽位制 Save/Load。
 
 - 条目 schema：{id(8位hex), title, auto, slot, createdAt, updatedAt, summary, messages[]}
 - slot=1..120 手动槽位号（网格 12 格/页 × 10 页）；auto 槽不占号。
@@ -7,6 +7,7 @@
   重复 load 覆盖同一槽（不占手动槽位）。
 - 写回 state 走 store.update_state 锁内 read-modify-write，
   与回合落盘/后台压缩互斥，不丢在途追加。
+- 迁移：旧文件名 data/sessions.json 存在时回退读取（写只写 checkpoints.json）。
 """
 from __future__ import annotations
 
@@ -19,12 +20,13 @@ from typing import Any
 from . import store
 from .store import DATA_DIR
 
-SESSIONS_PATH = DATA_DIR / "sessions.json"
+CHECKPOINTS_PATH = DATA_DIR / "checkpoints.json"
+_LEGACY_PATH = DATA_DIR / "sessions.json"  # 旧文件名回退读
 PREVIEW_LEN = 40
 MAX_SLOT = 120  # 手动存档槽位上限（12 格/页 × 10 页）
 
 
-class SessionError(Exception):
+class CheckpointError(Exception):
     """存档操作失败。kind: not_found（404）/ invalid（400）/ conflict（409）。"""
 
     def __init__(self, message: str, kind: str = "invalid") -> None:
@@ -70,8 +72,11 @@ def _normalize_slots(saves: list[dict[str, Any]]) -> None:
 
 
 def _load() -> list[dict[str, Any]]:
+    path = CHECKPOINTS_PATH
+    if not path.exists() and _LEGACY_PATH.exists():
+        path = _LEGACY_PATH  # 旧文件名回退（写回即迁移到 checkpoints.json）
     try:
-        data = json.loads(SESSIONS_PATH.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return []
     saves = [s for s in data if isinstance(s, dict)] if isinstance(data, list) else []
@@ -80,8 +85,8 @@ def _load() -> list[dict[str, Any]]:
 
 
 def _save(saves: list[dict[str, Any]]) -> None:
-    SESSIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    SESSIONS_PATH.write_text(
+    CHECKPOINTS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CHECKPOINTS_PATH.write_text(
         json.dumps(saves, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
@@ -136,7 +141,7 @@ def meta(entry: dict[str, Any]) -> dict[str, Any]:
 
 # ---------- CRUD ----------
 
-def list_sessions() -> list[dict[str, Any]]:
+def list_checkpoints() -> list[dict[str, Any]]:
     """auto 槽置顶，其后手动存档按 slot 升序。"""
     saves = _load()
     saves.sort(key=lambda s: (0 if s.get("auto") else 1, s.get("slot") or 0))
@@ -147,10 +152,10 @@ def _find(saves: list[dict[str, Any]], sid: str) -> dict[str, Any] | None:
     return next((s for s in saves if s.get("id") == sid), None)
 
 
-def get_session(sid: str) -> dict[str, Any]:
+def get_checkpoint(sid: str) -> dict[str, Any]:
     entry = _find(_load(), sid)
     if entry is None:
-        raise SessionError("存档不存在", kind="not_found")
+        raise CheckpointError("存档不存在", kind="not_found")
     return entry
 
 
@@ -161,15 +166,15 @@ def _assign_slot(saves: list[dict[str, Any]], slot: Any) -> int:
         for n in range(1, MAX_SLOT + 1):
             if n not in used:
                 return n
-        raise SessionError(f"手动存档已满（{MAX_SLOT} 槽）", kind="conflict")
+        raise CheckpointError(f"手动存档已满（{MAX_SLOT} 槽）", kind="conflict")
     if not _valid_slot(slot):
-        raise SessionError(f"槽位号需在 1–{MAX_SLOT} 之间")
+        raise CheckpointError(f"槽位号需在 1–{MAX_SLOT} 之间")
     if slot in used:
-        raise SessionError(f"槽位 {slot} 已被占用", kind="conflict")
+        raise CheckpointError(f"槽位 {slot} 已被占用", kind="conflict")
     return int(slot)
 
 
-def create_session(
+def create_checkpoint(
     title: str | None = None, slot: int | None = None
 ) -> dict[str, Any]:
     """快照当前会话新建存档；title 空 → 默认当前时间；slot 空 → 最小空槽。"""
@@ -191,13 +196,13 @@ def create_session(
     return entry
 
 
-def overwrite_session(sid: str, title: str | None = None) -> dict[str, Any]:
+def overwrite_checkpoint(sid: str, title: str | None = None) -> dict[str, Any]:
     """重命名（title 非空时）+ 用当前会话内容覆盖。"""
     summary, messages = _snapshot()
     saves = _load()
     entry = _find(saves, sid)
     if entry is None:
-        raise SessionError("存档不存在", kind="not_found")
+        raise CheckpointError("存档不存在", kind="not_found")
     if title and title.strip():
         entry["title"] = title.strip()
     entry["summary"] = summary
@@ -207,14 +212,14 @@ def overwrite_session(sid: str, title: str | None = None) -> dict[str, Any]:
     return entry
 
 
-def delete_session(sid: str) -> dict[str, Any]:
+def delete_checkpoint(sid: str) -> dict[str, Any]:
     saves = _load()
     for i, s in enumerate(saves):
         if s.get("id") == sid:
             gone = saves.pop(i)
             _save(saves)
             return gone
-    raise SessionError("存档不存在", kind="not_found")
+    raise CheckpointError("存档不存在", kind="not_found")
 
 
 # ---------- Load ----------
@@ -245,11 +250,11 @@ def _write_auto(summary: str, messages: list[dict[str, str]]) -> None:
     _save(saves)
 
 
-def load_session(sid: str) -> dict[str, Any]:
+def load_checkpoint(sid: str) -> dict[str, Any]:
     """加载存档覆盖当前会话；当前会话非空先存入 auto 槽。返回存档全文。"""
     target = _find(_load(), sid)
     if target is None:
-        raise SessionError("存档不存在", kind="not_found")
+        raise CheckpointError("存档不存在", kind="not_found")
 
     def _mutate(state: dict[str, Any]) -> None:
         cur_summary = str(state.get("summary") or "")

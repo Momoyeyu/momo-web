@@ -1,34 +1,34 @@
-// 存档槽位页（#/sessions）：视觉小说式 3×4 槽位网格，存档/读档双模式。
+// 存档槽位页（#/checkpoint）：视觉小说式 3×4 槽位网格，存档/读档双模式。
 // 保存 = 快照当前会话（backend state.json）；读取 = 存档覆盖当前会话并回对话页。
 // auto 槽是 load 前的自动备份（不占 120 手动槽位），固定置顶网格上方、只可读。
 // 模式由入口决定（标题菜单/对话工具条的「存档」「读档」），页内亦可切换；
 // 返回键按来源页回退。
 
 import { useEffect, useState, type ReactNode } from "react";
-import type { SessionMeta } from "../lib/types";
+import type { CheckpointMeta } from "../lib/types";
 import {
-  createSession,
-  deleteSession,
-  listSessions,
-  loadSession,
-  overwriteSession,
-} from "../services/sessionClient";
+  createCheckpoint,
+  deleteCheckpoint,
+  listCheckpoints,
+  loadCheckpoint,
+  overwriteCheckpoint,
+} from "../services/checkpointClient";
 import { resyncPassthrough } from "../lib/store";
 import { loadTranscript } from "../chat/engine";
 import {
   navigate,
   fromRoute,
-  sessionsEntryMode,
-  type SessionsMode,
+  checkpointEntryMode,
+  type CheckpointMode,
 } from "../router";
 import {
   MAX_PAGES,
   buildCells,
   pageCount,
   type SlotCell,
-} from "../lib/sessionGrid";
+} from "../lib/checkpointGrid";
 import { useT, currentLang } from "../i18n";
-import "../styles/sessions.css";
+import "../styles/checkpoint.css";
 import "../styles/persona.css";
 
 const LOCALE = { zh: "zh-CN", ja: "ja-JP", en: "en-US" } as const;
@@ -46,17 +46,17 @@ function formatTime(iso: string): string {
 
 const slotNo = (n: number): string => `No.${String(n).padStart(3, "0")}`;
 
-export default function Sessions() {
+export default function Checkpoint() {
   const t = useT();
-  const [mode, setMode] = useState<SessionsMode>(sessionsEntryMode());
-  const [slots, setSlots] = useState<SessionMeta[]>([]);
+  const [mode, setMode] = useState<CheckpointMode>(checkpointEntryMode());
+  const [slots, setSlots] = useState<CheckpointMeta[]>([]);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [pageIdx, setPageIdx] = useState(0);
 
   const refresh = async (): Promise<void> => {
     try {
-      setSlots(await listSessions());
+      setSlots(await listCheckpoints());
       setFailed(false);
     } catch {
       setFailed(true);
@@ -80,7 +80,7 @@ export default function Sessions() {
   const saveTo = async (slot: number): Promise<void> => {
     setBusy(true);
     try {
-      await createSession(undefined, slot);
+      await createCheckpoint(undefined, slot);
       await refresh();
     } catch {
       setFailed(true);
@@ -90,13 +90,13 @@ export default function Sessions() {
   };
 
   /** 存档模式点已占槽：确认后覆盖。 */
-  const overwrite = async (s: SessionMeta): Promise<void> => {
-    if (!window.confirm(t("sessions.confirmOverwrite", { title: s.title }))) {
+  const overwrite = async (s: CheckpointMeta): Promise<void> => {
+    if (!window.confirm(t("checkpoint.confirmOverwrite", { title: s.title }))) {
       return;
     }
     setBusy(true);
     try {
-      await overwriteSession(s.id);
+      await overwriteCheckpoint(s.id);
       await refresh();
     } catch {
       setFailed(true);
@@ -106,11 +106,11 @@ export default function Sessions() {
   };
 
   /** 读档模式点已占槽（含 auto）：确认 → 覆盖当前会话 → 灌引擎 → 回对话页。 */
-  const load = async (s: SessionMeta): Promise<void> => {
-    if (!window.confirm(t("sessions.confirmLoad", { title: s.title }))) return;
+  const load = async (s: CheckpointMeta): Promise<void> => {
+    if (!window.confirm(t("checkpoint.confirmLoad", { title: s.title }))) return;
     setBusy(true);
     try {
-      const save = await loadSession(s.id);
+      const save = await loadCheckpoint(s.id);
       await resyncPassthrough(); // 旧 history 不得随下次 PUT 盖回
       loadTranscript(save.messages ?? []);
       navigate("chat");
@@ -121,13 +121,13 @@ export default function Sessions() {
   };
 
   /** 读档模式卡片删除钮：确认后释放槽位。 */
-  const remove = async (s: SessionMeta): Promise<void> => {
-    if (!window.confirm(t("sessions.confirmDelete", { title: s.title }))) {
+  const remove = async (s: CheckpointMeta): Promise<void> => {
+    if (!window.confirm(t("checkpoint.confirmDelete", { title: s.title }))) {
       return;
     }
     setBusy(true);
     try {
-      await deleteSession(s.id);
+      await deleteCheckpoint(s.id);
       await refresh();
     } catch {
       setFailed(true);
@@ -146,7 +146,7 @@ export default function Sessions() {
   };
 
   /** 已占槽卡片体：槽位号 + 时间 + 末句预览（网格卡与 auto 卡共用）。 */
-  const cardBody = (s: SessionMeta, no: string): ReactNode => (
+  const cardBody = (s: CheckpointMeta, no: string): ReactNode => (
     <>
       <div className="slot-card-top">
         <span className="slot-no">{no}</span>
@@ -157,22 +157,22 @@ export default function Sessions() {
   );
 
   return (
-    <div className="sessions-page">
-      <div className={`sessions-panel sessions-${mode}`}>
-        <header className="sessions-head">
-          <h1>{t(`sessions.${mode}`)}</h1>
-          <div className="sessions-mode" role="tablist">
+    <div className="checkpoint-page">
+      <div className={`checkpoint-panel checkpoint-${mode}`}>
+        <header className="checkpoint-head">
+          <h1>{t(`checkpoint.${mode}`)}</h1>
+          <div className="checkpoint-mode" role="tablist">
             <button
               className={`seg${mode === "save" ? " seg-on" : ""}`}
               onClick={() => setMode("save")}
             >
-              {t("sessions.save")}
+              {t("checkpoint.save")}
             </button>
             <button
               className={`seg${mode === "load" ? " seg-on" : ""}`}
               onClick={() => setMode("load")}
             >
-              {t("sessions.load")}
+              {t("checkpoint.load")}
             </button>
           </div>
           <button className="ghost" onClick={back}>
@@ -180,9 +180,9 @@ export default function Sessions() {
           </button>
         </header>
 
-        <div className="sessions-body">
+        <div className="checkpoint-body">
           {failed && (
-            <div className="muted sessions-empty">{t("sessions.loadFailed")}</div>
+            <div className="muted checkpoint-empty">{t("checkpoint.loadFailed")}</div>
           )}
 
           {/* AUTO 自动存档槽：置顶于网格上方、独立于分页，只读不写 */}
@@ -195,12 +195,12 @@ export default function Sessions() {
                 if (mode === "load" && !busy) void load(auto);
               }}
             >
-              <span className="slot-badge">{t("sessions.autoBadge")}</span>
+              <span className="slot-badge">{t("checkpoint.autoBadge")}</span>
               {cardBody(auto, "")}
             </div>
           )}
 
-          <div className="sessions-grid">
+          <div className="checkpoint-grid">
             {cells.map((c) =>
               c.save ? (
                 <div
@@ -236,14 +236,14 @@ export default function Sessions() {
                     <span className="slot-no">{slotNo(c.slot)}</span>
                   </div>
                   <div className="slot-empty-hint muted">
-                    {t("sessions.emptySlot")}
+                    {t("checkpoint.emptySlot")}
                   </div>
                 </div>
               ),
             )}
           </div>
 
-          <footer className="sessions-pager">
+          <footer className="checkpoint-pager">
             <button
               className="ghost small"
               disabled={page === 0}
@@ -252,7 +252,7 @@ export default function Sessions() {
               ‹
             </button>
             <span className="muted">
-              {t("sessions.pageOf", {
+              {t("checkpoint.pageOf", {
                 cur: String(page + 1),
                 total: String(pages),
               })}

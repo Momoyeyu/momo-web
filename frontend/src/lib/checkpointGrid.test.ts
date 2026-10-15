@@ -6,10 +6,10 @@ import {
   buildCells,
   bySlot,
   pageCount,
-} from "./sessionGrid";
-import type { SessionMeta } from "./types";
+} from "./checkpointGrid";
+import type { CheckpointMeta } from "./types";
 
-const meta = (slot: number | null, auto = false): SessionMeta => ({
+const meta = (slot: number | null, auto = false): CheckpointMeta => ({
   id: `s${slot ?? "auto"}`,
   title: "t",
   auto,

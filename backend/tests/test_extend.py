@@ -11,9 +11,9 @@ from types import SimpleNamespace
 import pytest
 
 from app import agent, llm
-from app.agent import mcp_ext
-from app.agent.mcp_ext import ExtTools, hub, result_text, sanitize, tool_decl
-from app.agent.tools import TOOLS, run_call
+from app.agent import extend
+from app.agent.extend import ExtTools, hub, result_text, sanitize, tool_decl
+from app.agent.capability import TOOLS, run_call
 
 
 class _FakeTool:
@@ -33,7 +33,7 @@ def _text_result(*texts: str, is_error=False):
 
 
 def _source(prefix="tavily", tools=None, session=None):
-    return mcp_ext._Source(
+    return extend._Source(
         prefix, session if session is not None else object(),
         tools if tools is not None else [_FakeTool("search")],
     )
@@ -42,7 +42,7 @@ def _source(prefix="tavily", tools=None, session=None):
 _BUILTIN_NAMES = {d["function"]["name"] for d in TOOLS}
 
 
-def _ext_with(src: mcp_ext._Source) -> ExtTools:
+def _ext_with(src: extend._Source) -> ExtTools:
     ext = ExtTools()
     ext.add_source(src, set(_BUILTIN_NAMES))
     return ext
@@ -140,7 +140,7 @@ def test_run_call_ext_present_builtin_still_works(monkeypatch):
         pins=[],
         ext=ext,
     )
-    assert "iso" in json.loads(msg["content"])
+    assert "utc" in json.loads(msg["content"])
 
 
 def test_result_text_non_text_blocks_and_error():

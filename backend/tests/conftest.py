@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from app import memory, session, store
+from app import checkpoint, memory, store
 
 
 @pytest.fixture(autouse=True)
@@ -14,5 +14,10 @@ def isolated_data(tmp_path, monkeypatch):
     monkeypatch.setattr(
         memory, "EMBEDDINGS_PATH", tmp_path / "memory-embeddings.json"
     )
-    monkeypatch.setattr(session, "SESSIONS_PATH", tmp_path / "sessions.json")
+    monkeypatch.setattr(
+        checkpoint, "CHECKPOINTS_PATH", tmp_path / "checkpoints.json"
+    )
+    monkeypatch.setattr(
+        checkpoint, "_LEGACY_PATH", tmp_path / "sessions.json"
+    )
     yield

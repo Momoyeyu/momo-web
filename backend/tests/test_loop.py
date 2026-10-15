@@ -35,12 +35,12 @@ def test_react_tool_then_text(monkeypatch):
     # 按标点切段、保留标点
     assert deltas == ["你好呀。", "#happy 今天很开心！"]
 
-    # 第二轮 messages 带 tool 结果（common_time → iso+tz JSON）
+    # 第二轮 messages 带 tool 结果（common_time → utc+tz JSON）
     tool_msgs = [m for m in seen_messages[-1] if m.get("role") == "tool"]
     assert len(tool_msgs) == 1
     assert tool_msgs[0]["tool_call_id"] == "call_1"
     payload = json.loads(tool_msgs[0]["content"])
-    assert "iso" in payload and "tz" in payload
+    assert "utc" in payload and "tz" in payload
 
     # history 追加并落盘（指令/旧 #tag 已剥离，SSE delta 仍推原始文本）
     h = store.get_state()["history"]
@@ -114,7 +114,7 @@ def test_tool_memory_ops_via_react(monkeypatch):
 def test_tool_memory_update_dispatch():
     """memory_update 走 edit_memory：更新成功 / pin:* → not_found 说明文本。"""
     from app import memory
-    from app.agent.tools import run_call
+    from app.agent.capability import run_call
 
     mem = memory.add_memory("旧事实")
     msg = run_call(

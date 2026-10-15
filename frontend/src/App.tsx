@@ -4,7 +4,7 @@ import Title from "./pages/Title";
 import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
 import Backlog from "./pages/Backlog";
-import Sessions from "./pages/Sessions";
+import Checkpoint from "./pages/Checkpoint";
 import { useRoute } from "./router";
 import { getSettings, subscribe } from "./lib/store";
 
@@ -32,7 +32,7 @@ export default function App() {
         {route === "chat" && <Chat />}
         {route === "settings" && <Settings />}
         {route === "backlog" && <Backlog />}
-        {route === "sessions" && <Sessions />}
+        {route === "checkpoint" && <Checkpoint />}
       </div>
     </>
   );

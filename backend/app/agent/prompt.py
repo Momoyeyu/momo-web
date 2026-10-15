@@ -1,10 +1,10 @@
 """system prompt 组装：按 settings.general.lang 选 zh/en/ja（未知语言回退 zh）。"""
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
 from ..store import DEFAULT_STATE
+from ..timeinfo import now_info
 
 _LANG_NAMES = {"zh": "中文", "en": "English", "ja": "日本語"}
 _DEFAULT_PERSONA: dict[str, Any] = DEFAULT_STATE["persona"]
@@ -24,7 +24,7 @@ _T = {
         "prefs_head": "## 你的偏好",
         "settings_head": "## 你的基本设定",
         "lang_line": "你的对话语言是{lang}，需要使用该语言与用户交流，除非用户要求使用其他语言",
-        "time_line": "目前你所在的时区是{tz}，现在的时间是{time24h}",
+        "time_line": "当前 UTC 时间是{utc}，你所在的时区是{tz}",
         "mem_head": "# 记忆配置",
         "pins_head": "## 你的初始记忆",
         "mem_policy_head": "## 记忆使用策略",
@@ -63,7 +63,7 @@ _T = {
         "prefs_head": "## Your preferences",
         "settings_head": "## Your basic settings",
         "lang_line": "Your conversation language is {lang}; talk with the user in that language unless they ask for another one",
-        "time_line": "Your timezone is {tz}; the current time is {time24h}",
+        "time_line": "The current UTC time is {utc}; your timezone is {tz}",
         "mem_head": "# Memory Configuration",
         "pins_head": "## Your initial memories",
         "mem_policy_head": "## Memory usage policy",
@@ -102,7 +102,7 @@ _T = {
         "prefs_head": "## あなたの好み",
         "settings_head": "## あなたの基本設定",
         "lang_line": "あなたの会話言語は{lang}です。ユーザーが他の言語を要求しない限り、その言語で話してください",
-        "time_line": "現在のタイムゾーンは{tz}、時刻は{time24h}です",
+        "time_line": "現在の UTC 時刻は{utc}、タイムゾーンは{tz}です",
         "mem_head": "# 記憶設定",
         "pins_head": "## あなたの初期記憶",
         "mem_policy_head": "## 記憶の使用ポリシー",
@@ -190,9 +190,7 @@ def build_system_prompt(state: dict[str, Any]) -> str:
         if isinstance(p, str) and p.strip()
     ]
 
-    now = datetime.now().astimezone()
-    tz = now.tzname() or ""
-    time24h = now.strftime("%H:%M")
+    tinfo = now_info()
 
     sections: list[str] = []
 
@@ -211,7 +209,7 @@ def build_system_prompt(state: dict[str, Any]) -> str:
         "- " + line
         for line in (
             t["lang_line"].format(lang=_LANG_NAMES[lang]),
-            t["time_line"].format(tz=tz, time24h=time24h),
+            t["time_line"].format(utc=tinfo["utc"], tz=tinfo["tz"]),
         )
     )
     sections.append(

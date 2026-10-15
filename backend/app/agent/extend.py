@@ -206,7 +206,7 @@ class McpHub:
             self._loop = loop
 
     async def _open_async(self, enabled: list[dict[str, Any]]) -> ExtTools:
-        from .tools import TOOLS  # 延迟导入避免环
+        from .capability import TOOLS  # 延迟导入避免环
 
         # 防御：残留的旧 serve task 先放行退出（并发回合/上轮未走到 close）
         for ev in self._closers:

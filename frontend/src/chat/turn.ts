@@ -13,7 +13,7 @@ import { getSettings, newId, subscribe } from "../lib/store";
 import type {
   ChatMessage,
   ChatStatus,
-  SessionMessage,
+  CheckpointMessage,
   Settings,
 } from "../lib/types";
 import { DirectiveParser } from "../llm/directives";
@@ -210,7 +210,7 @@ export class ChatEngine {
    * 在途回合先打断（其部分落账随旧转写一起被覆盖）；字幕 = 最后一条
    * assistant 的末句，无则空。调用方负责 bumpTranscript 通知订阅者。
    */
-  loadHistory(messages: SessionMessage[]): void {
+  loadHistory(messages: CheckpointMessage[]): void {
     if (this.turn) this.interruptNow();
     this.safe(() => this.player.stop());
     this.history.length = 0;

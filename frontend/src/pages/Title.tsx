@@ -1,28 +1,28 @@
 // 主页：左上品牌 + 右侧视觉小说式菜单（胶囊按钮、悬停饰标、错峰入场）。
 // 透明区域点击穿透到 Live2D 画布（模型可点）。
 
-import { navigate, type SessionsMode } from "../router";
+import { navigate, type CheckpointMode } from "../router";
 import { useT } from "../i18n";
 import "../styles/title.css";
 
 const MENU: {
-  route: "chat" | "sessions" | "settings";
+  route: "chat" | "checkpoint" | "settings";
   labelKey: string;
   hint: string;
-  sessionsMode?: SessionsMode;
+  checkpointMode?: CheckpointMode;
 }[] = [
   { route: "chat", labelKey: "title.start", hint: "start" },
   {
-    route: "sessions",
-    labelKey: "sessions.save",
+    route: "checkpoint",
+    labelKey: "checkpoint.save",
     hint: "save",
-    sessionsMode: "save",
+    checkpointMode: "save",
   },
   {
-    route: "sessions",
-    labelKey: "sessions.load",
+    route: "checkpoint",
+    labelKey: "checkpoint.load",
     hint: "load",
-    sessionsMode: "load",
+    checkpointMode: "load",
   },
   { route: "settings", labelKey: "title.config", hint: "config" },
 ];
@@ -46,7 +46,7 @@ export default function Title() {
             onClick={() =>
               navigate(
                 m.route,
-                m.sessionsMode ? { sessionsMode: m.sessionsMode } : undefined,
+                m.checkpointMode ? { checkpointMode: m.checkpointMode } : undefined,
               )
             }
           >

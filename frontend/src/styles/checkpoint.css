@@ -1,7 +1,7 @@
 /* 存档槽位页：视觉小说式 3 行 × 4 列槽位网格 + AUTO 置顶卡 + 翻页条。
    沿用 backlog 的遮罩 overlay + 居中面板。 */
 
-.sessions-page {
+.checkpoint-page {
   position: fixed;
   inset: 0;
   z-index: 30;
@@ -14,7 +14,7 @@
   animation: page-in 0.28s ease both;
 }
 
-.sessions-panel {
+.checkpoint-panel {
   display: flex;
   flex-direction: column;
   width: min(760px, 94vw);
@@ -25,7 +25,7 @@
   overflow: hidden;
 }
 
-.sessions-head {
+.checkpoint-head {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -33,7 +33,7 @@
   border-bottom: 1px solid var(--line);
 }
 
-.sessions-head h1 {
+.checkpoint-head h1 {
   margin: 0;
   font-size: 17px;
   font-weight: 600;
@@ -42,7 +42,7 @@
 }
 
 /* 模式切换：存档 | 读档 分段钮 */
-.sessions-mode {
+.checkpoint-mode {
   display: flex;
   gap: 4px;
   margin-left: auto;
@@ -51,7 +51,7 @@
   border-radius: var(--r-md);
 }
 
-.sessions-mode .seg {
+.checkpoint-mode .seg {
   padding: 0.28em 1em;
   border: none;
   border-radius: var(--r-xs);
@@ -61,17 +61,17 @@
   color: var(--text-dim);
 }
 
-.sessions-mode .seg-on {
+.checkpoint-mode .seg-on {
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
 
-.sessions-head > .ghost {
+.checkpoint-head > .ghost {
   padding: 0.35em 1.1em;
   font-size: 13px;
 }
 
-.sessions-body {
+.checkpoint-body {
   flex: 1;
   min-height: 0;
   display: flex;
@@ -79,14 +79,14 @@
   padding: 14px 18px 16px;
 }
 
-.sessions-empty {
+.checkpoint-empty {
   padding: 6px 0 10px;
   text-align: center;
   font-size: 13px;
 }
 
 /* 槽位网格：固定 4 列 × 3 行，卡片随格拉伸（卡片长宽比 = 格子长宽比） */
-.sessions-grid {
+.checkpoint-grid {
   flex: 1;
   min-height: 0;
   display: grid;
@@ -123,11 +123,11 @@
   justify-content: space-between;
 }
 
-.sessions-load .slot-empty {
+.checkpoint-load .slot-empty {
   opacity: 0.45;
 }
 
-.sessions-save .slot-empty.slot-clickable:hover .slot-empty-hint {
+.checkpoint-save .slot-empty.slot-clickable:hover .slot-empty-hint {
   color: var(--accent);
 }
 
@@ -198,7 +198,7 @@
 }
 
 /* 翻页条 */
-.sessions-pager {
+.checkpoint-pager {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -206,11 +206,11 @@
   padding-top: 12px;
 }
 
-.sessions-pager button {
+.checkpoint-pager button {
   min-width: 2.4em;
 }
 
-.sessions-pager span {
+.checkpoint-pager span {
   font-size: 12px;
   letter-spacing: 0.1em;
   font-variant-numeric: tabular-nums;

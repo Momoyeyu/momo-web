@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from .. import memory
+from ..timeinfo import now_info
 
 if TYPE_CHECKING:
-    from .mcp_ext import ExtTools
+    from .extend import ExtTools
 
 # OpenAI function calling 工具声明
 TOOLS: list[dict[str, Any]] = [
@@ -67,7 +67,7 @@ TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "common_time",
-            "description": "获取 backend 本机当前时间",
+            "description": "获取当前 UTC 时间与本地时区",
             "parameters": {"type": "object", "properties": {}},
         },
     },
@@ -92,11 +92,7 @@ def execute_tool(name: str, args: dict[str, Any], pins: list[str]) -> str:
             memory.delete_memory(str(args.get("id") or ""))
             return json.dumps({"ok": True}, ensure_ascii=False)
         if name == "common_time":
-            now = datetime.now().astimezone()
-            return json.dumps(
-                {"iso": now.isoformat(timespec="seconds"), "tz": now.tzname() or ""},
-                ensure_ascii=False,
-            )
+            return json.dumps(now_info(), ensure_ascii=False)
         return f"未知工具：{name}"
     except memory.MemoryError as e:
         return str(e)  # 校验/去重/不可删 → 说明文本回给模型

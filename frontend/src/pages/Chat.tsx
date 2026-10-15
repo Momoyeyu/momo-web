@@ -188,15 +188,15 @@ export default function Chat() {
           </button>
           <button
             className="tb"
-            onClick={() => navigate("sessions", { sessionsMode: "save" })}
+            onClick={() => navigate("checkpoint", { checkpointMode: "save" })}
           >
-            {t("sessions.save")}
+            {t("checkpoint.save")}
           </button>
           <button
             className="tb"
-            onClick={() => navigate("sessions", { sessionsMode: "load" })}
+            onClick={() => navigate("checkpoint", { checkpointMode: "load" })}
           >
-            {t("sessions.load")}
+            {t("checkpoint.load")}
           </button>
           <button
             className={`tb${muted || !ttsConfigured ? " tb-off" : ""}`}

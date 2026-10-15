@@ -48,7 +48,7 @@ export const ja: Dict = {
     empty: "まだ会話がありません。",
     replay: "再生",
   },
-  sessions: {
+  checkpoint: {
     title: "セーブ",
     save: "セーブ",
     load: "ロード",

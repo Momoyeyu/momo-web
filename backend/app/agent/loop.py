@@ -10,9 +10,9 @@ from datetime import datetime, timezone
 from typing import Any, Iterator
 
 from .. import llm, store
-from . import compress, mcp_ext
-from .prompts import build_system_prompt
-from .tools import TOOLS, run_call
+from . import compress, extend
+from .prompt import build_system_prompt
+from .capability import TOOLS, run_call
 
 MAX_ROUNDS = 5
 HISTORY_WINDOW = 20
@@ -81,9 +81,9 @@ def run_turn(text: str) -> Iterator[dict[str, Any]]:
 
     # 拓展：连接 enabled 的 MCP server（连不上即不注入，失败不拖垮回合），
     # 工具以 {server}_{tool} 注入；turn 结束统一关闭连接。
-    ext_tools = mcp_ext.ExtTools()
+    ext_tools = extend.ExtTools()
     try:
-        ext_tools = mcp_ext.hub.open(
+        ext_tools = extend.hub.open(
             (state.get("settings") or {}).get("extensions")
         )
         # 无可用拓展时 tools 就是静态 TOOLS（行为与现状一致）
@@ -133,4 +133,4 @@ def run_turn(text: str) -> Iterator[dict[str, Any]]:
         for seg in split_segments(content):
             yield {"t": "delta", "text": seg}
     finally:
-        mcp_ext.hub.close()
+        extend.hub.close()

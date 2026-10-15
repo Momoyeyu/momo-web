@@ -48,7 +48,7 @@ export const en: Dict = {
     empty: "No conversation yet.",
     replay: "Replay",
   },
-  sessions: {
+  checkpoint: {
     title: "Saves",
     save: "Save",
     load: "Load",

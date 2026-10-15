@@ -142,14 +142,14 @@ export interface ChatMessage {
 export type ChatStatus = "idle" | "listening" | "thinking" | "speaking";
 
 /** 存档里的单条消息（backend history 快照；无前端 id）。 */
-export interface SessionMessage {
+export interface CheckpointMessage {
   role: "user" | "assistant";
   text: string;
   at: string;
 }
 
-/** 存档槽列表项（GET /api/sessions；preview = 末条消息截断）。 */
-export interface SessionMeta {
+/** 存档槽列表项（GET /api/checkpoints；preview = 末条消息截断）。 */
+export interface CheckpointMeta {
   id: string;
   title: string;
   /** 自动存档槽：load 前 backend 自动写入，不占手动槽位。 */
@@ -161,10 +161,10 @@ export interface SessionMeta {
   preview: string;
 }
 
-/** 存档全文（GET /api/sessions/{id} 与 load 返回）。 */
-export interface SessionSave extends SessionMeta {
+/** 存档全文（GET /api/checkpoints/{id} 与 load 返回）。 */
+export interface CheckpointSave extends CheckpointMeta {
   summary: string;
-  messages: SessionMessage[];
+  messages: CheckpointMessage[];
 }
 
 /** /api/state 持久化载荷（backend state.json ↔ localStorage 缓存共用 schema）。 */

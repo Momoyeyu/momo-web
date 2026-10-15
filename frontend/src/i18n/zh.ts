@@ -48,7 +48,7 @@ export const zh = {
     empty: "还没有对话。",
     replay: "重播",
   },
-  sessions: {
+  checkpoint: {
     title: "存档",
     save: "存档",
     load: "读档",

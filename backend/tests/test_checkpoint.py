@@ -45,13 +45,13 @@ def _fake_chat(content="好。", prompt_tokens=0):
 def test_save_list_get():
     client = TestClient(app)
     _seed(2, "甲")
-    r = client.post("/api/sessions", json={"title": "档一"})
+    r = client.post("/api/checkpoints", json={"title": "档一"})
     assert r.status_code == 201
     sid = r.json()["id"]
     assert len(sid) == 8
     assert r.json()["slot"] == 1
 
-    lst = client.get("/api/sessions").json()
+    lst = client.get("/api/checkpoints").json()
     assert len(lst) == 1
     item = lst[0]
     assert item["title"] == "档一" and item["auto"] is False
@@ -60,77 +60,77 @@ def test_save_list_get():
     assert item["preview"] == "甲答1"  # 末条消息截断
     assert "messages" not in item
 
-    full = client.get(f"/api/sessions/{sid}").json()
+    full = client.get(f"/api/checkpoints/{sid}").json()
     assert [m["role"] for m in full["messages"]] == ["user", "assistant"] * 2
     assert full["messages"][0]["text"] == "甲问0"
 
 
 def test_save_default_title_and_empty_body():
     client = TestClient(app)
-    r = client.post("/api/sessions")  # 无 body → title 默认当前时间
+    r = client.post("/api/checkpoints")  # 无 body → title 默认当前时间
     assert r.status_code == 201
-    item = client.get("/api/sessions").json()[0]
+    item = client.get("/api/checkpoints").json()[0]
     assert item["title"]
 
 
 def test_overwrite_and_rename():
     client = TestClient(app)
     _seed(1, "旧")
-    sid = client.post("/api/sessions", json={"title": "a"}).json()["id"]
+    sid = client.post("/api/checkpoints", json={"title": "a"}).json()["id"]
     _seed(1, "新")  # 当前会话追加一回合
 
-    r = client.put(f"/api/sessions/{sid}", json={"title": "改名"})
+    r = client.put(f"/api/checkpoints/{sid}", json={"title": "改名"})
     assert r.status_code == 200
     assert r.json()["title"] == "改名"
     assert "messages" not in r.json()
 
-    full = client.get(f"/api/sessions/{sid}").json()
+    full = client.get(f"/api/checkpoints/{sid}").json()
     assert len(full["messages"]) == 4  # 已被当前会话整体覆盖
     assert full["messages"][-1]["text"] == "新答0"
 
     # 不传 title：只覆盖内容，标题保留
-    r = client.put(f"/api/sessions/{sid}", json={})
+    r = client.put(f"/api/checkpoints/{sid}", json={})
     assert r.status_code == 200
-    assert client.get(f"/api/sessions/{sid}").json()["title"] == "改名"
+    assert client.get(f"/api/checkpoints/{sid}").json()["title"] == "改名"
 
 
 def test_delete_and_404():
     client = TestClient(app)
-    sid = client.post("/api/sessions", json={}).json()["id"]
-    assert client.delete(f"/api/sessions/{sid}").status_code == 204
-    assert client.get("/api/sessions").json() == []
-    assert client.delete(f"/api/sessions/{sid}").status_code == 404
-    assert client.get(f"/api/sessions/{sid}").status_code == 404
-    assert client.post(f"/api/sessions/{sid}/load").status_code == 404
+    sid = client.post("/api/checkpoints", json={}).json()["id"]
+    assert client.delete(f"/api/checkpoints/{sid}").status_code == 204
+    assert client.get("/api/checkpoints").json() == []
+    assert client.delete(f"/api/checkpoints/{sid}").status_code == 404
+    assert client.get(f"/api/checkpoints/{sid}").status_code == 404
+    assert client.post(f"/api/checkpoints/{sid}/load").status_code == 404
 
 
 def test_load_roundtrip_and_auto_slot():
     client = TestClient(app)
     entries_a = _seed(2, "甲")
-    sid_a = client.post("/api/sessions", json={"title": "A"}).json()["id"]
+    sid_a = client.post("/api/checkpoints", json={"title": "A"}).json()["id"]
     entries_b = _seed(1, "乙")  # 当前 = A + 一回合
-    sid_b = client.post("/api/sessions", json={"title": "B"}).json()["id"]
+    sid_b = client.post("/api/checkpoints", json={"title": "B"}).json()["id"]
 
-    r = client.post(f"/api/sessions/{sid_a}/load")
+    r = client.post(f"/api/checkpoints/{sid_a}/load")
     assert r.status_code == 200
     assert store.get_state()["history"] == entries_a  # 回到 A 时点
 
     # load 前现场进 auto 槽
-    autos = [s for s in client.get("/api/sessions").json() if s["auto"]]
+    autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos) == 1
-    auto_full = client.get(f"/api/sessions/{autos[0]['id']}").json()
+    auto_full = client.get(f"/api/checkpoints/{autos[0]['id']}").json()
     assert auto_full["messages"] == entries_a + entries_b
 
     # 再 load B：auto 槽原地覆盖，不新增
-    assert client.post(f"/api/sessions/{sid_b}/load").status_code == 200
-    autos2 = [s for s in client.get("/api/sessions").json() if s["auto"]]
+    assert client.post(f"/api/checkpoints/{sid_b}/load").status_code == 200
+    autos2 = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos2) == 1 and autos2[0]["id"] == autos[0]["id"]
     assert store.get_state()["history"] == entries_a + entries_b
 
     # load auto 槽自己 → 还原被 B 顶掉的现场（load 前 = A，又进 auto 槽）
     auto_id = autos[0]["id"]
-    assert client.post(f"/api/sessions/{auto_id}/load").status_code == 200
-    autos3 = [s for s in client.get("/api/sessions").json() if s["auto"]]
+    assert client.post(f"/api/checkpoints/{auto_id}/load").status_code == 200
+    autos3 = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos3) == 1 and autos3[0]["id"] == auto_id
 
 
@@ -138,19 +138,19 @@ def test_load_with_summary_roundtrip():
     client = TestClient(app)
     _seed(1)
     store.update_state(lambda st: st.__setitem__("summary", "旧摘要"))
-    sid = client.post("/api/sessions", json={}).json()["id"]
+    sid = client.post("/api/checkpoints", json={}).json()["id"]
     store.write_state({"history": [], "summary": ""})
-    client.post(f"/api/sessions/{sid}/load")
+    client.post(f"/api/checkpoints/{sid}/load")
     assert store.get_state()["summary"] == "旧摘要"
 
 
 def test_load_empty_current_skips_auto():
     client = TestClient(app)
     _seed(1)
-    sid = client.post("/api/sessions", json={}).json()["id"]
+    sid = client.post("/api/checkpoints", json={}).json()["id"]
     store.write_state({"history": []})
-    client.post(f"/api/sessions/{sid}/load")
-    assert all(not s["auto"] for s in client.get("/api/sessions").json())
+    client.post(f"/api/checkpoints/{sid}/load")
+    assert all(not s["auto"] for s in client.get("/api/checkpoints").json())
 
 
 # ---------- 槽位号 ----------
@@ -158,31 +158,31 @@ def test_load_empty_current_skips_auto():
 def test_slot_sequential_and_delete_recycles():
     """未指定 slot → 最小编号空槽；删除后槽位释放可复用。"""
     client = TestClient(app)
-    a = client.post("/api/sessions", json={}).json()
-    b = client.post("/api/sessions", json={}).json()
+    a = client.post("/api/checkpoints", json={}).json()
+    b = client.post("/api/checkpoints", json={}).json()
     assert (a["slot"], b["slot"]) == (1, 2)
-    assert client.delete(f"/api/sessions/{a['id']}").status_code == 204
-    c = client.post("/api/sessions", json={}).json()
+    assert client.delete(f"/api/checkpoints/{a['id']}").status_code == 204
+    c = client.post("/api/checkpoints", json={}).json()
     assert c["slot"] == 1  # 最小空槽被回收复用
 
 
 def test_slot_explicit_and_gap_fill():
     """指定空槽则用之；未指定跳过已占槽取最小空号；列表按 slot 排序。"""
     client = TestClient(app)
-    r = client.post("/api/sessions", json={"slot": 5})
+    r = client.post("/api/checkpoints", json={"slot": 5})
     assert r.status_code == 201 and r.json()["slot"] == 5
-    assert client.post("/api/sessions", json={}).json()["slot"] == 1
-    lst = client.get("/api/sessions").json()
+    assert client.post("/api/checkpoints", json={}).json()["slot"] == 1
+    lst = client.get("/api/checkpoints").json()
     assert [s["slot"] for s in lst] == [1, 5]
 
 
 def test_slot_out_of_range_and_occupied():
     client = TestClient(app)
-    assert client.post("/api/sessions", json={"slot": 0}).status_code == 400
-    assert client.post("/api/sessions", json={"slot": 121}).status_code == 400
-    sid = client.post("/api/sessions", json={"slot": 3}).json()["id"]
+    assert client.post("/api/checkpoints", json={"slot": 0}).status_code == 400
+    assert client.post("/api/checkpoints", json={"slot": 121}).status_code == 400
+    sid = client.post("/api/checkpoints", json={"slot": 3}).json()["id"]
     assert sid
-    r = client.post("/api/sessions", json={"slot": 3})
+    r = client.post("/api/checkpoints", json={"slot": 3})
     assert r.status_code == 409
 
 
@@ -190,7 +190,7 @@ def test_slot_migration_legacy_entries():
     """旧 sessions.json 无 slot 字段：读取时按文件序补号，auto 槽不占号。"""
     import json as _json
 
-    from app import session
+    from app import checkpoint
 
     legacy = [
         {
@@ -221,34 +221,34 @@ def test_slot_migration_legacy_entries():
             "messages": [{"role": "assistant", "text": "二", "at": "t"}],
         },
     ]
-    session.SESSIONS_PATH.write_text(
+    checkpoint.CHECKPOINTS_PATH.write_text(
         _json.dumps(legacy, ensure_ascii=False), encoding="utf-8"
     )
-    lst = TestClient(app).get("/api/sessions").json()
+    lst = TestClient(app).get("/api/checkpoints").json()
     by_id = {s["id"]: s for s in lst}
     assert by_id["legacy01"]["slot"] == 1
     assert by_id["legacy02"]["slot"] == 2
     assert by_id["legacyauto"]["slot"] is None
     assert lst[0]["id"] == "legacyauto"  # auto 置顶
     # 迁移后新建接最小编号空槽
-    assert TestClient(app).post("/api/sessions", json={}).json()["slot"] == 3
+    assert TestClient(app).post("/api/checkpoints", json={}).json()["slot"] == 3
 
 
 def test_preview_uses_last_message():
     client = TestClient(app)
     _seed(3, "丙")
-    client.post("/api/sessions", json={})
-    item = client.get("/api/sessions").json()[0]
+    client.post("/api/checkpoints", json={})
+    item = client.get("/api/checkpoints").json()[0]
     assert item["preview"] == "丙答2"
 
 
 def test_auto_slot_has_no_slot_number():
     client = TestClient(app)
     _seed(1, "甲")
-    sid = client.post("/api/sessions", json={}).json()["id"]
+    sid = client.post("/api/checkpoints", json={}).json()["id"]
     _seed(1, "乙")
-    client.post(f"/api/sessions/{sid}/load")  # 当前现场进 auto 槽
-    autos = [s for s in client.get("/api/sessions").json() if s["auto"]]
+    client.post(f"/api/checkpoints/{sid}/load")  # 当前现场进 auto 槽
+    autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos) == 1 and autos[0]["slot"] is None
 
 
