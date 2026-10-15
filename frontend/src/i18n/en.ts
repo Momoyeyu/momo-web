@@ -34,7 +34,7 @@ export const en: Dict = {
     voiceTitleOn: "Mute voice output",
     voiceTitleOff: "Unmute voice output",
     voiceNeedCfg: "Set up TTS in the Models tab first",
-    stop: "Stop",
+    stop: "Interrupt",
     errDefault: "Something went wrong",
     errSvc: {
       llm: "Chat model error ({detail})",
@@ -49,6 +49,8 @@ export const en: Dict = {
     title: "Backlog",
     empty: "No conversation yet.",
     replay: "Replay",
+    replayNeedTts: "Set up TTS in the Models tab first",
+    replayMuted: "Voice output is muted — unmute it in the toolbar first",
   },
   checkpoint: {
     title: "Saves",

@@ -34,7 +34,7 @@ export const ja: Dict = {
     voiceTitleOn: "音声出力を切る",
     voiceTitleOff: "音声出力を入れる",
     voiceNeedCfg: "先に「モデル」タブで TTS を設定してください",
-    stop: "停止",
+    stop: "中断",
     errDefault: "エラーが発生しました",
     errSvc: {
       llm: "会話モデルエラー（{detail}）",
@@ -49,6 +49,8 @@ export const ja: Dict = {
     title: "バックログ",
     empty: "まだ会話がありません。",
     replay: "再生",
+    replayNeedTts: "先に「モデル」タブで TTS を設定してください",
+    replayMuted: "音声出力がオフです。ツールバーでオンにしてください",
   },
   checkpoint: {
     title: "セーブ",

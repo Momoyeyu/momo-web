@@ -25,6 +25,9 @@ export default function Backlog() {
   const messages = engine.history;
   const name = personaName();
   const idle = engine.status === "idle";
+  // 回放可见反馈：TTS 未配置 / 语音静音时置灰 + tooltip 说明（点了也没声）。
+  const ttsConfigured = getState().settings.tts.url.trim() !== "";
+  const muted = engine.muted;
 
   // 打开即滚到底部看最新一条。
   useEffect(() => {
@@ -60,7 +63,14 @@ export default function Backlog() {
                 {m.role === "assistant" && (
                   <button
                     className="bl-replay"
-                    disabled={!idle || replaying !== null}
+                    disabled={!idle || replaying !== null || !ttsConfigured || muted}
+                    title={
+                      !ttsConfigured
+                        ? t("backlog.replayNeedTts")
+                        : muted
+                          ? t("backlog.replayMuted")
+                          : undefined
+                    }
                     onClick={() => replay(m.id)}
                   >
                     {replaying === m.id ? "…" : `♪ ${t("backlog.replay")}`}

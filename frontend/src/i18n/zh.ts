@@ -21,7 +21,7 @@ export const zh = {
     listening: "聆听中",
     thinking: "思考中",
     speaking: "回应中",
-    backlog: "回顾",
+    backlog: "记录",
     placeholder: "和 {name} 说点什么…",
     send: "发送",
     mic: "麦克风",
@@ -34,7 +34,7 @@ export const zh = {
     voiceTitleOn: "关闭语音输出",
     voiceTitleOff: "打开语音输出",
     voiceNeedCfg: "先在「模型」tab 配置 TTS",
-    stop: "停止",
+    stop: "打断",
     errDefault: "发生错误",
     errSvc: {
       llm: "对话模型出错（{detail}）",
@@ -46,9 +46,11 @@ export const zh = {
     you: "你",
   },
   backlog: {
-    title: "回顾",
+    title: "记录",
     empty: "还没有对话。",
-    replay: "重播",
+    replay: "回放",
+    replayNeedTts: "先在「模型」tab 配置 TTS",
+    replayMuted: "语音输出已静音，先在工具条打开",
   },
   checkpoint: {
     title: "存档",

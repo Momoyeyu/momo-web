@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { dueDirs } from "./dirs";
+import { dirAllowed, dueDirs } from "./dirs";
 import type { PendingDir } from "./dirs";
+import type { AvatarResources } from "../lib/types";
 
 const exp = (offset: number): PendingDir => ({
   kind: "exp",
@@ -38,5 +39,31 @@ describe("dueDirs", () => {
   it("同 offset 多条一次全触发", () => {
     const dirs = [exp(4), exp(4)];
     expect(dueDirs(dirs, 0, 4, 10)).toBe(2);
+  });
+});
+
+describe("dirAllowed 解析层清单校验", () => {
+  const res: AvatarResources = {
+    expressions: [
+      { name: "star_eyes", desc: "星星眼" },
+      { name: "fukidashi", desc: "惊讶冒泡" },
+    ],
+    motions: [
+      { name: "Idle/3", desc: "害羞地低头" },
+      { name: "TapBody/0", desc: "蹦一下" },
+    ],
+  };
+
+  it("清单内通过、清单外丢弃（通道各自查表）", () => {
+    expect(dirAllowed("exp", "star_eyes", res)).toBe(true);
+    expect(dirAllowed("exp", "sad", res)).toBe(false);
+    expect(dirAllowed("motion", "Idle/3", res)).toBe(true);
+    expect(dirAllowed("motion", "Nope/9", res)).toBe(false);
+    // 同名不同通道不互认
+    expect(dirAllowed("motion", "star_eyes", res)).toBe(false);
+  });
+
+  it("清单缺失（形象未解析出 resources）不拦，交 stage 兜底", () => {
+    expect(dirAllowed("exp", "whatever", undefined)).toBe(true);
   });
 });
