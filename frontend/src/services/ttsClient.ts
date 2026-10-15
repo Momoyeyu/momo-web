@@ -2,7 +2,7 @@
 // response_format=pcm → chunked 流式 s16le 24kHz mono，逐块回调给播放器。
 // AbortSignal 即取消（断连取消在途合成，无单独取消端点）。
 
-import type { EmotionTag, TtsConfig } from "../lib/types";
+import type { TtsConfig } from "../lib/types";
 import { ServiceError } from "../lib/errors";
 
 interface SpeakOptions {
@@ -36,15 +36,14 @@ function isAbort(err: unknown, signal?: AbortSignal): boolean {
 
 /**
  * 合成一段文本并把流式 PCM 块回调出去。
- * 请求体：{input, voice?, lang, emotion?, response_format:"pcm"}，
- * voice 为空走服务端缺省；emotion 固定 8 tag。
+ * 请求体：{input, voice?, lang, response_format:"pcm"}，
+ * voice 为空走服务端缺省；TTS 不做感情控制（表情/动作由指令单独驱动）。
  * HTTP 错误 → throw Error（带 status 与 OpenAI 信封 message）。
  * signal abort → 静默结束（不 throw）。
  */
 export async function streamSpeech(
   cfg: TtsConfig,
   text: string,
-  emotion: EmotionTag | undefined,
   opts: SpeakOptions,
 ): Promise<void> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -60,7 +59,6 @@ export async function streamSpeech(
         response_format: "pcm",
         lang: cfg.lang,
         voice: cfg.voice || undefined,
-        emotion: emotion || undefined,
         model: "momo-tts",
       }),
       signal: opts.signal ?? null,

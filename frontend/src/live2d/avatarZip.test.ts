@@ -58,6 +58,40 @@ describe("checkManifest", () => {
       missing: [],
       name: "TestModel",
       texture: "m/M.2048/texture_00.png",
+      resources: { expressions: [], motions: ["Idle/0"] },
+    });
+  });
+
+  it("资源清单：表情取 Name、动作枚举 组/序号", async () => {
+    const manifest = JSON.stringify({
+      Version: 3,
+      FileReferences: {
+        Moc: "M.moc3",
+        Textures: ["t.png"],
+        Expressions: [
+          { Name: "star_eyes", File: "e1.exp3.json" },
+          { Name: "fukidashi", File: "e2.exp3.json" },
+        ],
+        Motions: { Idle: [{ File: "a.motion3.json" }, { File: "b.motion3.json" }], Tap: [{ File: "c.motion3.json" }] },
+      },
+    });
+    const zip = await zipOf({
+      "m/M.model3.json": manifest,
+      "m/M.moc3": "bin",
+      "m/t.png": "png",
+      "m/e1.exp3.json": "{}",
+      "m/e2.exp3.json": "{}",
+      "m/a.motion3.json": "{}",
+      "m/b.motion3.json": "{}",
+      "m/c.motion3.json": "{}",
+    });
+    const r = await checkManifest(zip, "m/M.model3.json");
+    expect(r).toMatchObject({
+      missing: [],
+      resources: {
+        expressions: ["star_eyes", "fukidashi"],
+        motions: ["Idle/0", "Idle/1", "Tap/0"],
+      },
     });
   });
 
@@ -91,6 +125,9 @@ describe("checkManifest", () => {
       "m/t.png": "png",
     });
     const r = await checkManifest(zip, "m/M.model3.json");
-    expect(r).toMatchObject({ missing: [] });
+    expect(r).toMatchObject({
+      missing: [],
+      resources: { expressions: [], motions: [] },
+    });
   });
 });

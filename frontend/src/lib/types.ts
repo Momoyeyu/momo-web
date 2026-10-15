@@ -1,31 +1,5 @@
 // 全局共享类型——各模块契约的单一来源。
 
-/** 情绪 tag（固定 8 个，LLM 输出 [tag] 内联标记；同时透传给 TTS emotion 字段）。 */
-export type EmotionTag =
-  | "neutral"
-  | "happy"
-  | "sad"
-  | "angry"
-  | "surprised"
-  | "thinking"
-  | "shy"
-  | "sleepy";
-
-export const EMOTION_TAGS: readonly EmotionTag[] = [
-  "neutral",
-  "happy",
-  "sad",
-  "angry",
-  "surprised",
-  "thinking",
-  "shy",
-  "sleepy",
-];
-
-export function isEmotionTag(s: string): s is EmotionTag {
-  return (EMOTION_TAGS as readonly string[]).includes(s);
-}
-
 /** OpenAI 兼容 LLM 端点（url 可为 base 或完整 /chat/completions 地址）。 */
 export interface LlmConfig {
   url: string;
@@ -90,9 +64,26 @@ export interface Memory {
   createdAt: string;
 }
 
-/** 导入的 Live2D 模型元信息（zip 本体存 IndexedDB，key=id）。 */
+/** Live2D 资源语义层条目：资源名 + 可编辑的含义描述（写给 LLM 看）。 */
+export interface AvatarResource {
+  /** 表情 = FileReferences.Expressions[].Name；动作 = "组名/序号"。 */
+  name: string;
+  /** 语义描述（可为空；注入 prompt 时写作 "- 名称 — 描述"）。 */
+  desc: string;
+}
+
+/** 模型的表情/动作资源清单：导入时从 manifest 解析，desc 在设置页编辑。 */
+export interface AvatarResources {
+  expressions: AvatarResource[];
+  motions: AvatarResource[];
+}
+
+/** Live2D 模型元信息。导入模型 zip 本体存 IndexedDB（key=id）；
+ *  内置模型（builtin=true）无 zip，仅占位携带资源清单。 */
 export interface AvatarMeta {
   id: string;
+  /** 内置模型标记（不可删除，idb 无 blob）。 */
+  builtin?: boolean;
   /** 显示名（manifest Name 或 zip 文件名）。 */
   name: string;
   /** 原始 zip 文件名。 */
@@ -102,6 +93,8 @@ export interface AvatarMeta {
   /** zip 体积（字节）。 */
   size: number;
   addedAt: string;
+  /** 表情/动作资源清单 + 语义描述；缺省 = 尚未从 manifest 解析。 */
+  resources?: AvatarResources;
 }
 
 /** 人设卡（persona 页可编辑；backend 渲染进 system prompt）。 */
@@ -120,7 +113,6 @@ export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
-  emotion?: EmotionTag;
   at: string;
 }
 
@@ -132,8 +124,8 @@ export interface PersistedState {
   persona: PersonaCard;
   /** 初始记忆（pin）：用户维护的常驻事实，backend 注入 system prompt。 */
   pins: string[];
-  /** 用户导入的 Live2D 模型清单（blob 在 IndexedDB）。 */
+  /** Live2D 模型清单（含内置条目；导入模型 blob 在 IndexedDB）。 */
   avatars: AvatarMeta[];
-  /** 当前形象：内置 id 或 avatars[].id。 */
+  /** 当前形象：avatars[].id。 */
   avatarId: string;
 }

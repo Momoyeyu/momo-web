@@ -10,14 +10,9 @@ import { getStage } from "../live2d/stage";
 import type { Live2DStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
 import { getSettings, newId, subscribe } from "../lib/store";
-import type {
-  ChatMessage,
-  ChatStatus,
-  EmotionTag,
-  Settings,
-} from "../lib/types";
-import { EmotionParser } from "../llm/emotion";
-import type { EmotionEvent } from "../llm/emotion";
+import type { ChatMessage, ChatStatus, Settings } from "../lib/types";
+import { DirectiveParser } from "../llm/directives";
+import type { DirectiveEvent } from "../llm/directives";
 import { streamSpeech } from "../services/ttsClient";
 import { chat } from "../services/chatClient";
 import { SentenceSplitter } from "./sentences";
@@ -51,8 +46,6 @@ interface Turn {
   userText: string;
   /** assistant 已产出全文（打断按此落账）。 */
   text: string;
-  /** 本消息最近一个情绪 tag（消息 emotion + TTS emotion 参数）。 */
-  emotion: EmotionTag | undefined;
   llmDone: boolean;
   finished: boolean;
   /** 是否真有音频推给 player（决定收尾要不要等 drain）。 */
@@ -145,7 +138,7 @@ export class ChatEngine {
     const cfg = getSettings();
     if (!cfg.tts.url) return Promise.resolve();
     this.safe(() => this.player.stop());
-    return streamSpeech(cfg.tts, m.text, m.emotion, {
+    return streamSpeech(cfg.tts, m.text, {
       onChunk: (pcm) => {
         if (this.disposed) return;
         this.safe(() => this.player.push(pcm));
@@ -188,7 +181,6 @@ export class ChatEngine {
       audioAbort: new AbortController(),
       userText: trimmed,
       text: "",
-      emotion: undefined,
       llmDone: false,
       finished: false,
       pushedAudio: false,
@@ -305,22 +297,23 @@ export class ChatEngine {
         id: turn.id,
         role: "assistant",
         text: turn.text,
-        emotion: turn.emotion,
         at: new Date().toISOString(),
       };
       this.history.push(msg);
       this.events.onAssistantDone(msg);
     }
+    // 表情是回合内状态：回合中止/结束统一复位。
+    this.tryStage((st) => st.resetExpression());
     this.setPhase("idle");
   }
 
   private async runTurn(turn: Turn, cfg: Settings, userText: string): Promise<void> {
-    const parser = new EmotionParser();
+    const parser = new DirectiveParser();
     const splitter = new SentenceSplitter();
 
-    // tag 标记后的首个文本片常带前导空格/换行，剥掉避免字幕顶格留白。
+    // 指令后的首个文本片常带前导空格/换行，剥掉避免字幕顶格留白。
     let afterTag = false;
-    const feedEvents = (events: EmotionEvent[]): void => {
+    const feedEvents = (events: DirectiveEvent[]): void => {
       for (const e of events) {
         if (this.turn !== turn) return;
         if (e.kind === "text") {
@@ -330,10 +323,12 @@ export class ChatEngine {
           turn.text += delta;
           this.events.onAssistantDelta(turn.id, delta);
           for (const s of splitter.push(delta)) this.enqueueTts(turn, cfg, s);
-        } else {
-          turn.emotion = e.tag;
+        } else if (e.kind === "exp") {
           afterTag = true;
-          this.tryStage((st) => st.playEmotion(e.tag));
+          this.tryStage((st) => st.setExpression(e.name));
+        } else {
+          afterTag = true;
+          this.tryStage((st) => st.playMotion(e.id));
         }
       }
     };
@@ -387,7 +382,7 @@ export class ChatEngine {
 
     let req: Promise<void>;
     try {
-      req = streamSpeech(cfg.tts, sentence, turn.emotion, {
+      req = streamSpeech(cfg.tts, sentence, {
         signal,
         onChunk: (pcm) => {
           item.chunks.push(pcm);
@@ -444,12 +439,13 @@ export class ChatEngine {
         id: turn.id,
         role: "assistant",
         text: turn.text,
-        emotion: turn.emotion,
         at: new Date().toISOString(),
       };
       this.history.push(msg);
       this.events.onAssistantDone(msg);
     }
+    // 表情持续到本次回复结束：回合完成复位。
+    this.tryStage((st) => st.resetExpression());
     this.setPhase("idle");
   }
 

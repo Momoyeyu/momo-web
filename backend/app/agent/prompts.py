@@ -22,13 +22,19 @@ _T = {
         "tools": "你有以下工具：\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
         "joiner": "，",
         "ender": "。",
-        "emotion": (
-            "[情绪与动作指令]\n"
-            "情绪变化时，在对应句子之前插入独立的指令 `#tag`，tag 取值：\n"
-            "neutral happy sad angry surprised thinking shy sleepy。\n"
-            "例如「#happy 今天好开森！」「#thinking 让我想想……」。\n"
-            "指令不会被展示，也不会被朗读，只用于切换表情与动作。\n"
-            "正文里不要出现任何 # 或方括号标记。"
+        "exp_head": (
+            "[表情控制]\n"
+            "在需要切换表情的位置插入 <exp>名称</exp>，"
+            "表情立即切换并持续到本次回复结束。可用表情："
+        ),
+        "motion_head": (
+            "[动作控制]\n"
+            "在需要播放动作的位置插入 <motion>组名/序号</motion>，"
+            "动作播放一次后回到待机。可用动作："
+        ),
+        "directive_tail": (
+            "指令不会被展示也不会被朗读，清单以外的名称无效；"
+            "正文需要输出尖括号时写成 &lt; 或 &gt;。"
         ),
     },
     "en": {
@@ -42,13 +48,19 @@ _T = {
         "tools": "You have the following tools:\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
         "joiner": ", ",
         "ender": ".",
-        "emotion": (
-            "[Emotion & motion instructions]\n"
-            "When your emotion changes, insert a standalone `#tag` before the sentence. Available tags:\n"
-            "neutral happy sad angry surprised thinking shy sleepy.\n"
-            'e.g. "#happy I\'m so glad!" "#thinking Let me think...".\n'
-            "The tag is never displayed or read aloud; it only switches expression and motion.\n"
-            "Do not use any other # or bracket markup in the reply."
+        "exp_head": (
+            "[Expression control]\n"
+            "Insert <exp>name</exp> where the expression should change; "
+            "it applies immediately and lasts until this reply ends. Available expressions:"
+        ),
+        "motion_head": (
+            "[Motion control]\n"
+            "Insert <motion>group/index</motion> where a motion should play; "
+            "it plays once, then returns to idle. Available motions:"
+        ),
+        "directive_tail": (
+            "Directives are never displayed or read aloud; names outside the "
+            "lists are invalid. Use &lt; or &gt; for literal angle brackets in text."
         ),
     },
     "ja": {
@@ -62,13 +74,19 @@ _T = {
         "tools": "あなたは以下のツールを使えます：\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
         "joiner": "、",
         "ender": "。",
-        "emotion": (
-            "[感情・モーション指示]\n"
-            "感情が変わるときは、対応する文の前に独立した指令 `#tag` を挿入してください。tag の値：\n"
-            "neutral happy sad angry surprised thinking shy sleepy。\n"
-            "例：「#happy 今日はとても嬉しい！」「#thinking 考えさせて……」。\n"
-            "指令は表示・読み上げされず、表情とモーションの切り替えにのみ使われます。\n"
-            "本文に他の # や角括弧の記号を入れないでください。"
+        "exp_head": (
+            "[表情コントロール]\n"
+            "表情を切り替えたい位置に <exp>名前</exp> を挿入してください。"
+            "表情は即座に切り替わり、この返信の終わりまで持続します。利用できる表情："
+        ),
+        "motion_head": (
+            "[モーションコントロール]\n"
+            "モーションを再生したい位置に <motion>グループ名/番号</motion> を挿入してください。"
+            "一度だけ再生され、その後待機に戻ります。利用できるモーション："
+        ),
+        "directive_tail": (
+            "指令は表示・読み上げされず、リスト外の名前は無効です。"
+            "本文で山括弧が必要なときは &lt; や &gt; と書いてください。"
         ),
     },
 }
@@ -86,8 +104,32 @@ def _lang_of(state: dict[str, Any]) -> str:
     return "zh"
 
 
+def _avatar_resources(state: dict[str, Any]) -> dict[str, Any]:
+    """当前形象的资源清单（avatars[] 里按 avatarId 找；缺失 → 空）。"""
+    aid = state.get("avatarId") or "builtin"
+    for a in state.get("avatars") or []:
+        if isinstance(a, dict) and a.get("id") == aid:
+            res = a.get("resources")
+            return res if isinstance(res, dict) else {}
+    return {}
+
+
+def _resource_lines(items: Any) -> list[str]:
+    """资源清单 → "- 名称 — 描述" 行（空名跳过；无描述只列名称）。"""
+    lines: list[str] = []
+    for r in items or []:
+        if not isinstance(r, dict):
+            continue
+        name = str(r.get("name") or "").strip()
+        if not name:
+            continue
+        desc = str(r.get("desc") or "").strip()
+        lines.append(f"- {name} — {desc}" if desc else f"- {name}")
+    return lines
+
+
 def build_system_prompt(state: dict[str, Any]) -> str:
-    """按契约模板组装 system prompt；末尾固定追加情绪指令段。"""
+    """按契约模板组装 system prompt；表情/动作段按当前形象资源清单条件注入。"""
     lang = _lang_of(state)
     t = _T[lang]
     # 空字段回落出厂人设：用户在设置里清空=回到初始状态，
@@ -146,5 +188,18 @@ def build_system_prompt(state: dict[str, Any]) -> str:
         )
 
     sections.append(t["tools"])
-    sections.append(t["emotion"])
+
+    # 表情/动作指令段：清单为空的通道整段不注入（同初始记忆的条件规则）。
+    res = _avatar_resources(state)
+    blocks = [
+        head + "\n" + "\n".join(lines)
+        for head, lines in (
+            (t["exp_head"], _resource_lines(res.get("expressions"))),
+            (t["motion_head"], _resource_lines(res.get("motions"))),
+        )
+        if lines
+    ]
+    if blocks:
+        sections.append("\n\n".join(blocks) + "\n" + t["directive_tail"])
+
     return "\n\n".join(sections)

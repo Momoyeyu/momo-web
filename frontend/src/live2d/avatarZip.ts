@@ -71,6 +71,31 @@ async function readManifest(
   }
 }
 
+/** 从 manifest FileReferences 提取指令资源清单：
+ *  表情 = Expressions[].Name；动作 = "组名/序号"（组内按下标枚举）。 */
+function extractResources(json: unknown): {
+  expressions: string[];
+  motions: string[];
+} {
+  const refs = (json as { FileReferences?: Record<string, unknown> })
+    .FileReferences;
+  const expressions = (
+    (refs?.Expressions as { Name?: unknown }[] | undefined) ?? []
+  )
+    .map((e) => e?.Name)
+    .filter((n): n is string => typeof n === "string" && n.length > 0);
+  const motions: string[] = [];
+  const groups = refs?.Motions as
+    | Record<string, unknown[]>
+    | undefined;
+  for (const [group, items] of Object.entries(groups ?? {})) {
+    for (let i = 0; i < (Array.isArray(items) ? items.length : 0); i++) {
+      motions.push(`${group}/${i}`);
+    }
+  }
+  return { expressions, motions };
+}
+
 interface ManifestCheck {
   /** manifest 声明但 zip 内不存在的文件。 */
   missing: string[];
@@ -78,6 +103,8 @@ interface ManifestCheck {
   name?: string;
   /** 第一张纹理的 zip 内路径（卡片缩略图用）。 */
   texture?: string;
+  /** 表情/动作资源名清单（导入时预填进 AvatarMeta.resources）。 */
+  resources: { expressions: string[]; motions: string[] };
 }
 
 /** 校验 manifest 引用的文件在 zip 内全部存在。 */
@@ -95,6 +122,7 @@ export async function checkManifest(
   ).FileReferences?.Textures;
   return {
     missing: referencedFiles(m.dir, m.json).filter((p) => !namelist.has(p)),
+    resources: extractResources(m.json),
     texture:
       typeof textures?.[0] === "string"
         ? resolvePath(m.dir, textures[0])

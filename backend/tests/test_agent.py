@@ -42,11 +42,11 @@ def test_react_tool_then_text(monkeypatch):
     payload = json.loads(tool_msgs[0]["content"])
     assert "iso" in payload and "tz" in payload
 
-    # history 追加并落盘
+    # history 追加并落盘（指令/旧 #tag 已剥离，SSE delta 仍推原始文本）
     h = store.get_state()["history"]
     assert [m["role"] for m in h] == ["user", "assistant"]
     assert h[0]["text"] == "在吗"
-    assert h[1]["text"] == "你好呀。#happy 今天很开心！"
+    assert h[1]["text"] == "你好呀。今天很开心！"
 
 
 def test_llm_error_yields_error_event(monkeypatch):

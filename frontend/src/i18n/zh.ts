@@ -140,6 +140,12 @@ export const zh = {
     errManifest: "模型描述文件解析失败",
     errMissing: "模型描述文件引用的文件在 zip 中缺失",
     errStore: "模型保存失败（浏览器存储不可用）",
+    resources: "表情与动作",
+    resHint: "给每项写一句含义描述，momo 会在对话中按描述自行选用。",
+    expList: "表情",
+    motionList: "动作",
+    descPh: "含义（可选）",
+    resEmpty: "该模型没有可用的表情/动作资源。",
   },
 };
 

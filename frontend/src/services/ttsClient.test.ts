@@ -47,7 +47,7 @@ describe("streamSpeech", () => {
       ),
     );
     const got: number[][] = [];
-    await streamSpeech({ url: "http://h", ...CFG }, "hi", undefined, {
+    await streamSpeech({ url: "http://h", ...CFG }, "hi", {
       onChunk: (pcm) => got.push([...pcm]),
     });
     // [1] 滞留 → [1,2] 对齐下送；[3] 滞留 → [3,4] 下送；尾 [5] 单字节丢弃。
@@ -63,7 +63,7 @@ describe("streamSpeech", () => {
       vi.fn(async () => streamResponse([new Uint8Array([1, 2, 3, 4]), new Uint8Array([5, 6])])),
     );
     const got: number[][] = [];
-    await streamSpeech({ url: "http://h", ...CFG }, "hi", undefined, {
+    await streamSpeech({ url: "http://h", ...CFG }, "hi", {
       onChunk: (pcm) => got.push([...pcm]),
     });
     expect(got).toEqual([
@@ -85,7 +85,6 @@ describe("streamSpeech", () => {
     const err = await streamSpeech(
       { url: "http://h", ...CFG },
       "hi",
-      undefined,
       { onChunk: () => {} },
     ).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ServiceError);
@@ -107,7 +106,6 @@ describe("streamSpeech", () => {
     const err = await streamSpeech(
       { url: "http://h", ...CFG },
       "hi",
-      undefined,
       { onChunk: () => {} },
     ).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ServiceError);
@@ -117,7 +115,7 @@ describe("streamSpeech", () => {
   it("sends Authorization only when key is set", async () => {
     const spy = vi.fn(async (_url: string, _init: RequestInit) => streamResponse([]));
     vi.stubGlobal("fetch", spy);
-    await streamSpeech({ url: "http://h", key: "k1", voice: "", lang: "zh" }, "hi", "happy", {
+    await streamSpeech({ url: "http://h", key: "k1", voice: "", lang: "zh" }, "hi", {
       onChunk: () => {},
     });
     const init = spy.mock.calls[0][1] as RequestInit;
@@ -129,7 +127,6 @@ describe("streamSpeech", () => {
       input: "hi",
       response_format: "pcm",
       lang: "zh",
-      emotion: "happy",
       model: "momo-tts",
     });
   });
@@ -152,7 +149,7 @@ describe("streamSpeech", () => {
       }),
     );
     await expect(
-      streamSpeech({ url: "http://h", ...CFG }, "hi", undefined, {
+      streamSpeech({ url: "http://h", ...CFG }, "hi", {
         signal: controller.signal,
         onChunk: () => {},
       }),

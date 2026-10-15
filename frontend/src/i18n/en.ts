@@ -140,5 +140,12 @@ export const en: Dict = {
     errManifest: "Failed to parse the model descriptor",
     errMissing: "Files referenced by the model descriptor are missing in the zip",
     errStore: "Failed to save model (browser storage unavailable)",
+    resources: "Expressions & motions",
+    resHint:
+      "Give each item a short description — momo picks them in conversation by meaning.",
+    expList: "Expressions",
+    motionList: "Motions",
+    descPh: "Meaning (optional)",
+    resEmpty: "This model has no controllable expressions or motions.",
   },
 };

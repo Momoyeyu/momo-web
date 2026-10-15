@@ -4,6 +4,7 @@
 
 import type {
   AvatarMeta,
+  AvatarResources,
   Memory,
   PersistedState,
   PersonaCard,
@@ -19,6 +20,42 @@ const LEGACY_STORAGE_KEY = "momo-demo.v1";
 
 /** 内置模型（Hiyori）的 avatarId 取值。 */
 export const AVATAR_BUILTIN = "builtin";
+
+/**
+ * 内置 Hiyori 的资源清单（vendored manifest 的固定值；desc 可在设置页改）。
+ * 描述语义沿用旧情绪映射表的选型：m03=害羞 m04=开心 m06=思考
+ * m07=惊讶 m08=难过 m09=生气 m10=困倦；m01/m02/m05 为通用待机动作。
+ * 模型没有 .exp3.json，expressions 为空（表情段不注入 prompt）。
+ */
+const BUILTIN_RESOURCES: AvatarResources = {
+  expressions: [],
+  motions: [
+    { name: "Idle/0", desc: "待机轻晃" },
+    { name: "Idle/1", desc: "待机动作" },
+    { name: "Idle/2", desc: "害羞地低头" },
+    { name: "Idle/3", desc: "待机动作" },
+    { name: "Idle/4", desc: "思考的样子" },
+    { name: "Idle/5", desc: "惊讶" },
+    { name: "Idle/6", desc: "难过" },
+    { name: "Idle/7", desc: "生气" },
+    { name: "Idle/8", desc: "困倦" },
+    { name: "TapBody/0", desc: "开心地蹦一下" },
+  ],
+};
+
+/** 内置形象条目：始终位于 avatars[0]，不可删除。 */
+function builtinAvatar(): AvatarMeta {
+  return {
+    id: AVATAR_BUILTIN,
+    builtin: true,
+    name: "Hiyori",
+    fileName: "",
+    manifest: "Hiyori.model3.json",
+    size: 0,
+    addedAt: "",
+    resources: structuredClone(BUILTIN_RESOURCES),
+  };
+}
 
 const DEFAULT_SETTINGS: Settings = {
   general: {
@@ -54,7 +91,7 @@ function defaults(): PersistedState {
     settings: structuredClone(DEFAULT_SETTINGS),
     persona: structuredClone(DEFAULT_PERSONA),
     pins: [...DEFAULT_PINS],
-    avatars: [],
+    avatars: [builtinAvatar()],
     avatarId: AVATAR_BUILTIN,
   };
 }
@@ -179,6 +216,26 @@ function captureLegacyMemories(raw: Record<string, unknown>): void {
   if (!legacyMemories.length) legacyMemories = null;
 }
 
+/** avatars 归一化：保证内置条目在首位；内置条目缺 resources 时补出厂清单
+ * （导入条目缺省保留 undefined——设置页再按需懒解析 zip 补回）。 */
+function migrateAvatars(raw: unknown): AvatarMeta[] {
+  const list = (Array.isArray(raw) ? raw : []).filter(
+    (a): a is AvatarMeta =>
+      !!a && typeof a === "object" && typeof (a as AvatarMeta).id === "string",
+  );
+  const norm = list.map((a) =>
+    a.id === AVATAR_BUILTIN
+      ? {
+          ...a,
+          builtin: true as const,
+          resources: a.resources ?? structuredClone(BUILTIN_RESOURCES),
+        }
+      : a,
+  );
+  if (!norm.some((a) => a.id === AVATAR_BUILTIN)) norm.unshift(builtinAvatar());
+  return norm;
+}
+
 /** 记下 schema 外顶层字段，PUT 时原样带回。 */
 function capturePassthrough(raw: Record<string, unknown>): void {
   for (const k of Object.keys(raw)) {
@@ -194,6 +251,7 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
   const s = parsed.settings;
   captureLegacyMemories(parsed as Record<string, unknown>);
   capturePassthrough(parsed as Record<string, unknown>);
+  const avatars = migrateAvatars(parsed.avatars ?? d.avatars);
   return {
     settings: {
       general: { ...d.settings.general, ...s?.general },
@@ -204,11 +262,9 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
     },
     persona: migratePersona(parsed.persona, d.persona),
     pins: migratePins(parsed as Record<string, unknown>, d.pins),
-    avatars: parsed.avatars ?? d.avatars,
+    avatars,
     avatarId:
-      parsed.avatarId &&
-      (parsed.avatarId === AVATAR_BUILTIN ||
-        (parsed.avatars ?? []).some((a) => a.id === parsed.avatarId))
+      parsed.avatarId && avatars.some((a) => a.id === parsed.avatarId)
         ? parsed.avatarId
         : AVATAR_BUILTIN,
   };

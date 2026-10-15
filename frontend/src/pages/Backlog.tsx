@@ -67,10 +67,7 @@ export default function Backlog() {
                   </button>
                 )}
               </div>
-              <div className="bl-text">
-                {m.emotion && <span className="bl-emo">{m.emotion}</span>}
-                {m.text}
-              </div>
+              <div className="bl-text">{m.text}</div>
             </div>
           ))}
         </div>

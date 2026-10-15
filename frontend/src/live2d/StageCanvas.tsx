@@ -57,8 +57,8 @@ export default function StageCanvas({ visible }: { visible: boolean }) {
           pointerEvents: visible ? "auto" : "none",
         }}
         onClick={() => {
-          // 轻拍回应：模型未就绪时 playEmotion 自身静默 no-op。
-          getStage().playEmotion("happy");
+          // 轻拍回应：播模型约定的 TapBody 组，未就绪/无该组静默 no-op。
+          getStage().tap();
         }}
       />
     </div>

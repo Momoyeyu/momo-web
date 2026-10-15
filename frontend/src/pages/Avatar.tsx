@@ -13,7 +13,7 @@ import {
   subscribe,
   update,
 } from "../lib/store";
-import type { AvatarMeta } from "../lib/types";
+import type { AvatarMeta, AvatarResources } from "../lib/types";
 import { deleteBlob, getBlob, putBlob } from "../lib/idb";
 import { checkManifest, listManifests } from "../live2d/avatarZip";
 import { getStage } from "../live2d/stage";
@@ -98,6 +98,43 @@ export default function AvatarPanel() {
     reloadStage();
   };
 
+  // 旧数据懒回填：当前形象是导入模型且还没解析过 resources 时，
+  // 从 IndexedDB 的 zip 里读 manifest 补清单（desc 留空）。
+  useEffect(() => {
+    const active = getAvatars().find((a) => a.id === getAvatarId());
+    if (!active || active.builtin || active.resources) return;
+    let alive = true;
+    void (async () => {
+      const blob = await getBlob(active.id);
+      if (!blob) return;
+      const zip = await JSZip.loadAsync(blob);
+      const check = await checkManifest(zip, active.manifest);
+      if (!alive || "error" in check) return;
+      update({
+        avatars: getAvatars().map((a) =>
+          a.id === active.id
+            ? {
+                ...a,
+                resources: {
+                  expressions: check.resources.expressions.map((name) => ({
+                    name,
+                    desc: "",
+                  })),
+                  motions: check.resources.motions.map((name) => ({
+                    name,
+                    desc: "",
+                  })),
+                },
+              }
+            : a,
+        ),
+      });
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [activeId]);
+
   const doImport = async (
     zip: JSZip,
     file: File,
@@ -121,6 +158,14 @@ export default function AvatarPanel() {
       manifest: manifestPath,
       size: file.size,
       addedAt: new Date().toISOString(),
+      // 导入即解析资源清单；desc 留空待用户在下方语义层编辑。
+      resources: {
+        expressions: check.resources.expressions.map((name) => ({
+          name,
+          desc: "",
+        })),
+        motions: check.resources.motions.map((name) => ({ name, desc: "" })),
+      },
     };
     try {
       await putBlob(meta.id, file);
@@ -183,67 +228,109 @@ export default function AvatarPanel() {
     if (activeId === id) reloadStage();
   };
 
-  const cardOps = (id: string): React.ReactNode => (
+  const cardOps = (a: AvatarMeta): React.ReactNode => (
     <span className="avatar-ops">
-      {activeId !== id && (
-        <button className="ghost" onClick={() => activate(id)}>
+      {activeId !== a.id && (
+        <button className="ghost" onClick={() => activate(a.id)}>
           {t("avatar.use")}
         </button>
       )}
-      {id !== AVATAR_BUILTIN && (
-        <button className="ghost danger" onClick={() => remove(id)}>
+      {!a.builtin && (
+        <button className="ghost danger" onClick={() => remove(a.id)}>
           {t("avatar.delete")}
         </button>
       )}
     </span>
   );
 
+  const active = avatars.find((a) => a.id === activeId);
+
+  const setDesc = (
+    kind: keyof AvatarResources,
+    name: string,
+    desc: string,
+  ): void => {
+    update({
+      avatars: getAvatars().map((a) =>
+        a.id === activeId && a.resources
+          ? {
+              ...a,
+              resources: {
+                ...a.resources,
+                [kind]: a.resources[kind].map((r) =>
+                  r.name === name ? { ...r, desc } : r,
+                ),
+              },
+            }
+          : a,
+      ),
+    });
+  };
+
+  const resGroup = (
+    kind: keyof AvatarResources,
+    label: string,
+  ): React.ReactNode => {
+    const items = active?.resources?.[kind] ?? [];
+    if (!items.length) return null;
+    return (
+      <div className="res-group">
+        <div className="res-group-title muted">{label}</div>
+        {items.map((r) => (
+          <div key={r.name} className="res-row">
+            <span className="res-name">{r.name}</span>
+            <input
+              className="res-desc"
+              value={r.desc}
+              placeholder={t("avatar.descPh")}
+              onChange={(e) => setDesc(kind, r.name, e.target.value)}
+            />
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const hasRes =
+    !!active?.resources &&
+    (active.resources.expressions.length > 0 ||
+      active.resources.motions.length > 0);
+
   return (
     <div className="avatar-panel">
       <div className="avatar-grid">
-        {/* 内置模型 */}
-        <div
-          className={`avatar-card${activeId === AVATAR_BUILTIN ? " active" : ""}`}
-        >
-          <img
-            className="avatar-thumb"
-            src={BUILTIN_THUMB}
-            alt=""
-            draggable={false}
-          />
-          <div className="avatar-info">
-            <div className="avatar-title">
-              <span className="avatar-name">{BUILTIN_NAME}</span>
-              <span className="badge">{t("avatar.builtin")}</span>
-            </div>
-            <div className="avatar-meta muted">Hiyori.model3.json</div>
-          </div>
-          {activeId === AVATAR_BUILTIN ? (
-            <span className="badge badge-active">{t("avatar.inUse")}</span>
-          ) : (
-            cardOps(AVATAR_BUILTIN)
-          )}
-        </div>
-
-        {/* 导入模型 */}
+        {/* 模型清单（内置条目也在 avatars[] 里，位于首位） */}
         {avatars.map((a) => (
           <div
             key={a.id}
             className={`avatar-card${activeId === a.id ? " active" : ""}`}
           >
-            <AvatarThumb meta={a} />
+            {a.builtin ? (
+              <img
+                className="avatar-thumb"
+                src={BUILTIN_THUMB}
+                alt=""
+                draggable={false}
+              />
+            ) : (
+              <AvatarThumb meta={a} />
+            )}
             <div className="avatar-info">
               <div className="avatar-title">
-                <span className="avatar-name">{a.name}</span>
+                <span className="avatar-name">{a.name || BUILTIN_NAME}</span>
+                {a.builtin && (
+                  <span className="badge">{t("avatar.builtin")}</span>
+                )}
               </div>
               <div className="avatar-meta muted">
-                {a.manifest} · {fmtSize(a.size)}
+                {a.manifest}
+                {a.builtin ? "" : ` · ${fmtSize(a.size)}`}
               </div>
             </div>
             {activeId === a.id ? (
               <span className="badge badge-active">{t("avatar.inUse")}</span>
             ) : (
-              cardOps(a.id)
+              cardOps(a)
             )}
           </div>
         ))}
@@ -298,6 +385,22 @@ export default function AvatarPanel() {
 
       <p className="muted avatar-hint">{t("avatar.importHint")}</p>
       {error && <p className="avatar-error">{error}</p>}
+
+      {/* 语义层：当前形象的表情/动作清单，desc 供 momo 理解何时使用 */}
+      {active && (
+        <div className="panel avatar-res">
+          <h3 className="opt-group">{t("avatar.resources")}</h3>
+          <p className="muted avatar-hint">{t("avatar.resHint")}</p>
+          {hasRes ? (
+            <>
+              {resGroup("expressions", t("avatar.expList"))}
+              {resGroup("motions", t("avatar.motionList"))}
+            </>
+          ) : (
+            <p className="muted">{t("avatar.resEmpty")}</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

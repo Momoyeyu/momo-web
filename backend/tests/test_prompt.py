@@ -1,4 +1,4 @@
-"""system prompt 模板：字段注入 + pins + 情绪指令段。"""
+"""system prompt 模板：字段注入 + pins + 表情/动作指令段（按形象资源清单条件注入）。"""
 from __future__ import annotations
 
 from app import agent, store
@@ -36,16 +36,53 @@ def test_prompt_zh_fields_injected():
     assert "1. memory_add" in p and "5. common_time" in p
 
 
-def test_prompt_emotion_block_present_all_langs():
-    tags = "neutral happy sad angry surprised thinking shy sleepy"
+def test_prompt_directive_sections_all_langs():
+    """默认内置形象（Hiyori：无表情、10 个动作）→ 只注入动作段。"""
     for lang in ("zh", "en", "ja"):
         p = agent.build_system_prompt(_state(lang))
-        assert "#tag" in p
-        assert tags in p
-        # 情绪段必须是最后一段
+        assert "<motion>" in p and "Idle/4" in p
+        assert "<exp>" not in p  # Hiyori 无表情文件 → 表情段不注入
+        # 指令段必须是最后一段且以容错说明收尾
         assert p.split("\n\n")[-1].startswith("[")
     zh = agent.build_system_prompt(_state("zh"))
-    assert "[情绪与动作指令]" in zh
+    assert "[动作控制]" in zh
+    assert "- Idle/4 — 思考的样子" in zh
+    assert "&lt;" in zh
+
+
+def test_prompt_directive_sections_with_expressions():
+    """导入模型带表情资源 → 表情段注入，名称-描述成行。"""
+    p = agent.build_system_prompt(
+        _state(
+            "zh",
+            avatarId="av_x",
+            avatars=[
+                {
+                    "id": "av_x",
+                    "resources": {
+                        "expressions": [
+                            {"name": "star_eyes", "desc": "非常期待"},
+                            {"name": "fukidashi", "desc": ""},
+                        ],
+                        "motions": [{"name": "Tap/0", "desc": ""}],
+                    },
+                }
+            ],
+        )
+    )
+    assert "[表情控制]" in p
+    assert "- star_eyes — 非常期待" in p
+    assert "- fukidashi" in p and "fukidashi —" not in p
+    assert "[动作控制]" in p and "- Tap/0" in p
+
+
+def test_prompt_no_directive_section_when_no_resources():
+    """当前形象没有资源清单 → 整个指令段不出现。"""
+    p = agent.build_system_prompt(
+        _state("zh", avatarId="av_x", avatars=[{"id": "av_x"}])
+    )
+    assert "<exp>" not in p and "<motion>" not in p
+    assert "[动作控制]" not in p
 
 
 def test_prompt_en_and_ja_templates():

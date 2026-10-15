@@ -140,5 +140,11 @@ export const ja: Dict = {
     errManifest: "モデル記述ファイルの解析に失敗しました",
     errMissing: "モデル記述ファイルが参照するファイルが zip 内にありません",
     errStore: "モデルの保存に失敗しました（ブラウザのストレージが使えません）",
+    resources: "表情とモーション",
+    resHint: "各項目に意味を一言書くと、momo が会話の中で意味を見て使い分けます。",
+    expList: "表情",
+    motionList: "モーション",
+    descPh: "意味（任意）",
+    resEmpty: "このモデルには操作できる表情・モーションがありません。",
   },
 };

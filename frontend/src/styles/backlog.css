@@ -107,11 +107,3 @@
   word-break: break-word;
 }
 
-.bl-emo {
-  margin-right: 8px;
-  padding: 0 8px;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--r-sm);
-  color: var(--accent);
-  font-size: 11px;
-}
