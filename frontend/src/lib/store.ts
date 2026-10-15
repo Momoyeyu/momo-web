@@ -161,18 +161,29 @@ function normalizeAvatars(raw: unknown): AvatarMeta[] {
   return norm;
 }
 
-/** extensions 归一化：逐条补默认字段，非对象条目丢弃；enabled 缺省视为开。 */
+/** extensions 归一化：逐条补默认字段，非对象条目丢弃；enabled 缺省视为开。
+ *  旧 apiKey 字段已废除——读到直接丢弃，不做迁移。 */
 function normalizeExtensions(raw: unknown): McpExtension[] {
+  const strDict = (v: unknown): Record<string, string> =>
+    v && typeof v === "object" && !Array.isArray(v)
+      ? Object.fromEntries(
+          Object.entries(v).filter(
+            (e): e is [string, string] => typeof e[1] === "string",
+          ),
+        )
+      : {};
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
     .map((o) => ({
       name: typeof o.name === "string" ? o.name : "",
       transport: o.transport === "stdio" ? ("stdio" as const) : ("http" as const),
-      command: typeof o.command === "string" ? o.command : "",
-      endpoint: typeof o.endpoint === "string" ? o.endpoint : "",
-      apiKey: typeof o.apiKey === "string" ? o.apiKey : "",
       enabled: o.enabled !== false,
+      command: typeof o.command === "string" ? o.command : "",
+      args: strArr(o.args),
+      env: strDict(o.env),
+      endpoint: typeof o.endpoint === "string" ? o.endpoint : "",
+      headers: strDict(o.headers),
     }));
 }
 

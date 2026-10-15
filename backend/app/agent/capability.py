@@ -67,7 +67,7 @@ TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "common_time",
-            "description": "获取当前 UTC 时间与本地时区",
+            "description": "获取当前 UTC 时间与本地时区。需要精确当前时刻时调用：计算时间间隔、确认「现在几点/今天几号」、换算本地时间；一般闲聊无需调用（回合开始时间已注入系统提示词）",
             "parameters": {"type": "object", "properties": {}},
         },
     },

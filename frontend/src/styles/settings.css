@@ -74,10 +74,17 @@
   width: min(1100px, calc(100% - 96px));
   margin: 0 auto;
   padding: 26px 0 36px;
+  /* min-height 撑满滚动区：单栏页（拓展）靠它拿到定高弹性区。 */
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-body {
-  padding: 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* --- 双栏内容区：两列等宽、面板拉伸等高 --- */
@@ -556,7 +563,22 @@ button.ghost.danger:hover {
   box-shadow: 0 0 0 1px var(--danger-line);
 }
 
-/* --- 拓展 master-detail：左列表行可选中，右编辑面板 --- */
+/* --- 拓展 tab：唯一单栏页——整行通宽列表 + 居中配置弹窗 --- */
+
+/* 面板撑满内容区定高；中段列表弹性区内部滚动，UI 不随数据量抖动。 */
+.ext-panel {
+  flex: 1;
+  min-height: 0;
+}
+
+.ext-hint {
+  margin: 2px 4px 10px;
+  font-size: 12px;
+}
+
+.ext-list {
+  overflow-y: auto;
+}
 
 .ext-row {
   display: flex;
@@ -565,17 +587,11 @@ button.ghost.danger:hover {
   padding: 10px 8px;
   border-bottom: 1px solid var(--line-soft);
   border-radius: var(--r-sm);
-  cursor: pointer;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease;
 }
 
 .ext-row:hover {
   background: var(--panel-hover);
-}
-
-.ext-row.selected {
-  background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent);
 }
 
 .ext-name {
@@ -588,25 +604,156 @@ button.ghost.danger:hover {
   font-weight: 600;
 }
 
-.ext-transport {
+/* transport 徽标：小描边 chip。 */
+.ext-badge {
   flex: none;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+/* 连接状态点：●成功(n tools) / ✗失败 / ○未启用 / …探测中。 */
+.ext-dot {
+  flex: none;
+  min-width: 84px;
   font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-/* 右栏未选中空态：垂直居中提示。 */
-.ext-empty {
-  flex: 1;
+.ext-dot.ok {
+  color: var(--ok);
+}
+
+.ext-dot.err {
+  color: var(--danger);
+}
+
+.ext-dot.off {
+  color: var(--text-faint);
+}
+
+.ext-dot.wait {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+/* 底部两行：第一行 [+ 添加] 通宽、第二行独立翻页器（行内居中窄控件）。 */
+.ext-add {
+  width: 100%;
+}
+
+.ext-pagerline {
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: 32px 12px;
-  text-align: center;
-  font-size: 13px;
+  min-height: 28px;
+  margin-top: 8px;
 }
 
-/* 编辑面板底部操作行：右对齐。 */
+/* 弹窗底部操作行：右对齐。 */
 .ext-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
+  margin-top: 14px;
+}
+
+/* --- 居中弹窗：背景变暗，点背景关闭（未保存丢弃） --- */
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--backdrop);
+  backdrop-filter: blur(10px);
+}
+
+.ext-modal {
+  width: min(620px, calc(100% - 64px));
+  max-height: calc(100dvh - 96px);
+  overflow-y: auto;
+}
+
+.ext-modal .opt-label {
+  width: 96px;
+  font-size: 13px;
+}
+
+.ext-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ext-modal-head .opt-group {
+  margin: 0 4px;
+}
+
+.ext-json textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.ext-json-ops {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+
+/* 多行控件行（键值对编辑器）：标签顶对齐。 */
+.opt-row.top {
+  align-items: flex-start;
+}
+
+.opt-row.top .opt-label {
+  padding-top: 9px;
+}
+
+/* 键值对编辑器：KEY = value 行可增删。 */
+.kv-list {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.kv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.kv-key {
+  flex: 0 0 38%;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.kv-eq {
+  flex: none;
+  color: var(--text-dim);
+}
+
+.kv-val {
+  flex: 1;
+  min-width: 0;
+  font-family: monospace;
+  font-size: 12px;
 }
