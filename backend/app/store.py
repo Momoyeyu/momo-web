@@ -64,7 +64,7 @@ DEFAULT_STATE: dict[str, Any] = {
         "tts": {"url": "", "key": "", "voice": "", "lang": "zh"},
         # 语义检索端点（设置页「模型」tab 可改）；url 留空 = 只用词面召回
         "embedding": {"url": DEFAULT_URL, "key": "", "model": DEFAULT_MODEL},
-        # MCP 拓展清单（{name,transport,command?,endpoint?,apiKey?,enabled}）
+        # MCP 拓展清单（{name,transport,enabled} + stdio{command,args,env} / http{endpoint,headers}）
         "extensions": [],
     },
     # 与前端 DEFAULT_PERSONA 保持一致：prompt 组装时空字段回落到这里。

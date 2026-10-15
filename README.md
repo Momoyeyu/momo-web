@@ -40,7 +40,7 @@ cd backend && uv run pytest
 
 ## 说明
 
-- 状态（设置/人设/初始记忆/形象列表）由 backend `state.json` 权威存储，localStorage 仅作离线缓存。
+- 状态（设置/人设/初始记忆/形象列表）由 backend `momo.yaml` 权威存储，localStorage 仅作离线缓存。
 - Live2D 模型 zip 存浏览器 IndexedDB（不经 backend）。
 - Live2D Cubism Core 运行时从官方 CDN 加载（`VITE_MOMO_CUBISM_CORE_URL` 可换镜像）。
 

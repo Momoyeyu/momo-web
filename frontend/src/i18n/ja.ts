@@ -26,7 +26,6 @@ export const ja: Dict = {
     placeholder: "{name} に話しかける…",
     send: "送信",
     mic: "マイク",
-    micOn: "マイク·オン",
     micTitleOn: "マイクを切る",
     micTitleOff: "マイクを入れる",
     micNeedCfg: "先に設定で音声入力を設定・有効化してください",
@@ -174,14 +173,12 @@ export const ja: Dict = {
     pinsTitle: "初期記憶",
     pinsDesc:
       "momo が生まれつき知っていること（あなたの名前、二人の関係……）。会話中は常に覚えていて、忘れたり書き換えられたりしません。",
-    pinPh: "初期記憶を一行…",
     pinSearchPh: "初期記憶を検索…",
     pinAdd: "+ 追加",
     normalTitle: "記憶",
     normalDesc:
       "momo が会話の中で自分で記録した内容。ここで手動で追加・編集・削除もできます。",
-    add: "追加",
-    addPh: "記憶を手動追加…",
+    add: "+ 追加",
     searchPh: "記憶を検索…",
     empty: "一致する記憶がありません。",
     confirmDelete: "この記憶を削除しますか？",

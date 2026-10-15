@@ -26,7 +26,6 @@ export const zh = {
     placeholder: "和 {name} 说点什么…",
     send: "发送",
     mic: "麦克风",
-    micOn: "麦克风·开",
     micTitleOn: "关闭麦克风",
     micTitleOff: "打开麦克风",
     micNeedCfg: "先在设置里配置并开启语音输入",
@@ -174,14 +173,12 @@ export const zh = {
     pinsTitle: "初始记忆",
     pinsDesc:
       "momo 天生就知道的事（你的名字、你们的关系……）。对话中始终记得，不会被遗忘或改写。",
-    pinPh: "一条初始记忆…",
     pinSearchPh: "检索初始记忆…",
     pinAdd: "+ 添加",
     normalTitle: "普通记忆",
     normalDesc:
       "momo 在对话中自己记下的内容，也可以在这里手动增删改。",
-    add: "添加",
-    addPh: "手动添加一条记忆…",
+    add: "+ 添加",
     searchPh: "检索记忆…",
     empty: "没有匹配的记忆。",
     confirmDelete: "删除这条记忆？",

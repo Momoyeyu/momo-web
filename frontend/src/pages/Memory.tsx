@@ -19,6 +19,7 @@ import "../styles/settings.css";
 import "../styles/controls.css";
 
 const LOCALE = { zh: "zh-CN", ja: "ja-JP", en: "en-US" } as const;
+const NEW_ID = "__new__";
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -40,10 +41,10 @@ export default function MemoryPanel() {
   const [pinQuery, setPinQuery] = useState("");
   const [memPage, setMemPage] = useState(0);
   const [pinPage, setPinPage] = useState(0);
-  const [addDraft, setAddDraft] = useState("");
-  const [pinDraft, setPinDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  // 「+ 添加」挂起的新条目草稿：NEW_ID 占位 id + 所属栏目标记。
+  const [draftPinned, setDraftPinned] = useState<boolean | null>(null);
   // 卡片点开的详情弹窗（只读全文）。
   const [detail, setDetail] = useState<Memory | null>(null);
 
@@ -86,16 +87,17 @@ export default function MemoryPanel() {
     (memPg.page + 1) * LIST_PAGE_SIZE,
   );
 
-  const add = async (content: string, pinned: boolean): Promise<void> => {
-    const c = content.trim();
-    if (!c) return;
-    try {
-      await apiAdd(c, pinned);
-      if (pinned) setPinDraft("");
-      else setAddDraft("");
-      await refresh();
-    } catch {
-      setLoadFailed(true);
+  const startAdd = (pinned: boolean): void => {
+    // 草稿卡顶到第一页；清掉检索词保证草稿可见
+    setDraftPinned(pinned);
+    setEditingId(NEW_ID);
+    setEditDraft("");
+    if (pinned) {
+      setPinQuery("");
+      setPinPage(0);
+    } else {
+      setQuery("");
+      setMemPage(0);
     }
   };
 
@@ -106,11 +108,18 @@ export default function MemoryPanel() {
 
   const commitEdit = async (): Promise<void> => {
     const id = editingId;
+    const pinned = draftPinned;
     setEditingId(null);
     setEditDraft("");
+    setDraftPinned(null);
     if (!id) return;
     try {
-      await apiEdit(id, editDraft.trim());
+      if (id === NEW_ID && pinned !== null) {
+        const c = editDraft.trim();
+        if (c) await apiAdd(c, pinned);
+      } else {
+        await apiEdit(id, editDraft.trim());
+      }
       await refresh();
     } catch {
       setLoadFailed(true);
@@ -143,6 +152,7 @@ export default function MemoryPanel() {
             onClick={() => {
               setEditingId(null);
               setEditDraft("");
+              setDraftPinned(null);
             }}
           >
             {t("common.cancel")}
@@ -193,6 +203,19 @@ export default function MemoryPanel() {
     </div>
   );
 
+  /** 「+ 添加」挂起时的草稿卡（直接编辑态，提交才落 API）。 */
+  const draftCard = (pinned: boolean) =>
+    draftPinned === pinned && editingId === NEW_ID ? (
+      <div className="mem-item" key={NEW_ID}>
+        {editRow({
+          id: NEW_ID,
+          content: "",
+          createdAt: "",
+          pinned,
+        })}
+      </div>
+    ) : null;
+
   return (
     /* 双栏：初始记忆 | 普通记忆；添加行钉在各面板底缘。 */
     <div className="settings-cols">
@@ -212,6 +235,7 @@ export default function MemoryPanel() {
           />
         </div>
         <div className="col-grow">
+          {draftCard(true)}
           {loadFailed && <p className="muted">{t("memory.loadFailed")}</p>}
           {pinSlice.map(memCard)}
           {pinHits.length === 0 && !loadFailed && (
@@ -220,26 +244,13 @@ export default function MemoryPanel() {
         </div>
         <div className="col-foot">
           <div className="list-foot">
-            <div className="row">
-              <input
-                className="mem-search"
-                placeholder={t("memory.pinPh")}
-                value={pinDraft}
-                onChange={(e) => setPinDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                    void add(pinDraft, true);
-                  }
-                }}
-              />
-              <button
-                className="small"
-                onClick={() => void add(pinDraft, true)}
-                disabled={!pinDraft.trim()}
-              >
-                {t("memory.pinAdd")}
-              </button>
-            </div>
+            <button
+              className="ghost"
+              onClick={() => startAdd(true)}
+              disabled={editingId !== null}
+            >
+              {t("memory.pinAdd")}
+            </button>
             <Pager
               page={pinPg.page}
               pages={pinPg.pages}
@@ -265,6 +276,7 @@ export default function MemoryPanel() {
           />
         </div>
         <div className="col-grow">
+          {draftCard(false)}
           {loadFailed && <p className="muted">{t("memory.loadFailed")}</p>}
           {!loadFailed && shown.length === 0 && (
             <p className="muted">{t("memory.empty")}</p>
@@ -274,26 +286,13 @@ export default function MemoryPanel() {
         </div>
         <div className="col-foot">
           <div className="list-foot">
-            <div className="row">
-              <input
-                className="mem-search"
-                placeholder={t("memory.addPh")}
-                value={addDraft}
-                onChange={(e) => setAddDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                    void add(addDraft, false);
-                  }
-                }}
-              />
-              <button
-                className="small"
-                onClick={() => void add(addDraft, false)}
-                disabled={!addDraft.trim()}
-              >
-                {t("memory.add")}
-              </button>
-            </div>
+            <button
+              className="ghost"
+              onClick={() => startAdd(false)}
+              disabled={editingId !== null}
+            >
+              {t("memory.add")}
+            </button>
             <Pager
               page={memPg.page}
               pages={memPg.pages}

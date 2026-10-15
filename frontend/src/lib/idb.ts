@@ -1,5 +1,5 @@
 // IndexedDB 极简封装：存用户导入的 Live2D 模型 zip（体积大、
-// 二进制，不适合进 localStorage / backend state.json）。
+// 二进制，不适合进 localStorage / backend momo.yaml）。
 // 浏览器外（测试环境）所有调用静默降级为 miss/no-op。
 
 const DB_NAME = "momo-web";

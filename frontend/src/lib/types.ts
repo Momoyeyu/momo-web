@@ -175,7 +175,7 @@ export interface CheckpointSave extends CheckpointMeta {
   messages: CheckpointMessage[];
 }
 
-/** /api/state 持久化载荷（backend state.json ↔ localStorage 缓存共用 schema）。
+/** /api/state 持久化载荷（backend momo.yaml ↔ localStorage 缓存共用 schema）。
  *  初始记忆（pin）与会话历史在 momo.db，不在此 schema。 */
 export interface PersistedState {
   settings: Settings;

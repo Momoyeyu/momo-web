@@ -26,7 +26,6 @@ export const en: Dict = {
     placeholder: "Say something to {name}…",
     send: "Send",
     mic: "Mic",
-    micOn: "Mic·On",
     micTitleOn: "Mute microphone",
     micTitleOff: "Enable microphone",
     micNeedCfg: "Set up and enable voice input in Settings first",
@@ -174,14 +173,12 @@ export const en: Dict = {
     pinsTitle: "Pinned Memories",
     pinsDesc:
       "Things momo knows from birth (your name, your relationship…). Always remembered in chats — never forgotten or rewritten.",
-    pinPh: "A pinned memory…",
     pinSearchPh: "Filter initial memories…",
     pinAdd: "+ Add",
     normalTitle: "Memories",
     normalDesc:
       "What momo noted down during chats; you can also add, edit or delete entries here.",
-    add: "Add",
-    addPh: "Add a memory manually…",
+    add: "+ Add",
     searchPh: "Search memories…",
     empty: "No matching memories.",
     confirmDelete: "Delete this memory?",
