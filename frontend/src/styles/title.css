@@ -1,11 +1,11 @@
-/* Title 主页：左上品牌区 + 右侧胶囊菜单（柚子社式）。
-   根容器 pointer-events: none，透明区域点击穿透到 Live2D 画布。 */
+/* Title 主页：纯色背景 + 左上品牌区 + 右侧胶囊菜单（柚子社式）。
+   立绘只在对话场景出现——标题页盖一层不透明底色遮住常驻画布。 */
 
 .title-screen {
   position: fixed;
   inset: 0;
   z-index: 1;
-  pointer-events: none;
+  background: var(--bg);
 }
 
 .title-brand {
@@ -61,7 +61,6 @@
   flex-direction: column;
   gap: 16px;
   width: min(240px, 60vw);
-  pointer-events: auto;
 }
 
 .menu-item {
@@ -117,16 +116,14 @@
   flex: 1;
 }
 
+/* 英文 hint 小字常显，悬停提亮。 */
 .mi-hint {
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--text-dim);
-  opacity: 0;
-  transform: translateX(4px);
-  transition:
-    opacity 0.18s ease,
-    transform 0.18s ease;
+  opacity: 0.75;
+  transition: opacity 0.18s ease;
 }
 
 .menu-item:hover {
@@ -148,7 +145,6 @@
 
 .menu-item:hover .mi-hint {
   opacity: 1;
-  transform: none;
 }
 
 .menu-item:active {

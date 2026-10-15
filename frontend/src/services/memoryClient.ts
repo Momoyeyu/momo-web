@@ -9,7 +9,7 @@ export function listMemories(): Promise<Memory[]> {
   return apiJson<Memory[]>(API);
 }
 
-/** pinned=true 即初始记忆：常驻注入 system prompt、不可经本 API 删除。 */
+/** pinned=true 即初始记忆：常驻注入 system prompt（删除与普通记忆同走 DELETE）。 */
 export async function addMemory(
   content: string,
   pinned = false,

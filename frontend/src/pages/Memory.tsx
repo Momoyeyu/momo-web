@@ -12,6 +12,7 @@ import {
 } from "../services/memoryClient";
 import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
 import Pager from "../ui/Pager";
+import DetailModal from "../components/DetailModal";
 import { useT, currentLang } from "../i18n";
 import "../styles/persona.css";
 import "../styles/settings.css";
@@ -43,6 +44,8 @@ export default function MemoryPanel() {
   const [pinDraft, setPinDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
+  // 卡片点开的详情弹窗（只读全文）。
+  const [detail, setDetail] = useState<Memory | null>(null);
 
   const refresh = async (): Promise<void> => {
     try {
@@ -153,12 +156,19 @@ export default function MemoryPanel() {
         </div>
         <div className="mem-content">{m.content}</div>
         <div className="mem-ops">
-          <button className="ghost small" onClick={() => startEdit(m)}>
+          <button
+            className="ghost small"
+            onClick={(e) => {
+              e.stopPropagation();
+              startEdit(m);
+            }}
+          >
             {t("common.edit")}
           </button>
           <button
             className="ghost small danger"
-            onClick={() => {
+            onClick={(e) => {
+              e.stopPropagation();
               if (window.confirm(t("memory.confirmDelete"))) {
                 void remove(m.id);
               }
@@ -169,6 +179,19 @@ export default function MemoryPanel() {
         </div>
       </>
     );
+
+  /** 非编辑态卡片可点开详情弹窗（编辑/删除钮 stopPropagation 不触发）。 */
+  const memCard = (m: Memory) => (
+    <div
+      className={`mem-item${editingId === m.id ? "" : " mem-open"}`}
+      key={m.id}
+      onClick={() => {
+        if (editingId !== m.id) setDetail(m);
+      }}
+    >
+      {editRow(m)}
+    </div>
+  );
 
   return (
     /* 双栏：初始记忆 | 普通记忆；添加行钉在各面板底缘。 */
@@ -189,11 +212,8 @@ export default function MemoryPanel() {
           />
         </div>
         <div className="col-grow">
-          {pinSlice.map((m) => (
-            <div className="mem-item" key={m.id}>
-              {editRow(m)}
-            </div>
-          ))}
+          {loadFailed && <p className="muted">{t("memory.loadFailed")}</p>}
+          {pinSlice.map(memCard)}
           {pinHits.length === 0 && !loadFailed && (
             <p className="muted">{t("memory.empty")}</p>
           )}
@@ -250,11 +270,7 @@ export default function MemoryPanel() {
             <p className="muted">{t("memory.empty")}</p>
           )}
 
-          {shownSlice.map((m) => (
-            <div className="mem-item" key={m.id}>
-              {editRow(m)}
-            </div>
-          ))}
+          {shownSlice.map(memCard)}
         </div>
         <div className="col-foot">
           <div className="list-foot">
@@ -286,6 +302,13 @@ export default function MemoryPanel() {
           </div>
         </div>
       </section>
+      {detail && (
+        <DetailModal
+          meta={formatTime(detail.createdAt)}
+          text={detail.content}
+          onClose={() => setDetail(null)}
+        />
+      )}
     </div>
   );
 }

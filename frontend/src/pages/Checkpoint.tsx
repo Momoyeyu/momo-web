@@ -66,7 +66,10 @@ export default function Checkpoint() {
   const [pageIdx, setPageIdx] = useState(0);
   // 引擎状态变化（回合开始/结束）时重渲染，驱动「回合中禁存档」。
   useSyncExternalStore(subscribeTranscript, transcriptVersion);
-  const turnActive = getChatEngine().status !== "idle";
+  // 「回合中」口径与对话页工具条一致：仅 thinking/speaking，listening 不算。
+  const turnActive =
+    getChatEngine().status === "thinking" ||
+    getChatEngine().status === "speaking";
   // 存档模式：回合进行中禁保存（快照会截到半条回复）。
   const saveBlocked = mode === "save" && turnActive;
 
@@ -136,7 +139,7 @@ export default function Checkpoint() {
     }
   };
 
-  /** 读档模式卡片删除钮：确认后释放槽位。 */
+  /** 已占槽卡片删除钮（两种模式都有）：确认后释放槽位。 */
   const remove = async (s: CheckpointMeta): Promise<void> => {
     if (!window.confirm(t("checkpoint.confirmDelete", { title: s.title }))) {
       return;
@@ -218,18 +221,16 @@ export default function Checkpoint() {
                   onClick={() => openCell(c)}
                 >
                   {cardBody(c.save, slotNo(c.slot))}
-                  {mode === "load" && (
-                    <button
-                      className="ghost small danger slot-del"
-                      disabled={busy}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (c.save) void remove(c.save);
-                      }}
-                    >
-                      {t("common.del")}
-                    </button>
-                  )}
+                  <button
+                    className="ghost small danger slot-del"
+                    disabled={busy || saveBlocked}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (c.save) void remove(c.save);
+                    }}
+                  >
+                    {t("common.del")}
+                  </button>
                 </div>
               ) : (
                 <div
