@@ -10,6 +10,8 @@ import {
   editMemory as apiEdit,
   listMemories,
 } from "../services/memoryClient";
+import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
+import Pager from "../ui/Pager";
 import { useT, currentLang } from "../i18n";
 import "../styles/persona.css";
 import "../styles/settings.css";
@@ -34,6 +36,9 @@ export default function MemoryPanel() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
   const [query, setQuery] = useState("");
+  const [pinQuery, setPinQuery] = useState("");
+  const [memPage, setMemPage] = useState(0);
+  const [pinPage, setPinPage] = useState(0);
   const [addDraft, setAddDraft] = useState("");
   const [pinDraft, setPinDraft] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -61,6 +66,22 @@ export default function MemoryPanel() {
       .filter((m) => !q || m.content.toLowerCase().includes(q));
     return [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [memories, query]);
+
+  // 初始记忆检索 + 两侧分页（命中集分页，越界钳回末页）
+  const pinHits = useMemo(() => {
+    const q = pinQuery.trim().toLowerCase();
+    return pins.filter((m) => !q || m.content.toLowerCase().includes(q));
+  }, [pins, pinQuery]);
+  const pinPg = clampPage(pinPage, pinHits.length);
+  const pinSlice = pinHits.slice(
+    pinPg.page * LIST_PAGE_SIZE,
+    (pinPg.page + 1) * LIST_PAGE_SIZE,
+  );
+  const memPg = clampPage(memPage, shown.length);
+  const shownSlice = shown.slice(
+    memPg.page * LIST_PAGE_SIZE,
+    (memPg.page + 1) * LIST_PAGE_SIZE,
+  );
 
   const add = async (content: string, pinned: boolean): Promise<void> => {
     const c = content.trim();
@@ -156,33 +177,54 @@ export default function MemoryPanel() {
       <section className="panel persona-section settings-col">
         <h2>{t("memory.pinsTitle")}</h2>
         <p className="muted">{t("memory.pinsDesc")}</p>
+        <div className="mem-toolbar">
+          <input
+            className="mem-search"
+            placeholder={t("memory.pinSearchPh")}
+            value={pinQuery}
+            onChange={(e) => {
+              setPinQuery(e.target.value);
+              setPinPage(0);
+            }}
+          />
+        </div>
         <div className="col-grow">
-          {pins.map((m) => (
+          {pinSlice.map((m) => (
             <div className="mem-item" key={m.id}>
               {editRow(m)}
             </div>
           ))}
+          {pinHits.length === 0 && !loadFailed && (
+            <p className="muted">{t("memory.empty")}</p>
+          )}
         </div>
         <div className="col-foot">
-          <div className="row">
-            <input
-              className="mem-search"
-              placeholder={t("memory.pinPh")}
-              value={pinDraft}
-              onChange={(e) => setPinDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                  void add(pinDraft, true);
-                }
-              }}
+          <div className="list-foot">
+            <div className="row">
+              <input
+                className="mem-search"
+                placeholder={t("memory.pinPh")}
+                value={pinDraft}
+                onChange={(e) => setPinDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    void add(pinDraft, true);
+                  }
+                }}
+              />
+              <button
+                className="small"
+                onClick={() => void add(pinDraft, true)}
+                disabled={!pinDraft.trim()}
+              >
+                {t("memory.pinAdd")}
+              </button>
+            </div>
+            <Pager
+              page={pinPg.page}
+              pages={pinPg.pages}
+              onChange={setPinPage}
             />
-            <button
-              className="small"
-              onClick={() => void add(pinDraft, true)}
-              disabled={!pinDraft.trim()}
-            >
-              {t("memory.pinAdd")}
-            </button>
           </div>
         </div>
       </section>
@@ -196,7 +238,10 @@ export default function MemoryPanel() {
             className="mem-search"
             placeholder={t("memory.searchPh")}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setMemPage(0);
+            }}
           />
         </div>
         <div className="col-grow">
@@ -205,32 +250,39 @@ export default function MemoryPanel() {
             <p className="muted">{t("memory.empty")}</p>
           )}
 
-          {shown.map((m) => (
+          {shownSlice.map((m) => (
             <div className="mem-item" key={m.id}>
               {editRow(m)}
             </div>
           ))}
         </div>
         <div className="col-foot">
-          <div className="row">
-            <input
-              className="mem-search"
-              placeholder={t("memory.addPh")}
-              value={addDraft}
-              onChange={(e) => setAddDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                  void add(addDraft, false);
-                }
-              }}
+          <div className="list-foot">
+            <div className="row">
+              <input
+                className="mem-search"
+                placeholder={t("memory.addPh")}
+                value={addDraft}
+                onChange={(e) => setAddDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    void add(addDraft, false);
+                  }
+                }}
+              />
+              <button
+                className="small"
+                onClick={() => void add(addDraft, false)}
+                disabled={!addDraft.trim()}
+              >
+                {t("memory.add")}
+              </button>
+            </div>
+            <Pager
+              page={memPg.page}
+              pages={memPg.pages}
+              onChange={setMemPage}
             />
-            <button
-              className="small"
-              onClick={() => void add(addDraft, false)}
-              disabled={!addDraft.trim()}
-            >
-              {t("memory.add")}
-            </button>
           </div>
         </div>
       </section>

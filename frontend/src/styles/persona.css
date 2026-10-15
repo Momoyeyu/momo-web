@@ -94,6 +94,33 @@ button.danger:hover {
   flex-wrap: wrap;
 }
 
+/* 列表底行：左侧 [+ 添加]，右侧翻页器。 */
+.list-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.list-foot > .row {
+  flex: 1;
+  min-width: 0;
+}
+
+.list-pager {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pager-text {
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+
 .mem-search {
   flex: 1;
   min-width: 140px;

@@ -8,6 +8,7 @@ export const ja: Dict = {
     cancel: "キャンセル",
     edit: "編集",
     del: "削除",
+    pageOf: "{cur} / {total}",
   },
   title: {
     tagline: "チャットボット以上の存在",
@@ -137,7 +138,6 @@ export const ja: Dict = {
 
   },
   persona: {
-    card: "キャラ設定",
     basic: "基本情報",
     name: "名前",
     identity: "アイデンティティ",
@@ -145,6 +145,8 @@ export const ja: Dict = {
     personality: "性格",
     preferences: "好み",
     prefAdd: "+ 追加",
+    prefSearchPh: "嗜好を検索…",
+    prefEmpty: "一致する嗜好がありません。",
     preferencesPh: "例：いちごケーキが好き",
   },
   memory: {
@@ -152,6 +154,7 @@ export const ja: Dict = {
     pinsDesc:
       "momo が生まれつき知っていること（あなたの名前、二人の関係……）。会話中は常に覚えていて、忘れたり書き換えられたりしません。",
     pinPh: "初期記憶を一行…",
+    pinSearchPh: "初期記憶を検索…",
     pinAdd: "+ 追加",
     normalTitle: "記憶",
     normalDesc:

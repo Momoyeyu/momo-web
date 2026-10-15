@@ -8,6 +8,7 @@ export const en: Dict = {
     cancel: "Cancel",
     edit: "Edit",
     del: "Delete",
+    pageOf: "{cur} / {total}",
   },
   title: {
     tagline: "More than a chat bot",
@@ -137,7 +138,6 @@ export const en: Dict = {
 
   },
   persona: {
-    card: "Character Card",
     basic: "Basic Info",
     name: "Name",
     identity: "Identity",
@@ -145,6 +145,8 @@ export const en: Dict = {
     personality: "Personality",
     preferences: "Preferences",
     prefAdd: "+ Add",
+    prefSearchPh: "Filter preferences…",
+    prefEmpty: "No matching preferences.",
     preferencesPh: "e.g. likes strawberry cake",
   },
   memory: {
@@ -152,6 +154,7 @@ export const en: Dict = {
     pinsDesc:
       "Things momo knows from birth (your name, your relationship…). Always remembered in chats — never forgotten or rewritten.",
     pinPh: "A pinned memory…",
+    pinSearchPh: "Filter initial memories…",
     pinAdd: "+ Add",
     normalTitle: "Memories",
     normalDesc:

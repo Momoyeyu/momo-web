@@ -8,6 +8,7 @@ export const zh = {
     cancel: "取消",
     edit: "编辑",
     del: "删除",
+    pageOf: "{cur} / {total}",
   },
   title: {
     tagline: "不只是聊天机器人",
@@ -137,7 +138,6 @@ export const zh = {
 
   },
   persona: {
-    card: "人设卡",
     basic: "基本信息",
     name: "名称",
     identity: "身份",
@@ -145,6 +145,8 @@ export const zh = {
     personality: "性格",
     preferences: "偏好",
     prefAdd: "+ 添加",
+    prefSearchPh: "检索偏好…",
+    prefEmpty: "没有匹配的偏好。",
     preferencesPh: "例如：喜欢草莓蛋糕",
   },
   memory: {
@@ -152,6 +154,7 @@ export const zh = {
     pinsDesc:
       "momo 天生就知道的事（你的名字、你们的关系……）。对话中始终记得，不会被遗忘或改写。",
     pinPh: "一条初始记忆…",
+    pinSearchPh: "检索初始记忆…",
     pinAdd: "+ 添加",
     normalTitle: "普通记忆",
     normalDesc:

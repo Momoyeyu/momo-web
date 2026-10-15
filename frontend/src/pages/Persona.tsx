@@ -3,8 +3,11 @@
 // 布局按 prototype/setting：「基本信息」整行面板内左右两列，
 // 「偏好」独立整行面板。
 
+import { useState } from "react";
 import type { PersonaCard } from "../lib/types";
 import { DEFAULT_PERSONA } from "../lib/store";
+import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
+import Pager from "../ui/Pager";
 import { useT } from "../i18n";
 import "../styles/persona.css";
 
@@ -17,6 +20,20 @@ export default function PersonaPanel({
 }) {
   const t = useT();
   const patch = (p: Partial<PersonaCard>): void => onChange(p);
+
+  // 偏好列表：检索 + 分页（过滤后命中集分页，索引映射回原列表）。
+  const [prefQuery, setPrefQuery] = useState("");
+  const [prefPage, setPrefPage] = useState(0);
+  const prefHits = value.preferences
+    .map((text, i) => ({ text, i }))
+    .filter((x) =>
+      x.text.toLowerCase().includes(prefQuery.trim().toLowerCase()),
+    );
+  const pref = clampPage(prefPage, prefHits.length);
+  const prefSlice = prefHits.slice(
+    pref.page * LIST_PAGE_SIZE,
+    (pref.page + 1) * LIST_PAGE_SIZE,
+  );
 
   return (
     <div className="persona-tab">
@@ -53,8 +70,7 @@ export default function PersonaPanel({
             </label>
             <label className="field">
               <span className="field-label">{t("persona.personality")}</span>
-              <textarea
-                rows={3}
+              <input
                 value={value.personality}
                 placeholder={DEFAULT_PERSONA.personality}
                 onChange={(e) => patch({ personality: e.target.value })}
@@ -65,8 +81,17 @@ export default function PersonaPanel({
       </section>
       <section className="panel persona-section">
         <h2>{t("persona.preferences")}</h2>
-        <div className="field">
-          {value.preferences.map((p, i) => (
+        <input
+          className="mem-search"
+          placeholder={t("persona.prefSearchPh")}
+          value={prefQuery}
+          onChange={(e) => {
+            setPrefQuery(e.target.value);
+            setPrefPage(0);
+          }}
+        />
+        <div className="field col-grow">
+          {prefSlice.map(({ text: p, i }) => (
             <div className="pin-row" key={i}>
               <input
                 value={p}
@@ -91,12 +116,22 @@ export default function PersonaPanel({
               </button>
             </div>
           ))}
+          {prefHits.length === 0 && (
+            <p className="muted">{t("persona.prefEmpty")}</p>
+          )}
+        </div>
+        <div className="list-foot">
           <button
             className="ghost small"
             onClick={() => patch({ preferences: [...value.preferences, ""] })}
           >
             {t("persona.prefAdd")}
           </button>
+          <Pager
+            page={pref.page}
+            pages={pref.pages}
+            onChange={setPrefPage}
+          />
         </div>
       </section>
     </div>
