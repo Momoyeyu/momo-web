@@ -16,26 +16,48 @@ import type { DirectiveEvent } from "../llm/directives";
 import { streamSpeech } from "../services/ttsClient";
 import { chat } from "../services/chatClient";
 import { SentenceSplitter } from "./sentences";
+import { charsPerSec, dwellMs, sentencePauseMs } from "./pacing";
 
 interface ChatEngineEvents {
   onStatus(s: ChatStatus): void;
   /** 一条完整 user 消息落账（打字发送或 ASR final 转写）。 */
   onUserMessage(m: ChatMessage): void;
-  /** assistant 回复开始（id 供 delta 累积）。 */
+  /** assistant 回复开始。 */
   onAssistantStart(id: string): void;
-  onAssistantDelta(id: string, textDelta: string): void;
+  /** 当前句上屏文本（整串替换语义；仅变化时推）。 */
+  onDisplay(text: string): void;
   onAssistantDone(m: ChatMessage): void;
   onError(e: Error): void;
 }
 
 type Phase = "idle" | "thinking" | "speaking";
 
-/** 一句的 TTS 队列项：合成可并发，块先攒本地，按句序统一补推/直通给 player。 */
+/** 一句的 TTS 合成项：合成可并发，块先攒本地，轮到该句展示时才供 player。 */
 interface TtsItem {
   chunks: Uint8Array[];
   pushed: number;
   /** streamSpeech 流结束（成败都算——失败句直接跳过不占位）。 */
   done: boolean;
+}
+
+/** 展示队列项：一句话 + 它的 TTS（无语音/静音时 tts=null，走驻留计时）。 */
+interface SentItem {
+  text: string;
+  tts: TtsItem | null;
+}
+
+/** 逐字播放状态机：句为最小播放单元。 */
+interface DisplayState {
+  /** 当前展示句下标；== sentences.length 时展示「生产中的尾部」。 */
+  idx: number;
+  /** 当前句已上屏字符数（浮点累加，取整渲染）。 */
+  reveal: number;
+  /** 当前句上屏完成时刻（无 TTS 驻留计时起点；未完成为 0）。 */
+  doneAt: number;
+  /** 句间停顿截止时刻（上次切句后）。 */
+  pausedUntil: number;
+  /** 最近一次推给 UI 的字幕（去重避免无效渲染）。 */
+  emitted: string;
 }
 
 interface Turn {
@@ -52,13 +74,19 @@ interface Turn {
   pushedAudio: boolean;
   /** TTS 不可用/失败每回合只上报一次 onError。 */
   ttsErrorReported: boolean;
-  queue: TtsItem[];
-  /** 队头推进游标：queue[pushIndex] 是允许直通的当前句。 */
+  sentences: SentItem[];
+  /** TTS 供块游标：只允许供到当前展示句。 */
   pushIndex: number;
   inflight: number;
+  disp: DisplayState;
+  /** splitter.pending 快照：生产中未断句的尾部（逐字上屏的另一半）。 */
+  tail: string;
+  /** 播放 tick（setInterval id）。 */
+  timer: number;
 }
 
 const INTERRUPT_DEBOUNCE_MS = 300;
+const DISPLAY_TICK_MS = 40;
 
 function toError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e));
@@ -81,6 +109,8 @@ export class ChatEngine {
   private disposed = false;
   private voiceMuted = false;
   private unsubVolume: (() => void) | null = null;
+  /** 最近一次上屏字幕（Chat 页中途挂载时同步用）。 */
+  private lastDisplay = "";
 
   constructor(ev: ChatEngineEvents) {
     this.events = ev;
@@ -108,6 +138,11 @@ export class ChatEngine {
   /** 语音输出静音开关（工具栏即时切换，不持久化）。 */
   get muted(): boolean {
     return this.voiceMuted;
+  }
+
+  /** 当前应显示的字幕（当前句上屏文本；无回合时为最近一次）。 */
+  get display(): string {
+    return this.lastDisplay;
   }
 
   setMuted(m: boolean): void {
@@ -185,11 +220,16 @@ export class ChatEngine {
       finished: false,
       pushedAudio: false,
       ttsErrorReported: false,
-      queue: [],
+      sentences: [],
       pushIndex: 0,
       inflight: 0,
+      disp: { idx: 0, reveal: 0, doneAt: 0, pausedUntil: 0, emitted: "" },
+      tail: "",
+      timer: 0,
     };
     this.turn = turn;
+    this.lastDisplay = "";
+    turn.timer = window.setInterval(() => this.displayTick(turn), DISPLAY_TICK_MS);
     this.events.onAssistantStart(turn.id);
     this.setPhase("thinking");
     void this.runTurn(turn, cfg, trimmed);
@@ -287,8 +327,7 @@ export class ChatEngine {
     }
     turn.finished = true;
     turn.abort.abort();
-    turn.queue.length = 0;
-    turn.pushIndex = 0;
+    window.clearInterval(turn.timer);
     turn.inflight = 0;
     this.safe(() => this.player.stop());
     this.turn = null;
@@ -321,8 +360,8 @@ export class ChatEngine {
           afterTag = false;
           if (!delta) continue;
           turn.text += delta;
-          this.events.onAssistantDelta(turn.id, delta);
-          for (const s of splitter.push(delta)) this.enqueueTts(turn, cfg, s);
+          for (const s of splitter.push(delta)) this.pushSentence(turn, cfg, s);
+          turn.tail = splitter.pending;
         } else if (e.kind === "exp") {
           afterTag = true;
           this.tryStage((st) => st.setExpression(e.name));
@@ -352,25 +391,28 @@ export class ChatEngine {
 
     feedEvents(parser.flush());
     const tail = splitter.flush();
-    if (tail && tail.trim()) this.enqueueTts(turn, cfg, tail);
+    if (tail && tail.trim()) this.pushSentence(turn, cfg, tail);
+    turn.tail = "";
     turn.llmDone = true;
     this.maybeFinish(turn);
   }
 
-  /** 一句成句 → 立刻发 streamSpeech（并发合成），块入队列等序播放。 */
-  private enqueueTts(turn: Turn, cfg: Settings, sentence: string): void {
+  /** 一句成句 → 入展示队列（tts=null 时走驻留），并立刻发 streamSpeech 并发合成。 */
+  private pushSentence(turn: Turn, cfg: Settings, sentence: string): void {
     if (turn.finished) return;
+    const item: SentItem = { text: sentence, tts: null };
+    turn.sentences.push(item);
     if (this.voiceMuted || turn.audioAbort.signal.aborted) return;
     if (!cfg.tts.url) {
       this.reportTtsOnce(turn, new ServiceError("tts", "unconfigured"));
       return;
     }
-    const item: TtsItem = { chunks: [], pushed: 0, done: false };
-    turn.queue.push(item);
+    const tts: TtsItem = { chunks: [], pushed: 0, done: false };
+    item.tts = tts;
     turn.inflight += 1;
 
     const settle = (err?: unknown): void => {
-      item.done = true;
+      tts.done = true;
       turn.inflight -= 1;
       if (err !== undefined) this.reportTtsOnce(turn, toError(err));
       this.flushTts(turn);
@@ -385,7 +427,7 @@ export class ChatEngine {
       req = streamSpeech(cfg.tts, sentence, {
         signal,
         onChunk: (pcm) => {
-          item.chunks.push(pcm);
+          tts.chunks.push(pcm);
           this.flushTts(turn);
         },
       });
@@ -403,36 +445,122 @@ export class ChatEngine {
   }
 
   /**
-   * 保序推送：只有队头句（其前面各句已流完且全部块已推）才能向 player 供块；
-   * 队头句未流完时，后到的块直通；未轮到的句先在本地数组攒着。
+   * 按句供块：只有当前展示句（disp.idx）及其之前的句子允许向 player 供块；
+   * 未轮到的句先在本地攒着——这样每句音频正好在该句展示时开声，句间停顿天然生效。
    */
   private flushTts(turn: Turn): void {
     if (this.turn !== turn || turn.finished) return;
-    const queue = turn.queue;
-    while (turn.pushIndex < queue.length) {
-      const item = queue[turn.pushIndex];
+    const ss = turn.sentences;
+    while (turn.pushIndex < ss.length && turn.pushIndex <= turn.disp.idx) {
+      const item = ss[turn.pushIndex].tts;
+      if (!item) {
+        turn.pushIndex += 1;
+        continue;
+      }
       while (item.pushed < item.chunks.length) {
         const pcm = item.chunks[item.pushed];
         item.pushed += 1;
         this.safe(() => this.player.push(pcm));
         turn.pushedAudio = true;
-        if (this.phase === "thinking") this.setPhase("speaking");
       }
       if (!item.done) break;
       turn.pushIndex += 1;
     }
   }
 
-  /** 收尾判定：LLM 流完 + TTS 请求全部完成 + （若有音频）player 播空。 */
+  /** 播放 tick：逐字上屏 → 判切句 → 供 TTS 块 → 判收尾。 */
+  private displayTick(turn: Turn): void {
+    if (this.turn !== turn || turn.finished) return;
+    this.flushTts(turn);
+    const now = performance.now();
+    if (now < turn.disp.pausedUntil) {
+      this.maybeFinish(turn);
+      return;
+    }
+
+    const g = getSettings().general;
+    const active = turn.sentences[turn.disp.idx];
+    let fullText: string;
+    let complete: boolean;
+    if (active) {
+      fullText = active.text;
+      complete = true;
+    } else {
+      // 生产中的未断句尾部：跟着产出速度走（速率 = min(文字速度, 产出)）。
+      const tail = turn.tail.trimStart();
+      if (!tail) {
+        this.maybeFinish(turn);
+        return;
+      }
+      fullText = tail;
+      complete = false;
+    }
+
+    // 逐字上屏：受文字速度封顶，不超过已产出长度。
+    const target = fullText.length;
+    if (turn.disp.reveal < target) {
+      const rate = charsPerSec(g.textSpeed);
+      turn.disp.reveal =
+        rate === Infinity
+          ? target
+          : Math.min(target, turn.disp.reveal + rate * (DISPLAY_TICK_MS / 1000));
+      if (turn.disp.reveal >= target) turn.disp.doneAt = now;
+    }
+    const shown = fullText.slice(0, Math.floor(turn.disp.reveal));
+    if (shown !== turn.disp.emitted) {
+      turn.disp.emitted = shown;
+      this.lastDisplay = shown;
+      this.events.onDisplay(shown);
+      if (shown && this.phase === "thinking") this.setPhase("speaking");
+    }
+    if (!complete) return;
+
+    // 完整句的播完判定：TTS 开 = 音频播完；TTS 关/本句无音频 = 上屏完 + 按句长驻留。
+    const tts = active.tts;
+    const hasAudio = !!tts && !(tts.done && tts.chunks.length === 0);
+    let ended = false;
+    if (hasAudio && tts) {
+      const audioDone =
+        tts.done && turn.pushIndex > turn.disp.idx && !this.playerPlaying();
+      if (audioDone) {
+        // 音频播完即本句播完：未上完的字一次补齐再切句。
+        if (turn.disp.reveal < target) {
+          turn.disp.reveal = target;
+          turn.disp.emitted = fullText;
+          this.lastDisplay = fullText;
+          this.events.onDisplay(fullText);
+        }
+        ended = true;
+      }
+    } else if (
+      turn.disp.doneAt > 0 &&
+      now - turn.disp.doneAt >= dwellMs(g.sentenceSpeed, target)
+    ) {
+      ended = true;
+    }
+    if (ended) {
+      turn.disp.pausedUntil = now + sentencePauseMs(g.sentenceSpeed);
+      turn.disp.idx += 1;
+      turn.disp.reveal = 0;
+      turn.disp.doneAt = 0;
+    }
+    this.flushTts(turn);
+    this.maybeFinish(turn);
+  }
+
+  /** 收尾判定：LLM 流完 + TTS 请求全部完成 + 展示队列播完 + （若有音频）player 播空。 */
   private maybeFinish(turn: Turn): void {
     if (this.turn !== turn || turn.finished) return;
     if (!turn.llmDone || turn.inflight > 0) return;
+    if (turn.disp.idx < turn.sentences.length) return; // 还有句没播完
+    if (turn.tail.trim()) return; // 尾部未落句（llmDone 后应已 flush，保险）
     if (turn.pushedAudio && this.playerPlaying()) return;
     this.completeTurn(turn);
   }
 
   private completeTurn(turn: Turn): void {
     turn.finished = true;
+    window.clearInterval(turn.timer);
     this.turn = null;
     if (turn.text.trim()) {
       const msg: ChatMessage = {

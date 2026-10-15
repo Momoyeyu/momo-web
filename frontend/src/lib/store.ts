@@ -62,6 +62,8 @@ const DEFAULT_SETTINGS: Settings = {
     lang: "zh",
     chatLang: "auto",
     dialogOpacity: 66,
+    textSpeed: 60,
+    sentenceSpeed: 60,
     voiceVolume: 100,
     showStatus: true,
     voiceInput: true,

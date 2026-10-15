@@ -39,6 +39,10 @@ interface GeneralConfig {
   chatLang: Lang | "auto";
   /** 对话框背景不透明度 0–100（%）。 */
   dialogOpacity: number;
+  /** 文字速度 0–100：句内逐字上屏速率上限（100 = 贴着 LLM 生成速度）。 */
+  textSpeed: number;
+  /** 切句速度 0–100：句间停顿与无 TTS 驻留的统一缩放。 */
+  sentenceSpeed: number;
   /** TTS 语音播放音量 0–100（%）。 */
   voiceVolume: number;
   /** chat 页左上角是否显示对话状态条（空闲/聆听/思考/回应）。 */

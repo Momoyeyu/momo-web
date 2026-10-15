@@ -11,7 +11,8 @@ export interface EngineHandlers {
   onStatus?: (s: ChatStatus) => void;
   onUserMessage?: (m: ChatMessage) => void;
   onAssistantStart?: (id: string) => void;
-  onAssistantDelta?: (id: string, delta: string) => void;
+  /** 当前句上屏文本（整串替换语义）。 */
+  onDisplay?: (text: string) => void;
   onAssistantDone?: (m: ChatMessage) => void;
   onError?: (e: Error) => void;
 }
@@ -60,8 +61,8 @@ export function getChatEngine(): ChatEngine {
         handlers.onAssistantStart?.(id);
         bump();
       },
-      onAssistantDelta: (id, d) => {
-        handlers.onAssistantDelta?.(id, d);
+      onDisplay: (text) => {
+        handlers.onDisplay?.(text);
         bump();
       },
       onAssistantDone: (m) => {

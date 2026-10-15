@@ -5,7 +5,7 @@
 // 即改即生效：每次修改直接 update() 落盘（localStorage + 防抖 PUT
 // /api/state），无草稿/保存概念——语言切换等立即生效。
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import {
   getState,
   personaName,
@@ -13,6 +13,8 @@ import {
   update,
 } from "../lib/store";
 import { getChatEngine } from "../chat/engine";
+import { SentenceSplitter } from "../chat/sentences";
+import { charsPerSec, dwellMs, sentencePauseMs } from "../chat/pacing";
 import type { Settings as SettingsData } from "../lib/types";
 import { fromRoute, navigate } from "../router";
 import { useT, LANGS } from "../i18n";
@@ -109,6 +111,70 @@ function OptSwitch({
     >
       <span className="knob" />
     </button>
+  );
+}
+
+/**
+ * 对话框预览：与 chat 同一套节奏换算——按文字速度逐字上屏、
+ * 按切句速度驻留+停顿，多句循环播放（预览无 TTS，走驻留路径）。
+ */
+function DialogPreview({
+  name,
+  sample,
+  opacity,
+  textSpeed,
+  sentenceSpeed,
+}: {
+  name: string;
+  sample: string;
+  opacity: number;
+  textSpeed: number;
+  sentenceSpeed: number;
+}) {
+  const [text, setText] = useState("");
+
+  useEffect(() => {
+    const splitter = new SentenceSplitter();
+    const sentences = splitter.push(sample);
+    const tail = splitter.flush();
+    if (tail) sentences.push(tail);
+    if (!sentences.length) return;
+    let idx = 0;
+    let reveal = 0;
+    let doneAt = 0;
+    let pausedUntil = 0;
+    const timer = window.setInterval(() => {
+      const now = performance.now();
+      if (now < pausedUntil) return;
+      const cur = sentences[idx];
+      const rate = charsPerSec(textSpeed);
+      reveal =
+        rate === Infinity ? cur.length : Math.min(cur.length, reveal + rate * 0.04);
+      if (reveal >= cur.length) {
+        if (!doneAt) doneAt = now;
+        if (now - doneAt >= dwellMs(sentenceSpeed, cur.length)) {
+          idx = (idx + 1) % sentences.length;
+          reveal = 0;
+          doneAt = 0;
+          pausedUntil = now + sentencePauseMs(sentenceSpeed);
+          return; // 停顿时段保持上一句驻留，不清空
+        }
+      }
+      setText(cur.slice(0, Math.floor(reveal)));
+    }, 40);
+    return () => window.clearInterval(timer);
+  }, [sample, textSpeed, sentenceSpeed]);
+
+  return (
+    <div
+      className="dialog-preview"
+      style={{ "--dialog-alpha": opacity / 100 } as React.CSSProperties}
+    >
+      <div className="dialog-box">
+        <div className="nameplate">{name}</div>
+        <div className="subtitle">{text}</div>
+      </div>
+    </div>
   );
 }
 
@@ -317,6 +383,9 @@ export default function Settings() {
                       }
                     />
                   </OptRow>
+                  <h3 className="opt-group">
+                    {t("settings.groups.dialog")}
+                  </h3>
                   <OptRow
                     label={t("settings.dialogOpacity")}
                     extra={`${settings.general.dialogOpacity}%`}
@@ -333,25 +402,46 @@ export default function Settings() {
                       }
                     />
                   </OptRow>
-                  {/* 对话框透明度实时预览 */}
-                  <div
-                    className="dialog-preview"
-                    style={
-                      {
-                        "--dialog-alpha":
-                          settings.general.dialogOpacity / 100,
-                      } as React.CSSProperties
-                    }
+                  <OptRow
+                    label={t("settings.textSpeed")}
+                    extra={`${settings.general.textSpeed}%`}
                   >
-                    <div className="dialog-box">
-                      <div className="nameplate">
-                        {state.persona.name || personaName()}
-                      </div>
-                      <div className="subtitle">
-                        {t("settings.previewSample")}
-                      </div>
-                    </div>
-                  </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      style={rangeFill(settings.general.textSpeed)}
+                      value={settings.general.textSpeed}
+                      onChange={(e) =>
+                        patchGeneral({ textSpeed: Number(e.target.value) })
+                      }
+                    />
+                  </OptRow>
+                  <OptRow
+                    label={t("settings.sentenceSpeed")}
+                    extra={`${settings.general.sentenceSpeed}%`}
+                  >
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      step={1}
+                      style={rangeFill(settings.general.sentenceSpeed)}
+                      value={settings.general.sentenceSpeed}
+                      onChange={(e) =>
+                        patchGeneral({ sentenceSpeed: Number(e.target.value) })
+                      }
+                    />
+                  </OptRow>
+                  {/* 对话框实时预览：多句循环，逐字上屏 + 按切句速度换句 */}
+                  <DialogPreview
+                    name={state.persona.name || personaName()}
+                    sample={t("settings.previewSample")}
+                    opacity={settings.general.dialogOpacity}
+                    textSpeed={settings.general.textSpeed}
+                    sentenceSpeed={settings.general.sentenceSpeed}
+                  />
                   <OptRow
                     label={t("settings.voiceInput")}
                     extra={!asrConfigured ? t("settings.voiceNeedAsr") : undefined}

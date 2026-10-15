@@ -68,27 +68,23 @@ export default function Chat() {
       onStatus: (s) => {
         setStatus(s);
         setMicOn(engine.listening);
-        // 回合结束/打断后清掉遗留的流式字幕（无 onAssistantDone 的空回合兜底）。
-        if (s === "idle" || s === "listening") {
-          setStreamActive(false);
-          setStreamText("");
-        }
+        if (s === "idle" || s === "listening") setStreamActive(false);
       },
       onAssistantStart: () => {
         setStreamActive(true);
         setStreamText("");
       },
-      onAssistantDelta: (_id, d) => setStreamText((t) => t + d),
-      onAssistantDone: () => {
-        setStreamActive(false);
-        setStreamText("");
-      },
+      onDisplay: (text) => setStreamText(text),
+      // 回合结束字幕不清空：末句保持驻留（VN 惯例，完整回复在 backlog）。
+      onAssistantDone: () => setStreamActive(false),
       onError: (e) => showErr(e),
     };
     attachEngine(h);
-    // 挂载即同步当前相位（可能已有回合在跑）。
+    // 挂载即同步当前相位与字幕（可能已有回合在跑）。
     setStatus(engine.status);
     setMicOn(engine.listening);
+    setStreamActive(engine.status !== "idle");
+    setStreamText(engine.display);
     return () => {
       detachEngine(h);
       if (errTimer.current !== null) window.clearTimeout(errTimer.current);
@@ -124,7 +120,7 @@ export default function Chat() {
     .find((m) => m.role === "assistant");
   const subtitle = streamActive
     ? streamText || "…"
-    : (lastAssistant?.text ?? "");
+    : streamText || (lastAssistant?.text ?? "");
   const busy = status === "thinking" || status === "speaking";
 
   return (

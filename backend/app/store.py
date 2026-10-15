@@ -51,6 +51,8 @@ DEFAULT_STATE: dict[str, Any] = {
             "lang": "zh",
             "chatLang": "auto",
             "dialogOpacity": 66,
+            "textSpeed": 60,
+            "sentenceSpeed": 60,
             "voiceVolume": 100,
             "showStatus": True,
             "voiceInput": True,
