@@ -9,26 +9,40 @@ from ..store import DEFAULT_STATE
 _LANG_NAMES = {"zh": "中文", "en": "English", "ja": "日本語"}
 _DEFAULT_PERSONA: dict[str, Any] = DEFAULT_STATE["persona"]
 
-# 各语言模板片段；{...} 由 builder 注入
+# 各语言模板片段；{...} 由 builder 注入。结构见 meta/prompt.md：
+# # 人格配置（基本信息/偏好/基本设定）→ # 记忆配置（初始记忆/使用策略）→ # 行为配置（表情/动作）
 _T = {
     "zh": {
-        "self": "关于你自己：",
-        "parts": ("你的名字叫{v}", "你的身份是{v}", "你的年龄是{v}"),
-        "personality": "你的性格是{v}。",
-        "prefs": "你的偏好：",
-        "lang_line": "你的主语言是{lang}，需要使用该语言与用户交流，除非用户特别要求使用其他语言。",
-        "time_line": "目前你所在的时区是{tz}，现在的时间是{time24h}。",
-        "mem": "关于记忆：\n以下是你的初始记忆：",
-        "tools": "你有以下工具：\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
-        "joiner": "，",
-        "ender": "。",
-        "exp_head": (
-            "[表情控制]\n"
+        "persona_head": "# 人格配置",
+        "basic_head": "## 你的基本信息",
+        "info_lines": (
+            "你的名字叫{name}",
+            "你的身份是{identity}",
+            "你的年龄是{age}",
+            "你的性格是{personality}",
+        ),
+        "prefs_head": "## 你的偏好",
+        "settings_head": "## 你的基本设定",
+        "lang_line": "你的对话语言是{lang}，需要使用该语言与用户交流，除非用户要求使用其他语言",
+        "time_line": "目前你所在的时区是{tz}，现在的时间是{time24h}",
+        "mem_head": "# 记忆配置",
+        "pins_head": "## 你的初始记忆",
+        "mem_policy_head": "## 记忆使用策略",
+        "mem_policy": (
+            "用户透露偏好、身份、重要事实时，调用 memory_add 写入",
+            "对话涉及用户过去的事，或你不确定是否记过时，先调用 memory_search",
+            "memory_add 返回重复冲突时，用返回的冲突记忆 id 调用 memory_update 修正，不要重复写入",
+            "用户要求忘掉某件事时，先 memory_search 定位，再 memory_delete",
+            "初始记忆已在上方列出，属于已知事实，无需再 search",
+        ),
+        "behavior_head": "# 行为配置",
+        "exp_head": "## 表情控制策略",
+        "exp_intro": (
             "在需要切换表情的位置插入 <exp>名称</exp>，"
             "表情立即切换并持续到本次回复结束。可用表情："
         ),
-        "motion_head": (
-            "[动作控制]\n"
+        "motion_head": "## 动作控制策略",
+        "motion_intro": (
             "在需要播放动作的位置插入 <motion>组名/序号</motion>，"
             "动作播放一次后回到待机。可用动作："
         ),
@@ -38,23 +52,36 @@ _T = {
         ),
     },
     "en": {
-        "self": "About yourself:",
-        "parts": ("Your name is {v}", "your identity is {v}", "you are {v} years old"),
-        "personality": "Your personality: {v}.",
-        "prefs": "Your preferences:",
-        "lang_line": "Your primary language is {lang}; talk with the user in that language unless they explicitly ask for another one.",
-        "time_line": "Your timezone is {tz}; the current time is {time24h}.",
-        "mem": "About memory:\nThese are your initial memories:",
-        "tools": "You have the following tools:\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
-        "joiner": ", ",
-        "ender": ".",
-        "exp_head": (
-            "[Expression control]\n"
+        "persona_head": "# Persona Configuration",
+        "basic_head": "## Your basic information",
+        "info_lines": (
+            "Your name is {name}",
+            "Your identity is {identity}",
+            "You are {age} years old",
+            "Your personality is {personality}",
+        ),
+        "prefs_head": "## Your preferences",
+        "settings_head": "## Your basic settings",
+        "lang_line": "Your conversation language is {lang}; talk with the user in that language unless they ask for another one",
+        "time_line": "Your timezone is {tz}; the current time is {time24h}",
+        "mem_head": "# Memory Configuration",
+        "pins_head": "## Your initial memories",
+        "mem_policy_head": "## Memory usage policy",
+        "mem_policy": (
+            "When the user reveals preferences, identity, or important facts, call memory_add to save them",
+            "When the conversation touches on the user's past, or you are unsure whether something was recorded, call memory_search first",
+            "If memory_add reports a duplicate conflict, call memory_update with the returned conflicting memory id to fix it; do not write it again",
+            "When the user asks to forget something, locate it with memory_search first, then call memory_delete",
+            "The initial memories listed above are already known facts; no need to search for them",
+        ),
+        "behavior_head": "# Behavior Configuration",
+        "exp_head": "## Expression control policy",
+        "exp_intro": (
             "Insert <exp>name</exp> where the expression should change; "
             "it applies immediately and lasts until this reply ends. Available expressions:"
         ),
-        "motion_head": (
-            "[Motion control]\n"
+        "motion_head": "## Motion control policy",
+        "motion_intro": (
             "Insert <motion>group/index</motion> where a motion should play; "
             "it plays once, then returns to idle. Available motions:"
         ),
@@ -64,23 +91,36 @@ _T = {
         ),
     },
     "ja": {
-        "self": "あなた自身について：",
-        "parts": ("あなたの名前は{v}", "身分は{v}", "年齢は{v}歳"),
-        "personality": "性格は{v}。",
-        "prefs": "あなたの好み：",
-        "lang_line": "あなたの主言語は{lang}です。ユーザーが特に指定しない限り、その言語で話してください。",
-        "time_line": "現在のタイムゾーンは{tz}、時刻は{time24h}です。",
-        "mem": "記憶について：\n以下はあなたの初期記憶です：",
-        "tools": "あなたは以下のツールを使えます：\n1. memory_add\n2. memory_search\n3. memory_update\n4. memory_delete\n5. common_time",
-        "joiner": "、",
-        "ender": "。",
-        "exp_head": (
-            "[表情コントロール]\n"
+        "persona_head": "# 人格設定",
+        "basic_head": "## あなたの基本情報",
+        "info_lines": (
+            "あなたの名前は{name}",
+            "あなたの身分は{identity}",
+            "あなたの年齢は{age}歳",
+            "あなたの性格は{personality}",
+        ),
+        "prefs_head": "## あなたの好み",
+        "settings_head": "## あなたの基本設定",
+        "lang_line": "あなたの会話言語は{lang}です。ユーザーが他の言語を要求しない限り、その言語で話してください",
+        "time_line": "現在のタイムゾーンは{tz}、時刻は{time24h}です",
+        "mem_head": "# 記憶設定",
+        "pins_head": "## あなたの初期記憶",
+        "mem_policy_head": "## 記憶の使用ポリシー",
+        "mem_policy": (
+            "ユーザーが好み・身分・重要な事実を明かしたときは memory_add で書き込む",
+            "会話がユーザーの過去のことに触れたり、記憶したか不確かなときは、先に memory_search を呼ぶ",
+            "memory_add が重複競合を返したら、返された競合記憶の id で memory_update を呼んで修正し、重複して書き込まない",
+            "ユーザーが何かを忘れてほしいと言ったら、先に memory_search で特定してから memory_delete を呼ぶ",
+            "上記の初期記憶はすでに知っている事実なので、再検索は不要",
+        ),
+        "behavior_head": "# 行動設定",
+        "exp_head": "## 表情コントロールポリシー",
+        "exp_intro": (
             "表情を切り替えたい位置に <exp>名前</exp> を挿入してください。"
             "表情は即座に切り替わり、この返信の終わりまで持続します。利用できる表情："
         ),
-        "motion_head": (
-            "[モーションコントロール]\n"
+        "motion_head": "## モーションコントロールポリシー",
+        "motion_intro": (
             "モーションを再生したい位置に <motion>グループ名/番号</motion> を挿入してください。"
             "一度だけ再生され、その後待機に戻ります。利用できるモーション："
         ),
@@ -129,7 +169,7 @@ def _resource_lines(items: Any) -> list[str]:
 
 
 def build_system_prompt(state: dict[str, Any]) -> str:
-    """按契约模板组装 system prompt；表情/动作段按当前形象资源清单条件注入。"""
+    """按契约模板组装 system prompt；初始记忆/表情/动作段按条件注入。"""
     lang = _lang_of(state)
     t = _T[lang]
     # 空字段回落出厂人设：用户在设置里清空=回到初始状态，
@@ -154,52 +194,66 @@ def build_system_prompt(state: dict[str, Any]) -> str:
     tz = now.tzname() or ""
     time24h = now.strftime("%H:%M")
 
-    # 「关于你自己」：名称/身份/年龄一行，性格单独一句
-    lines: list[str] = []
-    values = [
-        str(persona.get("name") or "").strip(),
-        str(persona.get("identity") or "").strip(),
-        persona.get("age"),
-    ]
-    parts = [
-        tpl.format(v=v)
-        for tpl, v in zip(t["parts"], values)
-        if v is not None and str(v).strip() != ""
-    ]
-    if parts:
-        lines.append(t["joiner"].join(parts) + t["ender"])
-    personality = str(persona.get("personality") or "").strip()
-    if personality:
-        lines.append(t["personality"].format(v=personality))
-    sections = [t["self"] + "\n" + "\n".join(lines)] if lines else []
+    sections: list[str] = []
 
-    prefs = [str(p) for p in (persona.get("preferences") or []) if str(p).strip()]
-    if prefs:
-        sections.append(
-            t["prefs"] + "\n" + "\n".join(f"{i + 1}. {p}" for i, p in enumerate(prefs))
+    # # 人格配置：基本信息 / 偏好 / 基本设定
+    info = "\n".join(
+        "- " + line.format(
+            name=str(persona["name"]).strip(),
+            identity=str(persona["identity"]).strip(),
+            age=persona["age"],
+            personality=str(persona["personality"]).strip(),
         )
+        for line in t["info_lines"]
+    )
+    prefs = [str(p).strip() for p in (persona.get("preferences") or []) if str(p).strip()]
+    settings = "\n".join(
+        "- " + line
+        for line in (
+            t["lang_line"].format(lang=_LANG_NAMES[lang]),
+            t["time_line"].format(tz=tz, time24h=time24h),
+        )
+    )
+    sections.append(
+        "\n\n".join(
+            (
+                t["persona_head"] + "\n\n" + t["basic_head"] + "\n" + info,
+                t["prefs_head"] + "\n" + "\n".join(f"- {p}" for p in prefs),
+                t["settings_head"] + "\n" + settings,
+            )
+        )
+    )
 
-    sections.append(t["lang_line"].format(lang=_LANG_NAMES[lang]))
-    sections.append(t["time_line"].format(tz=tz, time24h=time24h))
-
+    # # 记忆配置：初始记忆（pins 为空时整段不出现）+ 使用策略
+    mem_blocks = []
     if pins:
-        sections.append(
-            t["mem"] + "\n" + "\n".join(f"{i + 1}. {p}" for i, p in enumerate(pins))
+        mem_blocks.append(
+            t["pins_head"] + "\n" + "\n".join(f"- {p}" for p in pins)
         )
+    mem_blocks.append(
+        t["mem_policy_head"]
+        + "\n"
+        + "\n".join(f"- {line}" for line in t["mem_policy"])
+    )
+    sections.append(t["mem_head"] + "\n\n" + "\n\n".join(mem_blocks))
 
-    sections.append(t["tools"])
-
-    # 表情/动作指令段：清单为空的通道整段不注入（同初始记忆的条件规则）。
+    # # 行为配置：清单为空的通道整段不注入；两通道都无资源则整节不出现。
     res = _avatar_resources(state)
-    blocks = [
-        head + "\n" + "\n".join(lines)
-        for head, lines in (
-            (t["exp_head"], _resource_lines(res.get("expressions"))),
-            (t["motion_head"], _resource_lines(res.get("motions"))),
+    behavior_blocks = [
+        head + "\n" + intro + "\n" + "\n".join(lines)
+        for head, intro, lines in (
+            (t["exp_head"], t["exp_intro"], _resource_lines(res.get("expressions"))),
+            (t["motion_head"], t["motion_intro"], _resource_lines(res.get("motions"))),
         )
         if lines
     ]
-    if blocks:
-        sections.append("\n\n".join(blocks) + "\n" + t["directive_tail"])
+    if behavior_blocks:
+        sections.append(
+            t["behavior_head"]
+            + "\n\n"
+            + "\n\n".join(behavior_blocks)
+            + "\n"
+            + t["directive_tail"]
+        )
 
     return "\n\n".join(sections)
