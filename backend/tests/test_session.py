@@ -49,13 +49,15 @@ def test_save_list_get():
     assert r.status_code == 201
     sid = r.json()["id"]
     assert len(sid) == 8
+    assert r.json()["slot"] == 1
 
     lst = client.get("/api/sessions").json()
     assert len(lst) == 1
     item = lst[0]
     assert item["title"] == "档一" and item["auto"] is False
+    assert item["slot"] == 1
     assert item["createdAt"] and item["updatedAt"]
-    assert item["preview"].startswith("甲问0")
+    assert item["preview"] == "甲答1"  # 末条消息截断
     assert "messages" not in item
 
     full = client.get(f"/api/sessions/{sid}").json()
@@ -149,6 +151,105 @@ def test_load_empty_current_skips_auto():
     store.write_state({"history": []})
     client.post(f"/api/sessions/{sid}/load")
     assert all(not s["auto"] for s in client.get("/api/sessions").json())
+
+
+# ---------- 槽位号 ----------
+
+def test_slot_sequential_and_delete_recycles():
+    """未指定 slot → 最小编号空槽；删除后槽位释放可复用。"""
+    client = TestClient(app)
+    a = client.post("/api/sessions", json={}).json()
+    b = client.post("/api/sessions", json={}).json()
+    assert (a["slot"], b["slot"]) == (1, 2)
+    assert client.delete(f"/api/sessions/{a['id']}").status_code == 204
+    c = client.post("/api/sessions", json={}).json()
+    assert c["slot"] == 1  # 最小空槽被回收复用
+
+
+def test_slot_explicit_and_gap_fill():
+    """指定空槽则用之；未指定跳过已占槽取最小空号；列表按 slot 排序。"""
+    client = TestClient(app)
+    r = client.post("/api/sessions", json={"slot": 5})
+    assert r.status_code == 201 and r.json()["slot"] == 5
+    assert client.post("/api/sessions", json={}).json()["slot"] == 1
+    lst = client.get("/api/sessions").json()
+    assert [s["slot"] for s in lst] == [1, 5]
+
+
+def test_slot_out_of_range_and_occupied():
+    client = TestClient(app)
+    assert client.post("/api/sessions", json={"slot": 0}).status_code == 400
+    assert client.post("/api/sessions", json={"slot": 121}).status_code == 400
+    sid = client.post("/api/sessions", json={"slot": 3}).json()["id"]
+    assert sid
+    r = client.post("/api/sessions", json={"slot": 3})
+    assert r.status_code == 409
+
+
+def test_slot_migration_legacy_entries():
+    """旧 sessions.json 无 slot 字段：读取时按文件序补号，auto 槽不占号。"""
+    import json as _json
+
+    from app import session
+
+    legacy = [
+        {
+            "id": "legacy01",
+            "title": "旧档A",
+            "auto": False,
+            "createdAt": "t",
+            "updatedAt": "t",
+            "summary": "",
+            "messages": [{"role": "user", "text": "一", "at": "t"}],
+        },
+        {
+            "id": "legacyauto",
+            "title": "旧auto",
+            "auto": True,
+            "createdAt": "t",
+            "updatedAt": "t",
+            "summary": "",
+            "messages": [],
+        },
+        {
+            "id": "legacy02",
+            "title": "旧档B",
+            "auto": False,
+            "createdAt": "t",
+            "updatedAt": "t",
+            "summary": "",
+            "messages": [{"role": "assistant", "text": "二", "at": "t"}],
+        },
+    ]
+    session.SESSIONS_PATH.write_text(
+        _json.dumps(legacy, ensure_ascii=False), encoding="utf-8"
+    )
+    lst = TestClient(app).get("/api/sessions").json()
+    by_id = {s["id"]: s for s in lst}
+    assert by_id["legacy01"]["slot"] == 1
+    assert by_id["legacy02"]["slot"] == 2
+    assert by_id["legacyauto"]["slot"] is None
+    assert lst[0]["id"] == "legacyauto"  # auto 置顶
+    # 迁移后新建接最小编号空槽
+    assert TestClient(app).post("/api/sessions", json={}).json()["slot"] == 3
+
+
+def test_preview_uses_last_message():
+    client = TestClient(app)
+    _seed(3, "丙")
+    client.post("/api/sessions", json={})
+    item = client.get("/api/sessions").json()[0]
+    assert item["preview"] == "丙答2"
+
+
+def test_auto_slot_has_no_slot_number():
+    client = TestClient(app)
+    _seed(1, "甲")
+    sid = client.post("/api/sessions", json={}).json()["id"]
+    _seed(1, "乙")
+    client.post(f"/api/sessions/{sid}/load")  # 当前现场进 auto 槽
+    autos = [s for s in client.get("/api/sessions").json() if s["auto"]]
+    assert len(autos) == 1 and autos[0]["slot"] is None
 
 
 # ---------- 上下文压缩 ----------

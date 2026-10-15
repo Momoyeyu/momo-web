@@ -148,12 +148,14 @@ export interface SessionMessage {
   at: string;
 }
 
-/** 存档槽列表项（GET /api/sessions；preview = 首条消息截断）。 */
+/** 存档槽列表项（GET /api/sessions；preview = 末条消息截断）。 */
 export interface SessionMeta {
   id: string;
   title: string;
   /** 自动存档槽：load 前 backend 自动写入，不占手动槽位。 */
   auto: boolean;
+  /** 手动槽位号 1–120（auto 槽为 null）。 */
+  slot: number | null;
   createdAt: string;
   updatedAt: string;
   preview: string;

@@ -1,9 +1,10 @@
-// 存档槽位页（#/sessions）：视觉小说式 Save/Load。
+// 存档槽位页（#/sessions）：视觉小说式 3×4 槽位网格，存档/读档双模式。
 // 保存 = 快照当前会话（backend state.json）；读取 = 存档覆盖当前会话并回对话页。
-// auto 槽是 load 前的自动备份（不占手动槽位），只可读不可写删。
-// 从 chat 还是 title 进来行为一致；返回键按来源页回退。
+// auto 槽是 load 前的自动备份（不占 120 手动槽位），固定置顶网格上方、只可读。
+// 模式由入口决定（标题菜单/对话工具条的「存档」「读档」），页内亦可切换；
+// 返回键按来源页回退。
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { SessionMeta } from "../lib/types";
 import {
   createSession,
@@ -14,7 +15,18 @@ import {
 } from "../services/sessionClient";
 import { resyncPassthrough } from "../lib/store";
 import { loadTranscript } from "../chat/engine";
-import { navigate, fromRoute } from "../router";
+import {
+  navigate,
+  fromRoute,
+  sessionsEntryMode,
+  type SessionsMode,
+} from "../router";
+import {
+  MAX_PAGES,
+  buildCells,
+  pageCount,
+  type SlotCell,
+} from "../lib/sessionGrid";
 import { useT, currentLang } from "../i18n";
 import "../styles/sessions.css";
 import "../styles/persona.css";
@@ -32,21 +44,15 @@ function formatTime(iso: string): string {
   });
 }
 
-/** 默认存档名 = 本地时间（与 backend 默认一致）。 */
-function defaultTitle(): string {
-  const d = new Date();
-  const p = (n: number): string => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
+const slotNo = (n: number): string => `No.${String(n).padStart(3, "0")}`;
 
 export default function Sessions() {
   const t = useT();
+  const [mode, setMode] = useState<SessionsMode>(sessionsEntryMode());
   const [slots, setSlots] = useState<SessionMeta[]>([]);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [renaming, setRenaming] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState("");
+  const [pageIdx, setPageIdx] = useState(0);
 
   const refresh = async (): Promise<void> => {
     try {
@@ -64,11 +70,17 @@ export default function Sessions() {
   const back = (): void =>
     navigate(fromRoute() === "chat" ? "chat" : "title");
 
-  const save = async (): Promise<void> => {
+  const auto = slots.find((s) => s.auto) ?? null;
+  const manual = slots.filter((s) => !s.auto);
+  const pages = pageCount(manual, mode);
+  const page = Math.min(pageIdx, pages - 1);
+  const cells = buildCells(manual, page);
+
+  /** 存档模式点空槽：快照写入该槽。 */
+  const saveTo = async (slot: number): Promise<void> => {
     setBusy(true);
     try {
-      await createSession(draft.trim() || defaultTitle());
-      setDraft("");
+      await createSession(undefined, slot);
       await refresh();
     } catch {
       setFailed(true);
@@ -77,21 +89,7 @@ export default function Sessions() {
     }
   };
 
-  /** 读取：存档覆盖当前会话 → 同步 passthrough → 灌引擎 → 回对话页。 */
-  const load = async (s: SessionMeta): Promise<void> => {
-    if (!window.confirm(t("sessions.confirmLoad", { title: s.title }))) return;
-    setBusy(true);
-    try {
-      const save = await loadSession(s.id);
-      await resyncPassthrough(); // 旧 history 不得随下次 PUT 盖回
-      loadTranscript(save.messages ?? []);
-      navigate("chat");
-    } catch {
-      setFailed(true);
-      setBusy(false);
-    }
-  };
-
+  /** 存档模式点已占槽：确认后覆盖。 */
   const overwrite = async (s: SessionMeta): Promise<void> => {
     if (!window.confirm(t("sessions.confirmOverwrite", { title: s.title }))) {
       return;
@@ -107,22 +105,22 @@ export default function Sessions() {
     }
   };
 
-  const commitRename = async (s: SessionMeta): Promise<void> => {
-    const title = renameDraft.trim();
-    setRenaming(null);
-    setRenameDraft("");
-    if (!title || title === s.title) return;
+  /** 读档模式点已占槽（含 auto）：确认 → 覆盖当前会话 → 灌引擎 → 回对话页。 */
+  const load = async (s: SessionMeta): Promise<void> => {
+    if (!window.confirm(t("sessions.confirmLoad", { title: s.title }))) return;
     setBusy(true);
     try {
-      await overwriteSession(s.id, title); // PUT：重命名 + 内容随当前会话刷新
-      await refresh();
+      const save = await loadSession(s.id);
+      await resyncPassthrough(); // 旧 history 不得随下次 PUT 盖回
+      loadTranscript(save.messages ?? []);
+      navigate("chat");
     } catch {
       setFailed(true);
-    } finally {
       setBusy(false);
     }
   };
 
+  /** 读档模式卡片删除钮：确认后释放槽位。 */
   const remove = async (s: SessionMeta): Promise<void> => {
     if (!window.confirm(t("sessions.confirmDelete", { title: s.title }))) {
       return;
@@ -138,121 +136,135 @@ export default function Sessions() {
     }
   };
 
-  const sorted = [...slots].sort((a, b) =>
-    b.updatedAt.localeCompare(a.updatedAt),
+  const openCell = (c: SlotCell): void => {
+    if (busy) return;
+    if (mode === "save") {
+      void (c.save ? overwrite(c.save) : saveTo(c.slot));
+    } else if (c.save) {
+      void load(c.save);
+    }
+  };
+
+  /** 已占槽卡片体：槽位号 + 时间 + 末句预览（网格卡与 auto 卡共用）。 */
+  const cardBody = (s: SessionMeta, no: string): ReactNode => (
+    <>
+      <div className="slot-card-top">
+        <span className="slot-no">{no}</span>
+        <span className="slot-time muted">{formatTime(s.updatedAt)}</span>
+      </div>
+      <div className="slot-preview">{s.preview || "…"}</div>
+    </>
   );
 
   return (
     <div className="sessions-page">
-      <div className="sessions-panel">
+      <div className={`sessions-panel sessions-${mode}`}>
         <header className="sessions-head">
-          <h1>{t("sessions.title")}</h1>
+          <h1>{t(`sessions.${mode}`)}</h1>
+          <div className="sessions-mode" role="tablist">
+            <button
+              className={`seg${mode === "save" ? " seg-on" : ""}`}
+              onClick={() => setMode("save")}
+            >
+              {t("sessions.save")}
+            </button>
+            <button
+              className={`seg${mode === "load" ? " seg-on" : ""}`}
+              onClick={() => setMode("load")}
+            >
+              {t("sessions.load")}
+            </button>
+          </div>
           <button className="ghost" onClick={back}>
             {t(fromRoute() === "chat" ? "common.backChat" : "common.backTitle")}
           </button>
         </header>
 
-        {/* 新建存档：命名输入（留空 = 当前时间），快照当前会话 */}
-        <div className="sessions-new">
-          <input
-            value={draft}
-            placeholder={t("sessions.namePh")}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) void save();
-            }}
-          />
-          <button onClick={() => void save()} disabled={busy}>
-            {t("sessions.newSave")}
-          </button>
-        </div>
-
-        <div className="sessions-list">
+        <div className="sessions-body">
           {failed && (
             <div className="muted sessions-empty">{t("sessions.loadFailed")}</div>
           )}
-          {!failed && sorted.length === 0 && (
-            <div className="muted sessions-empty">{t("sessions.empty")}</div>
+
+          {/* AUTO 自动存档槽：置顶于网格上方、独立于分页，只读不写 */}
+          {auto && (
+            <div
+              className={`slot-card slot-auto${
+                mode === "load" && !busy ? " slot-clickable" : ""
+              }`}
+              onClick={() => {
+                if (mode === "load" && !busy) void load(auto);
+              }}
+            >
+              <span className="slot-badge">{t("sessions.autoBadge")}</span>
+              {cardBody(auto, "")}
+            </div>
           )}
-          {sorted.map((s) => (
-            <div key={s.id} className={`slot${s.auto ? " slot-auto" : ""}`}>
-              <div className="slot-main">
-                {renaming === s.id ? (
-                  <div className="slot-rename">
-                    <input
-                      autoFocus
-                      value={renameDraft}
-                      onChange={(e) => setRenameDraft(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                          void commitRename(s);
-                        }
-                        if (e.key === "Escape") setRenaming(null);
-                      }}
-                    />
-                    <button
-                      className="ghost small"
-                      onClick={() => void commitRename(s)}
-                    >
-                      {t("common.save")}
-                    </button>
-                    <button
-                      className="ghost small"
-                      onClick={() => setRenaming(null)}
-                    >
-                      {t("common.cancel")}
-                    </button>
-                  </div>
-                ) : (
-                  <div className="slot-title">
-                    {s.auto && (
-                      <span className="slot-badge">{t("sessions.auto")}</span>
-                    )}
-                    {s.title}
-                  </div>
-                )}
-                <div className="slot-meta muted">{formatTime(s.updatedAt)}</div>
-                <div className="slot-preview">{s.preview || "…"}</div>
-              </div>
-              <div className="slot-ops">
-                <button
-                  className="ghost small"
-                  disabled={busy}
-                  onClick={() => void load(s)}
+
+          <div className="sessions-grid">
+            {cells.map((c) =>
+              c.save ? (
+                <div
+                  key={c.slot}
+                  className={`slot-card slot-filled${
+                    !busy ? " slot-clickable" : ""
+                  }`}
+                  onClick={() => openCell(c)}
                 >
-                  {t("sessions.load")}
-                </button>
-                {!s.auto && (
-                  <>
+                  {cardBody(c.save, slotNo(c.slot))}
+                  {mode === "load" && (
                     <button
-                      className="ghost small"
+                      className="ghost small danger slot-del"
                       disabled={busy}
-                      onClick={() => void overwrite(s)}
-                    >
-                      {t("sessions.overwrite")}
-                    </button>
-                    <button
-                      className="ghost small"
-                      disabled={busy}
-                      onClick={() => {
-                        setRenaming(s.id);
-                        setRenameDraft(s.title);
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (c.save) void remove(c.save);
                       }}
-                    >
-                      {t("sessions.rename")}
-                    </button>
-                    <button
-                      className="ghost small danger"
-                      disabled={busy}
-                      onClick={() => void remove(s)}
                     >
                       {t("common.del")}
                     </button>
-                  </>
-                )}
-              </div>
-            </div>
-          ))}
+                  )}
+                </div>
+              ) : (
+                <div
+                  key={c.slot}
+                  className={`slot-card slot-empty${
+                    mode === "save" && !busy ? " slot-clickable" : ""
+                  }`}
+                  onClick={() => openCell(c)}
+                >
+                  <div className="slot-card-top">
+                    <span className="slot-no">{slotNo(c.slot)}</span>
+                  </div>
+                  <div className="slot-empty-hint muted">
+                    {t("sessions.emptySlot")}
+                  </div>
+                </div>
+              ),
+            )}
+          </div>
+
+          <footer className="sessions-pager">
+            <button
+              className="ghost small"
+              disabled={page === 0}
+              onClick={() => setPageIdx(page - 1)}
+            >
+              ‹
+            </button>
+            <span className="muted">
+              {t("sessions.pageOf", {
+                cur: String(page + 1),
+                total: String(pages),
+              })}
+            </span>
+            <button
+              className="ghost small"
+              disabled={page >= pages - 1 || page >= MAX_PAGES - 1}
+              onClick={() => setPageIdx(page + 1)}
+            >
+              ›
+            </button>
+          </footer>
         </div>
       </div>
     </div>
