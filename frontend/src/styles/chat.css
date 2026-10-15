@@ -73,11 +73,11 @@
   }
 }
 
+/* 错误 toast：左上角状态条正下方，3s 自消。 */
 .chat-error {
   position: absolute;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 58px;
+  left: 20px;
   max-width: min(560px, 90vw);
   padding: 8px 16px;
   border-radius: var(--r-md);

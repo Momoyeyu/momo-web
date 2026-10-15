@@ -57,3 +57,10 @@ export class SentenceSplitter {
     return s ? s : null;
   }
 }
+
+/** 末句提取：整段过句切器，取最后一句（含未断句尾部；读档/回退字幕用）。 */
+export function lastSentence(text: string): string {
+  const sp = new SentenceSplitter();
+  const parts = sp.push(text);
+  return sp.flush() ?? parts[parts.length - 1] ?? "";
+}

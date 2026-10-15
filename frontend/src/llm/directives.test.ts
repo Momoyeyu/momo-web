@@ -47,7 +47,7 @@ describe("DirectiveParser 指令", () => {
     ).toEqual([exp("a"), motion("Idle/0"), text(" 唉")]);
   });
 
-  it("指令值不校验清单：未知资源照常产出事件（由 stage 丢弃）", () => {
+  it("指令值不校验清单：未知资源照常产出事件（清单过滤在 turn 层）", () => {
     const p = new DirectiveParser();
     expect(p.push("<exp>no_such</exp>好")).toEqual([
       exp("no_such"),

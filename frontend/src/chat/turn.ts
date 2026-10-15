@@ -9,7 +9,7 @@ import { TtsPlayer } from "../audio/player";
 import { getStage } from "../live2d/stage";
 import type { Live2DStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
-import { getSettings, newId, subscribe } from "../lib/store";
+import { getAvatarId, getAvatars, getSettings, newId, subscribe } from "../lib/store";
 import type {
   ChatMessage,
   ChatStatus,
@@ -20,8 +20,8 @@ import { DirectiveParser } from "../llm/directives";
 import type { DirectiveEvent } from "../llm/directives";
 import { streamSpeech } from "../services/ttsClient";
 import { chat, interrupt as sendInterrupt } from "../services/chatClient";
-import { SentenceSplitter } from "./sentences";
-import { dueDirs } from "./dirs";
+import { SentenceSplitter, lastSentence } from "./sentences";
+import { dueDirs, dirAllowed } from "./dirs";
 import type { PendingDir } from "./dirs";
 import { charsPerSec, dwellMs, sentencePauseMs } from "./pacing";
 
@@ -95,8 +95,8 @@ interface Turn {
   tail: string;
   /** 解析到但未成句的指令：offset = 到达时 pending 长度；成句时挂到该句。 */
   pendingDirs: PendingDir[];
-  /** 播放 tick（setInterval id）。 */
-  timer: number;
+  /** 播放 tick（setInterval id；构造期占位 0）。 */
+  timer: ReturnType<typeof setInterval> | number;
 }
 
 const INTERRUPT_DEBOUNCE_MS = 300;
@@ -104,13 +104,6 @@ const DISPLAY_TICK_MS = 40;
 
 function toError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e));
-}
-
-/** 末句提取：整段过句切器，取最后一句（读档字幕用）。 */
-function lastSentence(text: string): string {
-  const sp = new SentenceSplitter();
-  const parts = sp.push(text);
-  return sp.flush() ?? parts[parts.length - 1] ?? "";
 }
 
 export class ChatEngine {
@@ -130,6 +123,9 @@ export class ChatEngine {
   private micIntended = false;
 
   private lastInterruptAt = 0;
+  /** 发送串行链：打断回传完成前不放行新回合请求（G2——两个 POST 并发无序时，
+   *  backend 可能先收新消息再收截断，把新回合落账作废）。 */
+  private sendQueue: Promise<void> = Promise.resolve();
   private disposed = false;
   private voiceMuted = false;
   private unsubVolume: (() => void) | null = null;
@@ -233,13 +229,24 @@ export class ChatEngine {
     this.events.onDisplay(this.lastDisplay);
   }
 
-  /** 发送一条用户文本并跑一回合（thinking→speaking→idle）。 */
+  /** 发送一条用户文本并跑一回合（thinking→speaking→idle）。
+   *  走串行队列：在途回合先等打断回传落地，再发新回合请求。 */
   sendText(text: string): void {
     if (this.disposed) return;
     const trimmed = text.trim();
     if (!trimmed) return;
-    // 新输入隐式打断在途回合（绕过防抖，保证打断一定生效）。
-    if (this.phase !== "idle") this.interruptNow(true);
+    // catch 保底：单次发送异常不毒化队列（否则后续发送全部静默丢失）。
+    this.sendQueue = this.sendQueue.then(
+      () => this.doSend(trimmed).catch(() => {}),
+    );
+  }
+
+  private async doSend(trimmed: string): Promise<void> {
+    if (this.disposed) return;
+    // 新输入隐式打断在途回合（绕过防抖，保证打断一定生效）；
+    // await 回传完成：backend 先修正尾对再收新消息，保证消息不乱序。
+    if (this.phase !== "idle") await this.interruptNow(true);
+    if (this.disposed) return;
 
     const cfg = getSettings();
     if (!cfg.llm.url) {
@@ -279,7 +286,7 @@ export class ChatEngine {
     };
     this.turn = turn;
     this.lastDisplay = "";
-    turn.timer = window.setInterval(() => this.displayTick(turn), DISPLAY_TICK_MS);
+    turn.timer = setInterval(() => this.displayTick(turn), DISPLAY_TICK_MS);
     this.events.onAssistantStart(turn.id);
     this.setPhase("thinking");
     void this.runTurn(turn, cfg, trimmed);
@@ -290,6 +297,11 @@ export class ChatEngine {
     if (this.disposed || this.micOn || this.micStarting) return;
     this.micIntended = true;
     const cfg = getSettings();
+    if (!cfg.general.voiceInput) {
+      // 语音输入总开关关着：清掉意向静默返回（按钮侧已置灰，这是兜底门）。
+      this.micIntended = false;
+      return;
+    }
     if (!cfg.asr.url) {
       this.events.onError(new ServiceError("asr", "unconfigured"));
       return;
@@ -338,19 +350,27 @@ export class ChatEngine {
   suspendMic(): void {
     if (this.micSuspended) return;
     this.micSuspended = true;
-    if (this.micOn || this.micStarting) this.stopListening();
+    // stopListening 会无条件清意向，先记下挂起前是否开着再停。
+    const intended = this.micOn || this.micStarting || this.micIntended;
+    this.stopListening();
+    this.micIntended = intended;
   }
 
-  /** 回到 chat 页：挂起前麦是开着的 → 恢复监听。幂等。 */
+  /** 回到 chat 页：挂起前麦是开着的 → 恢复监听。幂等。
+   *  前置校验语音输入开关与 ASR 配置——挂起期间可能在设置页被关掉。 */
   resumeMic(): void {
     if (!this.micSuspended) return;
     this.micSuspended = false;
-    if (this.micIntended) void this.startListening();
+    const cfg = getSettings();
+    if (this.micIntended && cfg.general.voiceInput && cfg.asr.url.trim()) {
+      void this.startListening();
+    }
   }
 
-  /** 关麦（释放 ASR 连接与采集）。 */
+  /** 关麦（释放 ASR 连接与采集）。无条件清意向——
+   *  挂起态由 suspendMic 自己先存意向再调本函数。 */
   stopListening(): void {
-    if (!this.micSuspended) this.micIntended = false;
+    this.micIntended = false;
     this.micOn = false;
     const mic = this.mic;
     const asr = this.asr;
@@ -361,10 +381,11 @@ export class ChatEngine {
     this.emitStatus();
   }
 
-  /** 打断：停播放、abort 在途 LLM/TTS、当前 assistant 消息按已产出部分落账，
+  /** 打断：停播放、abort 在途 LLM/TTS、当前 assistant 消息按已展示部分落账，
    *  并回传 backend 截断持久化（两侧一致）。persist=false 用于读档等
    *  无需回传的场景（live 即将被整体覆盖）。
-   *  300ms 防抖——重复触发（SpeechStarted + 手动停止）忽略。 */
+   *  300ms 防抖——重复触发（SpeechStarted + 手动停止）忽略。
+   *  回传 promise 挂进发送队列：紧随其后的 sendText 等它落地再发新回合。 */
   interrupt(): void {
     if (!this.turn) {
       this.safe(() => this.player.stop());
@@ -373,7 +394,8 @@ export class ChatEngine {
     const now = Date.now();
     if (now - this.lastInterruptAt < INTERRUPT_DEBOUNCE_MS) return;
     this.lastInterruptAt = now;
-    this.interruptNow(true);
+    const done = this.interruptNow(true);
+    this.sendQueue = this.sendQueue.then(() => done);
   }
 
   dispose(): void {
@@ -400,27 +422,33 @@ export class ChatEngine {
     return parts.join("");
   }
 
-  private interruptNow(persist: boolean): void {
+  /**
+   * 打断执行体：本地立即停（播放/生成/展示），返回回传完成的 Promise
+   * 供调用方排序「打断 → 新回合」。persist=false 时立即 resolve。
+   */
+  private interruptNow(persist: boolean): Promise<void> {
     const turn = this.turn;
     if (!turn) {
       this.safe(() => this.player.stop());
-      return;
+      return Promise.resolve();
     }
     turn.finished = true;
     turn.abort.abort();
-    window.clearInterval(turn.timer);
+    clearInterval(turn.timer);
     turn.inflight = 0;
     this.safe(() => this.player.stop());
     this.turn = null;
-    // 后端截断：把用户实际看到的部分回传，backend 修正 live 尾对（幂等）。
-    if (persist) {
-      sendInterrupt(turn.userText, this.seenText(turn));
-    }
-    if (turn.text.trim()) {
+    // 落账以「用户实际看到的文本」为准：backlog / 存档 / 下回合上下文
+    // 与回传 backend 的截断值一致（assistant 可空，空则本地也不落账）。
+    const seen = this.seenText(turn);
+    const done = persist
+      ? sendInterrupt(turn.userText, seen)
+      : Promise.resolve();
+    if (seen) {
       const msg: ChatMessage = {
         id: turn.id,
         role: "assistant",
-        text: turn.text,
+        text: seen,
         at: new Date().toISOString(),
       };
       this.history.push(msg);
@@ -429,11 +457,17 @@ export class ChatEngine {
     // 表情是回合内状态：回合中止/结束统一复位。
     this.tryStage((st) => st.resetExpression());
     this.setPhase("idle");
+    return done;
   }
 
   private async runTurn(turn: Turn, cfg: Settings, userText: string): Promise<void> {
     const parser = new DirectiveParser();
     const splitter = new SentenceSplitter();
+    // 解析层清单校验（action.md）：指令值不在当前形象资源清单中 → 静默丢弃。
+    // 回合开始取一次快照，与注入提示词的清单同源；清单缺失时不拦（stage 兜底）。
+    const resources = getAvatars().find(
+      (a) => a.id === getAvatarId(),
+    )?.resources;
 
     // 指令后的首个文本片常带前导空格/换行，剥掉避免字幕顶格留白。
     let afterTag = false;
@@ -447,20 +481,16 @@ export class ChatEngine {
           turn.text += delta;
           for (const s of splitter.push(delta)) this.pushSentence(turn, cfg, s);
           turn.tail = splitter.pending;
-        } else if (e.kind === "exp") {
-          afterTag = true;
-          // 不立即驱动舞台：记录其在未断句尾部的偏移，展示游标越过才触发。
-          turn.pendingDirs.push({
-            kind: "exp",
-            name: e.name,
-            offset: splitter.pending.length,
-          });
         } else {
           afterTag = true;
+          const name = e.kind === "exp" ? e.name : e.id;
+          if (!dirAllowed(e.kind, name, resources)) continue; // 清单外静默丢弃
+          // 不立即驱动舞台：记录其在未断句尾部的偏移，展示游标越过才触发。
+          // buf 成句时会 trim()，偏移按 trim 后文本折算——剥掉前导空白。
           turn.pendingDirs.push({
-            kind: "motion",
-            name: e.id,
-            offset: splitter.pending.length,
+            kind: e.kind,
+            name,
+            offset: splitter.pending.trimStart().length,
           });
         }
       }
@@ -685,7 +715,7 @@ export class ChatEngine {
 
   private completeTurn(turn: Turn): void {
     turn.finished = true;
-    window.clearInterval(turn.timer);
+    clearInterval(turn.timer);
     this.turn = null;
     if (turn.text.trim()) {
       const msg: ChatMessage = {

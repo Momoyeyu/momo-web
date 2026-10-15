@@ -11,6 +11,7 @@ import {
   transcriptVersion,
 } from "../chat/engine";
 import type { EngineHandlers } from "../chat/engine";
+import { lastSentence } from "../chat/sentences";
 import type { ChatStatus } from "../lib/types";
 import { navigate } from "../router";
 import { useT } from "../i18n";
@@ -124,7 +125,7 @@ export default function Chat() {
     .find((m) => m.role === "assistant");
   const subtitle = streamActive
     ? streamText || "…"
-    : streamText || (lastAssistant?.text ?? "");
+    : streamText || (lastAssistant ? lastSentence(lastAssistant.text) : "");
   const busy = status === "thinking" || status === "speaking";
 
   return (
@@ -170,7 +171,7 @@ export default function Chat() {
                     : t("chat.micTitleOff")
               }
             >
-              {micOn ? t("chat.micOn") : t("chat.mic")}
+              🎤
             </button>
             {busy && (
               <button

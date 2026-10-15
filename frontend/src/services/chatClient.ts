@@ -12,18 +12,23 @@ import { ServiceError } from "../lib/errors";
 /**
  * 打断回传：本回合用户输入 + 用户实际看到的 assistant 文本（可空）。
  * backend 据此修正 live 尾对（截断/补写），保证两侧落账一致。
- * 尽力发送、失败静默（打断本身已本地生效，backend 侧幂等调和）。
+ * 返回在回传完成（响应体收完）后兑现的 Promise——调用方可 await 它来
+ * 给「打断 → 新回合」排序；失败静默（打断本身已本地生效，backend 幂等调和）。
  */
-export function interrupt(user: string, assistant: string): void {
+export function interrupt(user: string, assistant: string): Promise<void> {
   try {
-    void fetch("/api/chat/interrupt", {
+    return fetch("/api/chat/interrupt", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ user, assistant }),
       keepalive: true,
-    }).catch(() => {});
+    }).then(
+      (r) => r.arrayBuffer().then(() => undefined),
+      () => undefined,
+    );
   } catch {
     // 同步异常（如已 unload）忽略
+    return Promise.resolve();
   }
 }
 
