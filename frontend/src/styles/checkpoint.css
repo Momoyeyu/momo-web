@@ -41,32 +41,9 @@
   color: var(--accent);
 }
 
-/* 模式切换：存档 | 读档 分段钮 */
-.checkpoint-mode {
-  display: flex;
-  gap: 4px;
-  margin-left: auto;
-  padding: 3px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-}
-
-.checkpoint-mode .seg {
-  padding: 0.28em 1em;
-  border: none;
-  border-radius: var(--r-xs);
-  background: transparent;
-  font-size: 12px;
-  letter-spacing: 0.08em;
-  color: var(--text-dim);
-}
-
-.checkpoint-mode .seg-on {
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-
+/* 头部右端返回键（模式由入口决定，页内无切换控件）。 */
 .checkpoint-head > .ghost {
+  margin-left: auto;
   padding: 0.35em 1.1em;
   font-size: 13px;
 }
@@ -183,11 +160,11 @@
   letter-spacing: 0.1em;
 }
 
-/* 读档模式卡片上的删除钮（右上角） */
+/* 已占槽卡片删除钮（右下角，两种模式同位） */
 .slot-del {
   position: absolute;
-  top: 6px;
   right: 6px;
+  bottom: 6px;
   padding: 0 7px;
   font-size: 11px;
   opacity: 0;

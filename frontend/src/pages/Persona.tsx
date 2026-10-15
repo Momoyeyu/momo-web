@@ -1,13 +1,15 @@
 // 人格面板（设置页 tab）：人设卡编辑。受控组件——
 // 每次修改直接写 store 落盘（设置页即改即生效）。
 // 布局按 prototype/setting：「基本信息」整行面板内左右两列，
-// 「偏好」独立整行面板。
+// 「偏好」独立整行面板（卡片式：正文单行截断、点击出详情弹窗，
+// 编辑/删除在卡片上操作）。
 
 import { useState } from "react";
 import type { PersonaCard } from "../lib/types";
 import { DEFAULT_PERSONA } from "../lib/store";
 import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
 import Pager from "../ui/Pager";
+import DetailModal from "../components/DetailModal";
 import { useT } from "../i18n";
 import "../styles/persona.css";
 
@@ -24,6 +26,10 @@ export default function PersonaPanel({
   // 偏好列表：检索 + 分页（过滤后命中集分页，索引映射回原列表）。
   const [prefQuery, setPrefQuery] = useState("");
   const [prefPage, setPrefPage] = useState(0);
+  // 卡片内联编辑（原列表索引）与详情弹窗内容。
+  const [editingPref, setEditingPref] = useState<number | null>(null);
+  const [prefDraft, setPrefDraft] = useState("");
+  const [detail, setDetail] = useState<string | null>(null);
   const prefHits = value.preferences
     .map((text, i) => ({ text, i }))
     .filter((x) =>
@@ -34,6 +40,40 @@ export default function PersonaPanel({
     pref.page * LIST_PAGE_SIZE,
     (pref.page + 1) * LIST_PAGE_SIZE,
   );
+
+  /** 「+ 添加」：追加空条目并立即进入编辑态（清检索、跳末页保证可见）。 */
+  const addPref = (): void => {
+    const next = [...value.preferences, ""];
+    patch({ preferences: next });
+    setPrefQuery("");
+    setPrefPage(Math.max(0, Math.ceil(next.length / LIST_PAGE_SIZE) - 1));
+    setEditingPref(next.length - 1);
+    setPrefDraft("");
+  };
+
+  /** 保存卡片编辑：空内容视为放弃该条（直接移除）。 */
+  const commitPref = (): void => {
+    const i = editingPref;
+    const text = prefDraft.trim();
+    setEditingPref(null);
+    setPrefDraft("");
+    if (i === null) return;
+    patch({
+      preferences: text
+        ? value.preferences.map((x, j) => (j === i ? text : x))
+        : value.preferences.filter((_, j) => j !== i),
+    });
+  };
+
+  /** 取消编辑：新增的空白条目一并撤掉。 */
+  const cancelPref = (orig: string): void => {
+    const i = editingPref;
+    setEditingPref(null);
+    setPrefDraft("");
+    if (i !== null && orig === "") {
+      patch({ preferences: value.preferences.filter((_, j) => j !== i) });
+    }
+  };
 
   return (
     <div className="persona-tab">
@@ -92,28 +132,70 @@ export default function PersonaPanel({
         />
         <div className="field col-grow">
           {prefSlice.map(({ text: p, i }) => (
-            <div className="pin-row" key={i}>
-              <input
-                value={p}
-                placeholder={t("persona.preferencesPh")}
-                onChange={(e) =>
-                  patch({
-                    preferences: value.preferences.map((x, j) =>
-                      j === i ? e.target.value : x,
-                    ),
-                  })
-                }
-              />
-              <button
-                className="ghost small"
-                onClick={() =>
-                  patch({
-                    preferences: value.preferences.filter((_, j) => j !== i),
-                  })
-                }
-              >
-                {t("common.del")}
-              </button>
+            <div
+              className={`mem-item${editingPref === i ? "" : " mem-open"}`}
+              key={i}
+              onClick={() => {
+                if (editingPref !== i) setDetail(p);
+              }}
+            >
+              {editingPref === i ? (
+                <div className="mem-edit">
+                  <input
+                    autoFocus
+                    value={prefDraft}
+                    placeholder={t("persona.preferencesPh")}
+                    onChange={(e) => setPrefDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                        commitPref();
+                      } else if (e.key === "Escape") {
+                        cancelPref(p);
+                      }
+                    }}
+                  />
+                  <div className="row">
+                    <button className="small" onClick={() => commitPref()}>
+                      {t("common.save")}
+                    </button>
+                    <button
+                      className="ghost small"
+                      onClick={() => cancelPref(p)}
+                    >
+                      {t("common.cancel")}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mem-content">{p}</div>
+                  <div className="mem-ops">
+                    <button
+                      className="ghost small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingPref(i);
+                        setPrefDraft(p);
+                      }}
+                    >
+                      {t("common.edit")}
+                    </button>
+                    <button
+                      className="ghost small danger"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        patch({
+                          preferences: value.preferences.filter(
+                            (_, j) => j !== i,
+                          ),
+                        });
+                      }}
+                    >
+                      {t("common.del")}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           ))}
           {prefHits.length === 0 && (
@@ -121,10 +203,7 @@ export default function PersonaPanel({
           )}
         </div>
         <div className="list-foot">
-          <button
-            className="ghost small"
-            onClick={() => patch({ preferences: [...value.preferences, ""] })}
-          >
+          <button className="ghost small" onClick={addPref}>
             {t("persona.prefAdd")}
           </button>
           <Pager
@@ -134,6 +213,9 @@ export default function PersonaPanel({
           />
         </div>
       </section>
+      {detail !== null && (
+        <DetailModal text={detail} onClose={() => setDetail(null)} />
+      )}
     </div>
   );
 }
