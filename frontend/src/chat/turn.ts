@@ -16,6 +16,8 @@ import type { DirectiveEvent } from "../llm/directives";
 import { streamSpeech } from "../services/ttsClient";
 import { chat } from "../services/chatClient";
 import { SentenceSplitter } from "./sentences";
+import { dueDirs } from "./dirs";
+import type { PendingDir } from "./dirs";
 import { charsPerSec, dwellMs, sentencePauseMs } from "./pacing";
 
 interface ChatEngineEvents {
@@ -40,10 +42,15 @@ interface TtsItem {
   done: boolean;
 }
 
-/** 展示队列项：一句话 + 它的 TTS（无语音/静音时 tts=null，走驻留计时）。 */
+/** 展示队列项：一句话 + 它的 TTS（无语音/静音时 tts=null，走驻留计时）
+ *  + 句内待触发指令（展示游标越过其偏移才派发）。 */
 interface SentItem {
   text: string;
   tts: TtsItem | null;
+  /** 本句附着的表情/动作指令，按到达顺序。 */
+  dirs: PendingDir[];
+  /** 已触发游标：dirs[0..dirIdx) 已派发。 */
+  dirIdx: number;
 }
 
 /** 逐字播放状态机：句为最小播放单元。 */
@@ -81,6 +88,8 @@ interface Turn {
   disp: DisplayState;
   /** splitter.pending 快照：生产中未断句的尾部（逐字上屏的另一半）。 */
   tail: string;
+  /** 解析到但未成句的指令：offset = 到达时 pending 长度；成句时挂到该句。 */
+  pendingDirs: PendingDir[];
   /** 播放 tick（setInterval id）。 */
   timer: number;
 }
@@ -225,6 +234,7 @@ export class ChatEngine {
       inflight: 0,
       disp: { idx: 0, reveal: 0, doneAt: 0, pausedUntil: 0, emitted: "" },
       tail: "",
+      pendingDirs: [],
       timer: 0,
     };
     this.turn = turn;
@@ -364,10 +374,19 @@ export class ChatEngine {
           turn.tail = splitter.pending;
         } else if (e.kind === "exp") {
           afterTag = true;
-          this.tryStage((st) => st.setExpression(e.name));
+          // 不立即驱动舞台：记录其在未断句尾部的偏移，展示游标越过才触发。
+          turn.pendingDirs.push({
+            kind: "exp",
+            name: e.name,
+            offset: splitter.pending.length,
+          });
         } else {
           afterTag = true;
-          this.tryStage((st) => st.playMotion(e.id));
+          turn.pendingDirs.push({
+            kind: "motion",
+            name: e.id,
+            offset: splitter.pending.length,
+          });
         }
       }
     };
@@ -393,6 +412,18 @@ export class ChatEngine {
     const tail = splitter.flush();
     if (tail && tail.trim()) this.pushSentence(turn, cfg, tail);
     turn.tail = "";
+    // 末句之后的尾随指令：挂到队列末句（offset=句长，句末触发）；队列空则立即派发。
+    if (turn.pendingDirs.length) {
+      const last = turn.sentences[turn.sentences.length - 1];
+      if (last) {
+        for (const d of turn.pendingDirs) {
+          last.dirs.push({ ...d, offset: last.text.length });
+        }
+      } else {
+        for (const d of turn.pendingDirs) this.fireDir(d);
+      }
+      turn.pendingDirs = [];
+    }
     turn.llmDone = true;
     this.maybeFinish(turn);
   }
@@ -400,7 +431,14 @@ export class ChatEngine {
   /** 一句成句 → 入展示队列（tts=null 时走驻留），并立刻发 streamSpeech 并发合成。 */
   private pushSentence(turn: Turn, cfg: Settings, sentence: string): void {
     if (turn.finished) return;
-    const item: SentItem = { text: sentence, tts: null };
+    // 成句时收走累积的待触发指令：offset 即其在本句内的字符位置。
+    const item: SentItem = {
+      text: sentence,
+      tts: null,
+      dirs: turn.pendingDirs,
+      dirIdx: 0,
+    };
+    turn.pendingDirs = [];
     turn.sentences.push(item);
     if (this.voiceMuted || turn.audioAbort.signal.aborted) return;
     if (!cfg.tts.url) {
@@ -515,6 +553,13 @@ export class ChatEngine {
     }
     if (!complete) return;
 
+    // 展示游标越过指令位置才派发（offset 越界收敛到句尾；句中途可切换）。
+    const due = dueDirs(active.dirs, active.dirIdx, turn.disp.reveal, target);
+    while (active.dirIdx < due) {
+      this.fireDir(active.dirs[active.dirIdx]);
+      active.dirIdx += 1;
+    }
+
     // 完整句的播完判定：TTS 开 = 音频播完；TTS 关/本句无音频 = 上屏完 + 按句长驻留。
     const tts = active.tts;
     const hasAudio = !!tts && !(tts.done && tts.chunks.length === 0);
@@ -539,6 +584,11 @@ export class ChatEngine {
       ended = true;
     }
     if (ended) {
+      // 兜底：句结束时仍未触发的指令全部派发。
+      while (active.dirIdx < active.dirs.length) {
+        this.fireDir(active.dirs[active.dirIdx]);
+        active.dirIdx += 1;
+      }
       turn.disp.pausedUntil = now + sentencePauseMs(g.sentenceSpeed);
       turn.disp.idx += 1;
       turn.disp.reveal = 0;
@@ -602,6 +652,12 @@ export class ChatEngine {
       this.reported = s;
       this.events.onStatus(s);
     }
+  }
+
+  /** 派发一条表情/动作指令到舞台（未就绪由 tryStage 静默降级）。 */
+  private fireDir(d: PendingDir): void {
+    if (d.kind === "exp") this.tryStage((st) => st.setExpression(d.name));
+    else this.tryStage((st) => st.playMotion(d.name));
   }
 
   private tryStage(fn: (s: Live2DStage) => void): void {
