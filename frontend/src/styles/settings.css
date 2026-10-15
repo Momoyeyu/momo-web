@@ -117,8 +117,9 @@
   gap: 14px;
 }
 
+/* 列内标签宽度按最长 i18n 文本（ja 约 12 全角字）放宽。 */
 .settings-col .opt-label {
-  width: 108px;
+  width: 168px;
   font-size: 13px;
 }
 
@@ -201,6 +202,9 @@
 .avatar-name {
   font-size: 14px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .badge-active {
@@ -300,6 +304,10 @@
 .res-name {
   flex: none;
   min-width: 140px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-family: monospace;
   font-size: 12px;
   color: var(--text-dim);
@@ -333,11 +341,15 @@ button.ghost.danger:hover {
   font-size: 14px;
   color: var(--text-dim);
   letter-spacing: 0.06em;
+  white-space: nowrap;
 }
 
 .opt-extra {
-  margin-left: 10px;
+  flex: none;
+  margin-left: 6px;
   color: var(--accent-strong);
+  font-size: 12px;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 

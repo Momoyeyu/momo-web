@@ -71,7 +71,7 @@ function OptRow({
   children,
 }: {
   label: string;
-  /** 标签右侧小字（如滑块当前值）。 */
+  /** 控件末尾小字（如滑块当前值/未配置提示）。 */
   extra?: React.ReactNode;
   /** 必填项：标签后加 * 标记。 */
   required?: boolean;
@@ -82,9 +82,11 @@ function OptRow({
       <span className="opt-label">
         {label}
         {required && <span className="req">*</span>}
-        {extra && <span className="opt-extra">{extra}</span>}
       </span>
-      <div className="opt-ctl">{children}</div>
+      <div className="opt-ctl">
+        {children}
+        {extra && <span className="opt-extra">{extra}</span>}
+      </div>
     </div>
   );
 }
