@@ -29,7 +29,7 @@ export default function Title() {
       <nav className="title-menu">
         {MENU.map((m, i) => (
           <button
-            key={m.route}
+            key={m.labelKey}
             className="menu-item"
             style={{ animationDelay: `${0.12 + i * 0.08}s` }}
             onClick={() => navigate(m.route)}
