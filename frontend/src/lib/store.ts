@@ -5,6 +5,7 @@
 import type {
   AvatarMeta,
   AvatarResources,
+  McpExtension,
   Memory,
   PersistedState,
   PersonaCard,
@@ -73,6 +74,7 @@ const DEFAULT_SETTINGS: Settings = {
   asr: { url: "ws://127.0.0.1:7810/v1/listen", key: "" },
   tts: { url: "http://127.0.0.1:7811", key: "", voice: "", lang: "zh" },
   embedding: { url: "http://10.106.130.222:11434", model: "bge-m3" },
+  extensions: [],
 };
 
 export const DEFAULT_PERSONA: PersonaCard = {
@@ -238,6 +240,21 @@ function migrateAvatars(raw: unknown): AvatarMeta[] {
   return norm;
 }
 
+/** extensions 归一化：逐条补默认字段，非对象条目丢弃；enabled 缺省视为开。 */
+function migrateExtensions(raw: unknown): McpExtension[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
+    .map((o) => ({
+      name: typeof o.name === "string" ? o.name : "",
+      transport: o.transport === "stdio" ? ("stdio" as const) : ("http" as const),
+      command: typeof o.command === "string" ? o.command : "",
+      endpoint: typeof o.endpoint === "string" ? o.endpoint : "",
+      apiKey: typeof o.apiKey === "string" ? o.apiKey : "",
+      enabled: o.enabled !== false,
+    }));
+}
+
 /** 记下 schema 外顶层字段，PUT 时原样带回。 */
 function capturePassthrough(raw: Record<string, unknown>): void {
   for (const k of Object.keys(raw)) {
@@ -261,6 +278,7 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
       asr: { ...d.settings.asr, ...s?.asr },
       tts: { ...d.settings.tts, ...s?.tts },
       embedding: { ...d.settings.embedding, ...s?.embedding },
+      extensions: migrateExtensions(s?.extensions),
     },
     persona: migratePersona(parsed.persona, d.persona),
     pins: migratePins(parsed as Record<string, unknown>, d.pins),

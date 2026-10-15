@@ -80,6 +80,7 @@ export const zh = {
       embedding: "Embedding · 语义检索",
       avatar: "形象 · Live2D",
       dialog: "对话框设置",
+      extensions: "拓展 · MCP",
     },
     langLabel: "界面语言",
     chatLang: "对话语言",
@@ -116,6 +117,22 @@ export const zh = {
     hideKey: "隐藏",
     test: "测试连接",
     testNeedUrl: "先填写地址",
+    extHint:
+      "登记外部 MCP server 后，它的工具会从下一轮对话起对 momo 可用；连不上的 server 不会注入工具。",
+    extAdd: "＋ 添加拓展",
+    extUnnamed: "（未命名）",
+    extName: "名称",
+    extNamePh: "如 tavily",
+    extTransport: "连接方式",
+    extTransports: {
+      http: "http · 远程端点",
+      stdio: "stdio · 本地命令",
+    },
+    extCommand: "命令",
+    extCommandPh: "npx -y tavily-mcp@latest",
+    extEndpoint: "端点 URL",
+    extEndpointPh: "https://…/mcp",
+    extEnabled: "启用",
 
   },
   persona: {

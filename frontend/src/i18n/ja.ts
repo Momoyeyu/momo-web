@@ -80,6 +80,7 @@ export const ja: Dict = {
       embedding: "Embedding · 意味検索",
       avatar: "アバター · Live2D",
       dialog: "テキストウィンドウ設定",
+      extensions: "拡張 · MCP",
     },
     langLabel: "表示言語",
     chatLang: "会話言語",
@@ -116,6 +117,22 @@ export const ja: Dict = {
     hideKey: "隠す",
     test: "接続テスト",
     testNeedUrl: "先にURLを入力",
+    extHint:
+      "外部 MCP サーバーを登録すると、そのツールは次のターンから momo が使えます。接続できないサーバーは注入されません。",
+    extAdd: "＋ 拡張を追加",
+    extUnnamed: "（無名）",
+    extName: "名前",
+    extNamePh: "例：tavily",
+    extTransport: "接続方式",
+    extTransports: {
+      http: "http · リモートエンドポイント",
+      stdio: "stdio · ローカルコマンド",
+    },
+    extCommand: "コマンド",
+    extCommandPh: "npx -y tavily-mcp@latest",
+    extEndpoint: "エンドポイント URL",
+    extEndpointPh: "https://…/mcp",
+    extEnabled: "有効",
 
   },
   persona: {

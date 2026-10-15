@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterator
 
 from .. import llm, store
-from . import compress
+from . import compress, mcp_ext
 from .prompts import build_system_prompt
 from .tools import TOOLS, run_call
 
@@ -79,46 +79,58 @@ def run_turn(text: str) -> Iterator[dict[str, Any]]:
             messages.append({"role": role, "content": str(h.get("text") or "")})
     messages.append({"role": "user", "content": text})
 
-    content = ""
-    # 本回合末次调用的 token 用量（压缩阈值判定用）
-    usage: dict[str, Any] = {}
-    for _ in range(MAX_ROUNDS):
-        try:
-            msg = llm.chat_completion(
-                llm_cfg, messages, tools=TOOLS, usage_out=usage
-            )
-        except llm.LlmError as e:
-            yield {"t": "error", "message": str(e), "service": "llm"}
+    # 拓展：连接 enabled 的 MCP server（连不上即不注入，失败不拖垮回合），
+    # 工具以 {server}_{tool} 注入；turn 结束统一关闭连接。
+    ext_tools = mcp_ext.ExtTools()
+    try:
+        ext_tools = mcp_ext.hub.open(
+            (state.get("settings") or {}).get("extensions")
+        )
+        # 无可用拓展时 tools 就是静态 TOOLS（行为与现状一致）
+        tools = TOOLS + ext_tools.decls if ext_tools.decls else TOOLS
+
+        content = ""
+        # 本回合末次调用的 token 用量（压缩阈值判定用）
+        usage: dict[str, Any] = {}
+        for _ in range(MAX_ROUNDS):
+            try:
+                msg = llm.chat_completion(
+                    llm_cfg, messages, tools=tools, usage_out=usage
+                )
+            except llm.LlmError as e:
+                yield {"t": "error", "message": str(e), "service": "llm"}
+                return
+
+            tool_calls = msg.get("tool_calls") or []
+            if tool_calls:
+                messages.append(msg)  # assistant（含 tool_calls）原样回传
+                for call in tool_calls:
+                    messages.append(run_call(call, pins, ext_tools))
+                continue
+
+            content = str(msg.get("content") or "")
+            if content.strip():
+                break
+            # 空 content 且无 tool_calls：记一轮，继续重试
+        else:
+            yield {
+                "t": "error",
+                "message": "llm produced no response within 5 rounds",
+                "service": "llm",
+            }
             return
 
-        tool_calls = msg.get("tool_calls") or []
-        if tool_calls:
-            messages.append(msg)  # assistant（含 tool_calls）原样回传
-            for call in tool_calls:
-                messages.append(run_call(call, pins))
-            continue
-
-        content = str(msg.get("content") or "")
-        if content.strip():
-            break
-        # 空 content 且无 tool_calls：记一轮，继续重试
-    else:
-        yield {
-            "t": "error",
-            "message": "llm produced no response within 5 rounds",
-            "service": "llm",
-        }
-        return
-
-    # 回合结束：user/assistant（指令剥离后）追加进 history（cap 100）并落盘，再推流
-    at = datetime.now(timezone.utc).isoformat()
-    store.append_history(
-        [
-            {"role": "user", "text": text, "at": at},
-            {"role": "assistant", "text": _clean_reply(content), "at": at},
-        ]
-    )
-    # 用量达阈值 → 后台压缩最旧段（不阻塞本回合推流）
-    compress.maybe_compress(usage.get("prompt_tokens"))
-    for seg in split_segments(content):
-        yield {"t": "delta", "text": seg}
+        # 回合结束：user/assistant（指令剥离后）追加进 history（cap 100）并落盘，再推流
+        at = datetime.now(timezone.utc).isoformat()
+        store.append_history(
+            [
+                {"role": "user", "text": text, "at": at},
+                {"role": "assistant", "text": _clean_reply(content), "at": at},
+            ]
+        )
+        # 用量达阈值 → 后台压缩最旧段（不阻塞本回合推流）
+        compress.maybe_compress(usage.get("prompt_tokens"))
+        for seg in split_segments(content):
+            yield {"t": "delta", "text": seg}
+    finally:
+        mcp_ext.hub.close()
