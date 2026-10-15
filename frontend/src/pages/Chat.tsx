@@ -186,6 +186,12 @@ export default function Chat() {
           <button className="tb" onClick={() => navigate("backlog")}>
             {t("chat.backlog")}
           </button>
+          <button className="tb" onClick={() => navigate("sessions")}>
+            {t("sessions.save")}
+          </button>
+          <button className="tb" onClick={() => navigate("sessions")}>
+            {t("sessions.load")}
+          </button>
           <button
             className={`tb${muted || !ttsConfigured ? " tb-off" : ""}`}
             onClick={toggleVoice}

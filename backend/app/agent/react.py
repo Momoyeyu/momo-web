@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterator
 
 from .. import llm, store
+from . import compress
 from .prompts import build_system_prompt
 from .tools import TOOLS, run_call
 
@@ -62,6 +63,16 @@ def run_turn(text: str) -> Iterator[dict[str, Any]]:
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": build_system_prompt(state)}
     ]
+    # 压缩摘要存在时单独一条 system 消息承载：context = system + 摘要 + 最近窗口
+    summary = str(state.get("summary") or "").strip()
+    if summary:
+        messages.append(
+            {
+                "role": "system",
+                "content": "以下是本次对话此前部分的摘要，其后的最新消息接在它之后继续：\n"
+                + summary,
+            }
+        )
     for h in (state.get("history") or [])[-HISTORY_WINDOW:]:
         role = h.get("role")
         if role in ("user", "assistant"):
@@ -69,9 +80,13 @@ def run_turn(text: str) -> Iterator[dict[str, Any]]:
     messages.append({"role": "user", "content": text})
 
     content = ""
+    # 本回合末次调用的 token 用量（压缩阈值判定用）
+    usage: dict[str, Any] = {}
     for _ in range(MAX_ROUNDS):
         try:
-            msg = llm.chat_completion(llm_cfg, messages, tools=TOOLS)
+            msg = llm.chat_completion(
+                llm_cfg, messages, tools=TOOLS, usage_out=usage
+            )
         except llm.LlmError as e:
             yield {"t": "error", "message": str(e), "service": "llm"}
             return
@@ -103,5 +118,7 @@ def run_turn(text: str) -> Iterator[dict[str, Any]]:
             {"role": "assistant", "text": _clean_reply(content), "at": at},
         ]
     )
+    # 用量达阈值 → 后台压缩最旧段（不阻塞本回合推流）
+    compress.maybe_compress(usage.get("prompt_tokens"))
     for seg in split_segments(content):
         yield {"t": "delta", "text": seg}

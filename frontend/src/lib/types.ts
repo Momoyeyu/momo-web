@@ -122,6 +122,30 @@ export interface ChatMessage {
 
 export type ChatStatus = "idle" | "listening" | "thinking" | "speaking";
 
+/** 存档里的单条消息（backend history 快照；无前端 id）。 */
+export interface SessionMessage {
+  role: "user" | "assistant";
+  text: string;
+  at: string;
+}
+
+/** 存档槽列表项（GET /api/sessions；preview = 首条消息截断）。 */
+export interface SessionMeta {
+  id: string;
+  title: string;
+  /** 自动存档槽：load 前 backend 自动写入，不占手动槽位。 */
+  auto: boolean;
+  createdAt: string;
+  updatedAt: string;
+  preview: string;
+}
+
+/** 存档全文（GET /api/sessions/{id} 与 load 返回）。 */
+export interface SessionSave extends SessionMeta {
+  summary: string;
+  messages: SessionMessage[];
+}
+
 /** /api/state 持久化载荷（backend state.json ↔ localStorage 缓存共用 schema）。 */
 export interface PersistedState {
   settings: Settings;

@@ -17,7 +17,7 @@ def _tool_call(name: str, args: str = "{}", call_id: str = "call_1"):
 def test_react_tool_then_text(monkeypatch):
     seen_messages = []
 
-    def fake_chat(llm_cfg, messages, tools=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
         seen_messages.append(list(messages))
         assert tools  # tools 声明已传
         if len(seen_messages) == 1:
@@ -50,7 +50,7 @@ def test_react_tool_then_text(monkeypatch):
 
 
 def test_llm_error_yields_error_event(monkeypatch):
-    def fake_chat(llm_cfg, messages, tools=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
         raise llm.LlmError("llm unreachable")
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
@@ -61,7 +61,7 @@ def test_llm_error_yields_error_event(monkeypatch):
 
 
 def test_max_rounds_without_content(monkeypatch):
-    def fake_chat(llm_cfg, messages, tools=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
         return {
             "role": "assistant",
             "content": None,
@@ -79,7 +79,7 @@ def test_tool_memory_ops_via_react(monkeypatch):
     """tool_call 走真实 memory 层：add 成功、delete 未知 id 返回说明文本。"""
     rounds = []
 
-    def fake_chat(llm_cfg, messages, tools=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
         rounds.append(list(messages))
         n = len(rounds)
         if n == 1:
