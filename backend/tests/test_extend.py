@@ -181,6 +181,214 @@ def test_open_unreachable_server_yields_no_tools():
     hub.close()
 
 
+# ---- 连接参数：stdio env 注入 / http headers 透传 ----
+
+
+class _FakeACM:
+    """enter_async_context 兼容的假 async context manager。"""
+
+    def __init__(self, value):
+        self._v = value
+
+    async def __aenter__(self):
+        return self._v
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+class _FakeSession:
+    """ClientSession 替身：initialize/list_tools 返回固定工具。"""
+
+    def __init__(self, read, write):
+        pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def initialize(self):
+        pass
+
+    async def list_tools(self):
+        return SimpleNamespace(tools=[_FakeTool("ping")])
+
+
+def test_stdio_connect_passes_args_and_merged_env(monkeypatch):
+    seen = {}
+
+    def fake_stdio_client(params):
+        seen["params"] = params
+        return _FakeACM((object(), object()))
+
+    monkeypatch.setattr(extend, "stdio_client", fake_stdio_client)
+    monkeypatch.setattr(extend, "ClientSession", _FakeSession)
+    monkeypatch.setenv("MOMO_TEST_HOSTENV", "host")
+
+    tools = hub.open(
+        [
+            {
+                "name": "loc",
+                "transport": "stdio",
+                "command": "uvx",
+                "args": ["mcp-fs"],
+                "env": {"MY_KEY": "k1", "MOMO_TEST_HOSTENV": "override"},
+                "enabled": True,
+            }
+        ]
+    )
+    try:
+        assert [d["function"]["name"] for d in tools.decls] == ["loc_ping"]
+        p = seen["params"]
+        assert p.command == "uvx"
+        assert p.args == ["mcp-fs"]
+        # env = os.environ 合并 ext.env，后者覆盖同名宿主变量
+        assert p.env["MY_KEY"] == "k1"
+        assert p.env["MOMO_TEST_HOSTENV"] == "override"
+        assert "PATH" in p.env or "HOME" in p.env  # os.environ 透传
+    finally:
+        hub.close()
+
+
+def test_stdio_params_split_legacy_command_line():
+    # 旧式整行命令：首 token 作可执行名，其余前置于 args
+    p = extend._stdio_params({"command": "npx -y tavily-mcp", "args": ["x"]})
+    assert p.command == "npx"
+    assert p.args == ["-y", "tavily-mcp", "x"]
+    # args 容忍字符串形态（按 shell 规则拆）
+    p = extend._stdio_params({"command": "uvx", "args": "-y mcp-fs"})
+    assert p.args == ["-y", "mcp-fs"]
+
+
+def test_http_connect_passes_all_headers(monkeypatch):
+    seen = {}
+
+    def fake_http_client(headers=None, **kw):
+        seen["headers"] = headers
+        return _FakeACM(object())
+
+    def fake_streamable(url, http_client=None, **kw):
+        seen["url"] = url
+        return _FakeACM((object(), object()))
+
+    monkeypatch.setattr(extend, "create_mcp_http_client", fake_http_client)
+    monkeypatch.setattr(extend, "streamable_http_client", fake_streamable)
+    monkeypatch.setattr(extend, "ClientSession", _FakeSession)
+
+    ext = {
+        "name": "remote",
+        "transport": "http",
+        "endpoint": "https://mcp.example.com/mcp",
+        "headers": {"Authorization": "Bearer sek", "X-Team": "a"},
+        "enabled": True,
+    }
+    tools = hub.open([ext])
+    try:
+        assert [d["function"]["name"] for d in tools.decls] == ["remote_ping"]
+        assert seen["url"] == "https://mcp.example.com/mcp"
+        # headers 全量透传（鉴权走 Authorization 或自定义头）
+        assert seen["headers"] == {"Authorization": "Bearer sek", "X-Team": "a"}
+    finally:
+        hub.close()
+
+
+def test_http_connect_no_headers_passes_none(monkeypatch):
+    seen = {}
+
+    def fake_http_client(headers=None, **kw):
+        seen["headers"] = headers
+        return _FakeACM(object())
+
+    monkeypatch.setattr(extend, "create_mcp_http_client", fake_http_client)
+    monkeypatch.setattr(
+        extend,
+        "streamable_http_client",
+        lambda url, http_client=None, **kw: _FakeACM((object(), object())),
+    )
+    monkeypatch.setattr(extend, "ClientSession", _FakeSession)
+
+    tools = hub.open(
+        [
+            {
+                "name": "r",
+                "transport": "http",
+                "endpoint": "https://x/mcp",
+                "enabled": True,
+            }
+        ]
+    )
+    try:
+        assert tools.decls
+        assert seen["headers"] is None
+    finally:
+        hub.close()
+
+
+# ---- POST /api/extensions/probe ----
+
+
+def _client():
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    return TestClient(app)
+
+
+def test_probe_endpoint_ok(monkeypatch):
+    async def fake_connect(stack, ext):
+        return extend._Source(
+            "tavily", object(), [_FakeTool("a"), _FakeTool("b")]
+        )
+
+    monkeypatch.setattr(hub, "_connect", fake_connect)
+    r = _client().post(
+        "/api/extensions/probe",
+        json={
+            "name": "tavily",
+            "transport": "stdio",
+            "command": "npx",
+            "enabled": True,
+        },
+    )
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "tools": 2}
+
+
+def test_probe_endpoint_connect_failure(monkeypatch):
+    async def boom(stack, ext):
+        raise RuntimeError("spawn failed")
+
+    monkeypatch.setattr(hub, "_connect", boom)
+    r = _client().post(
+        "/api/extensions/probe",
+        json={
+            "name": "x",
+            "transport": "stdio",
+            "command": "npx",
+            "enabled": True,
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False and body["tools"] == 0
+    assert "spawn failed" in body["error"]
+
+
+def test_probe_endpoint_unconfigured_skips_connect(monkeypatch):
+    monkeypatch.setattr(
+        hub, "_connect", lambda *a: pytest.fail("未配置不应连接")
+    )
+    r = _client().post(
+        "/api/extensions/probe",
+        json={"name": "x", "transport": "http", "enabled": True},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["ok"] is False and body["error"] == "unconfigured"
+
+
 # ---- run_turn 接线 ----
 
 def _tool_call(name, args="{}"):

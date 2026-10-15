@@ -28,6 +28,11 @@ import {
   probeTts,
 } from "../services/probe";
 import type { ProbeResult } from "../services/probe";
+import { probeExtension } from "../services/extClient";
+import type { ExtProbeResult } from "../services/extClient";
+import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
+import { parseMcpJson } from "../lib/mcpJson";
+import Pager from "../ui/Pager";
 import Select from "../ui/Select";
 import PersonaPanel from "./Persona";
 import MemoryPanel from "./Memory";
@@ -68,6 +73,7 @@ function OptRow({
   label,
   extra,
   required,
+  top,
   children,
 }: {
   label: string;
@@ -75,10 +81,12 @@ function OptRow({
   extra?: React.ReactNode;
   /** 必填项：标签后加 * 标记。 */
   required?: boolean;
+  /** 多行控件（键值对编辑器）：标签顶对齐而非居中。 */
+  top?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="opt-row">
+    <div className={`opt-row${top ? " top" : ""}`}>
       <span className="opt-label">
         {label}
         {required && <span className="req">*</span>}
@@ -192,6 +200,317 @@ function DialogPreview({
   );
 }
 
+/* ---- 拓展配置弹窗（prototype/setting：居中 modal，背景变暗、点背景丢弃） ---- */
+
+/** http 端点合法性：空=未填（由必填另行提示），非空必须 http(s)://。 */
+function extEndpointError(url: string): boolean {
+  const v = url.trim();
+  if (!v) return false;
+  try {
+    return !["http:", "https:"].includes(new URL(v).protocol);
+  } catch {
+    return true;
+  }
+}
+
+/** 弹窗表单草稿：args/env/headers 用文本/键值对形态便于编辑，保存时归一。 */
+interface ExtForm {
+  name: string;
+  transport: McpExtension["transport"];
+  enabled: boolean;
+  command: string;
+  /** stdio 参数：空格分隔文本，保存时拆数组。 */
+  argsText: string;
+  envPairs: [string, string][];
+  endpoint: string;
+  headerPairs: [string, string][];
+}
+
+function extToForm(ext: McpExtension): ExtForm {
+  return {
+    name: ext.name,
+    transport: ext.transport,
+    enabled: ext.enabled,
+    command: ext.command,
+    argsText: ext.args.join(" "),
+    envPairs: Object.entries(ext.env),
+    endpoint: ext.endpoint,
+    headerPairs: Object.entries(ext.headers),
+  };
+}
+
+function formToExt(f: ExtForm): McpExtension {
+  const dict = (pairs: [string, string][]): Record<string, string> =>
+    Object.fromEntries(
+      pairs.filter(([k]) => k.trim()).map(([k, v]) => [k.trim(), v]),
+    );
+  return {
+    name: f.name.trim(),
+    transport: f.transport,
+    enabled: f.enabled,
+    command: f.command.trim(),
+    args: f.argsText.split(/\s+/).filter(Boolean),
+    env: dict(f.envPairs),
+    endpoint: f.endpoint.trim(),
+    headers: dict(f.headerPairs),
+  };
+}
+
+/** 校验：名称必填；stdio 命令必填；http 端点必填且 http(s)://。 */
+function extFormValid(f: ExtForm): boolean {
+  if (!f.name.trim()) return false;
+  if (f.transport === "stdio") return f.command.trim() !== "";
+  return f.endpoint.trim() !== "" && !extEndpointError(f.endpoint);
+}
+
+/** KEY = value 键值对编辑器：行可增删（env / headers 共用）。 */
+function KvEditor({
+  pairs,
+  onChange,
+  addLabel,
+}: {
+  pairs: [string, string][];
+  onChange: (pairs: [string, string][]) => void;
+  addLabel: string;
+}) {
+  const t = useT();
+  const setPair = (i: number, k: string, v: string): void =>
+    onChange(pairs.map((p, j) => (j === i ? ([k, v] as [string, string]) : p)));
+  return (
+    <div className="kv-list">
+      {pairs.map(([k, v], i) => (
+        <div className="kv-row" key={i}>
+          <input
+            className="kv-key"
+            value={k}
+            placeholder={t("settings.extKvKey")}
+            onChange={(e) => setPair(i, e.target.value, v)}
+          />
+          <span className="kv-eq">=</span>
+          <input
+            className="kv-val"
+            value={v}
+            placeholder={t("settings.extKvVal")}
+            onChange={(e) => setPair(i, k, e.target.value)}
+          />
+          <button
+            type="button"
+            className="ghost small danger"
+            onClick={() => onChange(pairs.filter((_, j) => j !== i))}
+          >
+            {t("common.del")}
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="ghost small kv-add"
+        onClick={() => onChange([...pairs, ["", ""]])}
+      >
+        {addLabel}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * MCP server 配置弹窗：transport 下拉切换差分字段（stdio=命令/参数/环境变量，
+ * http=端点/请求头）；顶部「从 JSON 填入」粘贴标准 MCP 配置——单条填表、
+ * 多条直接逐个导入列表；点遮罩或取消关闭（未保存丢弃）。
+ */
+function ExtConfigModal({
+  initial,
+  onSave,
+  onImport,
+  onClose,
+}: {
+  initial: McpExtension;
+  onSave: (ext: McpExtension) => void;
+  /** JSON 多条导入：直接进列表并关弹窗（草稿丢弃）。 */
+  onImport: (exts: McpExtension[]) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const [form, setForm] = useState<ExtForm>(() => extToForm(initial));
+  const [jsonOpen, setJsonOpen] = useState(false);
+  const [jsonText, setJsonText] = useState("");
+  const [jsonErr, setJsonErr] = useState(false);
+  const patch = (p: Partial<ExtForm>): void =>
+    setForm((f) => ({ ...f, ...p }));
+
+  const applyJson = (): void => {
+    try {
+      const exts = parseMcpJson(jsonText);
+      if (exts.length === 1) {
+        setForm(extToForm(exts[0]));
+        setJsonText("");
+        setJsonErr(false);
+        setJsonOpen(false);
+      } else {
+        onImport(exts);
+      }
+    } catch {
+      setJsonErr(true); // 解析失败：表单报错，不导入不污染
+    }
+  };
+
+  const endpointErr = extEndpointError(form.endpoint);
+
+  return (
+    <div className="modal-mask" onClick={onClose}>
+      <div
+        className="panel ext-modal"
+        role="dialog"
+        aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="ext-modal-head">
+          <h3 className="opt-group">{t("settings.extCfgTitle")}</h3>
+          <button
+            type="button"
+            className="ghost small"
+            onClick={() => {
+              setJsonOpen((o) => !o);
+              setJsonErr(false);
+            }}
+          >
+            {t("settings.extJsonBtn")}
+          </button>
+        </div>
+        {jsonOpen && (
+          <div className="ext-json">
+            <textarea
+              rows={5}
+              value={jsonText}
+              placeholder={t("settings.extJsonPh")}
+              onChange={(e) => {
+                setJsonText(e.target.value);
+                setJsonErr(false);
+              }}
+            />
+            <div className="ext-json-ops">
+              {jsonErr && (
+                <span className="probe-err">{t("settings.extJsonErr")}</span>
+              )}
+              <button
+                type="button"
+                className="small"
+                disabled={!jsonText.trim()}
+                onClick={applyJson}
+              >
+                {t("settings.extJsonApply")}
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="opt-list">
+          <OptRow label={t("settings.extName")} required>
+            <input
+              value={form.name}
+              placeholder={t("settings.extNamePh")}
+              onChange={(e) => patch({ name: e.target.value })}
+            />
+            {!form.name.trim() && (
+              <span className="probe-err">{t("settings.required")}</span>
+            )}
+          </OptRow>
+          <OptRow label={t("settings.extTransport")}>
+            <Select
+              value={form.transport}
+              options={[
+                {
+                  value: "http",
+                  label: t("settings.extTransports.http"),
+                },
+                {
+                  value: "stdio",
+                  label: t("settings.extTransports.stdio"),
+                },
+              ]}
+              onChange={(v) =>
+                patch({ transport: v as McpExtension["transport"] })
+              }
+            />
+          </OptRow>
+          {form.transport === "stdio" ? (
+            <>
+              <OptRow label={t("settings.extCommand")} required>
+                <input
+                  className={form.command.trim() ? undefined : "invalid"}
+                  value={form.command}
+                  placeholder={t("settings.extCommandPh")}
+                  onChange={(e) => patch({ command: e.target.value })}
+                />
+                {!form.command.trim() && (
+                  <span className="probe-err">{t("settings.required")}</span>
+                )}
+              </OptRow>
+              <OptRow label={t("settings.extArgs")}>
+                <input
+                  value={form.argsText}
+                  placeholder={t("settings.extArgsPh")}
+                  onChange={(e) => patch({ argsText: e.target.value })}
+                />
+              </OptRow>
+              <OptRow label={t("settings.extEnv")} top>
+                <KvEditor
+                  pairs={form.envPairs}
+                  onChange={(envPairs) => patch({ envPairs })}
+                  addLabel={t("settings.extEnvAdd")}
+                />
+              </OptRow>
+            </>
+          ) : (
+            <>
+              <OptRow label={t("settings.extEndpoint")} required>
+                <input
+                  className={endpointErr ? "invalid" : undefined}
+                  value={form.endpoint}
+                  placeholder={t("settings.extEndpointPh")}
+                  onChange={(e) => patch({ endpoint: e.target.value })}
+                />
+                {endpointErr ? (
+                  <span className="probe-err">{t("settings.invalidUrl")}</span>
+                ) : (
+                  !form.endpoint.trim() && (
+                    <span className="probe-err">{t("settings.required")}</span>
+                  )
+                )}
+              </OptRow>
+              <OptRow label={t("settings.extHeaders")} top>
+                <KvEditor
+                  pairs={form.headerPairs}
+                  onChange={(headerPairs) => patch({ headerPairs })}
+                  addLabel={t("settings.extHeaderAdd")}
+                />
+              </OptRow>
+            </>
+          )}
+          <OptRow label={t("settings.extEnabled")}>
+            <OptSwitch
+              on={form.enabled}
+              onChange={(v) => patch({ enabled: v })}
+            />
+          </OptRow>
+        </div>
+        <div className="ext-actions">
+          <button type="button" className="ghost key-toggle" onClick={onClose}>
+            {t("common.cancel")}
+          </button>
+          <button
+            type="button"
+            className="key-toggle"
+            disabled={!extFormValid(form)}
+            onClick={() => onSave(formToExt(form))}
+          >
+            {t("common.save")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Settings() {
   const t = useT();
   // 订阅 store：外部（如启动同步）改动也能刷新本页。
@@ -207,10 +526,13 @@ export default function Settings() {
   const [probes, setProbes] = useState<
     Partial<Record<EndpointSection, ProbeResult | "running">>
   >({});
-  // 拓展编辑：null=列表态，-1=新增，>=0=编辑第 i 条；draft 为表单副本。
+  // 拓展：null=无弹窗，-1=新增，>=0=编辑第 i 条；表单草稿归弹窗组件管。
   const [extEditing, setExtEditing] = useState<number | null>(null);
-  const [extDraft, setExtDraft] = useState<McpExtension | null>(null);
-  const [showExtKey, setShowExtKey] = useState(false);
+  const [extPage, setExtPage] = useState(0);
+  // 连接状态点：下标 → 探测结果（"running" = 进行中）。
+  const [extProbes, setExtProbes] = useState<
+    Record<number, ExtProbeResult | "running">
+  >({});
   // 语音输出开关：与 chat 工具条同一个开关（引擎运行时态）。
   const [voiceMuted, setVoiceMuted] = useState(getChatEngine().muted);
   const ttsConfigured = settings.tts.url.trim() !== "";
@@ -322,52 +644,89 @@ export default function Settings() {
     update({ settings: { ...settings, extensions: list } });
   };
 
-  const patchExtDraft = (p: Partial<McpExtension>): void => {
-    setExtDraft((d) => (d ? { ...d, ...p } : d));
-  };
+  // 连接状态：tab 打开（或清单变化）时对 enabled 记录各探测一次，
+  // 结果只影响状态点，失败不阻塞 UI。
+  useEffect(() => {
+    if (tab !== "extend") return;
+    let alive = true;
+    setExtProbes({});
+    settings.extensions.forEach((ext, i) => {
+      if (!ext.enabled) return;
+      setExtProbes((p) => ({ ...p, [i]: "running" }));
+      void probeExtension(ext).then((r) => {
+        if (alive) setExtProbes((p) => ({ ...p, [i]: r }));
+      });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [tab, settings.extensions]);
 
-  const startEditExt = (i: number): void => {
-    setExtEditing(i);
-    setExtDraft(
-      i >= 0
-        ? { ...settings.extensions[i] }
-        : {
-            name: "",
-            transport: "http",
-            command: "",
-            endpoint: "",
-            apiKey: "",
-            enabled: true,
-          },
-    );
-  };
+  const extPg = clampPage(extPage, settings.extensions.length);
+  const extSlice = settings.extensions
+    .map((ext, i) => ({ ext, i }))
+    .slice(extPg.page * LIST_PAGE_SIZE, (extPg.page + 1) * LIST_PAGE_SIZE);
 
-  const saveExt = (): void => {
-    if (extEditing === null || !extDraft) return;
+  const blankExt = (): McpExtension => ({
+    name: "",
+    transport: "http",
+    enabled: true,
+    command: "",
+    args: [],
+    env: {},
+    endpoint: "",
+    headers: {},
+  });
+
+  const saveExt = (ext: McpExtension): void => {
+    if (extEditing === null) return;
     const list = [...settings.extensions];
-    if (extEditing >= 0) list[extEditing] = extDraft;
-    else list.push(extDraft);
+    if (extEditing >= 0) list[extEditing] = ext;
+    else list.push(ext);
     patchExtensions(list);
     setExtEditing(null);
-    setExtDraft(null);
   };
 
-  /** http 端点合法性：空=未填（单独标必填），非空必须 http(s)://。 */
-  const extEndpointError = (url: string): boolean => {
-    const v = url.trim();
-    if (!v) return false;
-    try {
-      return !["http:", "https:"].includes(new URL(v).protocol);
-    } catch {
-      return true;
+  /** JSON 多条导入：逐条追加进列表（弹窗内草稿随之丢弃）。 */
+  const importExts = (exts: McpExtension[]): void => {
+    patchExtensions([...settings.extensions, ...exts]);
+    setExtEditing(null);
+  };
+
+  /** 行内状态点：未启用灰点 / 探测中 / ●成功(n tools) / ✗失败。 */
+  const extDot = (i: number, ext: McpExtension): React.ReactNode => {
+    if (!ext.enabled) {
+      return (
+        <span className="ext-dot off" title={t("settings.extStOff")}>
+          ○
+        </span>
+      );
     }
+    const r = extProbes[i];
+    if (!r || r === "running") {
+      return (
+        <span className="ext-dot wait" title={t("settings.extStRun")}>
+          …
+        </span>
+      );
+    }
+    if (r.ok) {
+      const label = t("settings.extStOk", { n: String(r.tools) });
+      return (
+        <span className="ext-dot ok" title={label}>
+          ● {label}
+        </span>
+      );
+    }
+    return (
+      <span
+        className="ext-dot err"
+        title={r.error || t("settings.extStFail")}
+      >
+        ✗ {t("settings.extStFail")}
+      </span>
+    );
   };
-
-  const extDraftValid = (d: McpExtension): boolean =>
-    d.name.trim() !== "" &&
-    (d.transport === "stdio"
-      ? d.command.trim() !== ""
-      : d.endpoint.trim() !== "" && !extEndpointError(d.endpoint));
 
   const keyRow = (sec: EndpointSection) => (
     <OptRow label={t("settings.apiKey")}>
@@ -661,28 +1020,19 @@ export default function Settings() {
               )}
 
               {tab === "extend" && (
-                <div className="settings-cols">
-                {/* 左栏：MCP server 列表（点击行 → 右栏编辑） */}
-                <section className="panel settings-col">
+                /* 拓展是设置页唯一单栏页：整行通宽列表，编辑走居中弹窗。 */
+                <section className="panel settings-col ext-panel">
                   <h3 className="opt-group">
                     {t("settings.groups.extensions")}
                   </h3>
-                  <div className="opt-list col-grow">
-                    {settings.extensions.length === 0 && (
-                      <p className="muted">{t("settings.extHint")}</p>
-                    )}
-                    {settings.extensions.map((ext, i) => (
-                      <div
-                        key={i}
-                        className={`ext-row${extEditing === i ? " selected" : ""}`}
-                        onClick={() => startEditExt(i)}
-                      >
+                  <p className="muted ext-hint">{t("settings.extHint")}</p>
+                  <div className="ext-list col-grow">
+                    {extSlice.map(({ ext, i }) => (
+                      <div className="ext-row" key={i}>
                         <span className="ext-name">
                           {ext.name || t("settings.extUnnamed")}
                         </span>
-                        <span className="ext-transport muted">
-                          {t(`settings.extTransports.${ext.transport}`)}
-                        </span>
+                        <span className="ext-badge">{ext.transport}</span>
                         <OptSwitch
                           on={ext.enabled}
                           onChange={(v) =>
@@ -693,19 +1043,22 @@ export default function Settings() {
                             )
                           }
                         />
+                        {extDot(i, ext)}
                         <button
                           type="button"
-                          className="ghost key-toggle danger"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          className="ghost small"
+                          onClick={() => setExtEditing(i)}
+                        >
+                          {t("common.edit")}
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost small danger"
+                          onClick={() =>
                             patchExtensions(
                               settings.extensions.filter((_, j) => j !== i),
-                            );
-                            if (extEditing === i) {
-                              setExtEditing(null);
-                              setExtDraft(null);
-                            }
-                          }}
+                            )
+                          }
                         >
                           {t("common.del")}
                         </button>
@@ -715,158 +1068,20 @@ export default function Settings() {
                   <div className="col-foot">
                     <button
                       type="button"
-                      className="ghost"
-                      onClick={() => startEditExt(-1)}
+                      className="ghost ext-add"
+                      onClick={() => setExtEditing(-1)}
                     >
                       {t("settings.extAdd")}
                     </button>
+                    <div className="ext-pagerline">
+                      <Pager
+                        page={extPg.page}
+                        pages={extPg.pages}
+                        onChange={setExtPage}
+                      />
+                    </div>
                   </div>
                 </section>
-                {/* 右栏：编辑面板（master-detail）；未选中 = 空态 */}
-                <section className="panel settings-col">
-                  {extEditing === null || !extDraft ? (
-                    <div className="ext-empty muted">
-                      {t("settings.extSelectHint")}
-                    </div>
-                  ) : (
-                    <>
-                    <h3 className="opt-group">
-                      {extEditing < 0
-                        ? t("settings.extAdd")
-                        : extDraft.name || t("settings.extUnnamed")}
-                    </h3>
-                    <div className="opt-list col-grow">
-                      <OptRow label={t("settings.extName")} required>
-                        <input
-                          value={extDraft.name}
-                          placeholder={t("settings.extNamePh")}
-                          onChange={(e) =>
-                            patchExtDraft({ name: e.target.value })
-                          }
-                        />
-                        {!extDraft.name.trim() && (
-                          <span className="probe-err">
-                            {t("settings.required")}
-                          </span>
-                        )}
-                      </OptRow>
-                      <OptRow label={t("settings.extTransport")}>
-                        <Select
-                          value={extDraft.transport}
-                          options={[
-                            {
-                              value: "http",
-                              label: t("settings.extTransports.http"),
-                            },
-                            {
-                              value: "stdio",
-                              label: t("settings.extTransports.stdio"),
-                            },
-                          ]}
-                          onChange={(v) =>
-                            patchExtDraft({
-                              transport: v as McpExtension["transport"],
-                            })
-                          }
-                        />
-                      </OptRow>
-                      {extDraft.transport === "stdio" ? (
-                        <OptRow label={t("settings.extCommand")} required>
-                          <input
-                            className={
-                              extDraft.command.trim() ? undefined : "invalid"
-                            }
-                            value={extDraft.command}
-                            placeholder={t("settings.extCommandPh")}
-                            onChange={(e) =>
-                              patchExtDraft({ command: e.target.value })
-                            }
-                          />
-                          {!extDraft.command.trim() && (
-                            <span className="probe-err">
-                              {t("settings.required")}
-                            </span>
-                          )}
-                        </OptRow>
-                      ) : (
-                        <OptRow label={t("settings.extEndpoint")} required>
-                          <input
-                            className={
-                              extEndpointError(extDraft.endpoint)
-                                ? "invalid"
-                                : undefined
-                            }
-                            value={extDraft.endpoint}
-                            placeholder={t("settings.extEndpointPh")}
-                            onChange={(e) =>
-                              patchExtDraft({ endpoint: e.target.value })
-                            }
-                          />
-                          {extEndpointError(extDraft.endpoint) ? (
-                            <span className="probe-err">
-                              {t("settings.invalidUrl")}
-                            </span>
-                          ) : (
-                            !extDraft.endpoint.trim() && (
-                              <span className="probe-err">
-                                {t("settings.required")}
-                              </span>
-                            )
-                          )}
-                        </OptRow>
-                      )}
-                      {extDraft.transport === "http" && (
-                        <OptRow label={t("settings.apiKey")}>
-                          <input
-                            type={showExtKey ? "text" : "password"}
-                            value={extDraft.apiKey}
-                            placeholder={t("settings.keyPh")}
-                            onChange={(e) =>
-                              patchExtDraft({ apiKey: e.target.value })
-                            }
-                          />
-                          <button
-                            type="button"
-                            className="ghost key-toggle"
-                            onClick={() => setShowExtKey((s) => !s)}
-                          >
-                            {showExtKey
-                              ? t("settings.hideKey")
-                              : t("settings.showKey")}
-                          </button>
-                        </OptRow>
-                      )}
-                      <OptRow label={t("settings.extEnabled")}>
-                        <OptSwitch
-                          on={extDraft.enabled}
-                          onChange={(v) => patchExtDraft({ enabled: v })}
-                        />
-                      </OptRow>
-                    </div>
-                    <div className="ext-actions col-foot">
-                        <button
-                          type="button"
-                          className="ghost key-toggle"
-                          onClick={() => {
-                            setExtEditing(null);
-                            setExtDraft(null);
-                          }}
-                        >
-                          {t("common.cancel")}
-                        </button>
-                        <button
-                          type="button"
-                          className="key-toggle"
-                          disabled={!extDraftValid(extDraft)}
-                          onClick={saveExt}
-                        >
-                          {t("common.save")}
-                        </button>
-                    </div>
-                    </>
-                  )}
-                </section>
-                </div>
               )}
             </div>
           )}
@@ -883,6 +1098,18 @@ export default function Settings() {
           </div>
         </div>
       </footer>
+
+      {/* 拓展配置弹窗：背景变暗，点背景/取消丢弃未保存内容 */}
+      {extEditing !== null && (
+        <ExtConfigModal
+          initial={
+            extEditing >= 0 ? settings.extensions[extEditing] : blankExt()
+          }
+          onSave={saveExt}
+          onImport={importExts}
+          onClose={() => setExtEditing(null)}
+        />
+      )}
     </div>
   );
 }

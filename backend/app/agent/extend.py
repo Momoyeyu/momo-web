@@ -1,6 +1,7 @@
 """拓展模块：把已启用 MCP server 的工具导入 ReAct 循环（modules/extend.md）。
 
-- 设置页登记 {name, transport(stdio|http), command|endpoint, apiKey?, enabled}
+- 设置页登记 {name, transport(stdio|http), enabled} + stdio 分支
+  {command, args[], env{}} + http 分支 {endpoint, headers{}}
 - 回合开始并发连接 enabled server → tools/list → 工具以 {server}_{tool}
   前缀名注入；server 连不上即不注入（不可用即不可见，不报错给用户）
 - tools/call 转发回对应 server；失败把错误文本作为 tool result 回模型
@@ -17,6 +18,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import re
 import shlex
 import threading
@@ -136,6 +138,39 @@ def _configured(ext: dict[str, Any]) -> bool:
     return bool(str(ext.get("endpoint") or "").strip())
 
 
+def _str_dict(raw: Any) -> dict[str, str]:
+    """键值对字段归一化：只收 str 键值，其余丢弃。"""
+    if not isinstance(raw, dict):
+        return {}
+    return {str(k): str(v) for k, v in raw.items() if isinstance(v, str)}
+
+
+def _stdio_params(ext: dict[str, Any]) -> StdioServerParameters:
+    """stdio 分支 → StdioServerParameters。
+
+    command 是可执行名（如 npx/uvx）；args 是参数数组（容忍旧式字符串，
+    按 shell 规则拆分）；env 键值对叠加在 os.environ 上注入子进程——
+    密钥类凭据（如 TAVILY_API_KEY）经此传递。
+    """
+    command = str(ext.get("command") or "").strip()
+    if not command:
+        raise ValueError("empty command")
+    raw_args = ext.get("args")
+    if isinstance(raw_args, str):
+        args = shlex.split(raw_args)
+    elif isinstance(raw_args, list):
+        args = [str(a) for a in raw_args]
+    else:
+        args = []
+    # command 应为可执行名；旧数据可能是整行命令——shlex 拆出首 token
+    # 作命令、其余前置于 args。
+    parts = shlex.split(command)
+    if len(parts) > 1:
+        command, args = parts[0], parts[1:] + args
+    env = {**os.environ, **_str_dict(ext.get("env"))}
+    return StdioServerParameters(command=command, args=args, env=env)
+
+
 class McpHub:
     """专属线程 + 常驻 asyncio loop 的 MCP 连接枢纽（惰性启动的单例）。"""
 
@@ -192,6 +227,24 @@ class McpHub:
             session.call_tool(name, args), self._loop
         )
         return fut.result(timeout=CALL_TIMEOUT)
+
+    def probe(self, ext: dict[str, Any]) -> dict[str, Any]:
+        """单条拓展的连通性探测（设置页状态点）：connect + list_tools + close。
+
+        返回 {"ok": bool, "tools": int, "error"?: str}；任何失败都文本化，
+        不向上抛。配置不完整直接判失败，不尝试连接。
+        """
+        if not isinstance(ext, dict) or not _configured(ext):
+            return {"ok": False, "tools": 0, "error": "unconfigured"}
+        try:
+            self._ensure_loop()
+            fut = asyncio.run_coroutine_threadsafe(
+                self._probe_async(ext), self._loop
+            )
+            r = fut.result(timeout=CONNECT_TIMEOUT + 2)
+            return r if isinstance(r, dict) else {"ok": False, "tools": 0}
+        except Exception as e:
+            return {"ok": False, "tools": 0, "error": str(e) or type(e).__name__}
 
     # ---- loop 线程内 ----
 
@@ -258,22 +311,15 @@ class McpHub:
     ) -> _Source:
         async with asyncio.timeout(CONNECT_TIMEOUT):
             if str(ext.get("transport") or "http") == "stdio":
-                cmd = shlex.split(str(ext.get("command") or ""))
-                if not cmd:
-                    raise ValueError("empty command")
                 read, write = await stack.enter_async_context(
-                    stdio_client(
-                        StdioServerParameters(command=cmd[0], args=cmd[1:])
-                    )
+                    stdio_client(_stdio_params(ext))
                 )
             else:
                 endpoint = str(ext.get("endpoint") or "")
                 if not endpoint:
                     raise ValueError("empty endpoint")
-                headers = {}
-                key = str(ext.get("apiKey") or "")
-                if key:
-                    headers["Authorization"] = f"Bearer {key}"
+                # headers 原样全量透传（鉴权统一走这里：Authorization 或自定义头）
+                headers = _str_dict(ext.get("headers"))
                 client = await stack.enter_async_context(
                     create_mcp_http_client(headers=headers or None)
                 )
@@ -286,6 +332,21 @@ class McpHub:
         return _Source(
             sanitize(ext.get("name")), session, list(listed.tools or [])
         )
+
+    async def _probe_async(self, ext: dict[str, Any]) -> dict[str, Any]:
+        """probe 的 loop 侧实现：ExitStack 随协程退出即断开连接。"""
+        try:
+            async with contextlib.AsyncExitStack() as stack:
+                src = await self._connect(stack, ext)
+            return {"ok": True, "tools": len(src.tools)}
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            return {
+                "ok": False,
+                "tools": 0,
+                "error": str(e) or type(e).__name__,
+            }
 
     async def _close_async(self) -> None:
         for ev in self._closers:
