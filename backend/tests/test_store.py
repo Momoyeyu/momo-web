@@ -1,9 +1,9 @@
-"""state 读写 + 默认值归一化 + 旧 schema 导入（memories/pins → momo.db）。"""
+"""state 读写 + 默认值归一化。"""
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from app import memory, store
+from app import store
 from app.main import app
 
 
@@ -23,53 +23,31 @@ def test_write_then_read_normalized():
     assert s["persona"]["name"] == "momo"
     # 未知字段透传
     assert s["custom"] == {"x": 1}
-    # 已迁 momo.db 的键不再出现在 state
-    assert "history" not in s and "summary" not in s and "pins" not in s
 
 
 def test_normalize_tolerates_junk():
-    s = store.normalize_state({"persona": None, "pins": "oops"})
+    s = store.normalize_state({"persona": None, "custom": "oops"})
     assert s["persona"]["name"] == "momo"
-    assert s["pins"] == "oops"  # 非 None 值原样透传（容错，不强行纠正类型）
+    assert s["custom"] == "oops"  # 非 None 值原样透传（容错，不强行纠正类型）
 
 
-def test_put_state_legacy_import_and_strip():
+def test_put_state_roundtrip():
+    """PUT 整体写入、GET 归一化回吐。"""
     client = TestClient(app)
-    body = {
-        "pins": ["用户叫夜羽"],
-        "user": {"name": "夜羽"},  # 旧 schema，应被忽略且不写回
-        "history": [{"role": "user", "text": "旧话", "at": "t"}],  # 忽略
-        "summary": "旧摘要",  # 忽略
-        "memories": [
-            {"content": "用户喜欢草莓蛋糕"},
-            {"content": "用户喜欢草莓蛋糕"},  # 重复 → 只入一条
-            {"content": "已失效记忆", "valid": False},  # valid==False 跳过
-            {"kind": "episodic"},  # 无 content 跳过
-        ],
-        "avatars": [],
-    }
-    r = client.put("/api/state", json=body)
+    r = client.put(
+        "/api/state",
+        json={
+            "settings": {"general": {"lang": "en"}},
+            "persona": {"name": "momo"},
+        },
+    )
     assert r.status_code == 204
-
-    mems = memory.list_memories()
-    normal = [m for m in mems if not m["pinned"]]
-    assert [m["content"] for m in normal] == ["用户喜欢草莓蛋糕"]
-    assert len(normal[0]["id"]) == 12
-    assert normal[0]["createdAt"]
-
-    # pins → pinned 行
-    assert memory.pins() == ["用户叫夜羽"]
-
-    stored = store.read_state()
-    assert "memories" not in stored
-    assert "user" not in stored
-    assert "pins" not in stored
-    assert "history" not in stored
-    assert "summary" not in stored
-
     r = client.get("/api/state")
     assert r.status_code == 200
-    assert "pins" not in r.json()
+    s = r.json()
+    assert s["settings"]["general"]["lang"] == "en"
+    assert s["settings"]["general"]["dialogOpacity"] == 66
+    assert s["avatars"][0]["id"] == "builtin"
 
 
 def test_get_state_endpoint_empty():

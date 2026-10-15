@@ -1,15 +1,14 @@
 """data/state.json 读写与默认值归一化。
 
-state.json 是唯一持久化（gitignored）。读取时做 defaults 深合并：
+state.json 是配置层持久化（gitignored）。读取时做 defaults 深合并：
 缺失键补默认值，多余键原样透传（前端字段后端不消费的也保留）。
 """
 from __future__ import annotations
 
 import copy
 import json
-import threading
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .embed import DEFAULT_MODEL, DEFAULT_URL
 
@@ -77,8 +76,6 @@ DEFAULT_STATE: dict[str, Any] = {
     },
     "avatars": [_BUILTIN_AVATAR],
     "avatarId": "builtin",
-    # pins/history/summary 已迁 momo.db（memories.pinned / live 会话行），
-    # 不再走 state.json。
 }
 
 
@@ -95,7 +92,7 @@ def _merge(defaults: Any, value: Any) -> Any:
 
 
 def normalize_state(state: dict[str, Any] | None) -> dict[str, Any]:
-    """任意（可能残缺/旧 schema）state → 合并默认值后的完整 state。"""
+    """任意（可能残缺）state → 合并默认值后的完整 state。"""
     merged = _merge(DEFAULT_STATE, state if isinstance(state, dict) else {})
     # 内置形象条目恒存在（avatars 是整体替换的数组，深合并补不了成员缺失）。
     avatars = merged.get("avatars")
@@ -131,20 +128,3 @@ def get_state() -> dict[str, Any]:
     if raw is None:
         return {}
     return normalize_state(raw)
-
-
-# state.json 读-改-写锁：保给将来需要原子 read-modify-write 的配置字段。
-_STATE_LOCK = threading.Lock()
-
-
-def update_state(mutate: Callable[[dict[str, Any]], Any]) -> Any:
-    """锁内 read-modify-write state.json，返回 mutate 的结果。
-
-    mutate 返回 False 时跳过写盘（用于「前提不成立则放弃」的原子检查）。
-    """
-    with _STATE_LOCK:
-        state = normalize_state(read_state())
-        result = mutate(state)
-        if result is not False:
-            write_state(state)
-        return result

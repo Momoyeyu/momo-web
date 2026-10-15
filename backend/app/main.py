@@ -7,13 +7,9 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import db
 from .api import chat, checkpoints, memories, state
 
 app = FastAPI(title="momo-web backend")
-
-# 首启迁移：旧 JSON（memories/checkpoints/state 的 pins/history/summary）→ momo.db
-db.migrate_legacy()
 
 # 本地开发：放行任意 localhost/127.0.0.1 端口（vite 默认 5173）
 app.add_middleware(

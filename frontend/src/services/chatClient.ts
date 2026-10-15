@@ -3,7 +3,7 @@
 // 前端只消费最终回答的增量 token。
 //
 // SSE 协议（每行 `data: <json>`）：
-//   {"t":"delta","text":"…"}            回答增量（情绪 #tag 内联在 text 里）
+//   {"t":"delta","text":"…"}            回答增量（<exp>/<motion> 指令内联在 text 里）
 //   {"t":"done"}                       回合结束
 //   {"t":"error","message":"…"}        回合失败（yield 给调用方映射成 Error）
 

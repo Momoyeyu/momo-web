@@ -41,17 +41,16 @@ def test_prompt_zh_fields_injected():
     assert "## 你的初始记忆" in p
     assert "- 用户的名称是夜羽" in p
     assert "- 夜羽是我的创造者" in p
-    # 记忆使用策略常驻；工具清单不再写进 prompt
-    assert "## 记忆使用策略" in p
-    assert "memory_add" in p and "memory_search" in p
-    assert "common_time" not in p
+    # 使用策略下沉到 tools description；工具清单与策略文本都不写进 prompt
+    assert "## 记忆使用策略" not in p
+    assert "memory_add" not in p and "common_time" not in p
 
 
-def test_prompt_no_pins_section_when_empty():
-    """pins 为空 → 初始记忆段不出现，记忆使用策略仍在。"""
+def test_prompt_no_memory_section_when_pins_empty():
+    """pins 为空 → 记忆配置整块不出现（使用策略不在模板，仅剩初始记忆段）。"""
     p = _prompt("zh", pins=[])
+    assert "# 记忆配置" not in p
     assert "## 你的初始记忆" not in p
-    assert "## 记忆使用策略" in p
 
 
 def test_prompt_directive_sections_all_langs():
@@ -149,4 +148,5 @@ def test_prompt_empty_persona_falls_back_defaults():
     assert "你的身份是由夜羽开发的AI" in p
     assert "你的年龄是16" in p
     assert "你的性格是乖巧听话" in p
-    assert "- 喜欢草莓蛋糕" in p
+    # 偏好是列表型配置：空 = 整段不注入（含头），不回落默认值。
+    assert "## 你的偏好" not in p

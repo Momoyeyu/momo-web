@@ -5,8 +5,6 @@
 // 清单外的指令值照常产出事件，由消费方静默丢弃。
 // 容错：畸形/未闭合标记退化为字面文本，不会吃掉正文；正文里的
 // &lt; / &gt; / &amp; 实体解码回字面字符。
-// 兼容：旧版 `#tag`（8 个固定情绪词）是上一代语法，模型从历史里学来
-// 还可能偶发——命中旧词表时静默吞掉（不驱动任何资源），其余 # 按文本。
 
 export type DirectiveEvent =
   | { kind: "text"; text: string }
@@ -22,18 +20,6 @@ const OPEN_TAGS: [string, Channel][] = [
 ];
 /** 指令值上限：超出即按畸形处理（退化为文本），防止未闭合标记吃掉整段回复。 */
 const MAX_VALUE_LEN = 64;
-/** 旧版 `#tag` 情绪词表：仅用于兼容剥离（不再是资源通道）。 */
-const LEGACY_TAGS = new Set([
-  "neutral",
-  "happy",
-  "sad",
-  "angry",
-  "surprised",
-  "thinking",
-  "shy",
-  "sleepy",
-]);
-const LEGACY_TAG_CHAR = /[a-z]/;
 /** 文本通道解码的实体集（解析器只吃字面 <exp>/<motion>，尖括号靠实体绕过）。 */
 const ENTITIES: [string, string][] = [
   ["&lt;", "<"],
@@ -65,8 +51,6 @@ export class DirectiveParser {
   private value = "";
   /** 闭标签未决片段（"<"、"</ex" 等）。 */
   private closing: string | null = null;
-  /** "#" 后的旧版 tag 未决缓冲；非 null 表示在判定是否是旧指令。 */
-  private hash: string | null = null;
 
   /** 喂入一段流式增量，返回本次解析出的事件。 */
   push(delta: string): DirectiveEvent[] {
@@ -162,39 +146,8 @@ export class DirectiveParser {
         continue;
       }
 
-      // 旧版 #tag 判定中。
-      if (this.hash !== null) {
-        if (LEGACY_TAG_CHAR.test(ch) && this.hash.length < 10) {
-          this.hash += ch;
-          continue;
-        }
-        const legacy = LEGACY_TAGS.has(this.hash);
-        const buf = this.hash;
-        this.hash = null;
-        if (!legacy) {
-          // 不是旧指令：# 与字母原样算文本（"#topic"、"#1" 等）。
-          this.text += `#${buf}`;
-        } else if (/\s/.test(ch)) {
-          // 旧指令后紧跟的空白（"#happy 文本"）一并吃掉，避免字幕顶格留白。
-          continue;
-        }
-        // 终止字符重新按正文路径判定（可能是 < 或 # 的新一轮）。
-        if (ch === "<") {
-          emitText();
-          this.open = "<";
-        } else if (ch === "#") {
-          emitText();
-          this.hash = "";
-        } else {
-          this.text += ch;
-        }
-        continue;
-      }
-
       if (ch === "<") {
         this.open = "<";
-      } else if (ch === "#") {
-        this.hash = "";
       } else {
         this.text += ch;
       }
@@ -203,12 +156,8 @@ export class DirectiveParser {
     return out;
   }
 
-  /** 流结束：未闭合标记一律退化为字面文本；未决旧 tag 照常结算。 */
+  /** 流结束：未闭合标记一律退化为字面文本。 */
   flush(): DirectiveEvent[] {
-    if (this.hash !== null) {
-      if (!LEGACY_TAGS.has(this.hash)) this.text += `#${this.hash}`;
-      this.hash = null;
-    }
     if (this.open !== null) {
       this.text += this.open;
       this.open = null;

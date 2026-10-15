@@ -180,17 +180,3 @@ def test_search_embedding_path_and_lazy_fill(monkeypatch):
     calls.clear()
     memory.search_memories("query")
     assert calls == ["query"]
-
-
-def test_import_legacy():
-    n = memory.import_legacy(
-        [
-            {"content": "a"},
-            {"content": "a"},  # 重复
-            {"content": "b", "valid": False},
-            "not a dict",
-            {"content": 42},
-        ]
-    )
-    assert n == 1
-    assert [m["content"] for m in memory.list_memories()] == ["a"]

@@ -11,7 +11,6 @@ def isolated_data(tmp_path, monkeypatch):
     monkeypatch.setattr(store, "DATA_DIR", tmp_path)
     monkeypatch.setattr(store, "STATE_PATH", tmp_path / "state.json")
     db.reset()
-    db.migrate_legacy()
     yield
     db.reset()
 

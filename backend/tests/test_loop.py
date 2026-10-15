@@ -26,14 +26,14 @@ def test_react_tool_then_text(monkeypatch):
                 "content": None,
                 "tool_calls": [_tool_call("common_time")],
             }
-        return {"role": "assistant", "content": "你好呀。#happy 今天很开心！"}
+        return {"role": "assistant", "content": "你好呀。<exp>开心</exp>今天很开心！"}
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
 
     events = list(agent.run_turn("在吗"))
     deltas = [e["text"] for e in events if e["t"] == "delta"]
     # 按标点切段、保留标点
-    assert deltas == ["你好呀。", "#happy 今天很开心！"]
+    assert deltas == ["你好呀。", "<exp>开心</exp>今天很开心！"]
 
     # 第二轮 messages 带 tool 结果（common_time → utc+tz JSON）
     tool_msgs = [m for m in seen_messages[-1] if m.get("role") == "tool"]
@@ -42,7 +42,7 @@ def test_react_tool_then_text(monkeypatch):
     payload = json.loads(tool_msgs[0]["content"])
     assert "utc" in payload and "tz" in payload
 
-    # history 追加并落盘（指令/旧 #tag 已剥离，SSE delta 仍推原始文本）
+    # history 追加并落盘（指令已剥离，SSE delta 仍推原始文本）
     h = checkpoint.live_messages()
     assert [m["role"] for m in h] == ["user", "assistant"]
     assert h[0]["text"] == "在吗"

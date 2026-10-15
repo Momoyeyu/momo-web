@@ -406,7 +406,7 @@ def load_checkpoint(sid: str) -> dict[str, Any]:
     """加载存档覆盖当前会话；当前会话非空先存入 auto 槽。返回存档全文。
 
     代际 +1：load 之后在途回合的 commit_reply 全部作废（其 user
-    行已随旧 live 进 auto 槽）。
+    行已随原 live 进 auto 槽）。
     """
     _guard_snapshot_id(sid)
     with db.tx() as c:

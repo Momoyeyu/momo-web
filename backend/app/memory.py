@@ -1,7 +1,7 @@
 """长期记忆存储：data/momo.db 的 memories 表 + memory_vec 向量表。
 
 - 条目 schema：{id, content, createdAt, pinned}；pinned=1 即初始记忆
-  （原 state.pins 迁入，伪 id pin:* 废弃——所有记忆都是真实行 id）。
+  （提示词注入用）。
 - 向量检索走 sqlite-vec vec0（cosine KNN）；候选向量缺失时懒算补写，
   embedding 未配置/不可达 → 降级 bigram Jaccard。
 - 写路径走 db.tx()；能力层（capability）负责「pin 不可被工具改/删」的拦截，
@@ -198,39 +198,6 @@ def delete_memory(mem_id: str) -> dict[str, Any]:
         if db._vec_table_dim() is not None:
             conn.execute("DELETE FROM memory_vec WHERE id=?", (mem_id,))
     return _row(row)
-
-
-def import_legacy(items: list[Any]) -> int:
-    """旧版 state.memories 一次性导入：跳过 valid==False 与非字符串条目，去重。"""
-    count = 0
-    for it in items:
-        if not isinstance(it, dict):
-            continue
-        if it.get("valid", True) is False:
-            continue
-        content = it.get("content")
-        if not isinstance(content, str):
-            continue
-        try:
-            add_memory(content)
-            count += 1
-        except MemoryError:
-            pass
-    return count
-
-
-def import_pins(items: list[Any]) -> int:
-    """旧版 state.pins 一次性导入为 pinned 行（PUT /api/state 兼容路径）。"""
-    count = 0
-    for p in items:
-        if not isinstance(p, str) or not p.strip():
-            continue
-        try:
-            add_memory(p, pinned=True)
-            count += 1
-        except MemoryError:
-            pass
-    return count
 
 
 # ---------- 搜索 ----------

@@ -124,38 +124,3 @@ describe("DirectiveParser 实体解码", () => {
     expect(p.push("t; b")).toEqual([text("< b")]);
   });
 });
-
-describe("DirectiveParser 旧版 #tag 兼容剥离", () => {
-  it("旧词表的 #tag 静默吞掉、吃掉一个尾随空白", () => {
-    const p = new DirectiveParser();
-    expect(p.push("#happy 今天好开心")).toEqual([text("今天好开心")]);
-    expect(p.flush()).toEqual([]);
-  });
-
-  it("句中 #tag 同样剥离", () => {
-    const p = new DirectiveParser();
-    expect(p.push("嗯。#sad 有点难过")).toEqual([text("嗯。有点难过")]);
-  });
-
-  it("非旧词表的 #xxx 按文本保留", () => {
-    const p = new DirectiveParser();
-    expect(p.push("#topic 标签")).toEqual([text("#topic 标签")]);
-  });
-
-  it("# 后非字母：# 按文本", () => {
-    const p = new DirectiveParser();
-    expect(p.push("排#1 名")).toEqual([text("排#1 名")]);
-  });
-
-  it("跨 chunk 拆分的旧 #tag", () => {
-    const p = new DirectiveParser();
-    expect(p.push("好#ha")).toEqual([text("好")]);
-    expect(p.push("ppy 了")).toEqual([text("了")]);
-  });
-
-  it("flush 结算未决旧 #tag", () => {
-    const p = new DirectiveParser();
-    expect(p.push("唉#sleepy")).toEqual([text("唉")]);
-    expect(p.flush()).toEqual([]);
-  });
-});

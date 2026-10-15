@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from app import agent, checkpoint, db, llm, store
+from app import agent, checkpoint, db, llm
 from app.agent import compress
 from app.main import app
 
@@ -231,104 +231,6 @@ def test_auto_slot_not_deletable():
     autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos) == 1
     assert client.delete(f"/api/checkpoints/{autos[0]['id']}").status_code == 400
-
-
-def test_slot_migration_legacy_entries(tmp_path, monkeypatch):
-    """旧 checkpoints.json 无 slot 字段：导入 DB 时按文件序补号，auto 不占号。"""
-    import json as _json
-
-    legacy_dir = tmp_path / "legacy"
-    legacy_dir.mkdir()
-    legacy = [
-        {
-            "id": "legacy01",
-            "title": "旧档A",
-            "auto": False,
-            "createdAt": "t",
-            "updatedAt": "t",
-            "summary": "",
-            "messages": [{"role": "user", "text": "一", "at": "t"}],
-        },
-        {
-            "id": "legacyauto",
-            "title": "旧auto",
-            "auto": True,
-            "createdAt": "t",
-            "updatedAt": "t",
-            "summary": "",
-            "messages": [],
-        },
-        {
-            "id": "legacy02",
-            "title": "旧档B",
-            "auto": False,
-            "createdAt": "t",
-            "updatedAt": "t",
-            "summary": "",
-            "messages": [{"role": "assistant", "text": "二", "at": "t"}],
-        },
-    ]
-    (legacy_dir / "checkpoints.json").write_text(
-        _json.dumps(legacy, ensure_ascii=False), encoding="utf-8"
-    )
-    monkeypatch.setattr(store, "DATA_DIR", legacy_dir)
-    db.reset()
-    db.migrate_legacy()
-
-    lst = TestClient(app).get("/api/checkpoints").json()
-    by_id = {s["id"]: s for s in lst}
-    assert by_id["legacy01"]["slot"] == 1
-    assert by_id["legacy02"]["slot"] == 2
-    assert by_id["legacyauto"]["slot"] is None
-    assert lst[0]["id"] == "legacyauto"  # auto 置顶
-    # 迁移后新建接最小编号空槽
-    assert TestClient(app).post("/api/checkpoints", json={}).json()["slot"] == 3
-
-
-def test_state_json_migration(tmp_path, monkeypatch):
-    """旧 state.json 的 pins/history/summary 首启导入 DB 并从文件剥离。"""
-    import json as _json
-
-    legacy_dir = tmp_path / "state-legacy"
-    legacy_dir.mkdir()
-    (legacy_dir / "state.json").write_text(
-        _json.dumps(
-            {
-                "pins": ["用户的名称是夜羽"],
-                "history": [
-                    {"role": "user", "text": "你好", "at": "t1"},
-                    {"role": "assistant", "text": "你好呀", "at": "t2"},
-                ],
-                "summary": "旧摘要",
-                "persona": {"name": "momo"},
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(store, "DATA_DIR", legacy_dir)
-    monkeypatch.setattr(store, "STATE_PATH", legacy_dir / "state.json")
-    db.reset()
-    db.migrate_legacy()
-
-    assert memory_pins() == ["用户的名称是夜羽"]
-    assert _live_texts() == ["你好", "你好呀"]
-    assert _live_summary() == "旧摘要"
-    # 已迁键剥离出 state.json，persona 等配置保留
-    raw = _json.loads((legacy_dir / "state.json").read_text(encoding="utf-8"))
-    assert "pins" not in raw and "history" not in raw and "summary" not in raw
-    assert raw["persona"]["name"] == "momo"
-    # 幂等：再跑一次不翻倍
-    db.migrate_legacy()
-    assert _live_texts() == ["你好", "你好呀"]
-
-
-def memory_pins() -> list[str]:
-    from app import memory
-
-    return memory.pins()
-
-
 def test_preview_uses_last_message():
     client = TestClient(app)
     _seed(3, "丙")

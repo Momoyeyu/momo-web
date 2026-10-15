@@ -6,7 +6,6 @@ import type {
   AvatarMeta,
   AvatarResources,
   McpExtension,
-  Memory,
   PersistedState,
   PersonaCard,
   Settings,
@@ -16,15 +15,13 @@ import { fetchState, putState } from "../services/stateClient";
 export type { PersistedState };
 
 const STORAGE_KEY = "momo-web.v1";
-/** momo-demo 时代的旧 key：首次读取时迁移（读旧→写新→删旧）。 */
-const LEGACY_STORAGE_KEY = "momo-demo.v1";
 
 /** 内置模型（Hiyori）的 avatarId 取值。 */
 export const AVATAR_BUILTIN = "builtin";
 
 /**
  * 内置 Hiyori 的资源清单（vendored manifest 的固定值；desc 可在设置页改）。
- * 描述语义沿用旧情绪映射表的选型：m03=害羞 m04=开心 m06=思考
+ * 描述语义沿用内置情绪映射表的选型：m03=害羞 m04=开心 m06=思考
  * m07=惊讶 m08=难过 m09=生气 m10=困倦；m01/m02/m05 为通用待机动作。
  * 模型没有 .exp3.json，expressions 为空（表情段不注入 prompt）。
  */
@@ -117,108 +114,36 @@ function defaultBackend(): StorageLike {
 
 let backend: StorageLike = defaultBackend();
 
-/** 旧 schema 遗留的普通记忆：随下一次 PUT /api/state 透传给 backend 导入一次，随后丢弃。 */
-let legacyMemories: Memory[] | null = null;
-/** 旧 schema 的 pins/user：同样一次性透传给 backend 导入 momo.db（pinned 行）。 */
-let legacyPins: string[] | null = null;
-
 /**
- * schema 外顶层字段（backend 维护的旧 history、以及将来的新字段）：
- * 读取时记下、PUT 时原样带上——PUT 是整体替换，不透传会把它们抹掉。
- * user/memories/humanBlock/pins 属旧 schema，被 migrate 消费，不透传。
+ * schema 外顶层字段（将来新增字段）：读取时记下、PUT 时原样带上——
+ * PUT 是整体替换，不透传会把它们抹掉。
  */
 let passthrough: Record<string, unknown> = {};
-const KNOWN_KEYS = new Set([
-  "settings",
-  "persona",
-  "pins",
-  "avatars",
-  "avatarId",
-  "user",
-  "memories",
-  "humanBlock",
-]);
+const KNOWN_KEYS = new Set(["settings", "persona", "avatars", "avatarId"]);
 
 const strArr = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 
-/**
- * persona 归一化：新 schema 逐字段合并；旧 schema（oneLiner/likes/
- * dislikes/traits/tone/taboos/examples）映射——name/identity 保留，
- * personality ← traits.join("，")，preferences ← likes+dislikes 改写。
- */
-function migratePersona(raw: unknown, d: PersonaCard): PersonaCard {
+/** persona 归一化：逐字段与默认合并。 */
+function normalizePersona(raw: unknown, d: PersonaCard): PersonaCard {
   if (!raw || typeof raw !== "object") return d;
   const o = raw as Record<string, unknown>;
-  if (typeof o.personality === "string" || Array.isArray(o.preferences)) {
-    return {
-      name: typeof o.name === "string" ? o.name : d.name,
-      identity: typeof o.identity === "string" ? o.identity : d.identity,
-      age:
-        typeof o.age === "number" && Number.isFinite(o.age) ? o.age : d.age,
-      personality:
-        typeof o.personality === "string" ? o.personality : d.personality,
-      preferences: Array.isArray(o.preferences)
-        ? strArr(o.preferences)
-        : d.preferences,
-    };
-  }
-  const traits = strArr(o.traits);
-  const likes = strArr(o.likes);
-  const dislikes = strArr(o.dislikes);
-  const migrated = [
-    ...likes.map((x) => `喜欢${x}`),
-    ...dislikes.map((x) => `讨厌${x}`),
-  ];
   return {
-    name: typeof o.name === "string" && o.name ? o.name : d.name,
-    identity: typeof o.identity === "string" && o.identity ? o.identity : d.identity,
-    age: d.age,
-    personality: traits.length ? traits.join("，") : d.personality,
-    preferences: migrated.length ? migrated : d.preferences,
+    name: typeof o.name === "string" ? o.name : d.name,
+    identity: typeof o.identity === "string" ? o.identity : d.identity,
+    age:
+      typeof o.age === "number" && Number.isFinite(o.age) ? o.age : d.age,
+    personality:
+      typeof o.personality === "string" ? o.personality : d.personality,
+    preferences: Array.isArray(o.preferences)
+      ? strArr(o.preferences)
+      : d.preferences,
   };
-}
-
-/**
- * pins 归一化（仅作旧 schema 迁移用：pins 数组或旧版
- * user{name,relation,note} → 透传给 backend 导入 momo.db 的 pinned 行）。
- */
-function migratePins(raw: Record<string, unknown>, d: string[]): string[] {
-  if (Array.isArray(raw.pins)) return strArr(raw.pins);
-  const u = raw.user;
-  if (u && typeof u === "object") {
-    const o = u as Record<string, unknown>;
-    const pins: string[] = [];
-    const name = typeof o.name === "string" ? o.name.trim() : "";
-    if (name) pins.push(`用户的名称是${name}`);
-    const relation = typeof o.relation === "string" ? o.relation.trim() : "";
-    if (relation) pins.push(relation);
-    const note =
-      typeof o.note === "string"
-        ? o.note.trim()
-        : typeof raw.humanBlock === "string"
-          ? raw.humanBlock.trim()
-          : "";
-    if (note) pins.push(note);
-    return pins;
-  }
-  return d;
-}
-
-/** parsed 里夹着旧版 memories 数组时接住，留待下一次 PUT 带给 backend 导入。 */
-function captureLegacyMemories(raw: Record<string, unknown>): void {
-  const m = raw.memories;
-  if (!Array.isArray(m) || !m.length) return;
-  legacyMemories = m.filter(
-    (x): x is Memory =>
-      !!x && typeof x === "object" && typeof (x as Memory).content === "string",
-  );
-  if (!legacyMemories.length) legacyMemories = null;
 }
 
 /** avatars 归一化：保证内置条目在首位；内置条目缺 resources 时补出厂清单
  * （导入条目缺省保留 undefined——设置页再按需懒解析 zip 补回）。 */
-function migrateAvatars(raw: unknown): AvatarMeta[] {
+function normalizeAvatars(raw: unknown): AvatarMeta[] {
   const list = (Array.isArray(raw) ? raw : []).filter(
     (a): a is AvatarMeta =>
       !!a && typeof a === "object" && typeof (a as AvatarMeta).id === "string",
@@ -237,7 +162,7 @@ function migrateAvatars(raw: unknown): AvatarMeta[] {
 }
 
 /** extensions 归一化：逐条补默认字段，非对象条目丢弃；enabled 缺省视为开。 */
-function migrateExtensions(raw: unknown): McpExtension[] {
+function normalizeExtensions(raw: unknown): McpExtension[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
@@ -264,15 +189,8 @@ const listeners = new Set<() => void>();
 function merge(parsed: Partial<PersistedState>): PersistedState {
   const d = defaults();
   const s = parsed.settings;
-  captureLegacyMemories(parsed as Record<string, unknown>);
   capturePassthrough(parsed as Record<string, unknown>);
-  // 旧 schema 的 pins/user：迁入 backend momo.db（透传一次后丢弃）。
-  const raw = parsed as Record<string, unknown>;
-  if (Array.isArray(raw.pins) || raw.user) {
-    const migrated = migratePins(raw, []);
-    if (migrated.length) legacyPins = migrated;
-  }
-  const avatars = migrateAvatars(parsed.avatars ?? d.avatars);
+  const avatars = normalizeAvatars(parsed.avatars ?? d.avatars);
   return {
     settings: {
       general: { ...d.settings.general, ...s?.general },
@@ -280,9 +198,9 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
       asr: { ...d.settings.asr, ...s?.asr },
       tts: { ...d.settings.tts, ...s?.tts },
       embedding: { ...d.settings.embedding, ...s?.embedding },
-      extensions: migrateExtensions(s?.extensions),
+      extensions: normalizeExtensions(s?.extensions),
     },
-    persona: migratePersona(parsed.persona, d.persona),
+    persona: normalizePersona(parsed.persona, d.persona),
     avatars,
     avatarId:
       parsed.avatarId && avatars.some((a) => a.id === parsed.avatarId)
@@ -291,21 +209,7 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
   };
 }
 
-/** 旧 key 迁移：新 key 无数据且旧 key 有 → 读旧→写新→删旧。 */
-function migrateStorageKey(): void {
-  try {
-    if (backend.getItem(STORAGE_KEY)) return;
-    const old = backend.getItem(LEGACY_STORAGE_KEY);
-    if (!old) return;
-    backend.setItem(STORAGE_KEY, old);
-    backend.removeItem(LEGACY_STORAGE_KEY);
-  } catch {
-    // 迁移失败无碍：按无存档走默认
-  }
-}
-
 function load(): PersistedState {
-  migrateStorageKey();
   try {
     const raw = backend.getItem(STORAGE_KEY);
     if (!raw) return defaults();
@@ -332,26 +236,13 @@ export async function bootPersist(): Promise<void> {
   persist();
 }
 
-/** 防抖 PUT /api/state；失败静默（localStorage 仍兜底）。
- *  带一次旧版 memories/pins 透传：首个成功 PUT 后丢弃该字段。 */
+/** 防抖 PUT /api/state；失败静默（localStorage 仍兜底）。 */
 function remoteSave(): void {
   if (!inBrowser()) return;
   if (saveTimer !== null) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    const body: Record<string, unknown> = {
-      ...passthrough,
-      ...state,
-      ...(legacyMemories ? { memories: legacyMemories } : {}),
-      ...(legacyPins ? { pins: legacyPins } : {}),
-    };
-    void putState(body).then((ok) => {
-      // backend 已收到旧 memories/pins（会自行导入），本地不再携带
-      if (ok) {
-        legacyMemories = null;
-        legacyPins = null;
-      }
-    });
+    void putState({ ...passthrough, ...state });
   }, 300);
 }
 
@@ -369,9 +260,8 @@ export function getState(): PersistedState {
 }
 
 /**
- * 外部改动 backend state 后（如读档覆盖了 history）重拉 passthrough。
- * 不做的话旧 history 会随下一次防抖 PUT 盖回刚加载的会话。
- * 先掐掉在途防抖写：它携带的仍是读档前的 passthrough。
+ * 外部改动 backend state 后（如读档）重拉 passthrough。
+ * 先掐掉在途防抖写：它携带的仍是改动前的 passthrough。
  */
 export async function resyncPassthrough(): Promise<void> {
   if (!inBrowser()) return;

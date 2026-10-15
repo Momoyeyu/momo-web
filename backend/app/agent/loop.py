@@ -21,19 +21,13 @@ HISTORY_WINDOW = 20
 _DELTA_DELIMS = "。！？!?…\n"
 
 # 落库前剥离表情/动作指令：history 会回喂给下一轮 LLM，指令标记
-# 留在上下文里只会教会模型继续输出旧格式。#tag 是上一代语法的残留
-# 习惯，同样剥除（值清单固定——仅是文本清洗，不再驱动资源）。
+# 留在上下文里只会教会模型继续输出指令。
 _RE_DIRECTIVE = re.compile(r"<(exp|motion)>[^<]*</\1>[^\S\n]*")
-_RE_LEGACY_TAG = re.compile(
-    r"(?<![\w#])#(?:neutral|happy|sad|angry|surprised|thinking|shy|sleepy)\b"
-    r"[^\S\n]*"  # 同行的尾随空白一并吃掉（不吞换行）
-)
 
 
 def _clean_reply(text: str) -> str:
-    """剥离 <exp>/<motion> 指令与旧版 #tag，返回可展示/落库的正文。"""
+    """剥离 <exp>/<motion> 指令，返回可展示/落库的正文。"""
     s = _RE_DIRECTIVE.sub("", text)
-    s = _RE_LEGACY_TAG.sub("", s)
     # 指令移除后行首可能残留空白
     return "\n".join(line.lstrip() for line in s.split("\n")).strip()
 

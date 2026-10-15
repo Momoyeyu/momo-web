@@ -10,7 +10,7 @@ _LANG_NAMES = {"zh": "中文", "en": "English", "ja": "日本語"}
 _DEFAULT_PERSONA: dict[str, Any] = DEFAULT_STATE["persona"]
 
 # 各语言模板片段；{...} 由 builder 注入。结构见 meta/prompt.md：
-# # 人格配置（基本信息/偏好/基本设定）→ # 记忆配置（初始记忆/使用策略）→ # 行为配置（表情/动作）
+# # 人格配置（基本信息/偏好/基本设定）→ # 记忆配置（仅初始记忆）→ # 行为配置（表情/动作）
 _T = {
     "zh": {
         "persona_head": "# 人格配置",
@@ -27,14 +27,6 @@ _T = {
         "time_line": "当前 UTC 时间是{utc}，你所在的时区是{tz}",
         "mem_head": "# 记忆配置",
         "pins_head": "## 你的初始记忆",
-        "mem_policy_head": "## 记忆使用策略",
-        "mem_policy": (
-            "用户透露偏好、身份、重要事实时，调用 memory_add 写入",
-            "对话涉及用户过去的事，或你不确定是否记过时，先调用 memory_search",
-            "memory_add 返回重复冲突时，用返回的冲突记忆 id 调用 memory_update 修正，不要重复写入",
-            "用户要求忘掉某件事时，先 memory_search 定位，再 memory_delete",
-            "初始记忆已在上方列出，属于已知事实，无需再 search",
-        ),
         "behavior_head": "# 行为配置",
         "exp_head": "## 表情控制策略",
         "exp_intro": (
@@ -66,14 +58,6 @@ _T = {
         "time_line": "The current UTC time is {utc}; your timezone is {tz}",
         "mem_head": "# Memory Configuration",
         "pins_head": "## Your initial memories",
-        "mem_policy_head": "## Memory usage policy",
-        "mem_policy": (
-            "When the user reveals preferences, identity, or important facts, call memory_add to save them",
-            "When the conversation touches on the user's past, or you are unsure whether something was recorded, call memory_search first",
-            "If memory_add reports a duplicate conflict, call memory_update with the returned conflicting memory id to fix it; do not write it again",
-            "When the user asks to forget something, locate it with memory_search first, then call memory_delete",
-            "The initial memories listed above are already known facts; no need to search for them",
-        ),
         "behavior_head": "# Behavior Configuration",
         "exp_head": "## Expression control policy",
         "exp_intro": (
@@ -105,14 +89,6 @@ _T = {
         "time_line": "現在の UTC 時刻は{utc}、タイムゾーンは{tz}です",
         "mem_head": "# 記憶設定",
         "pins_head": "## あなたの初期記憶",
-        "mem_policy_head": "## 記憶の使用ポリシー",
-        "mem_policy": (
-            "ユーザーが好み・身分・重要な事実を明かしたときは memory_add で書き込む",
-            "会話がユーザーの過去のことに触れたり、記憶したか不確かなときは、先に memory_search を呼ぶ",
-            "memory_add が重複競合を返したら、返された競合記憶の id で memory_update を呼んで修正し、重複して書き込まない",
-            "ユーザーが何かを忘れてほしいと言ったら、先に memory_search で特定してから memory_delete を呼ぶ",
-            "上記の初期記憶はすでに知っている事実なので、再検索は不要",
-        ),
         "behavior_head": "# 行動設定",
         "exp_head": "## 表情コントロールポリシー",
         "exp_intro": (
@@ -188,8 +164,7 @@ def build_system_prompt(
         persona.get("age"), bool
     ):
         persona["age"] = _DEFAULT_PERSONA["age"]
-    if not any(str(p).strip() for p in (persona.get("preferences") or [])):
-        persona["preferences"] = _DEFAULT_PERSONA["preferences"]
+    # 偏好是列表型配置：空 = 无偏好，不回落默认；装配侧按条件注入（含头）。
     pins = [
         p.strip() for p in (pins or []) if isinstance(p, str) and p.strip()
     ]
@@ -216,28 +191,27 @@ def build_system_prompt(
             t["time_line"].format(utc=tinfo["utc"], tz=tinfo["tz"]),
         )
     )
-    sections.append(
-        "\n\n".join(
-            (
-                t["persona_head"] + "\n\n" + t["basic_head"] + "\n" + info,
-                t["prefs_head"] + "\n" + "\n".join(f"- {p}" for p in prefs),
-                t["settings_head"] + "\n" + settings,
-            )
+    # 偏好条件注入（含头）：空列表 = 无偏好，整段不出现，不留空标题。
+    persona_blocks = [
+        t["persona_head"] + "\n\n" + t["basic_head"] + "\n" + info,
+        t["settings_head"] + "\n" + settings,
+    ]
+    if prefs:
+        persona_blocks.insert(
+            1, t["prefs_head"] + "\n" + "\n".join(f"- {p}" for p in prefs)
         )
-    )
+    sections.append("\n\n".join(persona_blocks))
 
-    # # 记忆配置：初始记忆（pins 为空时整段不出现）+ 使用策略
-    mem_blocks = []
+    # # 记忆配置：仅初始记忆；pins 为空时整块不出现。
+    # 使用策略已下沉到各能力的 tools description（见 capability.py），不进提示词。
     if pins:
-        mem_blocks.append(
-            t["pins_head"] + "\n" + "\n".join(f"- {p}" for p in pins)
+        sections.append(
+            t["mem_head"]
+            + "\n\n"
+            + t["pins_head"]
+            + "\n"
+            + "\n".join(f"- {p}" for p in pins)
         )
-    mem_blocks.append(
-        t["mem_policy_head"]
-        + "\n"
-        + "\n".join(f"- {line}" for line in t["mem_policy"])
-    )
-    sections.append(t["mem_head"] + "\n\n" + "\n\n".join(mem_blocks))
 
     # # 行为配置：清单为空的通道整段不注入；两通道都无资源则整节不出现。
     res = _avatar_resources(state)

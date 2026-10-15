@@ -16,7 +16,7 @@ TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "memory_add",
-            "description": "新增一条普通记忆（关于用户或对话的重要事实）",
+            "description": "新增一条普通记忆。用户透露偏好、身份、重要事实时调用写入；若返回重复冲突，改用 memory_update 修正返回的冲突记忆 id，不要重复写入",
             "parameters": {
                 "type": "object",
                 "properties": {"content": {"type": "string"}},
@@ -28,7 +28,7 @@ TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "memory_search",
-            "description": "搜索相关记忆，返回 [{id, content}]",
+            "description": "搜索相关记忆，返回 [{id, content}]。对话涉及用户过去的事、或不确定是否记过时先调用；初始记忆已注入系统提示词、属于已知事实，无需再搜索",
             "parameters": {
                 "type": "object",
                 "properties": {"query": {"type": "string"}},
@@ -55,7 +55,7 @@ TOOLS: list[dict[str, Any]] = [
         "type": "function",
         "function": {
             "name": "memory_delete",
-            "description": "删除一条普通记忆（初始记忆 pin 不可删除）",
+            "description": "删除一条普通记忆（初始记忆 pin 不可删除）；用户要求忘掉某件事时，先 memory_search 定位再调用",
             "parameters": {
                 "type": "object",
                 "properties": {"id": {"type": "string"}},

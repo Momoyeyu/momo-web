@@ -127,7 +127,7 @@ export default function Checkpoint() {
     setBusy(true);
     try {
       const save = await loadCheckpoint(s.id);
-      await resyncPassthrough(); // 旧 history 不得随下次 PUT 盖回
+      await resyncPassthrough(); // 掐掉在途防抖写并重拉 passthrough
       loadTranscript(save.messages ?? []);
       navigate("chat");
     } catch {
