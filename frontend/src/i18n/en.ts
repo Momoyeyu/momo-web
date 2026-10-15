@@ -65,6 +65,7 @@ export const en: Dict = {
       embedding: "Embedding · Semantic recall",
       avatar: "Avatar · Live2D",
       dialog: "Dialog box",
+      extensions: "Extensions · MCP",
     },
     langLabel: "Language",
     chatLang: "Chat language",
@@ -101,6 +102,22 @@ export const en: Dict = {
     hideKey: "Hide",
     test: "Test connection",
     testNeedUrl: "fill in the URL first",
+    extHint:
+      "Registered MCP servers expose their tools to momo from the next turn on; unreachable servers are simply not injected.",
+    extAdd: "＋ Add extension",
+    extUnnamed: "(unnamed)",
+    extName: "Name",
+    extNamePh: "e.g. tavily",
+    extTransport: "Transport",
+    extTransports: {
+      http: "http · remote endpoint",
+      stdio: "stdio · local command",
+    },
+    extCommand: "Command",
+    extCommandPh: "npx -y tavily-mcp@latest",
+    extEndpoint: "Endpoint URL",
+    extEndpointPh: "https://…/mcp",
+    extEnabled: "Enabled",
 
   },
   persona: {

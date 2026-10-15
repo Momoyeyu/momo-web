@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from .. import memory
+
+if TYPE_CHECKING:
+    from .mcp_ext import ExtTools
 
 # OpenAI function calling 工具声明
 TOOLS: list[dict[str, Any]] = [
@@ -101,8 +104,14 @@ def execute_tool(name: str, args: dict[str, Any], pins: list[str]) -> str:
         return f"工具执行失败：{e}"
 
 
-def run_call(call: dict[str, Any], pins: list[str]) -> dict[str, Any]:
-    """执行一条 tool_calls 元素，返回 role=tool 的消息。"""
+def run_call(
+    call: dict[str, Any], pins: list[str], ext: ExtTools | None = None
+) -> dict[str, Any]:
+    """执行一条 tool_calls 元素，返回 role=tool 的消息。
+
+    ext：本回合的 MCP 拓展工具表；名字命中时转发给对应 server
+    （失败已由 ExtTools.call 文本化），否则走内置工具。
+    """
     fn = call.get("function") or {}
     name = str(fn.get("name") or "")
     raw_args = fn.get("arguments") or "{}"
@@ -116,8 +125,12 @@ def run_call(call: dict[str, Any], pins: list[str]) -> dict[str, Any]:
             "tool_call_id": call.get("id") or "",
             "content": "工具参数解析失败",
         }
+    if ext is not None and ext.has(name):
+        content = ext.call(name, args)
+    else:
+        content = execute_tool(name, args, pins)
     return {
         "role": "tool",
         "tool_call_id": call.get("id") or "",
-        "content": execute_tool(name, args, pins),
+        "content": content,
     }

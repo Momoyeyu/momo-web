@@ -53,12 +53,31 @@ interface GeneralConfig {
   semanticSearch: boolean;
 }
 
+/** MCP 拓展登记项：外部 MCP server 的连接配置（backend 每回合按此连接并
+ *  导入 tools/list，工具以 {server}_{tool} 注入）。 */
+export interface McpExtension {
+  /** 显示名；同时用作工具名前缀（backend 会合法化为 [a-zA-Z0-9_]）。 */
+  name: string;
+  /** 连接方式：stdio = 本地命令子进程；http = Streamable HTTP 端点。 */
+  transport: "stdio" | "http";
+  /** stdio：完整命令行（backend 按 shell 规则拆分），如 `npx -y xxx-mcp`。 */
+  command: string;
+  /** http：MCP 端点 URL（http(s)://…）。 */
+  endpoint: string;
+  /** http 鉴权（选填）：非空时作为 Authorization: Bearer 头发送。 */
+  apiKey: string;
+  /** 开关；关闭即不连接不注入（下一回合生效）。 */
+  enabled: boolean;
+}
+
 export interface Settings {
   general: GeneralConfig;
   llm: LlmConfig;
   asr: AsrConfig;
   tts: TtsConfig;
   embedding: EmbeddingConfig;
+  /** 已登记的 MCP 拓展清单。 */
+  extensions: McpExtension[];
 }
 
 /** 普通记忆条目（backend /api/memories 返回；pin 不在此列）。 */
