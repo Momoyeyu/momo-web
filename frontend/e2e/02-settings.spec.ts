@@ -151,12 +151,21 @@ test("形象 tab：偏好与 Live2D 模型左右并排且等宽", async ({ page 
   await expect(cols.nth(0)).toContainText("偏好");
   await expect(cols.nth(1)).toContainText("Live2D 模型");
 
-  // 等宽（对齐要求）：两栏宽度之差 < 2px
+  // 等宽等高：列表区按一页 3 条预留高度，故两侧与条数无关地保持一致
   const [a, b] = await Promise.all([
     cols.nth(0).boundingBox(),
     cols.nth(1).boundingBox(),
   ]);
   expect(Math.abs((a?.width ?? 0) - (b?.width ?? 0))).toBeLessThan(2);
+  expect(Math.abs((a?.height ?? 0) - (b?.height ?? 0))).toBeLessThan(2);
+
+  // 两侧卡片也等高（偏好单行 vs 形象带缩略图），行才能在水平方向对齐
+  const [cardL, cardR] = await Promise.all([
+    cols.nth(0).locator(".list-item").first().boundingBox(),
+    cols.nth(1).locator(".list-item").first().boundingBox(),
+  ]);
+  expect(Math.abs((cardL?.height ?? 0) - (cardR?.height ?? 0))).toBeLessThan(2);
+  expect(cardL?.height ?? 0).toBeGreaterThanOrEqual(70);
 
   // 形象面板已从「模型」tab 移走
   await page.locator(".stab", { hasText: "模型" }).click();

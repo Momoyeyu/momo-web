@@ -7,7 +7,7 @@
 import { useState } from "react";
 import type { PersonaCard } from "../lib/types";
 import { DEFAULT_PERSONA } from "../lib/store";
-import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
+import { CARD_PAGE_SIZE, clampPage } from "../lib/paging";
 import Pager from "../ui/Pager";
 import AvatarPanel from "./Avatar";
 import DetailModal from "../components/DetailModal";
@@ -39,10 +39,10 @@ export default function PersonaPanel({
     .filter((x) =>
       x.text.toLowerCase().includes(prefQuery.trim().toLowerCase()),
     );
-  const pref = clampPage(prefPage, prefHits.length);
+  const pref = clampPage(prefPage, prefHits.length, CARD_PAGE_SIZE);
   const prefSlice = prefHits.slice(
-    pref.page * LIST_PAGE_SIZE,
-    (pref.page + 1) * LIST_PAGE_SIZE,
+    pref.page * CARD_PAGE_SIZE,
+    (pref.page + 1) * CARD_PAGE_SIZE,
   );
 
   /** 「+ 添加」：追加空条目并立即进入编辑态（清检索、跳末页保证可见）。 */
@@ -50,7 +50,7 @@ export default function PersonaPanel({
     const next = [...value.preferences, ""];
     patch({ preferences: next });
     setPrefQuery("");
-    setPrefPage(Math.max(0, Math.ceil(next.length / LIST_PAGE_SIZE) - 1));
+    setPrefPage(Math.max(0, Math.ceil(next.length / CARD_PAGE_SIZE) - 1));
     setEditingPref(next.length - 1);
     setPrefDraft("");
   };
@@ -145,7 +145,7 @@ export default function PersonaPanel({
             disabled={editingPref !== null}
           />
         </div>
-        <div className="field col-grow">
+        <div className="list-body">
           {prefSlice.map(({ text: p, i }) => (
             <EditableItem
               key={i}

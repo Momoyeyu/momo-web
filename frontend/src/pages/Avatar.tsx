@@ -19,7 +19,7 @@ import {
   update,
 } from "../lib/store";
 import type { AvatarMeta, AvatarResources } from "../lib/types";
-import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
+import { CARD_PAGE_SIZE, clampPage } from "../lib/paging";
 import { deleteBlob, getBlob, putBlob } from "../lib/idb";
 import { checkManifest, listManifests } from "../live2d/avatarZip";
 import { getStage } from "../live2d/stage";
@@ -117,10 +117,10 @@ export default function AvatarPanel() {
     const q = query.trim().toLowerCase();
     return !q || `${a.name} ${a.manifest}`.toLowerCase().includes(q);
   });
-  const pg = clampPage(page, hits.length);
+  const pg = clampPage(page, hits.length, CARD_PAGE_SIZE);
   const slice = hits.slice(
-    pg.page * LIST_PAGE_SIZE,
-    (pg.page + 1) * LIST_PAGE_SIZE,
+    pg.page * CARD_PAGE_SIZE,
+    (pg.page + 1) * CARD_PAGE_SIZE,
   );
   const resAvatar = resId ? (avatars.find((a) => a.id === resId) ?? null) : null;
 
@@ -350,7 +350,7 @@ export default function AvatarPanel() {
         />
       </div>
 
-      <div className="field col-grow">
+      <div className="list-body">
         {slice.map((a) => (
           <div
             key={a.id}
