@@ -18,9 +18,15 @@ describe("Hint", () => {
     expect(html).toContain(`aria-label="${TEXT}"`);
   });
 
-  it("用朝下的 .tip-b：贴在面板顶部时才不会被滚动容器裁掉", () => {
-    const html = renderToStaticMarkup(createElement(Hint, { text: TEXT }));
-    expect(html).toContain('class="hint tip tip-b tip-l"');
+  it("默认朝上弹；贴顶的元素传 side=\"down\" 才用 .tip-b", () => {
+    const up = renderToStaticMarkup(createElement(Hint, { text: TEXT }));
+    expect(up).toContain('class="hint tip tip-l"');
+    expect(up).not.toContain("tip-b");
+
+    const down = renderToStaticMarkup(
+      createElement(Hint, { text: TEXT, side: "down" }),
+    );
+    expect(down).toContain('class="hint tip tip-l tip-b"');
   });
 
   it("键盘可达：可聚焦，浮窗在 :focus-visible 时同样显示", () => {

@@ -8,16 +8,24 @@
 // 尺寸按 em 走：比相邻文字略小一丢丢，并自动跟随所在位置的字号。
 //
 // 用途：把「说明书式」的长句从页面上收进浮窗，说明只在用户主动询问时出现。
-// 复用 controls.css 的 .tip 机制（与记忆卡片的图钉同一套浮窗）：
-//   .tip    提供 data-tip → ::after 浮窗
-//   .tip-b  浮窗朝**下**弹：这东西通常贴在面板顶部，朝上会被滚动容器裁掉
-//   .tip-l  左对齐：贴左缘时不至于向左出界
+// 复用 controls.css 的 .tip 机制（与图钉同一套浮窗）：
+//   .tip      提供 data-tip → ::after 浮窗，默认朝**上**弹
+//   side="down"  朝下弹：元素贴在面板顶部时用，朝上会被滚动容器裁掉
+//   .tip-l    左对齐：贴左缘时不至于向左出界
 import "../styles/controls.css";
 
-export default function Hint({ text }: { text: string }) {
+export default function Hint({
+  text,
+  side = "up",
+}: {
+  /** 解释正文（同时进 data-tip 与 aria-label）。 */
+  text: string;
+  /** 浮窗朝向。默认朝上；贴着容器顶部的元素用 "down"。 */
+  side?: "up" | "down";
+}) {
   return (
     <span
-      className="hint tip tip-b tip-l"
+      className={`hint tip tip-l${side === "down" ? " tip-b" : ""}`}
       data-tip={text}
       role="img"
       aria-label={text}

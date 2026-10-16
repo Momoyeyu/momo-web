@@ -952,7 +952,7 @@ export default function Settings() {
                       {t("settings.groups.extensions")}
                     </h3>
                     {/* 这段说明是「说明书」性质：收进问号浮窗，不占版面 */}
-                    <Hint text={t("settings.extHint")} />
+                    <Hint text={t("settings.extHint")} side="down" />
                   </div>
                   <div className="ext-list col-grow">
                     {extSlice.map(({ ext, i }) => (

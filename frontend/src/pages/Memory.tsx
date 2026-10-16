@@ -18,6 +18,7 @@ import EditableItem from "../ui/EditableItem";
 import IconButton from "../ui/IconButton";
 import Button from "../ui/Button";
 import AddItemModal from "../ui/AddItemModal";
+import Hint from "../ui/Hint";
 import { useT, currentLang } from "../i18n";
 import "../styles/persona.css";
 import "../styles/settings.css";
@@ -142,9 +143,8 @@ export default function MemoryPanel() {
       // 图钉与编辑/删除同列：都是右侧图标操作，垂直居中对齐
       actions={
         <Button
-          className={`mem-pinicon tip tip-r${m.pinned ? " on" : ""}`}
-          data-tip={t("memory.pinTip")}
-          onClick={(e) => {
+          className={`mem-pinicon${m.pinned ? " on" : ""}`}
+onClick={(e) => {
             e.stopPropagation();
             void togglePin(m);
           }}
@@ -237,8 +237,7 @@ export default function MemoryPanel() {
             <div className="mem-pinopt">
               {/* 与记忆卡片同款图钉：pinned=实心金 / unpinned=金色描边 */}
               <Button
-                className={`mem-pinicon tip tip-l${addPinned ? " on" : ""}`}
-                data-tip={t("memory.pinTip")}
+                className={`mem-pinicon${addPinned ? " on" : ""}`}
                 aria-pressed={addPinned}
                 onClick={() => setAddPinned((v) => !v)}
               >
@@ -258,7 +257,9 @@ export default function MemoryPanel() {
                   />
                 </svg>
               </Button>
-              <span>PIN</span>
+                            <span>PIN</span>
+                            {/* 说明挂在问号上：图钉本身悬停不弹东西 */}
+                            <Hint text={t("memory.pinTip")} />
             </div>
           }
         />
