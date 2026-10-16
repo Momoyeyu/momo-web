@@ -53,7 +53,6 @@ export const ja: Dict = {
     replayMuted: "音声出力がオフです。ツールバーでオンにしてください",
   },
   checkpoint: {
-    title: "セーブ",
     save: "セーブ",
     load: "ロード",
     autoBadge: "AUTO",

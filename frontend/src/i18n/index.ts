@@ -35,16 +35,6 @@ export function resolvePromptLang(g: GeneralConfig): Lang {
   return "zh";
 }
 
-/**
- * momo 对话语言（settings.general.chatLang；auto/缺失 → 回落界面语言）。
- *
- * prompt 组装、出厂默认人设、TTS 合成语言都按它选，语义与后端
- * prompt._lang_of 对齐；取词用 tFor(promptLang(), …) 而不是 t()（后者跟界面语言）。
- */
-export function promptLang(): Lang {
-  return resolvePromptLang(getSettings().general);
-}
-
 function lookup(dict: Dict, key: string): string | undefined {
   let cur: unknown = dict;
   for (const seg of key.split(".")) {

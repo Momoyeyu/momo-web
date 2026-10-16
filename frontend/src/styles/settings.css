@@ -115,10 +115,6 @@
 }
 
 /* 单数项 / 整行面板：紧跟双栏区下方铺满。 */
-.settings-full {
-  margin-top: 16px;
-}
-
 /* 半宽面板内收窄行距与标签列。 */
 .settings-col .opt-row {
   gap: 14px;
@@ -338,11 +334,6 @@
   min-width: 0;
 }
 
-button.ghost.danger:hover {
-  color: var(--danger-text);
-  border-color: var(--danger-line);
-}
-
 .key-toggle {
   flex: none;
   padding: 0.5em 1em;
@@ -400,12 +391,6 @@ button.ghost.danger:hover {
 }
 
 /* --- 人格/记忆面板复用的双栏表单 --- */
-
-.fields-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px 28px;
-}
 
 /* 表单项统一走 controls.css 的 .opt-row / .opt-label（ui/FieldRow），
    不再有「标签在上」的 .field 竖排形态。 */

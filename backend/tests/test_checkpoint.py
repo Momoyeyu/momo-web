@@ -366,7 +366,7 @@ def test_load_invalidates_inflight_turn(monkeypatch):
 
 
 def test_run_turn_skips_stream_when_gen_stale(monkeypatch):
-    """load 后的在途 run_turn：commit 失败 → 不 yield delta。"""
+    """load 后的在途 run_turn：落账失败 → 不产出任何句子事件。"""
     _seed(1, "甲")
     client = TestClient(app)
     sid = client.post("/api/checkpoints", json={}).json()["id"]
@@ -377,7 +377,7 @@ def test_run_turn_skips_stream_when_gen_stale(monkeypatch):
 
     monkeypatch.setattr(llm, "chat_stream", fake)
     events = list(turn.run_turn("hi"))
-    assert [e for e in events if e["t"] == "delta"] == []
+    assert [e for e in events if e["t"] == "sentence"] == []
 
 
 def test_interrupt_endpoint():

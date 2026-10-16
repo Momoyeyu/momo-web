@@ -1,7 +1,8 @@
 // 方形纯图标按钮：描边框 + 居中 svg；hover 变金、描边加粗。
-// 内置 plus / edit / trash / check；其余图标走 children 传 svg。
+// 内置 plus / edit / trash / check 四种图标。
 // 纯图标没有可见文字，可发现性靠 tip（悬停浮窗）与 label（读屏）两者都给。
-import type { MouseEvent, ReactNode } from "react";
+import type { MouseEvent } from "react";
+
 import "../styles/controls.css";
 
 const PATHS = {
@@ -28,7 +29,6 @@ export default function IconButton({
   active,
   size = "md",
   className,
-  children,
 }: {
   /** aria-label（纯图标按钮必须给读屏一个名字）。 */
   label: string;
@@ -49,7 +49,6 @@ export default function IconButton({
   size?: "md" | "sm";
   /** 附加类（多为定位，如存档卡的 .slot-del）。 */
   className?: string;
-  children?: ReactNode;
 }) {
   const paths: readonly string[] | undefined = icon ? PATHS[icon] : undefined;
   const cls = [
@@ -72,23 +71,19 @@ export default function IconButton({
       onClick={onClick}
       disabled={disabled}
     >
-      {paths ? (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          {paths.map((d) => (
-            <path
-              key={d}
-              d={d}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ))}
-        </svg>
-      ) : (
-        children
-      )}
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        {(paths ?? []).map((d) => (
+          <path
+            key={d}
+            d={d}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        ))}
+      </svg>
     </button>
   );
 }

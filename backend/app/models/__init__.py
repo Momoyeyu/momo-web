@@ -247,14 +247,6 @@ class ProbeResult(TypedDict):
 ErrorService = Literal["llm", "backend"]
 
 
-class DeltaEvent(TypedDict):
-    """整段原文增量。**当前后端不再产出**（切句改为句事件，见 SentenceEvent），
-    保留类型是为了 SSE 契约向后兼容：老客户端认 delta，新客户端只认 sentence。"""
-
-    t: Literal["delta"]
-    text: str
-
-
 class SentenceDir(TypedDict):
     """句子携带的指令（kind=exp 切表情 / motion 播动作，offset 为句内位置）。"""
 
@@ -287,5 +279,5 @@ class DoneEvent(TypedDict):
 
 
 #: agent 层产出的事件（done 由 api 层在回合成功后追加）。
-TurnEvent = DeltaEvent | SentenceEvent | ErrorEvent
-SseEvent = DeltaEvent | SentenceEvent | ErrorEvent | DoneEvent
+TurnEvent = SentenceEvent | ErrorEvent
+SseEvent = SentenceEvent | ErrorEvent | DoneEvent

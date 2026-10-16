@@ -28,7 +28,6 @@ class CheckpointError(Exception):
     def __init__(self, message: str, kind: str = "invalid") -> None:
         super().__init__(message)
         self.kind = kind
-        self.not_found = kind == "not_found"
 
 
 now_iso = db.now_iso

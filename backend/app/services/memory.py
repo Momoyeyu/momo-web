@@ -45,8 +45,6 @@ class MemoryError(Exception):
     def __init__(self, message: str, kind: str = "invalid") -> None:
         super().__init__(message)
         self.kind = kind
-        self.duplicate = kind == "duplicate"
-        self.not_found = kind == "not_found"
 
 
 # ==================== 对外操作 ====================

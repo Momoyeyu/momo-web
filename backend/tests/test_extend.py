@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.core import llm, mcp
+from app.core import llm
 from app.services import turn
 from app.core import mcp as extend
 from app.core.mcp import ExtTools, hub, result_text, sanitize, tool_decl

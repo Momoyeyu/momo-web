@@ -95,10 +95,6 @@ export class Live2DStage {
   private modelUrl: string | null = null;
 
   /** 模型是否已加载（口型/情绪写参前置检查）。 */
-  get ready(): boolean {
-    return this.model != null;
-  }
-
   /** 初始化舞台（透明背景叠页面；canvas 全窗口）。幂等：同一 canvas 重复调用跳过。 */
   init(canvas: HTMLCanvasElement): void {
     if (this.app) {

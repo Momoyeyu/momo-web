@@ -135,7 +135,6 @@ export default function NebulaCanvas() {
     try {
       return init(gl, canvas);
     } catch (e) {
-      (window as unknown as Record<string, unknown>).__nebula = String(e);
       return undefined;
     }
 
@@ -295,7 +294,6 @@ export default function NebulaCanvas() {
     resize();
     paint();
     schedule();
-    (window as unknown as Record<string, unknown>).__nebula = "ok";
 
     return () => {
       disposed = true;

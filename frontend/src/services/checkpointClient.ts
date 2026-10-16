@@ -35,10 +35,6 @@ export async function createCheckpoint(
   );
 }
 
-export function getCheckpoint(id: string): Promise<CheckpointSave> {
-  return apiJson<CheckpointSave>(`${API}/${id}`);
-}
-
 /** 覆盖写入（title 非空时同时重命名）。 */
 export function overwriteCheckpoint(
   id: string,

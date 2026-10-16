@@ -1,17 +1,16 @@
-// 通用按钮：把全站散落的 `ghost` / `small` / `danger` 类组合收敛成声明式 props。
+// 通用按钮：把全站散落的 `ghost` / `small` 类组合收敛成声明式 props。
 //
 // 刻意**不引入基础类**（没有 .btn）——solid 就是裸 <button>，emit 出来的类串与
 // 封装前逐字一致。因此页面私有的按钮形态（.tb / .bl-replay / .menu-item /
 // .slot-del / .kv-add / .stab …）直接走 className 逃生口，外观不受影响。
 //
-// 类的拼装顺序固定为 ghost → small → danger → className，与既有写法一致。
+// 类的拼装顺序固定为 ghost → small → className，与既有写法一致。
 import type { ButtonHTMLAttributes } from "react";
 import "../styles/controls.css";
 
 export default function Button({
   variant = "solid",
   size = "md",
-  danger = false,
   className,
   type = "button",
   ...rest
@@ -20,13 +19,10 @@ export default function Button({
   variant?: "solid" | "ghost";
   /** md = 默认尺寸；sm = 卡片/行内小按钮（原 `small`）。 */
   size?: "md" | "sm";
-  /** 危险操作（删除等）：原 `danger`。 */
-  danger?: boolean;
 }) {
   const cls = [
     variant === "ghost" ? "ghost" : "",
     size === "sm" ? "small" : "",
-    danger ? "danger" : "",
     className ?? "",
   ]
     .filter(Boolean)

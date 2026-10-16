@@ -500,7 +500,6 @@ export class ChatEngine {
         } else if (ev.t === "error") {
           throw new ServiceError("llm", "http", 0, ev.message);
         }
-        // delta：过渡期遗留（整段原文），新前端不再消费；done：走统一收尾
       }
     } catch (err) {
       if (this.turn === turn) this.events.onError(toError(err));

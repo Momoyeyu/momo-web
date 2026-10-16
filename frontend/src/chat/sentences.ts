@@ -49,10 +49,6 @@ export class SentenceSplitter {
   }
 
   /** 生产中的未断句尾部（展示层逐字上屏用；含未 trim 的原文）。 */
-  get pending(): string {
-    return this.buf;
-  }
-
   /** 收尾残余；无残余返回 null。 */
   flush(): string | null {
     const s = this.buf.trim();

@@ -1,12 +1,6 @@
 /* 人格 tab（设置页内）：三块 panel（人设卡 / 用户画像 / 长期记忆）。 */
 /* 颜色与控件基线全部走 base.css 变量，这里只管排版。 */
 
-.persona-tab {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
 /* 左 Live2D 与右 MCP 两个面板共用同一套纵向版式：
    标题行 / 工具条 / 列表 / 翻页器 之间的间距一致，两栏才会真正对齐。 */
 .persona-section,
@@ -26,12 +20,6 @@
   line-height: 1.6;
 }
 
-/* fields-grid 内的单列容器：基本信息面板左右两列各一列字段。 */
-.fields-col {
-  display: flex;
-  flex-direction: column;
-}
-
 /* 「基本信息」是通栏面板、内部再分两列（每列约 630px），标签列沿用
    controls.css 里 .opt-label 的默认宽度 —— 与设置页其它 tab 完全一致，
    不给本页单独开宽度档。行距由 .opt-row 自身的 padding 与分隔线提供，
@@ -43,18 +31,6 @@
 .persona-section textarea,
 .mem-search {
   width: 100%;
-}
-
-.persona-section > textarea {
-  resize: vertical;
-  line-height: 1.6;
-}
-/* 注：`.list-edit textarea` 的同款规则归 controls.css（EditableItem 自带）。 */
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 button.small {

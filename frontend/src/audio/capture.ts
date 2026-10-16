@@ -35,10 +35,6 @@ export class MicStreamer {
   private onError: ((err: unknown) => void) | null = null;
   private _active = false;
 
-  get active(): boolean {
-    return this._active;
-  }
-
   /** 请求麦克风并开始推帧。权限拒绝/设备缺失时抛错并释放资源。 */
   async start(
     onChunk: (pcm: Uint8Array) => void,

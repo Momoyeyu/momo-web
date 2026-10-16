@@ -18,12 +18,7 @@ describe("Button 的类串映射（必须与封装前的 className 逐字一致�
     expect(cls({})).toBeUndefined();
     expect(cls({ variant: "ghost" })).toBe("ghost");
     expect(cls({ size: "sm" })).toBe("small");
-    expect(cls({ variant: "ghost", size: "sm" })).toBe("ghost small");
-    expect(cls({ variant: "ghost", danger: true })).toBe("ghost danger");
-    expect(cls({ variant: "ghost", size: "sm", danger: true })).toBe(
-      "ghost small danger",
-    );
-  });
+    expect(cls({ variant: "ghost", size: "sm" })).toBe("ghost small");  });
 
   it("className 逃生口：页面私有类原样拼在末尾", () => {
     expect(cls({ variant: "ghost", className: "key-toggle" })).toBe(
@@ -35,8 +30,8 @@ describe("Button 的类串映射（必须与封装前的 className 逐字一致�
     // 整块私有形态（无 ghost/small）：类串就是 className 本身
     expect(cls({ className: "tb" })).toBe("tb");
     expect(cls({ className: "menu-item" })).toBe("menu-item");
-    expect(cls({ variant: "ghost", size: "sm", className: "slot-del", danger: true })).toBe(
-      "ghost small danger slot-del",
+    expect(cls({ variant: "ghost", size: "sm", className: "slot-del" })).toBe(
+      "ghost small slot-del",
     );
   });
 

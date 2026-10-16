@@ -4,8 +4,8 @@
 import type { CheckpointMeta } from "./types";
 import type { CheckpointMode } from "../router";
 
-export const GRID_COLS = 4;
-export const GRID_ROWS = 3;
+const GRID_COLS = 4;
+const GRID_ROWS = 3;
 export const PER_PAGE = GRID_COLS * GRID_ROWS; // 12
 export const MAX_PAGES = 10;
 export const MAX_SLOT = PER_PAGE * MAX_PAGES; // 120

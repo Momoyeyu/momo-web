@@ -1,6 +1,3 @@
-/** 设置页长列表共用：每页条数与页码钳制。 */
-export const LIST_PAGE_SIZE = 10;
-
 /** 卡片列表（Live2D 模型 / MCP 拓展）：每页 5 条。
  *
  *  与 styles/controls.css 的 .list-body（min-height 按 5 条预留）配套：
@@ -12,7 +9,7 @@ export const CARD_PAGE_SIZE = 5;
 export function clampPage(
   page: number,
   total: number,
-  pageSize: number = LIST_PAGE_SIZE,
+  pageSize: number,
 ): {
   page: number;
   pages: number;

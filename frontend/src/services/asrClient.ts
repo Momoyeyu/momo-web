@@ -60,14 +60,9 @@ interface AsrServerMessage {
 
 export class AsrStream {
   private ws: WebSocket | null = null;
-  private _open = false;
   /** close() 已发起（等回声/超时中）；用于幂等。 */
   private closing = false;
   private closeTimer: ReturnType<typeof setTimeout> | null = null;
-
-  get open(): boolean {
-    return this._open;
-  }
 
   /** 建立连接；resolve 于 WS open（首个 Metadata 事件由 onResult 之外正常分发）。 */
   connect(cfg: AsrConfig, events: AsrEvents): Promise<void> {
@@ -81,7 +76,6 @@ export class AsrStream {
 
       ws.onopen = () => {
         settled = true;
-        this._open = true;
         resolve();
       };
       ws.onmessage = (ev: MessageEvent) => this.onMessage(ev.data, events, ws);
@@ -94,7 +88,6 @@ export class AsrStream {
         }
       };
       ws.onclose = (ev) => {
-        this._open = false;
         this.clearCloseTimer();
         if (this.ws === ws) this.ws = null;
         if (!settled) {
@@ -120,12 +113,6 @@ export class AsrStream {
   }
 
   /** {type:"Finalize"}：强制断句冲刷 VAD 残留。 */
-  finalize(): void {
-    const ws = this.ws;
-    if (!ws || ws.readyState !== WebSocket.OPEN || this.closing) return;
-    ws.send(JSON.stringify({ type: "Finalize" }));
-  }
-
   /** {type:"CloseStream"} → 等服务端回声或超时后 close(1000)。幂等。 */
   close(): void {
     const ws = this.ws;

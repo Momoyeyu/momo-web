@@ -5,8 +5,6 @@
 // SSE 协议（每行 `data: <json>`）：
 //   {"t":"sentence","no","text","dirs","at"}  一句话已落账（正文已剥离指令，
 //                                         dirs 是该句要触发的表情/动作及句内偏移）
-//   {"t":"delta","text":"…"}            过渡期遗留：整段原文（含指令）。
-//                                         新前端只认 sentence，收到 delta 忽略。
 //   {"t":"done"}                       回合结束
 //   {"t":"error","message":"…"}        回合失败（yield 给调用方映射成 Error）
 
@@ -44,7 +42,6 @@ export interface SentenceDir {
 
 export type ChatEvent =
   | { t: "sentence"; no: number; text: string; dirs: SentenceDir[]; at: string }
-  | { t: "delta"; text: string }
   | { t: "done" }
   | { t: "error"; message: string };
 
@@ -75,9 +72,6 @@ function parseEvent(data: string): ChatEvent | null {
         dirs: Array.isArray(j.dirs) ? (j.dirs as SentenceDir[]) : [],
         at: typeof j.at === "string" ? j.at : "",
       };
-    }
-    if (j.t === "delta" && typeof j.text === "string") {
-      return { t: "delta", text: j.text };
     }
     if (j.t === "done") return { t: "done" };
     if (j.t === "error") {

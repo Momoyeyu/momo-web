@@ -53,7 +53,6 @@ export const en: Dict = {
     replayMuted: "Voice output is muted — unmute it in the toolbar first",
   },
   checkpoint: {
-    title: "Saves",
     save: "Save",
     load: "Load",
     autoBadge: "AUTO",

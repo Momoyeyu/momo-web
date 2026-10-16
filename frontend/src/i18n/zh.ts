@@ -53,7 +53,6 @@ export const zh = {
     replayMuted: "语音输出已静音，先在工具条打开",
   },
   checkpoint: {
-    title: "存档",
     save: "存档",
     load: "读档",
     autoBadge: "AUTO",
