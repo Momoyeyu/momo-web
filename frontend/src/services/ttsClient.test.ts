@@ -162,4 +162,28 @@ describe("streamSpeech", () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it("voice 为空则不带该字段，非空则原样透传", async () => {
+    const spy = vi.fn(async (_url: string, _init: RequestInit) => streamResponse([]));
+    vi.stubGlobal("fetch", spy);
+
+    await streamSpeech({ url: "http://h", key: "", voice: "v1" }, "hi", {
+      lang: LANG,
+      onChunk: () => {},
+    });
+    const withVoice = JSON.parse(
+      (spy.mock.calls[0][1] as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect(withVoice.voice).toBe("v1");
+
+    spy.mockClear();
+    await streamSpeech({ url: "http://h", key: "", voice: "" }, "hi", {
+      lang: LANG,
+      onChunk: () => {},
+    });
+    const without = JSON.parse(
+      (spy.mock.calls[0][1] as RequestInit).body as string,
+    ) as Record<string, unknown>;
+    expect("voice" in without).toBe(false);
+  });
 });

@@ -67,16 +67,26 @@ describe("chat 的 SSE 消费", () => {
       frame(sentence(0, "甲。")) + frame(sentence(1, "乙。")) + frame({ t: "done" });
     const got = await drain(sse([whole.slice(0, 7), whole.slice(7, 40), whole.slice(40)]));
     expect(got.map((e) => e.t)).toEqual(["sentence", "sentence", "done"]);
+    // 跨分片时文本最容易粘连/截断，所以文本也要断言
+    expect(got.flatMap((e) => (e.t === "sentence" ? [e.text] : []))).toEqual([
+      "甲。",
+      "乙。",
+    ]);
   });
 
   it("未知事件类型跳过，不影响后续句子", async () => {
     const got = await drain(
       sse([
+        frame(sentence(0, "第一句。")),
         frame({ t: "whatever" }),
-        frame(sentence(0, "唯一句。")),
+        frame(sentence(1, "第二句。")),
         frame({ t: "done" }),
       ]),
     );
-    expect(got.map((e) => e.t)).toEqual(["sentence", "done"]);
+    // 未知类型插在两句之间：跳过它之后，后面的句子仍要送达
+    expect(got.flatMap((e) => (e.t === "sentence" ? [e.text] : []))).toEqual([
+      "第一句。",
+      "第二句。",
+    ]);
   });
 });

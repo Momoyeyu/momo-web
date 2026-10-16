@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_PAGES,
-  MAX_SLOT,
   PER_PAGE,
   buildCells,
   bySlot,
@@ -44,6 +43,8 @@ describe("pageCount", () => {
     expect(pageCount([meta(12)], "save")).toBe(2); // 第 1 页满 → 第 2 页可存
     expect(pageCount([meta(13)], "save")).toBe(2);
     expect(pageCount([meta(120)], "save")).toBe(MAX_PAGES); // 上限 10 页
+    expect(pageCount([meta(121)], "save")).toBe(MAX_PAGES); // 越界不再增页
+    expect(pageCount([meta(null, true)], "save")).toBe(1); // AUTO 槽不占手动页
   });
 });
 
@@ -54,14 +55,12 @@ describe("buildCells", () => {
     expect(cells[0]).toEqual({ slot: 1, save: null });
     expect(cells[2].save?.slot).toBe(3);
     expect(cells[11]).toEqual({ slot: 12, save: null });
+    // 第 1 页不得漏进第 2 页的存档（分页边界）
+    expect(cells.some((c) => c.save?.slot === 14)).toBe(false);
 
     const p2 = buildCells([meta(3), meta(14)], 1);
     expect(p2[0].slot).toBe(13);
     expect(p2[1].save?.slot).toBe(14);
     expect(p2[11].slot).toBe(24);
-  });
-
-  it("槽位上限 = 页数 × 每页格数 = 120", () => {
-    expect(MAX_SLOT).toBe(120);
   });
 });

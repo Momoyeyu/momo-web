@@ -32,7 +32,8 @@ describe("DetailModal", () => {
       text: "x",
       onClose: () => {},
     });
-    expect(html).toContain("modal-meta");
-    expect(html).toContain("01/02 03:04");
+    // 绑定「meta 文本确实在这个 meta 元素里」——只断言 contain("modal-meta")
+    // 的话，把整行删掉反而永远通过
+    expect(html).toMatch(/modal-meta[^>]*>[^<]*01\/02 03:04/);
   });
 });
