@@ -1,4 +1,5 @@
-// 对话页：真实 LLM 回合（SSE → 前端剥指令 → 逐句上屏 → 落账）、backlog、控件态。
+// 对话页：真实 LLM 回合（后端切句并剥指令 → SSE sentence 事件 → 前端逐句上屏与落账）、
+// backlog、控件态。
 //
 // ⚠️ 会真实写入 live 会话（这是 /api/chat 的固有行为）。用例只发**一条固定文案**，
 // afterEach 用 /api/chat/interrupt 撤掉 assistant 行；user 行没有 API 可删，
@@ -80,7 +81,7 @@ test("真实回合：发送 → 逐句上屏 → 落账 → backlog 可见，且
   await expect(page.locator(".bl-item").filter({ hasText: PROMPT }).first()).toBeVisible();
 });
 
-test("backlog：历史条目按角色交替渲染，assistant 带回放按钮", async ({ page }) => {
+test("backlog：历史条目按角色渲染，assistant 带回放按钮（句级：连续多条 assistant）", async ({ page }) => {
   await gotoRoute(page, "backlog");
   await expect(page.locator(".backlog-list")).toBeVisible();
 
