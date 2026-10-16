@@ -9,11 +9,11 @@ test.afterEach(restore);
 
 const TAG = "e2e偏好";
 
-/** 形象页「基本信息」用的是 .field / .field-label（与设置页行式表单项不同）。 */
+/** 形象页「基本信息」走 ui/FieldRow：与设置页同款「左标签 + 右控件」行。 */
 const personaField = (page: import("@playwright/test").Page, label: string) =>
   page
-    .locator(".persona-tab .field")
-    .filter({ has: page.locator(".field-label", { hasText: label }) });
+    .locator(".persona-tab .opt-row")
+    .filter({ has: page.locator(".opt-label", { hasText: label }) });
 
 /** 偏好面板：.persona-section 依次是 基本信息 / 偏好 / Live2D 模型，取第 2 块。 */
 const prefPanel = (page: import("@playwright/test").Page) =>

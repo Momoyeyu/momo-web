@@ -14,6 +14,7 @@ import AvatarPanel from "./Avatar";
 import AddItemModal from "../ui/AddItemModal";
 import DetailModal from "../components/DetailModal";
 import EditableItem from "../ui/EditableItem";
+import FieldRow from "../ui/FieldRow";
 import IconButton from "../ui/IconButton";
 import Button from "../ui/Button";
 import { useT, tFor, promptLang } from "../i18n";
@@ -81,43 +82,42 @@ export default function PersonaPanel({
     <div className="persona-tab">
       <section className="panel persona-section">
         <h3 className="opt-group">{t("persona.basic")}</h3>
+        {/* 与设置页一致：左标签 + 右控件（ui/FieldRow），不再用「标签在上」的竖排。
+            仍是两列网格（名称/年龄 一行、身份/性格 一行），列内行距交给 .opt-row
+            自己的 padding 与分隔线。 */}
         <div className="fields-grid">
           <div className="fields-col">
-            <label className="field">
-              <span className="field-label">{t("persona.name")}</span>
+            <FieldRow label={t("persona.name")}>
               <input
                 value={value.name}
                 placeholder={DEFAULT_PERSONA.name}
                 onChange={(e) => patch({ name: e.target.value })}
               />
-            </label>
-            <label className="field">
-              <span className="field-label">{t("persona.identity")}</span>
+            </FieldRow>
+            <FieldRow label={t("persona.identity")}>
               <input
                 value={value.identity}
                 placeholder={tFor(promptLang(), "persona.defaults.identity")}
                 onChange={(e) => patch({ identity: e.target.value })}
               />
-            </label>
+            </FieldRow>
           </div>
           <div className="fields-col">
-            <label className="field">
-              <span className="field-label">{t("persona.age")}</span>
+            <FieldRow label={t("persona.age")}>
               <input
                 type="number"
                 placeholder={String(DEFAULT_PERSONA.age)}
                 value={Number.isFinite(value.age) ? value.age : ""}
                 onChange={(e) => patch({ age: e.target.valueAsNumber })}
               />
-            </label>
-            <label className="field">
-              <span className="field-label">{t("persona.personality")}</span>
+            </FieldRow>
+            <FieldRow label={t("persona.personality")}>
               <input
                 value={value.personality}
                 placeholder={tFor(promptLang(), "persona.defaults.personality")}
                 onChange={(e) => patch({ personality: e.target.value })}
               />
-            </label>
+            </FieldRow>
           </div>
         </div>
       </section>

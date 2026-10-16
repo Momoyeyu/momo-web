@@ -407,8 +407,8 @@ button.ghost.danger:hover {
   gap: 18px 28px;
 }
 
-/* .field / .field-label 的基础样式归 persona.css（唯一定义处——此前两份定义值不同、
-   谁生效取决于打包顺序）。 */
+/* 表单项统一走 controls.css 的 .opt-row / .opt-label（ui/FieldRow），
+   不再有「标签在上」的 .field 竖排形态。 */
 
 /* --- 底部操作条（独立全宽容器） --- */
 

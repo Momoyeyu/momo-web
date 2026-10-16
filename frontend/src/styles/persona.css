@@ -27,32 +27,21 @@
 .fields-col {
   display: flex;
   flex-direction: column;
-  gap: 18px;
 }
 
-/* 字段（标签 + 控件竖排）——唯一定义处。
-   settings.css 里曾有一份重复定义且 .field-label 多一个 letter-spacing；
-   打包顺序决定谁生效（settings.css 在后），这里合并为一份并保留当时生效的值。 */
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+/* 「基本信息」是通栏面板、内部再分两列（每列约 630px），标签列沿用
+   controls.css 里 .opt-label 的默认宽度 —— 与设置页其它 tab 完全一致，
+   不给本页单独开宽度档。行距由 .opt-row 自身的 padding 与分隔线提供，
+   故列内 gap 归零（原来是竖排字段之间的 18px）。 */
 
-.field-label {
-  font-size: 13px;
-  color: var(--text-dim);
-  letter-spacing: 0.08em;
-}
+/* 注：原来的 .field / .field-label（标签在上的竖排字段）已随「基本信息」
+   改用 ui/FieldRow 而移除 —— 全站表单项统一为「左标签 + 右控件」。 */
 
-.field input,
-.field textarea,
 .persona-section textarea,
 .mem-search {
   width: 100%;
 }
 
-.field textarea,
 .persona-section > textarea {
   resize: vertical;
   line-height: 1.6;

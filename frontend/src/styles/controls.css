@@ -161,6 +161,8 @@
 }
 
 .opt-ctl input[type="text"],
+.opt-ctl input[type="number"],
+.opt-ctl input[type="url"],
 .opt-ctl input[type="password"],
 .opt-ctl input:not([type]) {
   flex: 1;
