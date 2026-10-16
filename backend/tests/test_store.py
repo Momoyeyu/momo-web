@@ -4,7 +4,7 @@ from __future__ import annotations
 import yaml
 from fastapi.testclient import TestClient
 
-from app import store
+from app.core import state as store
 from app.main import app
 
 
@@ -30,6 +30,17 @@ def test_normalize_tolerates_junk():
     s = store.normalize_state({"persona": None, "custom": "oops"})
     assert s["persona"]["name"] == "momo"
     assert s["custom"] == "oops"  # 非 None 值原样透传（容错，不强行纠正类型）
+
+
+def test_default_persona_keeps_text_fields_empty():
+    """出厂人设不把某一种语言的文案写成配置数据：identity/personality 留空
+    （由 prompt 按语言回落），preferences 不种默认值（空 = 无偏好）。"""
+    p = store.normalize_state({})["persona"]
+    assert p["name"] == "momo"
+    assert p["age"] == 16
+    assert p["identity"] == ""
+    assert p["personality"] == ""
+    assert p["preferences"] == []
 
 
 def test_put_state_roundtrip():

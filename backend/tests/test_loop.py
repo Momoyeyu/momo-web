@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 
-from app import agent, checkpoint, llm
+from app.core import llm
+from app.services import checkpoint, turn
 
 
 def _tool_call(name: str, args: str = "{}", call_id: str = "call_1"):
@@ -30,7 +31,7 @@ def test_react_tool_then_text(monkeypatch):
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
 
-    events = list(agent.run_turn("在吗"))
+    events = list(turn.run_turn("在吗"))
     deltas = [e["text"] for e in events if e["t"] == "delta"]
     # 按标点切段、保留标点
     assert deltas == ["你好呀。", "<exp>开心</exp>今天很开心！"]
@@ -54,7 +55,7 @@ def test_llm_error_yields_error_event(monkeypatch):
         raise llm.LlmError("llm unreachable")
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
-    events = list(agent.run_turn("hi"))
+    events = list(turn.run_turn("hi"))
     assert events == [
         {"t": "error", "message": "llm unreachable", "service": "llm"}
     ]
@@ -69,7 +70,7 @@ def test_max_rounds_without_content(monkeypatch):
         }
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
-    events = list(agent.run_turn("hi"))
+    events = list(turn.run_turn("hi"))
     assert len(events) == 1
     assert events[0]["t"] == "error"
     assert "5 rounds" in events[0]["message"]
@@ -97,7 +98,7 @@ def test_tool_memory_ops_via_react(monkeypatch):
         return {"role": "assistant", "content": "记好了！"}
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
-    events = list(agent.run_turn("帮我记一下"))
+    events = list(turn.run_turn("帮我记一下"))
     assert [e for e in events if e["t"] == "delta"] == [
         {"t": "delta", "text": "记好了！"}
     ]
@@ -106,15 +107,15 @@ def test_tool_memory_ops_via_react(monkeypatch):
     assert json.loads(tool_msgs[0]["content"])["ok"] is True
     assert "不存在" in tool_msgs[1]["content"]
 
-    from app import memory
+    from app.services import memory
 
     assert memory.list_memories()[0]["content"] == "用户喜欢草莓"
 
 
 def test_tool_memory_update_dispatch():
     """memory_update 走 edit_memory：更新成功 / pinned 行 → 拒绝文本。"""
-    from app import memory
-    from app.agent.capability import run_call
+    from app.services import memory
+    from app.services.capability import run_call
 
     mem = memory.add_memory("旧事实")
     msg = run_call(

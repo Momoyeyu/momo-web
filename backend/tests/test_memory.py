@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import pytest
 
-from app import db, embed, memory
+from app.core import embed
+from app.core import db
+from app.services import memory
 
 
 def _no_embed(text: str, cfg=None):
@@ -78,12 +80,12 @@ def test_dedup_returns_conflict_id():
 
 def test_edit_and_delete():
     mem = memory.add_memory("旧内容")
-    edited = memory.edit_memory(mem["id"], "新内容")
+    edited = memory.update_memory(mem["id"], "新内容")
     assert edited["id"] == mem["id"]
     assert edited["content"] == "新内容"
 
     with pytest.raises(memory.MemoryError) as e:
-        memory.edit_memory("nonexistent", "x")
+        memory.update_memory("nonexistent", "x")
     assert e.value.kind == "not_found"
 
     memory.delete_memory(mem["id"])
@@ -96,7 +98,7 @@ def test_edit_and_delete():
 
 def test_pin_crud_via_rest_not_tool():
     """pin 行：REST/存储层可改删（设置页维护），能力层拦截。"""
-    from app.agent.capability import execute_tool
+    from app.services.capability import execute_tool
 
     pin = memory.add_memory("用户叫夜羽", pinned=True)
     # 工具路径：pin 不可删/改
@@ -106,7 +108,7 @@ def test_pin_crud_via_rest_not_tool():
     assert "pin" in msg
     assert memory.pins() == ["用户叫夜羽"]  # 未被改动
     # 存储层（REST 走这层）可以直接维护
-    memory.edit_memory(pin["id"], "夜羽大人")
+    memory.update_memory(pin["id"], "夜羽大人")
     memory.delete_memory(pin["id"])
     assert memory.pins() == []
 
@@ -114,22 +116,22 @@ def test_pin_crud_via_rest_not_tool():
 def test_edit_excludes_self_in_dedup():
     mem = memory.add_memory("用户喜欢草莓蛋糕和巧克力")
     # 编辑成与自身近似的内容不应被判重
-    edited = memory.edit_memory(mem["id"], "用户喜欢草莓蛋糕和巧克力！")
+    edited = memory.update_memory(mem["id"], "用户喜欢草莓蛋糕和巧克力！")
     assert edited["content"].endswith("！")
 
 
 def test_semantic_search_switch(monkeypatch):
     """设置页「语义检索」关掉 → _embed_cfg 返回 {}，与未配置等价。"""
-    from app import store
+    from app.core import state as cfg
 
-    state = store.normalize_state(None)
+    state = cfg.normalize_state(None)
     state["settings"]["general"]["semanticSearch"] = False
-    store.write_state(state)
-    assert memory._embed_cfg() == {}
+    cfg.write_state(state)
+    assert memory.embedding_config() == {}
 
     state["settings"]["general"]["semanticSearch"] = True
-    store.write_state(state)
-    assert memory._embed_cfg().get("url")
+    cfg.write_state(state)
+    assert memory.embedding_config().get("url")
 
 
 def test_search_jaccard_fallback(monkeypatch):

@@ -1,7 +1,8 @@
 """system prompt 模板：字段注入 + pins + 表情/动作指令段（按形象资源清单条件注入）。"""
 from __future__ import annotations
 
-from app import agent, store
+from app.core import state as store
+from app.services import prompt
 
 _PINS = ["用户的名称是夜羽", "夜羽是我的创造者"]
 
@@ -23,7 +24,7 @@ def _state(lang: str, **over):
 
 
 def _prompt(lang: str, pins=_PINS, **over) -> str:
-    return agent.build_system_prompt(_state(lang, **over), pins)
+    return prompt.build_system_prompt(_state(lang, **over), pins)
 
 
 def test_prompt_zh_fields_injected():
@@ -150,3 +151,49 @@ def test_prompt_empty_persona_falls_back_defaults():
     assert "你的性格是乖巧听话" in p
     # 偏好是列表型配置：空 = 整段不注入（含头），不回落默认值。
     assert "## 你的偏好" not in p
+
+
+_EMPTY_PERSONA = {
+    "name": "",
+    "identity": "",
+    "age": None,
+    "personality": "",
+    "preferences": [],
+}
+
+
+def test_prompt_empty_persona_text_defaults_follow_language():
+    """identity/personality 的出厂回落按 prompt 语言取，不再写死中文。"""
+    ja = _prompt("ja", persona=dict(_EMPTY_PERSONA))
+    assert "あなたの身分は夜羽が開発したAI" in ja
+    assert "あなたの性格はおとなしくて素直" in ja
+    assert "由夜羽开发的AI" not in ja
+
+    en = _prompt("en", persona=dict(_EMPTY_PERSONA))
+    assert "Your identity is an AI assistant" in en
+    assert "Your personality is sweet and obedient" in en
+    assert "由夜羽开发的AI" not in en
+
+
+def test_prompt_text_defaults_follow_chat_lang_not_ui_lang():
+    """默认值跟对话语言（chatLang），不跟界面语言（lang）。"""
+    p = _prompt(
+        "zh",
+        settings={"general": {"lang": "zh", "chatLang": "ja"}},
+        persona=dict(_EMPTY_PERSONA),
+    )
+    assert "あなたの身分は夜羽が開発したAI" in p
+    assert "あなたの性格はおとなしくて素直" in p
+    assert "由夜羽开发的AI" not in p
+
+
+def test_prompt_language_switch_keeps_neutral_defaults():
+    """name/age 与语言无关：三语都回落 momo / 16。"""
+    for lang, name_line, age_line in (
+        ("zh", "你的名字叫momo", "你的年龄是16"),
+        ("ja", "あなたの名前はmomo", "あなたの年齢は16歳"),
+        ("en", "Your name is momo", "You are 16 years old"),
+    ):
+        p = _prompt(lang, persona=dict(_EMPTY_PERSONA))
+        assert name_line in p
+        assert age_line in p

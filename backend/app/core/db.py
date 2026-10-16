@@ -1,4 +1,4 @@
-"""data/momo.db：数据层（memories / memory_vec / sessions / messages）。
+"""data/momo.db：连接、schema、事务（存储层的公共底座）。
 
 - 单连接（check_same_thread=False）+ RLock；写路径统一走 tx()
   （BEGIN IMMEDIATE），回合落盘 / 读档 / 后台压缩在 DB 层互斥。
@@ -17,16 +17,16 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Iterator
 
-from . import store
+from . import state
 
 LIVE_ID = "live"
 
 
-def _now_iso() -> str:
+def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _new_id(n: int = 12) -> str:
+def new_id(n: int = 12) -> str:
     return uuid.uuid4().hex[:n]
 
 
@@ -71,7 +71,7 @@ except Exception:  # pragma: no cover - 扩展缺失时降级词面召回
 
 
 def _db_path():
-    return store.DATA_DIR / "momo.db"
+    return state.DATA_DIR / "momo.db"
 
 
 def conn() -> sqlite3.Connection:
@@ -89,7 +89,7 @@ def conn() -> sqlite3.Connection:
                     c.enable_load_extension(True)
                     sqlite_vec.load(c)
                 except Exception:
-                    pass  # vec 不可用时 ensure_vec 会失败 → 词面召回
+                    pass  # vec 不可用时 repository.vectors.ensure 会失败 → 词面召回
             c.executescript(_SCHEMA)
             _ensure_live(c)
             c.commit()
@@ -138,41 +138,5 @@ def _ensure_live(c: sqlite3.Connection) -> None:
     c.execute(
         "INSERT OR IGNORE INTO sessions(id, slot, auto, created_at, updated_at)"
         " VALUES(?, NULL, 0, ?, ?)",
-        (LIVE_ID, _now_iso(), _now_iso()),
+        (LIVE_ID, now_iso(), now_iso()),
     )
-
-
-# ---------- memory_vec（维度跟随当前 embedding 输出） ----------
-
-
-def _vec_table_dim() -> int | None:
-    """已建 vec 表的向量维度；未建返回 None。"""
-    dim = meta_get("vec_dim")
-    try:
-        return int(dim) if dim else None
-    except ValueError:
-        return None
-
-
-def ensure_vec(dim: int) -> bool:
-    """保证 memory_vec 存在且维度=dim；维度漂移 → 重建（向量可懒算补回）。"""
-    if sqlite_vec is None or dim <= 0:
-        return False
-    with tx() as c:
-        cur = _vec_table_dim()
-        exists = c.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='memory_vec'"
-        ).fetchone()
-        if exists and cur == dim:
-            return True
-        c.execute("DROP TABLE IF EXISTS memory_vec")
-        c.execute(
-            f"CREATE VIRTUAL TABLE memory_vec USING vec0("
-            f"id TEXT PRIMARY KEY, vec float[{int(dim)}] distance_metric=cosine)"
-        )
-        c.execute(
-            "INSERT INTO meta(key,value) VALUES('vec_dim',?) "
-            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-            (str(dim),),
-        )
-    return True

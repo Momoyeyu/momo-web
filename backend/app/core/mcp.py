@@ -22,7 +22,7 @@ import os
 import re
 import shlex
 import threading
-from typing import Any
+from typing import TYPE_CHECKING, Any, Iterator
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -30,6 +30,10 @@ from mcp.client.streamable_http import (
     create_mcp_http_client,
     streamable_http_client,
 )
+
+if TYPE_CHECKING:
+    from ..models import ProbeResult
+
 
 log = logging.getLogger(__name__)
 
@@ -184,8 +188,14 @@ class McpHub:
 
     # ---- 同步侧（run_turn 调用） ----
 
-    def open(self, extensions: Any) -> ExtTools:
-        """连接 enabled 且配置完整的 server；任何失败都收敛为空集合。"""
+    def open(self, extensions: Any, reserved: set[str]) -> ExtTools:
+        """连接 enabled 且配置完整的 server；任何失败都收敛为空集合。
+
+        extensions 来自 momo.yaml（用户可编辑、可能被写坏），故这里按 Any 收、
+        运行时逐层校验，不信任类型。
+        reserved：需要避让的工具名（内置能力名）——由 service 层传入，
+        client 层不反向依赖 service。
+        """
         enabled = [
             e
             for e in (extensions if isinstance(extensions, list) else [])
@@ -199,7 +209,7 @@ class McpHub:
             self._ensure_loop()
             self.close()  # 防御：上个 turn 没走到 close 时先清残留
             fut = asyncio.run_coroutine_threadsafe(
-                self._open_async(enabled), self._loop
+                self._open_async(enabled, reserved), self._loop
             )
             tools = fut.result(timeout=OPEN_TIMEOUT + 2)
             return tools if isinstance(tools, ExtTools) else ExtTools()
@@ -228,11 +238,11 @@ class McpHub:
         )
         return fut.result(timeout=CALL_TIMEOUT)
 
-    def probe(self, ext: dict[str, Any]) -> dict[str, Any]:
+    def probe(self, ext: dict[str, Any]) -> ProbeResult:
         """单条拓展的连通性探测（设置页状态点）：connect + list_tools + close。
 
-        返回 {"ok": bool, "tools": int, "error"?: str}；任何失败都文本化，
-        不向上抛。配置不完整直接判失败，不尝试连接。
+        返回形状见 models.ProbeResult；任何失败都文本化，不向上抛。
+        配置不完整直接判失败，不尝试连接。
         """
         if not isinstance(ext, dict) or not _configured(ext):
             return {"ok": False, "tools": 0, "error": "unconfigured"}
@@ -258,9 +268,9 @@ class McpHub:
             ).start()
             self._loop = loop
 
-    async def _open_async(self, enabled: list[dict[str, Any]]) -> ExtTools:
-        from .capability import TOOLS  # 延迟导入避免环
-
+    async def _open_async(
+        self, enabled: list[dict[str, Any]], reserved: set[str]
+    ) -> ExtTools:
         # 防御：残留的旧 serve task 先放行退出（并发回合/上轮未走到 close）
         for ev in self._closers:
             ev.set()
@@ -278,7 +288,7 @@ class McpHub:
         except Exception:
             sources = []
         tools = ExtTools()
-        taken = {d["function"]["name"] for d in TOOLS}
+        taken = set(reserved)
         for src in sources:
             if isinstance(src, _Source):
                 tools.add_source(src, taken)
@@ -363,6 +373,20 @@ class McpHub:
             except Exception:
                 for t in tasks:
                     t.cancel()
+
+
+@contextlib.contextmanager
+def open_tools(extensions: Any, reserved: set[str]) -> Iterator[ExtTools]:
+    """一回合可用的拓展工具集；退出时关闭连接。
+
+    连不上/未配置的 server 直接不进工具表（不可用即不可见），
+    任何失败都收敛为空集合，故这里没有异常路径。
+    """
+    tools = hub.open(extensions, reserved)
+    try:
+        yield tools
+    finally:
+        hub.close()
 
 
 # 进程级单例：loop 线程惰性启动，挂到 interpreter 退出（daemon）。

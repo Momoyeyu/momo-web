@@ -1,22 +1,18 @@
 """OpenAI 兼容 embeddings client。
 
 配置来自 state.settings.embedding（{url, key, model}，设置页可改）；
-DEFAULT_URL/DEFAULT_MODEL 是出厂默认（可被 env 覆盖），
-store.py 拿它们填 DEFAULT_STATE。
+出厂默认由 config 层提供（DEFAULT_EMBEDDING_*，env 可覆盖）。
 url 为空 = 未配置 → 返回 None；其余失败（超时/不可达/坏响应）
 同样返回 None，由调用方走 lexical 兜底。
 """
 from __future__ import annotations
 
-import os
 from typing import Any
 
 import httpx
 
-DEFAULT_URL = os.environ.get(
-    "MOMO_EMBEDDING_URL", "http://10.106.130.222:11434"
-).rstrip("/")
-DEFAULT_MODEL = os.environ.get("MOMO_EMBEDDING_MODEL", "bge-m3")
+from .state import DEFAULT_EMBEDDING_MODEL
+
 TIMEOUT = 5.0
 
 
@@ -26,7 +22,7 @@ def embed(text: str, cfg: dict[str, Any] | None = None) -> list[float] | None:
     url = str(cfg.get("url") or "").rstrip("/")
     if not url:
         return None
-    model = str(cfg.get("model") or "") or DEFAULT_MODEL
+    model = str(cfg.get("model") or "") or DEFAULT_EMBEDDING_MODEL
     headers: dict[str, str] = {}
     key = str(cfg.get("key") or "")
     if key:

@@ -10,9 +10,11 @@
 """
 from __future__ import annotations
 
+import sqlite3
 from typing import Any
 
-from . import db
+from ..core import db
+from ..models import CheckpointDetail, CheckpointMeta, StoredMessage
 
 PREVIEW_LEN = 40
 MAX_SLOT = 120  # 手动存档槽位上限（12 格/页 × 10 页）
@@ -29,7 +31,7 @@ class CheckpointError(Exception):
         self.not_found = kind == "not_found"
 
 
-_now_iso = db._now_iso
+now_iso = db.now_iso
 
 
 def _default_title() -> str:
@@ -40,7 +42,7 @@ def _default_title() -> str:
 
 
 def _new_id() -> str:
-    return db._new_id(8)
+    return db.new_id(8)
 
 
 # ---------- live 会话（当前会话行） ----------
@@ -50,7 +52,7 @@ def live_summary() -> str:
     return str(rows[0]["summary"]) if rows else ""
 
 
-def live_messages() -> list[dict[str, str]]:
+def live_messages() -> list[StoredMessage]:
     """当前会话消息（展示/注入上下文用；不含 role 外的内部列）。"""
     rows = db.query(
         "SELECT role, text, at FROM messages WHERE session_id=? ORDER BY seq",
@@ -66,7 +68,7 @@ def generation() -> int:
     return int(rows[0]["generation"]) if rows else 0
 
 
-def _next_seq(c: Any, sid: str) -> int:
+def _next_seq(c: sqlite3.Connection, sid: str) -> int:
     r = c.execute(
         "SELECT COALESCE(MAX(seq)+1, 0) AS s FROM messages WHERE session_id=?",
         (sid,),
@@ -117,7 +119,7 @@ def commit_reply(text: str, gen: int, at: str) -> bool:
         return True
 
 
-def _trim_live(c: Any) -> None:
+def _trim_live(c: sqlite3.Connection) -> None:
     """live.messages 保留最新 LIVE_HISTORY_MAX 条，删除更旧的。
 
     裁剪边界不拆散完整回合：剩余的最早一条必须是 role='user'——
@@ -161,7 +163,7 @@ def interrupt_turn(user: str, assistant: str) -> None:
         ).fetchall()
         last = rows[0] if rows else None
         prev = rows[1] if len(rows) > 1 else None
-        now = _now_iso()
+        now = now_iso()
         if (
             last
             and last["role"] == "assistant"
@@ -206,7 +208,7 @@ def interrupt_turn(user: str, assistant: str) -> None:
 
 # ---------- 快照 / 展示 ----------
 
-def _messages_of(c: Any, sid: str) -> list[dict[str, str]]:
+def _messages_of(c: sqlite3.Connection, sid: str) -> list[StoredMessage]:
     rows = c.execute(
         "SELECT role, text, at FROM messages WHERE session_id=? ORDER BY seq",
         (sid,),
@@ -216,7 +218,7 @@ def _messages_of(c: Any, sid: str) -> list[dict[str, str]]:
     ]
 
 
-def _copy_messages(c: Any, src: str, dst: str) -> None:
+def _copy_messages(c: sqlite3.Connection, src: str, dst: str) -> None:
     """整段复制 src 会话的 messages 到 dst（dst 原有先清）。"""
     c.execute("DELETE FROM messages WHERE session_id=?", (dst,))
     c.execute(
@@ -227,7 +229,7 @@ def _copy_messages(c: Any, src: str, dst: str) -> None:
     )
 
 
-def _preview_of(c: Any, sid: str) -> str:
+def _preview_of(c: sqlite3.Connection, sid: str) -> str:
     """列表预览：末条消息文本压空白后截 ~40 字（最新一句对话）。"""
     r = c.execute(
         "SELECT text FROM messages WHERE session_id=?"
@@ -239,7 +241,7 @@ def _preview_of(c: Any, sid: str) -> str:
     return " ".join(str(r["text"]).split())[:PREVIEW_LEN]
 
 
-def _meta_row(r: Any, preview: str) -> dict[str, Any]:
+def _meta_row(r: sqlite3.Row, preview: str) -> CheckpointMeta:
     slot = r["slot"]
     return {
         "id": r["id"],
@@ -252,8 +254,8 @@ def _meta_row(r: Any, preview: str) -> dict[str, Any]:
     }
 
 
-def meta(entry: dict[str, Any]) -> dict[str, Any]:
-    """存档行 → 列表项（外部传入的 dict 需含 messages 以算 preview）。"""
+def meta(entry: CheckpointDetail) -> CheckpointMeta:
+    """存档全文 → 列表项（丢 messages，用末条算出 preview）。"""
     msgs = entry.get("messages")
     if isinstance(msgs, list) and msgs:
         last = msgs[-1]
@@ -275,7 +277,7 @@ def meta(entry: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _entry(c: Any, r: Any) -> dict[str, Any]:
+def _entry(c: sqlite3.Connection, r: sqlite3.Row) -> CheckpointDetail:
     """会话行 → 存档全文 dict（含 messages）。"""
     m = _meta_row(r, _preview_of(c, r["id"]))
     return {
@@ -292,7 +294,7 @@ def _entry(c: Any, r: Any) -> dict[str, Any]:
 
 # ---------- CRUD ----------
 
-def list_checkpoints() -> list[dict[str, Any]]:
+def list_checkpoints() -> list[CheckpointMeta]:
     """auto 槽置顶，其后手动存档按 slot 升序（不含 live 行）。"""
     with db.tx() as c:
         rows = c.execute(
@@ -303,7 +305,7 @@ def list_checkpoints() -> list[dict[str, Any]]:
         return [_meta_row(r, _preview_of(c, r["id"])) for r in rows]
 
 
-def get_checkpoint(sid: str) -> dict[str, Any]:
+def get_checkpoint(sid: str) -> CheckpointDetail:
     if sid == LIVE_ID:
         raise CheckpointError("存档不存在", kind="not_found")
     with db.tx() as c:
@@ -315,7 +317,7 @@ def get_checkpoint(sid: str) -> dict[str, Any]:
         return _entry(c, r)
 
 
-def _assign_slot(c: Any, slot: Any) -> int:
+def _assign_slot(c: sqlite3.Connection, slot: Any) -> int:
     """确定新存档槽位：指定空槽则用之，未指定取最小编号空槽。"""
     used = {
         int(r["slot"])
@@ -339,11 +341,11 @@ def _assign_slot(c: Any, slot: Any) -> int:
 
 def create_checkpoint(
     title: str | None = None, slot: int | None = None
-) -> dict[str, Any]:
+) -> CheckpointDetail:
     """快照当前会话新建存档；title 空 → 默认当前时间；slot 空 → 最小空槽。"""
     with db.tx() as c:
         sslot = _assign_slot(c, slot)
-        now = _now_iso()
+        now = now_iso()
         sid = _new_id()
         c.execute(
             "INSERT INTO sessions"
@@ -363,7 +365,7 @@ def create_checkpoint(
         ).fetchone())
 
 
-def overwrite_checkpoint(sid: str, title: str | None = None) -> dict[str, Any]:
+def overwrite_checkpoint(sid: str, title: str | None = None) -> CheckpointDetail:
     """重命名（title 非空时）+ 用当前会话内容覆盖。"""
     _guard_snapshot_id(sid)
     with db.tx() as c:
@@ -372,7 +374,7 @@ def overwrite_checkpoint(sid: str, title: str | None = None) -> dict[str, Any]:
             raise CheckpointError("存档不存在", kind="not_found")
         if r["auto"]:
             raise CheckpointError("自动存档槽不可覆盖", kind="invalid")
-        now = _now_iso()
+        now = now_iso()
         t = (title or "").strip()
         c.execute(
             "UPDATE sessions SET summary=?, updated_at=?"
@@ -386,7 +388,7 @@ def overwrite_checkpoint(sid: str, title: str | None = None) -> dict[str, Any]:
         ).fetchone())
 
 
-def delete_checkpoint(sid: str) -> dict[str, Any]:
+def delete_checkpoint(sid: str) -> CheckpointDetail:
     _guard_snapshot_id(sid)
     with db.tx() as c:
         r = c.execute("SELECT * FROM sessions WHERE id=?", (sid,)).fetchone()
@@ -407,9 +409,9 @@ def _guard_snapshot_id(sid: str) -> None:
 # ---------- Load ----------
 
 
-def _write_auto(c: Any, summary: str) -> None:
+def _write_auto(c: sqlite3.Connection, summary: str) -> None:
     """当前 live 内容写入 auto 槽：已有 auto 槽原地覆盖，否则新建。"""
-    now = _now_iso()
+    now = now_iso()
     row = c.execute(
         "SELECT id FROM sessions WHERE auto=1 AND id != ?", (LIVE_ID,)
     ).fetchone()
@@ -430,7 +432,7 @@ def _write_auto(c: Any, summary: str) -> None:
     _copy_messages(c, LIVE_ID, aid)
 
 
-def load_checkpoint(sid: str) -> dict[str, Any]:
+def load_checkpoint(sid: str) -> CheckpointDetail:
     """加载存档覆盖当前会话；当前会话非空先存入 auto 槽。返回存档全文。
 
     代际 +1：load 之后在途回合的 commit_reply 全部作废（其 user
@@ -459,10 +461,35 @@ def load_checkpoint(sid: str) -> dict[str, Any]:
         if cur_count:
             _write_auto(c, cur_summary)
         _copy_messages(c, sid, LIVE_ID)
-        now = _now_iso()
+        now = now_iso()
         c.execute(
             "UPDATE sessions SET summary=?, updated_at=?,"
             " generation=generation+1 WHERE id=?",
             (str(target["summary"] or ""), now, LIVE_ID),
         )
         return _entry(c, target)
+
+
+def new_session() -> None:
+    """开启新会话：live 非空先快照进 auto 槽，然后清空 live。
+
+    代际 +1：在途回合的 commit_reply 全部作废（其 user 行已随原
+    live 进 auto 槽）。
+    """
+    with db.tx() as c:
+        live = c.execute(
+            "SELECT summary FROM sessions WHERE id=?", (LIVE_ID,)
+        ).fetchone()
+        if live is not None:
+            n = c.execute(
+                "SELECT COUNT(*) AS n FROM messages WHERE session_id=?",
+                (LIVE_ID,),
+            ).fetchone()["n"]
+            if n:
+                _write_auto(c, str(live["summary"] or ""))
+        c.execute("DELETE FROM messages WHERE session_id=?", (LIVE_ID,))
+        c.execute(
+            "UPDATE sessions SET summary='', updated_at=?,"
+            " generation=generation+1 WHERE id=?",
+            (now_iso(), LIVE_ID),
+        )

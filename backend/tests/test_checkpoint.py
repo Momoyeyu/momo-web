@@ -4,8 +4,10 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app import agent, checkpoint, db, llm
-from app.agent import compress
+from app.core import llm
+from app.core import db
+from app.services import checkpoint, turn
+from app.services import compress
 from app.main import app
 
 from conftest import add_turn
@@ -363,7 +365,7 @@ def test_run_turn_skips_stream_when_gen_stale(monkeypatch):
         return {"role": "assistant", "content": "迟到回复"}
 
     monkeypatch.setattr(llm, "chat_completion", fake)
-    events = list(agent.run_turn("hi"))
+    events = list(turn.run_turn("hi"))
     assert [e for e in events if e["t"] == "delta"] == []
 
 
@@ -388,7 +390,7 @@ def test_compress_trigger_and_assembly(monkeypatch):
         llm, "chat_completion", _fake_chat("摘要一", prompt_tokens=10**9)
     )
 
-    events = list(agent.run_turn("继续"))
+    events = list(turn.run_turn("继续"))
     assert any(e["t"] == "delta" for e in events)
 
     assert _live_summary() == "摘要一"
@@ -404,7 +406,7 @@ def test_compress_trigger_and_assembly(monkeypatch):
         return {"role": "assistant", "content": "嗯。"}
 
     monkeypatch.setattr(llm, "chat_completion", spy)
-    list(agent.run_turn("再来"))
+    list(turn.run_turn("再来"))
     sys_msgs = [m for m in seen[0] if m["role"] == "system"]
     assert len(sys_msgs) == 2
     assert "摘要一" in sys_msgs[1]["content"]
@@ -432,7 +434,7 @@ def test_compress_below_threshold_noop(monkeypatch):
     _seed(4)
     monkeypatch.setattr(compress, "Thread", _InlineThread)
     monkeypatch.setattr(llm, "chat_completion", _fake_chat("好。", prompt_tokens=1))
-    list(agent.run_turn("hi"))
+    list(turn.run_turn("hi"))
     assert _live_summary() == ""
     assert len(checkpoint.live_messages()) == 10
 
@@ -519,3 +521,50 @@ def test_live_cap_trim_happens_in_commit_tx():
         "SELECT COUNT(*) AS n FROM messages WHERE session_id=?", (db.LIVE_ID,)
     )[0]["n"]
     assert n == 100
+
+
+# ---------- 新会话（标题页「开始」） ----------
+
+
+def test_new_session_snapshots_and_clears_live():
+    """POST live/new：live 非空先进 auto 槽，然后清空；summary 一并清。"""
+    client = TestClient(app)
+    _seed(2)
+    _set_summary("旧会话摘要")
+    gen_before = checkpoint.generation()
+
+    r = client.post("/api/checkpoints/live/new")
+    assert r.status_code == 204
+    assert checkpoint.live_messages() == []
+    assert _live_summary() == ""
+    assert checkpoint.generation() == gen_before + 1  # 在途写入作废
+
+    autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
+    assert len(autos) == 1
+    full = client.get(f"/api/checkpoints/{autos[0]['id']}").json()
+    assert [m["text"] for m in full["messages"]] == ["问0", "答0", "问1", "答1"]
+    assert full["summary"] == "旧会话摘要"
+
+
+def test_new_session_empty_live_no_auto_slot():
+    """live 本来就空：不产生 auto 槽，live 仍为空。"""
+    client = TestClient(app)
+    r = client.post("/api/checkpoints/live/new")
+    assert r.status_code == 204
+    assert checkpoint.live_messages() == []
+    assert client.get("/api/checkpoints").json() == []
+
+
+def test_new_session_again_overwrites_auto_slot():
+    """连续两次新会话：第二次的现场原地覆盖 auto 槽，不新增。"""
+    client = TestClient(app)
+    _seed(1, "甲")
+    client.post("/api/checkpoints/live/new")
+    autos1 = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
+
+    _seed(1, "乙")
+    client.post("/api/checkpoints/live/new")
+    autos2 = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
+    assert len(autos2) == 1 and autos2[0]["id"] == autos1[0]["id"]
+    full = client.get(f"/api/checkpoints/{autos2[0]['id']}").json()
+    assert [m["text"] for m in full["messages"]] == ["乙问0", "乙答0"]

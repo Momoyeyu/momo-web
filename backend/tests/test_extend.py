@@ -10,10 +10,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from app import agent, llm
-from app.agent import extend
-from app.agent.extend import ExtTools, hub, result_text, sanitize, tool_decl
-from app.agent.capability import TOOLS, run_call
+from app.core import llm, mcp
+from app.services import turn
+from app.core import mcp as extend
+from app.core.mcp import ExtTools, hub, result_text, sanitize, tool_decl
+from app.services.capability import TOOLS, run_call
 
 
 class _FakeTool:
@@ -153,16 +154,16 @@ def test_result_text_non_text_blocks_and_error():
 # ---- 不可用即不可见 ----
 
 def test_open_skips_disabled_and_unconfigured():
-    assert hub.open(None).decls == []
-    assert hub.open([]).decls == []
-    assert hub.open("junk").decls == []
+    assert hub.open(None, _BUILTIN_NAMES).decls == []
+    assert hub.open([], _BUILTIN_NAMES).decls == []
+    assert hub.open("junk", _BUILTIN_NAMES).decls == []
     # 未启用 / 缺 endpoint / 缺 command：不尝试连接
     exts = [
         {"name": "a", "transport": "http", "endpoint": "http://x", "enabled": False},
         {"name": "b", "transport": "http", "endpoint": "", "enabled": True},
         {"name": "c", "transport": "stdio", "command": " ", "enabled": True},
     ]
-    assert hub.open(exts).decls == []
+    assert hub.open(exts, _BUILTIN_NAMES).decls == []
 
 
 def test_open_unreachable_server_yields_no_tools():
@@ -175,7 +176,7 @@ def test_open_unreachable_server_yields_no_tools():
             "enabled": True,
         }
     ]
-    tools = hub.open(exts)
+    tools = hub.open(exts, _BUILTIN_NAMES)
     assert tools.decls == []
     assert tools.call("bad_server_x", {}) == "未知工具：bad_server_x"
     hub.close()
@@ -238,7 +239,7 @@ def test_stdio_connect_passes_args_and_merged_env(monkeypatch):
                 "enabled": True,
             }
         ]
-    )
+    , _BUILTIN_NAMES)
     try:
         assert [d["function"]["name"] for d in tools.decls] == ["loc_ping"]
         p = seen["params"]
@@ -284,7 +285,7 @@ def test_http_connect_passes_all_headers(monkeypatch):
         "headers": {"Authorization": "Bearer sek", "X-Team": "a"},
         "enabled": True,
     }
-    tools = hub.open([ext])
+    tools = hub.open([ext], _BUILTIN_NAMES)
     try:
         assert [d["function"]["name"] for d in tools.decls] == ["remote_ping"]
         assert seen["url"] == "https://mcp.example.com/mcp"
@@ -318,7 +319,7 @@ def test_http_connect_no_headers_passes_none(monkeypatch):
                 "enabled": True,
             }
         ]
-    )
+    , _BUILTIN_NAMES)
     try:
         assert tools.decls
         assert seen["headers"] is None
@@ -401,7 +402,7 @@ def _tool_call(name, args="{}"):
 
 def test_run_turn_extends_tools_and_dispatches(monkeypatch):
     ext = _ext_with(_source())
-    monkeypatch.setattr(hub, "open", lambda exts: ext)
+    monkeypatch.setattr(hub, "open", lambda exts, reserved: ext)
     closed = []
     monkeypatch.setattr(hub, "close", lambda: closed.append(1))
     monkeypatch.setattr(
@@ -423,7 +424,7 @@ def test_run_turn_extends_tools_and_dispatches(monkeypatch):
         return {"role": "assistant", "content": "查到了。"}
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
-    events = list(agent.run_turn("帮我搜一下"))
+    events = list(turn.run_turn("帮我搜一下"))
     assert [e["text"] for e in events if e["t"] == "delta"] == ["查到了。"]
     # 注入声明 = 内置 + 拓展
     names = {d["function"]["name"] for d in seen_tools[0]}
@@ -432,7 +433,7 @@ def test_run_turn_extends_tools_and_dispatches(monkeypatch):
 
 
 def test_run_turn_without_extensions_passes_static_tools(monkeypatch):
-    monkeypatch.setattr(hub, "open", lambda exts: ExtTools())
+    monkeypatch.setattr(hub, "open", lambda exts, reserved: ExtTools())
     monkeypatch.setattr(hub, "close", lambda: None)
 
     def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
@@ -440,5 +441,5 @@ def test_run_turn_without_extensions_passes_static_tools(monkeypatch):
         return {"role": "assistant", "content": "好。"}
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
-    events = list(agent.run_turn("hi"))
+    events = list(turn.run_turn("hi"))
     assert [e["text"] for e in events if e["t"] == "delta"] == ["好。"]

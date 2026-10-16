@@ -5,16 +5,17 @@ from typing import Any
 
 from fastapi import APIRouter, Body
 
-from ..agent.extend import hub
+from ..services import extend
+from ..models import ProbeResult
 
 router = APIRouter()
 
 
 @router.post("/api/extensions/probe")
-def probe_extension(ext: dict[str, Any] = Body(...)) -> dict[str, Any]:
+def probe_extension(ext: dict[str, Any] = Body(...)) -> ProbeResult:
     """对一条拓展记录做 connect + list_tools + close 探测。
 
-    body = 单条拓展配置 JSON；返回 {"ok": bool, "tools": int, "error"?: str}。
+    body = 单条拓展配置 JSON（来自设置页，未校验故按 dict 收）；返回形状见 models.ProbeResult。
     失败不抛错——不可达的 server 只是不可见，探测本身永不阻塞 UI。
     """
-    return hub.probe(ext)
+    return extend.probe(ext)

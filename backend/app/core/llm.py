@@ -4,9 +4,13 @@
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
+
+if TYPE_CHECKING:
+    from ..models import ChatMessage
+
 
 TIMEOUT = 60.0
 
@@ -17,14 +21,14 @@ class LlmError(Exception):
 
 def chat_completion(
     llm_cfg: dict[str, Any],
-    messages: list[dict[str, Any]],
+    messages: list[ChatMessage],
     tools: list[dict[str, Any]] | None = None,
     usage_out: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """POST {url}/v1/chat/completions → choices[0].message。
+) -> ChatMessage:
+    """POST {url}/v1/chat/completions → choices[0].message（形状见 models.ChatMessage）。
 
-    返回 message dict（含 role/content/tool_calls）。失败抛 LlmError。
-    usage_out 传入 dict 时清原值并写入响应的 usage（压缩阈值判定用）。
+    失败抛 LlmError。usage_out 传入 dict 时清原值并写入响应的 usage
+    （压缩阈值判定用）。
     """
     url = str(llm_cfg.get("url") or "").rstrip("/")
     if not url:

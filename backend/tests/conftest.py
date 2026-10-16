@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import pytest
 
-from app import checkpoint, db, store
+from app.core import db, state
+from app.services import checkpoint
 
 
 @pytest.fixture(autouse=True)
 def isolated_data(tmp_path, monkeypatch):
-    monkeypatch.setattr(store, "DATA_DIR", tmp_path)
-    monkeypatch.setattr(store, "STATE_PATH", tmp_path / "momo.yaml")
+    monkeypatch.setattr(state, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(state, "STATE_PATH", tmp_path / "momo.yaml")
     db.reset()
     yield
     db.reset()

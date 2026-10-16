@@ -1,10 +1,11 @@
-"""system prompt 组装：按 settings.general.lang 选 zh/en/ja（未知语言回退 zh）。"""
+"""system prompt 组装：按对话语言（chatLang，auto→界面语言）选 zh/en/ja，未知回退 zh。"""
 from __future__ import annotations
 
 from typing import Any
 
-from ..store import DEFAULT_STATE
-from ..timeinfo import now_info
+from ..models import State
+from ..core.state import DEFAULT_STATE
+from ..core.time import now_info
 
 _LANG_NAMES = {"zh": "中文", "en": "English", "ja": "日本語"}
 _DEFAULT_PERSONA: dict[str, Any] = DEFAULT_STATE["persona"]
@@ -21,6 +22,9 @@ _T = {
             "你的年龄是{age}",
             "你的性格是{personality}",
         ),
+        # 人设字段留空时的出厂回落（与前端 persona.defaults.* 同一份文案）
+        "default_identity": "由夜羽开发的AI",
+        "default_personality": "乖巧听话",
         "prefs_head": "## 你的偏好",
         "settings_head": "## 你的基本设定",
         "lang_line": "你的对话语言是{lang}，需要使用该语言与用户交流，除非用户要求使用其他语言",
@@ -52,6 +56,9 @@ _T = {
             "You are {age} years old",
             "Your personality is {personality}",
         ),
+        # 人设字段留空时的出厂回落（与前端 persona.defaults.* 同一份文案）
+        "default_identity": "an AI assistant",
+        "default_personality": "sweet and obedient",
         "prefs_head": "## Your preferences",
         "settings_head": "## Your basic settings",
         "lang_line": "Your conversation language is {lang}; talk with the user in that language unless they ask for another one",
@@ -83,6 +90,9 @@ _T = {
             "あなたの年齢は{age}歳",
             "あなたの性格は{personality}",
         ),
+        # 人设字段留空时的出厂回落（与前端 persona.defaults.* 同一份文案）
+        "default_identity": "夜羽が開発したAI",
+        "default_personality": "おとなしくて素直",
         "prefs_head": "## あなたの好み",
         "settings_head": "## あなたの基本設定",
         "lang_line": "あなたの会話言語は{lang}です。ユーザーが他の言語を要求しない限り、その言語で話してください",
@@ -108,22 +118,26 @@ _T = {
 }
 
 
-def _lang_of(state: dict[str, Any]) -> str:
+def _lang_of(state: State) -> str:
     """momo 对话语言：general.chatLang（auto/缺失 → 回落界面语言 lang）。"""
-    g = (state.get("settings") or {}).get("general") or {}
-    raw = str(g.get("chatLang") or "").lower()
+    g = state["settings"]["general"]
+    raw = str(g["chatLang"] or "").lower()
     if not raw or raw == "auto":
-        raw = str(g.get("lang") or "zh").lower()
+        raw = str(g["lang"] or "zh").lower()
     for code in ("zh", "en", "ja"):
         if raw.startswith(code):
             return code
     return "zh"
 
 
-def _avatar_resources(state: dict[str, Any]) -> dict[str, Any]:
-    """当前形象的资源清单（avatars[] 里按 avatarId 找；缺失 → 空）。"""
-    aid = state.get("avatarId") or "builtin"
-    for a in state.get("avatars") or []:
+def _avatar_resources(state: State) -> dict[str, Any]:
+    """当前形象的资源清单（avatars[] 里按 avatarId 找；缺失 → 空）。
+
+    返回值保持 dict[str, Any]：resources 来自 momo.yaml，可能是任意形状，
+    故仍做 isinstance 兜底（这是真防御，不是死代码）。
+    """
+    aid = state["avatarId"] or "builtin"
+    for a in state["avatars"]:
         if isinstance(a, dict) and a.get("id") == aid:
             res = a.get("resources")
             return res if isinstance(res, dict) else {}
@@ -145,21 +159,27 @@ def _resource_lines(items: Any) -> list[str]:
 
 
 def build_system_prompt(
-    state: dict[str, Any], pins: list[str] | None = None
+    state: State, pins: list[str] | None = None
 ) -> str:
     """按契约模板组装 system prompt；初始记忆/表情/动作段按条件注入。
 
+    state：必须是 store.normalize_state() 的产物——字段存在性由该边界保证，
+    本函数因此直接下标访问，不再做防御式下钻。
     pins：初始记忆文本列表（momo.db memories.pinned=1；由调用方注入，
     state 里已不含 pin 数据）。
     """
     lang = _lang_of(state)
     t = _T[lang]
     # 空字段回落出厂人设：用户在设置里清空=回到初始状态，
-    # prompt 侧始终装配默认值（与前端 placeholder 显示一致）。
-    persona = dict(state.get("persona") or {})
-    for key in ("name", "identity", "personality"):
+    # prompt 侧始终装配默认值（与前端 placeholder 显示同一份文案）。
+    # identity/personality 是文案型字段，按当前 prompt 语言取 _T[lang]，
+    # 不把某一种语言写死；name/age 与语言无关，仍取 store 默认值。
+    persona = dict(state["persona"])
+    if not str(persona.get("name") or "").strip():
+        persona["name"] = _DEFAULT_PERSONA["name"]
+    for key in ("identity", "personality"):
         if not str(persona.get(key) or "").strip():
-            persona[key] = _DEFAULT_PERSONA[key]
+            persona[key] = t[f"default_{key}"]
     if not isinstance(persona.get("age"), (int, float)) or isinstance(
         persona.get("age"), bool
     ):

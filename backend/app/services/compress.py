@@ -12,8 +12,10 @@ from __future__ import annotations
 from threading import Lock, Thread
 from typing import Any
 
-from .. import db, llm, store
-from ..db import LIVE_ID
+from ..core import llm
+from ..core import db
+from ..core.state import load as load_state
+from ..core.db import LIVE_ID
 
 # ~64k 窗口的 70%：在真正撑爆上下文之前压一轮
 COMPRESS_TOKEN_THRESHOLD = 45_000
@@ -61,7 +63,7 @@ def _fold_count(history: list[Any]) -> int:
 
 def compress_once() -> bool:
     """同步压缩一次（后台 worker 与测试共用）。成功写回 → True。"""
-    state = store.normalize_state(store.read_state())
+    state = load_state()
     gen = db.query(
         "SELECT generation, summary FROM sessions WHERE id=?", (LIVE_ID,)
     )
@@ -76,7 +78,7 @@ def compress_once() -> bool:
     if fold_n < 2:
         return False
     seg = history[:fold_n]
-    llm_cfg = (state.get("settings") or {}).get("llm") or {}
+    llm_cfg = state["settings"]["llm"]
 
     lines = [f"{m['role']}: {m['text']}" for m in seg]
     if old_summary:

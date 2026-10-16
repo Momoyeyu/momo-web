@@ -6,13 +6,14 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Iterator
+from typing import Iterator
 
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from .. import agent, checkpoint
+from ..services import checkpoint, turn
+from ..models import SseEvent
 
 router = APIRouter()
 
@@ -28,7 +29,7 @@ class InterruptIn(BaseModel):
     assistant: str = ""
 
 
-def _sse(ev: dict[str, Any]) -> str:
+def _sse(ev: SseEvent) -> str:
     return f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
 
 
@@ -40,8 +41,8 @@ def chat(req: ChatIn) -> StreamingResponse:
     def stream() -> Iterator[str]:
         errored = False
         try:
-            for ev in agent.run_turn(req.text):
-                if ev.get("t") == "error":
+            for ev in turn.run_turn(req.text):
+                if ev["t"] == "error":
                     errored = True
                 yield _sse(ev)
         except Exception as e:  # 兜底：agent 未捕获的异常也走 error 事件

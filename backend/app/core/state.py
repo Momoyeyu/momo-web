@@ -6,14 +6,24 @@ momo.yaml 是配置层持久化（gitignored）。读取时做 defaults 深合�
 from __future__ import annotations
 
 import copy
+import os
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
-from .embed import DEFAULT_MODEL, DEFAULT_URL
+if TYPE_CHECKING:
+    from ..models import State
 
-DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+# 出厂默认：embedding 端点与模型（env 可覆盖）。放 core 层，
+# 这样 core 不反向依赖任何上层（models/services/api）。
+DEFAULT_EMBEDDING_URL = os.environ.get(
+    "MOMO_EMBEDDING_URL", "http://10.106.130.222:11434"
+).rstrip("/")
+DEFAULT_EMBEDDING_MODEL = os.environ.get("MOMO_EMBEDDING_MODEL", "bge-m3")
+
+DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 STATE_PATH = DATA_DIR / "momo.yaml"
 
 # 内置 Hiyori 的资源清单（与前端 BUILTIN_RESOURCES 保持一致；
@@ -63,17 +73,22 @@ DEFAULT_STATE: dict[str, Any] = {
         "asr": {"url": "", "key": ""},
         "tts": {"url": "", "key": "", "voice": "", "lang": "zh"},
         # 语义检索端点（设置页「模型」tab 可改）；url 留空 = 只用词面召回
-        "embedding": {"url": DEFAULT_URL, "key": "", "model": DEFAULT_MODEL},
+        "embedding": {
+            "url": DEFAULT_EMBEDDING_URL,
+            "key": "",
+            "model": DEFAULT_EMBEDDING_MODEL,
+        },
         # MCP 拓展清单（{name,transport,enabled} + stdio{command,args,env} / http{endpoint,headers}）
         "extensions": [],
     },
-    # 与前端 DEFAULT_PERSONA 保持一致：prompt 组装时空字段回落到这里。
+    # 与前端 DEFAULT_PERSONA 保持一致：identity/personality 留空，prompt 组装时
+    # 按对话语言回落到 prompt._T[lang] 的出厂文案；preferences 空 = 无偏好。
     "persona": {
         "name": "momo",
-        "identity": "由夜羽开发的AI",
+        "identity": "",
+        "personality": "",
         "age": 16,
-        "personality": "乖巧听话",
-        "preferences": ["喜欢草莓蛋糕", "讨厌苦的东西"],
+        "preferences": [],
     },
     "avatars": [_BUILTIN_AVATAR],
     "avatarId": "builtin",
@@ -92,8 +107,13 @@ def _merge(defaults: Any, value: Any) -> Any:
     return value
 
 
-def normalize_state(state: dict[str, Any] | None) -> dict[str, Any]:
-    """任意（可能残缺）state → 合并默认值后的完整 state。"""
+def normalize_state(state: dict[str, Any] | None) -> State:
+    """任意（可能残缺）state → 合并默认值后的完整 state。
+
+    这是**形状保证边界**：返回值的字段必然齐全，因此下游消费方
+    （agent/loop、agent/compress、memory、agent/prompt）直接下标访问即可，
+    不需要 `(state.get("settings") or {}).get(...) or {}` 那层防御。
+    """
     merged = _merge(DEFAULT_STATE, state if isinstance(state, dict) else {})
     # 内置形象条目恒存在（avatars 是整体替换的数组，深合并补不了成员缺失）。
     avatars = merged.get("avatars")
@@ -104,6 +124,14 @@ def normalize_state(state: dict[str, Any] | None) -> dict[str, Any]:
     ):
         avatars.insert(0, copy.deepcopy(_BUILTIN_AVATAR))
     return merged
+
+
+def load() -> State:
+    """读取 + 归一化，进程内消费配置的统一入口。
+
+    返回值字段必然齐全（见 normalize_state），因此 service 层直接下标访问即可。
+    """
+    return normalize_state(read_state())
 
 
 def read_state() -> dict[str, Any] | None:

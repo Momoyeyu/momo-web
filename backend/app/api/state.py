@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Body, Response
 
-from .. import store
+from ..services import state
 
 router = APIRouter()
 
@@ -13,11 +13,11 @@ router = APIRouter()
 @router.get("/api/state")
 def get_state() -> dict[str, Any]:
     """完整 state JSON；无任何数据返回 {}。"""
-    return store.get_state()
+    return state.read()
 
 
 @router.put("/api/state", status_code=204)
 def put_state(payload: dict[str, Any] = Body(...)) -> Response:
     """整体替换 state。"""
-    store.write_state(payload)
+    state.replace(payload)
     return Response(status_code=204)
