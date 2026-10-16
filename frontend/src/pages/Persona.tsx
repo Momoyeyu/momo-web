@@ -2,7 +2,8 @@
 // 每次修改直接写 store 落盘（设置页即改即生效）。
 // 布局按 prototype/setting：「基本信息」整行面板内左右两列，
 // 「偏好」独立整行面板（卡片走 ui/EditableItem，与记忆页同一形态：
-// 正文单行截断、点击出详情弹窗，编辑/删除在卡片上操作）。
+// 正文单行截断、点击出详情弹窗，编辑/删除在卡片上操作；
+// 添加走 ui/AddItemModal 弹窗，与工具栏的「+」软绑定）。
 
 import { useState } from "react";
 import type { PersonaCard } from "../lib/types";
@@ -10,6 +11,7 @@ import { DEFAULT_PERSONA } from "../lib/store";
 import { CARD_PAGE_SIZE, clampPage } from "../lib/paging";
 import Pager from "../ui/Pager";
 import AvatarPanel from "./Avatar";
+import AddItemModal from "../ui/AddItemModal";
 import DetailModal from "../components/DetailModal";
 import EditableItem from "../ui/EditableItem";
 import IconButton from "../ui/IconButton";
@@ -34,6 +36,8 @@ export default function PersonaPanel({
   const [editingPref, setEditingPref] = useState<number | null>(null);
   const [prefDraft, setPrefDraft] = useState("");
   const [detail, setDetail] = useState<string | null>(null);
+  // 「+ 添加」走 ui/AddItemModal（与加号软绑定）
+  const [addOpen, setAddOpen] = useState(false);
   const prefHits = value.preferences
     .map((text, i) => ({ text, i }))
     .filter((x) =>
@@ -45,14 +49,12 @@ export default function PersonaPanel({
     (pref.page + 1) * CARD_PAGE_SIZE,
   );
 
-  /** 「+ 添加」：追加空条目并立即进入编辑态（清检索、跳末页保证可见）。 */
-  const addPref = (): void => {
-    const next = [...value.preferences, ""];
+  /** 弹窗保存：追加新条目（清检索、跳末页保证可见）。 */
+  const addPref = (text: string): void => {
+    const next = [...value.preferences, text];
     patch({ preferences: next });
     setPrefQuery("");
     setPrefPage(Math.max(0, Math.ceil(next.length / CARD_PAGE_SIZE) - 1));
-    setEditingPref(next.length - 1);
-    setPrefDraft("");
   };
 
   /** 保存卡片编辑：空内容视为放弃该条（直接移除）。 */
@@ -69,14 +71,10 @@ export default function PersonaPanel({
     });
   };
 
-  /** 取消编辑：新增的空白条目一并撤掉。 */
-  const cancelPref = (orig: string): void => {
-    const i = editingPref;
+  /** 取消编辑：改动不落盘（添加改走弹窗，不再有待撤的空条目）。 */
+  const cancelPref = (): void => {
     setEditingPref(null);
     setPrefDraft("");
-    if (i !== null && orig === "") {
-      patch({ preferences: value.preferences.filter((_, j) => j !== i) });
-    }
   };
 
   return (
@@ -141,8 +139,7 @@ export default function PersonaPanel({
           <IconButton
             icon="plus"
             label={t("persona.prefAdd")}
-            onClick={addPref}
-            disabled={editingPref !== null}
+            onClick={() => setAddOpen(true)}
           />
         </div>
         <div className="list-body">
@@ -171,7 +168,7 @@ export default function PersonaPanel({
                       if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                         commitPref();
                       } else if (e.key === "Escape") {
-                        cancelPref(p);
+                        cancelPref();
                       }
                     }}
                   />
@@ -182,7 +179,7 @@ export default function PersonaPanel({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => cancelPref(p)}
+                      onClick={() => cancelPref()}
                     >
                       {t("common.cancel")}
                     </Button>
@@ -217,6 +214,19 @@ export default function PersonaPanel({
       </div>
       {detail !== null && (
         <DetailModal text={detail} onClose={() => setDetail(null)} />
+      )}
+
+      {/* 添加走弹窗：与工具栏的「+」软绑定（见 ui/AddItemModal 顶部注释） */}
+      {addOpen && (
+        <AddItemModal
+          title={t("persona.prefAdd")}
+          placeholder={t("persona.preferencesPh")}
+          onSave={(text) => {
+            setAddOpen(false);
+            addPref(text);
+          }}
+          onCancel={() => setAddOpen(false)}
+        />
       )}
     </div>
   );

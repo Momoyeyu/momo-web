@@ -22,7 +22,7 @@ async function purgeMemories(request: APIRequestContext): Promise<void> {
 async function addViaUi(page: import("@playwright/test").Page, text: string): Promise<void> {
   await page.locator(".mem-toolbar .icon-btn").click();
   await expect(page.locator(".modal-overlay")).toBeVisible();
-  await page.locator(".mem-add-text").fill(text);
+  await page.locator(".add-field").fill(text);
   await page.locator(".modal-foot").getByText("保存").click();
   await expect(page.locator(".modal-overlay")).toBeHidden();
 }

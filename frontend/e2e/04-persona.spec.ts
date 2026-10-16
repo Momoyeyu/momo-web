@@ -37,13 +37,11 @@ test("偏好：添加 → 出现在列表 → 编辑 → 详情弹窗 → 删除
   const original = ((await readState(request)).persona as { preferences: string[] })
     .preferences.length;
 
-  // 添加：IconButton 追加空条目并直接进入编辑态
+  // 添加：走弹窗（与工具栏「+」软绑定；不再用「追加空条目 + 进编辑态」）
   await prefPanel(page).locator(".mem-toolbar .icon-btn").click();
-  const editing = page
-    .locator(".list-item")
-    .filter({ has: page.locator(".list-edit") });
-  await editing.locator("input").fill(`${TAG}喜欢苏打水`);
-  await editing.getByText("保存").click();
+  await page.locator(".add-modal .add-field").fill(`${TAG}喜欢苏打水`);
+  await page.locator(".modal-foot").getByText("保存").click();
+  await expect(page.locator(".modal-overlay")).toBeHidden();
 
   await expect(prefCard(page, `${TAG}喜欢苏打水`)).toBeVisible();
   await waitSaved(page); // store 的 remoteSave 有 300ms 防抖，先等落盘再断言后端
@@ -76,18 +74,20 @@ test("偏好：添加 → 出现在列表 → 编辑 → 详情弹窗 → 删除
   expect((final.persona as { preferences: string[] }).preferences.length).toBe(original);
 });
 
-test("偏好编辑态取消：新增的空条目被撤掉，数量回到原值", async ({ page, request }) => {
+test("添加弹窗取消：不产生任何条目", async ({ page, request }) => {
   await openTab(page, "形象");
   const original = ((await readState(request)).persona as { preferences: string[] })
     .preferences.length;
 
   await prefPanel(page).locator(".mem-toolbar .icon-btn").click();
-  const editing = page
-    .locator(".list-item")
-    .filter({ has: page.locator(".list-edit") });
-  await editing.getByText("取消").click();
+  await page.locator(".add-modal .add-field").fill(`${TAG}不该存在`);
+  await page.locator(".modal-foot").getByText("取消").click();
+  await expect(page.locator(".modal-overlay")).toBeHidden();
   await waitSaved(page);
 
   const after = await readState(request);
-  expect((after.persona as { preferences: string[] }).preferences.length).toBe(original);
+  const prefs = (after.persona as { preferences: string[] }).preferences;
+  expect(prefs.length).toBe(original);
+  // 取消要真的不落盘，而不只是数量对上
+  expect(prefs).not.toContain(`${TAG}不该存在`);
 });

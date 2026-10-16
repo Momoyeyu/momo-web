@@ -42,3 +42,15 @@
   justify-content: flex-end;
   gap: 10px;
 }
+
+/* 「+ 添加条目」弹窗（ui/AddItemModal）：比通用弹窗窄一些，
+   输入框统一占满一行。原来记忆页自己写的 .mem-add-text 已并入 .add-field。 */
+.add-modal {
+  width: min(440px, 92vw);
+}
+
+.add-field {
+  width: 100%;
+  resize: vertical;
+  line-height: 1.6;
+}

@@ -5,6 +5,8 @@ import type { MouseEvent, ReactNode } from "react";
 import "../styles/controls.css";
 
 const PATHS = {
+  /** 「+ 添加条目」——与 ui/AddItemModal 软绑定：代码分开写，但总是成对使用。
+      列表用「+」添加条目时，内容一律由那个弹窗收集。 */
   plus: ["M12 5v14M5 12h14"],
   edit: ["M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z"],
   trash: [

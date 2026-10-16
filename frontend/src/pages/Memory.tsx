@@ -17,7 +17,7 @@ import DetailModal from "../components/DetailModal";
 import EditableItem from "../ui/EditableItem";
 import IconButton from "../ui/IconButton";
 import Button from "../ui/Button";
-import Modal from "../ui/Modal";
+import AddItemModal from "../ui/AddItemModal";
 import { useT, currentLang } from "../i18n";
 import "../styles/persona.css";
 import "../styles/settings.css";
@@ -48,7 +48,6 @@ export default function MemoryPanel() {
   const [editDraft, setEditDraft] = useState("");
   // 「+ 添加」弹窗：内容草稿 + 是否 PIN。
   const [adding, setAdding] = useState(false);
-  const [addDraft, setAddDraft] = useState("");
   const [addPinned, setAddPinned] = useState(false);
   // 卡片点开的详情弹窗（只读全文）。
   const [detail, setDetail] = useState<Memory | null>(null);
@@ -101,15 +100,12 @@ export default function MemoryPanel() {
     }
   };
 
-  const commitAdd = async (): Promise<void> => {
-    const c = addDraft.trim();
-    const pinned = addPinned;
+  /** 弹窗保存：内容与 PIN 由 ui/AddItemModal 收集后回调传入。 */
+  const commitAdd = async (content: string, pinned: boolean): Promise<void> => {
     setAdding(false);
-    setAddDraft("");
     setAddPinned(false);
-    if (!c) return;
     try {
-      await apiAdd(c, pinned);
+      await apiAdd(content, pinned);
       await refresh();
     } catch {
       setLoadFailed(true);
@@ -227,49 +223,45 @@ export default function MemoryPanel() {
       </div>
 
       {/* 添加记忆弹窗：内容 + PIN 选项 */}
+      {/* 添加走弹窗：与工具栏的「+」软绑定（见 ui/AddItemModal 顶部注释） */}
       {adding && (
-        <Modal onClose={() => setAdding(false)}>
-          <div className="modal-meta muted">{t("memory.newTitle")}</div>
-          <textarea
-            className="mem-add-text"
-            rows={4}
-            autoFocus
-            value={addDraft}
-            onChange={(e) => setAddDraft(e.target.value)}
-          />
-          <div className="mem-pinopt">
-            {/* 与记忆卡片同款图钉：pinned=实心金 / unpinned=金色描边 */}
-            <Button
-              className={`mem-pinicon tip tip-l${addPinned ? " on" : ""}`}
-              data-tip={t("memory.pinTip")}
-              aria-pressed={addPinned}
-              onClick={() => setAddPinned((v) => !v)}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M9 4h6l-1.2 6.2L17 13.4V15H7v-1.6l3.2-3.2L9 4z"
-                  fill={addPinned ? "currentColor" : "none"}
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M12 15v5"
-                  stroke="currentColor"
-                  strokeWidth="1.6"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </Button>
-            <span>PIN</span>
-          </div>
-          <div className="modal-foot">
-            <Button variant="ghost" onClick={() => setAdding(false)}>
-              {t("common.cancel")}
-            </Button>
-            <Button onClick={() => void commitAdd()}>{t("common.save")}</Button>
-          </div>
-        </Modal>
+        <AddItemModal
+          title={t("memory.newTitle")}
+          multiline
+          onSave={(text) => void commitAdd(text, addPinned)}
+          onCancel={() => {
+            setAdding(false);
+            setAddPinned(false);
+          }}
+          extra={
+            <div className="mem-pinopt">
+              {/* 与记忆卡片同款图钉：pinned=实心金 / unpinned=金色描边 */}
+              <Button
+                className={`mem-pinicon tip tip-l${addPinned ? " on" : ""}`}
+                data-tip={t("memory.pinTip")}
+                aria-pressed={addPinned}
+                onClick={() => setAddPinned((v) => !v)}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M9 4h6l-1.2 6.2L17 13.4V15H7v-1.6l3.2-3.2L9 4z"
+                    fill={addPinned ? "currentColor" : "none"}
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M12 15v5"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </Button>
+              <span>PIN</span>
+            </div>
+          }
+        />
       )}
 
       {detail && (
