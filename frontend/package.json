@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "mock": "node scripts/mock-services.mjs",
-    "gen:api": "openapi-typescript ../backend/openapi.json -o src/api/schema.d.ts"
+    "gen:api": "node scripts/gen-api.mjs"
   },
   "dependencies": {
     "jszip": "^3.10.2",
