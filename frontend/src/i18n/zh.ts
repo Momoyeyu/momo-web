@@ -119,7 +119,9 @@ export const zh = {
     testFail: "失败",
     extHint:
       "登记外部 MCP server 后，它的工具会从下一轮对话起对 momo 可用；连不上的 server 不会注入工具。",
-    extAdd: "＋ 添加 MCP server",
+    extAdd: "添加 MCP server",
+    extSearchPh: "检索 MCP server…",
+    extEmpty: "没有匹配的 MCP server。",
     extUnnamed: "（未命名）",
     extCfgTitle: "MCP server 配置",
     extName: "名称",

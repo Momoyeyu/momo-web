@@ -119,7 +119,9 @@ export const ja: Dict = {
     testFail: "失敗",
     extHint:
       "外部 MCP サーバーを登録すると、そのツールは次のターンから momo が使えます。接続できないサーバーは注入されません。",
-    extAdd: "＋ MCP サーバーを追加",
+    extAdd: "MCP サーバーを追加",
+    extSearchPh: "MCP サーバーを検索…",
+    extEmpty: "一致する MCP サーバーはありません。",
     extUnnamed: "（無名）",
     extCfgTitle: "MCP サーバー設定",
     extName: "名前",

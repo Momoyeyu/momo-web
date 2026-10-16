@@ -2,7 +2,7 @@
 //
 // 刻意**不引入基础类**（没有 .btn）——solid 就是裸 <button>，emit 出来的类串与
 // 封装前逐字一致。因此页面私有的按钮形态（.tb / .bl-replay / .menu-item /
-// .slot-del / .ext-add / .kv-add / .stab …）直接走 className 逃生口，外观不受影响。
+// .slot-del / .kv-add / .stab …）直接走 className 逃生口，外观不受影响。
 //
 // 类的拼装顺序固定为 ghost → small → danger → className，与既有写法一致。
 import type { ButtonHTMLAttributes } from "react";

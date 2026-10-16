@@ -459,22 +459,15 @@ button.ghost.danger:hover {
   margin: 0;
 }
 
-.ext-list {
-  overflow-y: auto;
-}
-
+/* 拓展卡片复用 .list-item 的卡片外形（与 Live2D 面板同构，因此也等高等宽）；
+   这里只补「不可点击」时的悬停反馈与过渡。 */
 .ext-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 8px;
-  border-bottom: 1px solid var(--line-soft);
-  border-radius: var(--r-sm);
   transition: background 0.15s ease;
 }
 
 .ext-row:hover {
   background: var(--panel-hover);
+  border-color: var(--line-strong);
 }
 
 .ext-name {
@@ -526,17 +519,6 @@ button.ghost.danger:hover {
 }
 
 /* 底部两行：第一行 [+ 添加] 通宽、第二行独立翻页器（行内居中窄控件）。 */
-.ext-add {
-  width: 100%;
-}
-
-.ext-pagerline {
-  display: flex;
-  justify-content: center;
-  min-height: 28px;
-  margin-top: 8px;
-}
-
 /* 弹窗底部操作行：右对齐。 */
 .ext-actions {
   display: flex;

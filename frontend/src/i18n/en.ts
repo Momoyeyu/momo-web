@@ -119,7 +119,9 @@ export const en: Dict = {
     testFail: "fail",
     extHint:
       "Registered MCP servers expose their tools to momo from the next turn on; unreachable servers are simply not injected.",
-    extAdd: "＋ Add MCP server",
+    extAdd: "Add MCP server",
+    extSearchPh: "Search MCP servers…",
+    extEmpty: "No matching MCP server.",
     extUnnamed: "(unnamed)",
     extCfgTitle: "MCP server config",
     extName: "Name",

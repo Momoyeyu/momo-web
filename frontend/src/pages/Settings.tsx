@@ -30,7 +30,7 @@ import {
 import type { ProbeResult } from "../services/probe";
 import { probeExtension } from "../services/extClient";
 import type { ExtProbeResult } from "../services/extClient";
-import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
+import { CARD_PAGE_SIZE, clampPage } from "../lib/paging";
 import { parseMcpJson } from "../lib/mcpJson";
 import FieldRow from "../ui/FieldRow";
 import Modal from "../ui/Modal";
@@ -471,6 +471,7 @@ export default function Settings() {
   >({});
   // 拓展：null=无弹窗，-1=新增，>=0=编辑第 i 条；表单草稿归弹窗组件管。
   const [extEditing, setExtEditing] = useState<number | null>(null);
+  const [extQuery, setExtQuery] = useState("");
   const [extPage, setExtPage] = useState(0);
   // 连接状态点：下标 → 探测结果（"running" = 进行中）。
   const [extProbes, setExtProbes] = useState<
@@ -631,10 +632,17 @@ export default function Settings() {
     };
   }, [tab, settings.extensions]);
 
-  const extPg = clampPage(extPage, settings.extensions.length);
-  const extSlice = settings.extensions
-    .map((ext, i) => ({ ext, i }))
-    .slice(extPg.page * LIST_PAGE_SIZE, (extPg.page + 1) * LIST_PAGE_SIZE);
+  // 检索 + 分页（与 Live2D 面板同构：过滤命中集分页，索引映射回原清单）
+  const extHits = settings.extensions
+  .map((ext, i) => ({ ext, i }))
+  .filter(({ ext }) =>
+  (ext.name || "").toLowerCase().includes(extQuery.trim().toLowerCase()),
+  );
+  const extPg = clampPage(extPage, extHits.length, CARD_PAGE_SIZE);
+  const extSlice = extHits.slice(
+  extPg.page * CARD_PAGE_SIZE,
+  (extPg.page + 1) * CARD_PAGE_SIZE,
+  );
 
   const blankExt = (): McpExtension => ({
     name: "",
@@ -954,9 +962,29 @@ export default function Settings() {
                     {/* 这段说明是「说明书」性质：收进问号浮窗，不占版面 */}
                     <Hint text={t("settings.extHint")} side="down" />
                   </div>
-                  <div className="ext-list col-grow">
-                    {extSlice.map(({ ext, i }) => (
-                      <div className="ext-row" key={i}>
+                  <div className="mem-toolbar">
+                  <input
+                  className="mem-search"
+                  placeholder={t("settings.extSearchPh")}
+                  value={extQuery}
+                  onChange={(e) => {
+                  setExtQuery(e.target.value);
+                  setExtPage(0);
+                  }}
+                  />
+                  <IconButton
+                  icon="plus"
+                  label={t("settings.extAdd")}
+                  tip={t("settings.extAdd")}
+                  onClick={() => setExtEditing(-1)}
+                  />
+                  </div>
+                  <div className="list-body">
+                  {extSlice.length === 0 && (
+                  <p className="muted">{t("settings.extEmpty")}</p>
+                  )}
+                  {extSlice.map(({ ext, i }) => (
+                  <div className="list-item ext-row" key={i}>
                         <span className="ext-name">
                           {ext.name || t("settings.extUnnamed")}
                         </span>
@@ -995,20 +1023,7 @@ export default function Settings() {
                     ))}
                   </div>
                   <div className="col-foot">
-                    <Button
-                      variant="ghost"
-                      className="ext-add"
-                      onClick={() => setExtEditing(-1)}
-                    >
-                      {t("settings.extAdd")}
-                    </Button>
-                    <div className="ext-pagerline">
-                      <Pager
-                        page={extPg.page}
-                        pages={extPg.pages}
-                        onChange={setExtPage}
-                      />
-                    </div>
+                  <Pager page={extPg.page} pages={extPg.pages} onChange={setExtPage} />
                   </div>
                 </section>
                 </div>

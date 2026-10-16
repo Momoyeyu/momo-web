@@ -90,9 +90,9 @@ test("拓展 tab：登记 stdio MCP server → 出现在列表 → 删除", asyn
   const hint = page.locator(".ext-panel .hint").first();
   await expect(hint).toHaveAttribute("data-tip", /MCP/);
   await expect(hint).toHaveAttribute("aria-label", /MCP/);
-  await expect(page.locator(".ext-list")).toBeVisible();
+  await expect(page.locator(".ext-panel .list-body")).toBeVisible();
 
-  await page.locator(".ext-add").click();
+  await page.locator(".ext-panel .mem-toolbar .icon-btn").click();
   await expect(page.locator(".modal-overlay")).toBeVisible();
 
   await fieldRow(page, "名称", ".ext-modal").locator("input").fill("e2e-echo");
