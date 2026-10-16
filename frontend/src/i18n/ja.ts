@@ -169,7 +169,7 @@ export const ja: Dict = {
     preferencesPh: "例：いちごケーキが好き",
     // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
     defaults: {
-      identity: "AIアシスタント",
+      identity: "夜羽が開発したAI",
       personality: "おとなしくて素直",
     },
   },

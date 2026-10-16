@@ -23,7 +23,7 @@ _T = {
             "你的性格是{personality}",
         ),
         # 人设字段留空时的出厂回落（与前端 persona.defaults.* 同一份文案）
-        "default_identity": "一个 AI 助手",
+        "default_identity": "由夜羽开发的AI",
         "default_personality": "乖巧听话",
         "prefs_head": "## 你的偏好",
         "settings_head": "## 你的基本设定",
@@ -91,7 +91,7 @@ _T = {
             "あなたの性格は{personality}",
         ),
         # 人设字段留空时的出厂回落（与前端 persona.defaults.* 同一份文案）
-        "default_identity": "AIアシスタント",
+        "default_identity": "夜羽が開発したAI",
         "default_personality": "おとなしくて素直",
         "prefs_head": "## あなたの好み",
         "settings_head": "## あなたの基本設定",

@@ -61,7 +61,7 @@ test("形象 tab 的出厂默认值跟随「对话语言」而非界面语言", 
   await waitSaved(page);
 
   await page.locator(".stab", { hasText: "形象" }).click();
-  await expect(identity(page)).toHaveAttribute("placeholder", "AIアシスタント");
+  await expect(identity(page)).toHaveAttribute("placeholder", "夜羽が開発したAI");
   await expect(page.locator(".stab-label").first()).toHaveText("通用"); // 界面没跟着变
 
   await page.locator(".stab", { hasText: "通用" }).click();

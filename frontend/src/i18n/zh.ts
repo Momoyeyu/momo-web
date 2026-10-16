@@ -169,7 +169,7 @@ export const zh = {
     preferencesPh: "例如：喜欢草莓蛋糕",
     // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
     defaults: {
-      identity: "一个 AI 助手",
+      identity: "由夜羽开发的AI",
       personality: "乖巧听话",
     },
   },

@@ -146,7 +146,7 @@ def test_prompt_empty_persona_falls_back_defaults():
         },
     )
     assert "你的名字叫momo" in p
-    assert "你的身份是一个 AI 助手" in p
+    assert "你的身份是由夜羽开发的AI" in p
     assert "你的年龄是16" in p
     assert "你的性格是乖巧听话" in p
     # 偏好是列表型配置：空 = 整段不注入（含头），不回落默认值。
@@ -165,14 +165,14 @@ _EMPTY_PERSONA = {
 def test_prompt_empty_persona_text_defaults_follow_language():
     """identity/personality 的出厂回落按 prompt 语言取，不再写死中文。"""
     ja = _prompt("ja", persona=dict(_EMPTY_PERSONA))
-    assert "あなたの身分はAIアシスタント" in ja
+    assert "あなたの身分は夜羽が開発したAI" in ja
     assert "あなたの性格はおとなしくて素直" in ja
-    assert "一个 AI 助手" not in ja
+    assert "由夜羽开发的AI" not in ja
 
     en = _prompt("en", persona=dict(_EMPTY_PERSONA))
     assert "Your identity is an AI assistant" in en
     assert "Your personality is sweet and obedient" in en
-    assert "一个 AI 助手" not in en
+    assert "由夜羽开发的AI" not in en
 
 
 def test_prompt_text_defaults_follow_chat_lang_not_ui_lang():
@@ -182,9 +182,9 @@ def test_prompt_text_defaults_follow_chat_lang_not_ui_lang():
         settings={"general": {"lang": "zh", "chatLang": "ja"}},
         persona=dict(_EMPTY_PERSONA),
     )
-    assert "あなたの身分はAIアシスタント" in p
+    assert "あなたの身分は夜羽が開発したAI" in p
     assert "あなたの性格はおとなしくて素直" in p
-    assert "一个 AI 助手" not in p
+    assert "由夜羽开发的AI" not in p
 
 
 def test_prompt_language_switch_keeps_neutral_defaults():
