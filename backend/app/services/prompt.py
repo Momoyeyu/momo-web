@@ -3,6 +3,9 @@
 模版**只有英文一份**（见 _T），对语言不敏感 —— 三种语言各维护一套模版既难同步、
 也没有证据表明效果更好。
 
+人设不在模版里，也不在配置里：它来自 resources/soul.md（见 load_soul），
+整段原样注入人设段 —— 想写多细就写多细，不受设置页字段限制。
+
 会随语言变化的只有两处：
 1. lang_line：值来自设置里的「对话语言」（chatLang，auto → 界面语言，未知回退 zh）
 2. 人设字段留空时的出厂回落（_DEFAULTS）—— 那是**内容**，不是模版措辞
@@ -11,20 +14,32 @@
 """
 from __future__ import annotations
 
+import os
+import re
+from pathlib import Path
+
 from typing import Any
 
 from ..models import State
 from ..core.time import now_info
 
 _LANG_NAMES = {"zh": "中文", "en": "English", "ja": "日本語"}
-#: 出厂人设：**写死**。设置页没有对应入口，用户改不到 ——
-#: 要改人设就改这里（这是唯一入口）。
-PERSONA: dict[str, Any] = {
-    "name": "momo",
-    "age": 16,
-    "identity": "人工智能",
-    "personality": "乖巧听话",
-}
+#: momo 的「灵魂」：一份 markdown 资源文件，**原样**注入 system prompt 的人设段。
+#: 见 backend/resources/soul.md（直接编辑即可改人设，下一轮对话生效）。
+#: HTML 注释在加载时剥掉 —— 文件里可以写给人看的说明，不吃模型上下文。
+SOUL_PATH = Path(
+    os.environ.get("MOMO_SOUL")
+    or str(Path(__file__).resolve().parents[2] / "resources" / "soul.md")
+)
+
+
+def load_soul() -> str:
+    """读 soul 文件；缺失/为空 → 空串（人设段整段不注入）。"""
+    try:
+        raw = SOUL_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    return re.sub(r"<!--.*?-->", "", raw, flags=re.S).strip()
 
 # 段落顺序：人格配置（基本信息/偏好/基本设定）→ 记忆配置（仅初始记忆）
 # → 输出方式 → 行为配置（表情/动作）。{...} 由 builder 注入。
@@ -38,13 +53,6 @@ PERSONA: dict[str, Any] = {
 # 它们原样插入模版占位符，可以是任何语言，不需要模版配合。
 _T: dict[str, Any] = {
     "persona_head": "# Persona Configuration",
-    "basic_head": "## Your basic information",
-    "info_lines": (
-        "Your name is {name}",
-        "Your identity is {identity}",
-        "You are {age} years old",
-        "Your personality is {personality}",
-    ),
     "settings_head": "## Your basic settings",
     "lang_line": (
         "Your conversation language is {lang}; talk with the user in that "
@@ -132,8 +140,8 @@ def build_system_prompt(
     """
     lang = _lang_of(state)
     t = _T  # 模版只有一份（英文），不再按语言取
-    # 人设写死（见 PERSONA）：不从配置读，用户也没有入口改。
-    persona = PERSONA
+    # 人设来自 soul 文件（backend/resources/soul.md），原样注入。
+    soul = load_soul()
     # 初始记忆（pins）由调用方注入（momo.db 里 pinned=1 的行）。
     pins = [
         p.strip() for p in (pins or []) if isinstance(p, str) and p.strip()
@@ -143,16 +151,7 @@ def build_system_prompt(
 
     sections: list[str] = []
 
-    # # 人格配置：基本信息 / 基本设定
-    info = "\n".join(
-        "- " + line.format(
-            name=str(persona["name"]).strip(),
-            identity=str(persona["identity"]).strip(),
-            age=persona["age"],
-            personality=str(persona["personality"]).strip(),
-        )
-        for line in t["info_lines"]
-    )
+    # # 人格配置：soul（原样）+ 基本设定
     settings = "\n".join(
         "- " + line
         for line in (
@@ -161,10 +160,10 @@ def build_system_prompt(
         )
     )
     # 偏好条件注入（含头）：空列表 = 无偏好，整段不出现，不留空标题。
-    persona_blocks = [
-        t["persona_head"] + "\n\n" + t["basic_head"] + "\n" + info,
-        t["settings_head"] + "\n" + settings,
-    ]
+    persona_blocks: list[str] = []
+    if soul:
+        persona_blocks.append(t["persona_head"] + "\n\n" + soul)
+    persona_blocks.append(t["settings_head"] + "\n" + settings)
     sections.append("\n\n".join(persona_blocks))
 
     # # 记忆配置：仅初始记忆；pins 为空时整块不出现。

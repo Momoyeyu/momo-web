@@ -32,17 +32,15 @@ def test_normalize_tolerates_junk():
     assert s["custom"] == "oops"  # 非 None 值原样透传（容错，不强行纠正类型）
 
 
-def test_persona_is_hardcoded_not_configurable():
-    """人设写死在 prompt.PERSONA：不属于配置，用户也没有入口改。"""
+def test_persona_lives_in_soul_file_not_config():
+    """人设不在配置里，而在 resources/soul.md：用户改不到，开发者直接编辑文件。"""
     assert "persona" not in store.normalize_state({})
     from app.services import prompt
 
-    assert prompt.PERSONA == {
-        "name": "momo",
-        "age": 16,
-        "identity": "人工智能",
-        "personality": "乖巧听话",
-    }
+    soul = prompt.load_soul()
+    assert soul, "soul 文件应存在且非空"
+    assert prompt.SOUL_PATH.name == "soul.md"
+    assert "momo" in soul
 
 
 def test_put_state_roundtrip():

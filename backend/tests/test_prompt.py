@@ -76,16 +76,13 @@ def test_fields_and_pins_are_injected_verbatim():
     p = _prompt("zh")
     # 模版是英文
     assert "# Persona Configuration" in p
-    assert "## Your basic information" in p
     assert "## Your initial memories" in p
     assert "# Memory Configuration" in p
-    # 注入的是中文内容（原样插入，模版不参与翻译）
-    # 人设来自写死的 PERSONA，而不是上面那份假配置
-    assert "- Your name is momo" in p
-    assert "- Your identity is 人工智能" in p
-    assert "- You are 16 years old" in p
-    assert "- Your personality is 乖巧听话" in p
-    assert "配置里的" not in p
+    # 人设段 = soul 文件原文（中文内容原样注入，模版不参与翻译）
+    soul = prompt.load_soul()
+    assert soul and soul in p
+    assert "- 名称：momo" in p
+    assert "配置里的" not in p  # 配置里的人设一概不读
     # 偏好功能已删除：整段（含头）都不该出现
     assert "## Your preferences" not in p
     assert "- 配置里的偏好" not in p
@@ -196,12 +193,19 @@ def test_output_style_section_present_for_every_language():
         assert "empty content" in p
 
 
-def test_persona_is_identical_across_languages():
-    """人设写死且与对话语言无关：三语的基本信息段完全相同。"""
-    infos = []
+def test_soul_is_injected_identically_across_languages():
+    """soul 与对话语言无关：三语拿到的是同一段人设原文。"""
+    souls = []
     for lang in ("zh", "en", "ja"):
         p = _prompt(lang)
-        block = p.split("## Your basic information")[1].split("##")[0]
-        infos.append(block)
-    assert infos[0] == infos[1] == infos[2]
-    assert "人工智能" in infos[0]
+        souls.append(p.split("## Your basic settings")[0])
+    assert souls[0] == souls[1] == souls[2]
+    assert "# momo" in souls[0]
+
+
+def test_missing_soul_skips_persona_section(monkeypatch, tmp_path):
+    """soul 文件缺失 → 人设段整段不注入（其余段落照常）。"""
+    monkeypatch.setattr(prompt, "SOUL_PATH", tmp_path / "nope.md")
+    p = _prompt("zh")
+    assert "# Persona Configuration" not in p
+    assert "## Your basic settings" in p  # 基本设定仍在
