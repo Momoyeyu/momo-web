@@ -82,7 +82,7 @@ export default function PersonaPanel({
   return (
     <div className="persona-tab">
       <section className="panel persona-section">
-        <h2>{t("persona.basic")}</h2>
+        <h3 className="opt-group">{t("persona.basic")}</h3>
         <div className="fields-grid">
           <div className="fields-col">
             <label className="field">
@@ -127,7 +127,7 @@ export default function PersonaPanel({
           高度自然对齐（.settings-cols 的 align-items: stretch）。 */}
       <div className="settings-cols">
         <section className="panel persona-section">
-        <h2>{t("persona.preferences")}</h2>
+        <h3 className="opt-group">{t("persona.preferences")}</h3>
         <div className="mem-toolbar">
           <input
             className="mem-search"
@@ -208,10 +208,10 @@ export default function PersonaPanel({
         </div>
       </section>
         <section className="panel persona-section">
-          <h2>
+          <h3 className="opt-group">
             {t("settings.groups.avatar")}
             <span className="req">*</span>
-          </h2>
+          </h3>
           <AvatarPanel />
         </section>
       </div>

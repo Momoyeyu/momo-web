@@ -884,6 +884,9 @@ export default function Settings() {
               {tab === "models" && (
                 <>
                 <div className="settings-cols">
+                {/* 每个小标题各自成格，与「通用」页一致（2 列网格里一格一组）。
+                    网格按行填充，故顺序为：第 1 行 LLM｜ASR，第 2 行 Embedding｜TTS，
+                    与原「左栏 LLM+Embedding / 右栏 ASR+TTS」的位置一致。 */}
                 <section className="panel settings-col opt-list">
                   <h3 className="opt-group">{t("settings.groups.llm")}</h3>
                   {urlRow("llm", "settings.llmUrlPh", true)}
@@ -901,7 +904,13 @@ export default function Settings() {
                       <span className="probe-err">{t("settings.required")}</span>
                     )}
                   </FieldRow>
-
+                </section>
+                <section className="panel settings-col opt-list">
+                  <h3 className="opt-group">{t("settings.groups.asr")}</h3>
+                  {urlRow("asr", "settings.asrUrlPh")}
+                  {keyRow("asr")}
+                </section>
+                <section className="panel settings-col opt-list">
                   <h3 className="opt-group">
                     {t("settings.groups.embedding")}
                   </h3>
@@ -918,10 +927,6 @@ export default function Settings() {
                   </FieldRow>
                 </section>
                 <section className="panel settings-col opt-list">
-                  <h3 className="opt-group">{t("settings.groups.asr")}</h3>
-                  {urlRow("asr", "settings.asrUrlPh")}
-                  {keyRow("asr")}
-
                   <h3 className="opt-group">{t("settings.groups.tts")}</h3>
                   {urlRow("tts", "settings.ttsUrlPh")}
                   {keyRow("tts")}
@@ -934,7 +939,6 @@ export default function Settings() {
                   </FieldRow>
                   {/* 合成语言不单独配置：跟随「通用」页的对话语言
                       （见 i18n 的 resolvePromptLang 与 services/ttsClient.ts）。 */}
-
                 </section>
                 </div>
                 </>

@@ -14,10 +14,8 @@
   padding: 22px 24px;
 }
 
-.persona-section h2 {
-  margin: 0 0 4px;
-  font-size: 16px;
-}
+/* 面板小标题统一用 settings.css 的 .opt-group（金色小字），
+   与「模型」等 tab 一致；这里不再单独定义 h2 样式。 */
 
 .persona-section p {
   margin: 0;
