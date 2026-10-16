@@ -143,36 +143,35 @@ export default function MemoryPanel() {
       onStartEdit={() => startEdit(m)}
       onDelete={() => void remove(m.id)}
       deleteConfirm={t("memory.confirmDelete")}
-      head={
-        <>
-          <span className="muted">{formatTime(m.createdAt)}</span>
-          <Button
-            className={`mem-pinicon tip tip-r${m.pinned ? " on" : ""}`}
-            data-tip={t("memory.pinTip")}
-            onClick={(e) => {
-              e.stopPropagation();
-              void togglePin(m);
-            }}
-          >
-            {/* 图钉：pinned=实心金，unpinned=金色描边 */}
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M9 4h6l-1.2 6.2L17 13.4V15H7v-1.6l3.2-3.2L9 4z"
-                fill={m.pinned ? "currentColor" : "none"}
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M12 15v5"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-          </Button>
-        </>
+      // 图钉与编辑/删除同列：都是右侧图标操作，垂直居中对齐
+      actions={
+        <Button
+          className={`mem-pinicon tip tip-r${m.pinned ? " on" : ""}`}
+          data-tip={t("memory.pinTip")}
+          onClick={(e) => {
+            e.stopPropagation();
+            void togglePin(m);
+          }}
+        >
+          {/* 图钉：pinned=实心金，unpinned=金色描边 */}
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M9 4h6l-1.2 6.2L17 13.4V15H7v-1.6l3.2-3.2L9 4z"
+              fill={m.pinned ? "currentColor" : "none"}
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M12 15v5"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+            />
+          </svg>
+        </Button>
       }
+      head={<span className="muted">{formatTime(m.createdAt)}</span>}
       edit={
         <div className="list-edit">
           <textarea

@@ -318,6 +318,11 @@
   stroke-width: 2.6;
 }
 
+.icon-btn.danger:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+
 .icon-btn:disabled {
   opacity: 0.4;
   cursor: default;
@@ -378,6 +383,23 @@
   border-radius: var(--r-md);
   padding: 10px 12px;
   margin-bottom: 8px;
+  /* 左侧正文 + 右侧图标操作列；正文因此垂直居中 */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 编辑态回到纵向：输入框在上、保存/取消在下 */
+.list-item.list-editing {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+/* 左侧正文（头部行 + 截断正文） */
+.list-main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -407,9 +429,24 @@
   white-space: nowrap;
 }
 
+/* 右侧操作列：纯图标，与正文垂直居中。
+   图标按钮在这里收小一档（34 → 28），与图钉等自带样式的操作项同尺寸。 */
 .list-ops {
+  flex: none;
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
+}
+
+.list-ops .icon-btn,
+.list-ops .mem-pinicon {
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+}
+
+.list-ops .mem-pinicon {
+  margin-left: 0;
 }
 
 .list-edit textarea {

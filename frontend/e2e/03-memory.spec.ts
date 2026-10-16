@@ -47,7 +47,7 @@ test("空态 → 添加 → 出现在列表 → 删除", async ({ page }) => {
   // 删除走 window.confirm：Playwright 默认忽略弹窗（≈取消），必须显式接受，
   // 且要在点击之前注册。
   page.on("dialog", (d) => void d.accept());
-  await card(page, `${PREFIX}喜欢吃草莓蛋糕`).getByText("删除").click();
+  await card(page, `${PREFIX}喜欢吃草莓蛋糕`).getByLabel("删除").click();
   await expect(card(page, `${PREFIX}喜欢吃草莓蛋糕`)).toHaveCount(0);
 });
 
@@ -106,7 +106,7 @@ test("卡片内联编辑：改内容后列表与后端都更新", async ({ page,
   await openTab(page, "记忆");
   await addViaUi(page, `${PREFIX}旧事实`);
 
-  await card(page, `${PREFIX}旧事实`).getByText("编辑").click();
+  await card(page, `${PREFIX}旧事实`).getByLabel("编辑").click();
 
   // 进入编辑态后内容在 <textarea> 里，不再是文本内容，
   // 按 hasText 定位的卡片会失效——改用「含有 .list-edit 的那张卡」定位。

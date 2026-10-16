@@ -59,7 +59,7 @@ test("偏好：添加 → 出现在列表 → 编辑 → 详情弹窗 → 删除
   await expect(page.locator(".modal-overlay")).toBeHidden();
 
   // 内联编辑：改内容
-  await prefCard(page, `${TAG}喜欢苏打水`).getByText("编辑").click();
+  await prefCard(page, `${TAG}喜欢苏打水`).getByLabel("编辑").click();
   const editBox = page
     .locator(".list-item")
     .filter({ has: page.locator(".list-edit") });
@@ -68,7 +68,7 @@ test("偏好：添加 → 出现在列表 → 编辑 → 详情弹窗 → 删除
   await expect(prefCard(page, `${TAG}喜欢气泡水`)).toBeVisible();
 
   // 删除（偏好删除无确认弹窗）
-  await prefCard(page, `${TAG}喜欢气泡水`).getByText("删除").click();
+  await prefCard(page, `${TAG}喜欢气泡水`).getByLabel("删除").click();
   await expect(prefCard(page, `${TAG}喜欢气泡水`)).toHaveCount(0);
   await waitSaved(page);
 
