@@ -4,7 +4,7 @@
 细节都在下方函数或别的层：
 
     build_messages    节点 B：system prompt + 摘要 + 最近窗口 + 本回合输入
-    react             节点 R→D→E→CNT：LLM 调用与工具回填，≤5 轮
+    react             节点 R→D→E→CNT→H：流式 LLM 调用、工具回填、边到边切句推流，≤5 轮
     checkpoint.*      user 落账 / assistant **逐句**落账（代际校验）
     compress.*        回合末按用量触发后台压缩（不阻塞推流）
     core.sentences    节点 H：切句（唯一口径，前端不再切句）
@@ -12,11 +12,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Iterator
 
 from ..core import llm, mcp
-from ..core.sentences import split_sentences
+from ..core.sentences import Sentence, SentenceStream
 from ..core import db
 from ..core.state import load as load_state
 from ..models import ChatMessage, ErrorEvent, State, StoredMessage, TurnEvent
@@ -28,15 +27,6 @@ MAX_ROUNDS = 5
 HISTORY_WINDOW = 20
 
 SUMMARY_PREFIX = "以下是本次对话此前部分的摘要，其后的最新消息接在它之后继续：\n"
-
-
-@dataclass(frozen=True)
-class Reply:
-    """`react` 的结果：成功带正文与用量，失败带 error 事件。"""
-
-    text: str = ""
-    prompt_tokens: int | None = None
-    error: ErrorEvent | None = None
 
 
 # ==================== 主流程 ====================
@@ -52,30 +42,7 @@ def run_turn(text: str) -> Iterator[TurnEvent]:
         return  # 会话已被读档/重置 → 本回合静默作废
 
     with mcp.open_tools(state["settings"]["extensions"], builtin_names()) as ext_tools:
-        reply = react(messages, ext_tools, state)  # 节点 R→D→E→CNT
-        if reply.error is not None:
-            yield reply.error  # 节点 ERR（不发 done，由 api 层决定）
-            return
-
-        # 节点 H 前置：先触发压缩（不阻塞本回合推流）
-        compress.maybe_compress(reply.prompt_tokens)
-
-        # 节点 H：切句（唯一口径，已剥离指令）→ 逐句落账 → 推句事件。
-        # 代际漂移（读档/打断）时静默丢弃剩余句子。
-        for no, sent in enumerate(split_sentences(reply.text)):
-            if not checkpoint.append_sentence(sent.text, gen, at):
-                return
-            yield {
-                "t": "sentence",
-                "no": no,
-                "text": sent.text,
-                "dirs": [
-                    {"kind": d.kind, "name": d.name, "offset": d.offset}
-                    for d in sent.dirs
-                ],
-                "at": at,
-            }
-            # (见文件末尾的过渡期 delta)
+        yield from react(messages, ext_tools, state, gen, at)  # 节点 R→D→E→CNT→H
 
 
 # ==================== 节点实现 ====================
@@ -118,38 +85,90 @@ def _merge_assistant(msgs: list[StoredMessage]) -> list[ChatMessage]:
 
 
 def react(
-    messages: list[ChatMessage], ext_tools: mcp.ExtTools, state: State
-) -> Reply:
-    """节点 R→D→E→CNT：调 LLM；有 tool_calls 就执行回填继续，拿到正文即结束。
+    messages: list[ChatMessage],
+    ext_tools: mcp.ExtTools,
+    state: State,
+    gen: int,
+    at: str,
+) -> Iterator[TurnEvent]:
+    """节点 R→D→E→CNT→H：流式调 LLM，正文**边到边切句落账并推句事件**。
 
-    最多 MAX_ROUNDS 次调用（tool 轮与空 content 轮同样计数）。
+    与改造前的本质差别：**正文不再是回合的终点**。一轮调用里文本可以出现多次
+    （工具调用前后的说明都算），只有「本轮结束且没有工具调用」才收尾；因此
+   用户在生成过程中就能看到/听到前几句，而不必等整段生成完。
+
+    文本增量与工具调用增量在同一条 assistant 消息里交错到达（见 llm.chat_stream），
+    工具参数是分片下发的、在客户端按 index 累积。
     工具表：无可用拓展时原样下发内置表（`TOOLS` 本身，不做拷贝）。
     """
     tools = TOOLS + ext_tools.decls if ext_tools.decls else TOOLS
     llm_cfg = state["settings"]["llm"]
     usage: dict[str, Any] = {}  # 末次调用的用量（压缩阈值判定用）
+    splitter = SentenceStream()
+    seq = 0
+
+    def take(sent: Sentence) -> TurnEvent | None:
+        """成句 → 落账 → 句事件；None = 代际漂移（读档/打断），调用方应停止。"""
+        nonlocal seq
+        if not checkpoint.append_sentence(sent.text, gen, at):
+            return None
+        ev: TurnEvent = {
+            "t": "sentence",
+            "no": seq,
+            "text": sent.text,
+            "dirs": [
+                {"kind": d.kind, "name": d.name, "offset": d.offset}
+                for d in sent.dirs
+            ],
+            "at": at,
+        }
+        seq += 1
+        return ev
 
     for _ in range(MAX_ROUNDS):
+        calls: list[dict[str, Any]] | None = None
+        round_text = ""
         try:
-            message = llm.chat_completion(
-                llm_cfg, messages, tools=tools, usage_out=usage
-            )
+            for ev in llm.chat_stream(llm_cfg, messages, tools=tools, usage_out=usage):
+                if ev["type"] == "text":
+                    delta = str(ev["delta"])
+                    round_text += delta
+                    for sent in splitter.push(delta):
+                        out = take(sent)
+                        if out is None:
+                            return
+                        yield out
+                elif ev["type"] == "tool_calls":
+                    calls = ev["calls"]
         except llm.LlmError as e:
-            return Reply(error=_error(str(e)))
+            yield _error(str(e))  # 节点 ERR（不发 done，由 api 层决定）
+            return
 
-        tool_calls = message.get("tool_calls") or []
-        if tool_calls:
-            messages.append(message)  # assistant（含 tool_calls）原样回传
-            for call in tool_calls:
+        if calls:
+            # 工具轮：本轮 assistant 消息（含前言正文）原样回传 + 回填工具结果
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": round_text or None,
+                    "tool_calls": calls,
+                }
+            )
+            for call in calls:
                 messages.append(run_call(call, ext_tools))
             continue
 
-        content = str(message.get("content") or "")
-        if content.strip():
-            return Reply(text=content, prompt_tokens=usage.get("prompt_tokens"))
-        # 空 content 且无 tool_calls：记一轮，继续重试
+        # 本轮没有工具调用 → 收尾：flush 残余句，然后结束回合
+        for sent in splitter.flush():
+            out = take(sent)
+            if out is None:
+                return
+            yield out
+        if not round_text.strip():
+            continue  # 空正文且无工具调用：记一轮，继续重试（与原实现一致）
+        compress.maybe_compress(usage.get("prompt_tokens"))  # 不阻塞推流
+        return
 
-    return Reply(error=_error(f"llm produced no response within {MAX_ROUNDS} rounds"))
+    yield _error(f"llm produced no response within {MAX_ROUNDS} rounds")
 
 
 def _error(message: str) -> ErrorEvent:

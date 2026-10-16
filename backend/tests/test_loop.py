@@ -22,14 +22,11 @@ def test_react_tool_then_text(monkeypatch):
         seen_messages.append(list(messages))
         assert tools  # tools 声明已传
         if len(seen_messages) == 1:
-            return {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [_tool_call("common_time")],
-            }
-        return {"role": "assistant", "content": "你好呀。<exp>开心</exp>今天很开心！"}
+            yield {"type": "tool_calls", "calls": [_tool_call("common_time")]}
+            return
+        yield {"type": "text", "delta": "你好呀。<exp>开心</exp>今天很开心！"}
 
-    monkeypatch.setattr(llm, "chat_completion", fake_chat)
+    monkeypatch.setattr(llm, "chat_stream", fake_chat)
 
     events = list(turn.run_turn("在吗"))
 
@@ -65,7 +62,7 @@ def test_llm_error_yields_error_event(monkeypatch):
     def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
         raise llm.LlmError("llm unreachable")
 
-    monkeypatch.setattr(llm, "chat_completion", fake_chat)
+    monkeypatch.setattr(llm, "chat_stream", fake_chat)
     events = list(turn.run_turn("hi"))
     assert events == [
         {"t": "error", "message": "llm unreachable", "service": "llm"}
@@ -74,13 +71,9 @@ def test_llm_error_yields_error_event(monkeypatch):
 
 def test_max_rounds_without_content(monkeypatch):
     def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
-        return {
-            "role": "assistant",
-            "content": None,
-            "tool_calls": [_tool_call("common_time")],
-        }
+        yield {"type": "tool_calls", "calls": [_tool_call("common_time")]}
 
-    monkeypatch.setattr(llm, "chat_completion", fake_chat)
+    monkeypatch.setattr(llm, "chat_stream", fake_chat)
     events = list(turn.run_turn("hi"))
     assert len(events) == 1
     assert events[0]["t"] == "error"
@@ -95,20 +88,20 @@ def test_tool_memory_ops_via_react(monkeypatch):
         rounds.append(list(messages))
         n = len(rounds)
         if n == 1:
-            return {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [_tool_call("memory_add", '{"content": "用户喜欢草莓"}', "c1")],
+            yield {
+                "type": "tool_calls",
+                "calls": [_tool_call("memory_add", '{"content": "用户喜欢草莓"}', "c1")],
             }
+            return
         if n == 2:
-            return {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [_tool_call("memory_delete", '{"id": "nope"}', "c2")],
+            yield {
+                "type": "tool_calls",
+                "calls": [_tool_call("memory_delete", '{"id": "nope"}', "c2")],
             }
-        return {"role": "assistant", "content": "记好了！"}
+            return
+        yield {"type": "text", "delta": "记好了！"}
 
-    monkeypatch.setattr(llm, "chat_completion", fake_chat)
+    monkeypatch.setattr(llm, "chat_stream", fake_chat)
     events = list(turn.run_turn("帮我记一下"))
     assert [e["text"] for e in events if e["t"] == "sentence"] == ["记好了！"]
 
@@ -165,3 +158,47 @@ def test_merge_assistant_groups_sentences_per_turn():
         {"role": "user", "content": "问2"},
         {"role": "assistant", "content": "答3。"},
     ]
+
+
+def test_turn_speaks_before_and_after_tool_call(monkeypatch):
+    """正文不再是回合的终点：工具调用前后都能说话，两段都成句落账。"""
+    rounds = []
+
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+        rounds.append(list(messages))
+        if len(rounds) == 1:
+            yield {"type": "text", "delta": "我查一下。"}
+            yield {"type": "tool_calls", "calls": [_tool_call("common_time")]}
+            return
+        yield {"type": "text", "delta": "现在是三点。"}
+
+    monkeypatch.setattr(llm, "chat_stream", fake_chat)
+    events = list(turn.run_turn("几点了"))
+    sents = [e for e in events if e["t"] == "sentence"]
+    assert [e["no"] for e in sents] == [0, 1]
+    assert [e["text"] for e in sents] == ["我查一下。", "现在是三点。"]
+    # 两段同属一个回合，都落账
+    assert [m["text"] for m in checkpoint.live_messages()] == [
+        "几点了",
+        "我查一下。",
+        "现在是三点。",
+    ]
+    # 工具轮回传的 assistant 消息保留前言正文（不是只有 tool_calls）
+    assistant_msgs = [m for m in rounds[-1] if m.get("role") == "assistant"]
+    assert assistant_msgs[0]["content"] == "我查一下。"
+    assert assistant_msgs[0]["tool_calls"]
+
+
+def test_sentence_is_persisted_before_round_finishes(monkeypatch):
+    """阶段二的核心：第一句在**整轮结束之前**就已落账 —— 生成期间就能看到。"""
+    snapshots = []
+
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+        yield {"type": "text", "delta": "第一句。第二句。"}
+        # 流还没结束，此刻查 DB：第一句已经落账（第二句因「等下一个字符」还在缓冲）
+        snapshots.append([m["text"] for m in checkpoint.live_messages()])
+        yield {"type": "text", "delta": "第三句。"}
+
+    monkeypatch.setattr(llm, "chat_stream", fake_chat)
+    list(turn.run_turn("在吗"))
+    assert snapshots == [["在吗", "第一句。"]]

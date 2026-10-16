@@ -46,7 +46,13 @@ _T = {
             "指令不会被展示也不会被朗读，清单以外的名称无效；"
             "正文需要输出尖括号时写成 &lt; 或 &gt;。"
         ),
-    },
+            "output_head": "## 输出方式",
+        "output_lines": (
+            "你可以在一轮回复里分多次输出：每次只说一个意思，一句到两句算一个完整输出",
+            "需要调用工具时，先用一句话说明你打算做什么再去调用——这句话会立刻被用户看到和听到",
+            "每次输出都要是能独立朗读的完整语句；不要一次吐出整段长文，也不要输出空白内容",
+        ),
+},
     "en": {
         "persona_head": "# Persona Configuration",
         "basic_head": "## Your basic information",
@@ -80,7 +86,13 @@ _T = {
             "Directives are never displayed or read aloud; names outside the "
             "lists are invalid. Use &lt; or &gt; for literal angle brackets in text."
         ),
-    },
+            "output_head": "## How you speak",
+        "output_lines": (
+            "You may speak in several separate outputs within one reply: say one thing at a time, one or two sentences per output",
+            "When you need a tool, first say in one sentence what you are about to do, then call it — that line is shown and spoken to the user right away",
+            "Every output must be a complete, speakable sentence. Never dump a whole paragraph at once, and never output empty content",
+        ),
+},
     "ja": {
         "persona_head": "# 人格設定",
         "basic_head": "## あなたの基本情報",
@@ -114,7 +126,13 @@ _T = {
             "指令は表示・読み上げされず、リスト外の名前は無効です。"
             "本文で山括弧が必要なときは &lt; や &gt; と書いてください。"
         ),
-    },
+            "output_head": "## 話し方",
+        "output_lines": (
+            "1回の返信の中で何度も出力してよい：一度に一つのことだけを話し、一文か二文を一つの出力単位にする",
+            "ツールを使うときは、まず何をするかを一文で伝えてから呼び出す——その一文はすぐに表示され読み上げられる",
+            "どの出力も単独で読み上げられる完全な文にすること。長い段落を一度に吐き出したり、空の内容を出力したりしない",
+        ),
+},
 }
 
 
@@ -243,6 +261,12 @@ def build_system_prompt(
         )
         if lines
     ]
+    # 输出方式：恒定注入（与形象资源无关）——一轮可多次输出、工具调用前先说明，
+    # 直接决定前端「逐句可见/逐句朗读」的观感。
+    sections.append(
+        t["output_head"] + "\n" + "\n".join(f"- {line}" for line in t["output_lines"])
+    )
+
     if behavior_blocks:
         sections.append(
             t["behavior_head"]

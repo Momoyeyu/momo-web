@@ -46,11 +46,22 @@ class _InlineThread:
             self._target()
 
 
-def _fake_chat(content="好。", prompt_tokens=0):
+def _fake_completion(content="好。", prompt_tokens=0):
+    """llm.chat_completion 替身：压缩摘要走非流式这条路径。"""
+
     def fake(llm_cfg, messages, tools=None, usage_out=None):
         if usage_out is not None:
             usage_out.update({"prompt_tokens": prompt_tokens})
         return {"role": "assistant", "content": content}
+
+    return fake
+
+
+def _fake_chat(content="好。", prompt_tokens=0):
+    def fake(llm_cfg, messages, tools=None, usage_out=None):
+        if usage_out is not None:
+            usage_out.update({"prompt_tokens": prompt_tokens})
+        yield {"type": "text", "delta": content}
 
     return fake
 
@@ -362,9 +373,9 @@ def test_run_turn_skips_stream_when_gen_stale(monkeypatch):
 
     def fake(llm_cfg, messages, tools=None, usage_out=None):
         client.post(f"/api/checkpoints/{sid}/load")  # LLM 返回前发生读档
-        return {"role": "assistant", "content": "迟到回复"}
+        yield {"type": "text", "delta": "迟到回复"}
 
-    monkeypatch.setattr(llm, "chat_completion", fake)
+    monkeypatch.setattr(llm, "chat_stream", fake)
     events = list(turn.run_turn("hi"))
     assert [e for e in events if e["t"] == "delta"] == []
 
@@ -387,8 +398,9 @@ def test_compress_trigger_and_assembly(monkeypatch):
     _seed(4)  # 8 条
     monkeypatch.setattr(compress, "Thread", _InlineThread)
     monkeypatch.setattr(
-        llm, "chat_completion", _fake_chat("摘要一", prompt_tokens=10**9)
+        llm, "chat_stream", _fake_chat("摘要一", prompt_tokens=10**9)
     )
+    monkeypatch.setattr(llm, "chat_completion", _fake_completion("摘要一"))
 
     events = list(turn.run_turn("继续"))
     assert any(e["t"] == "sentence" for e in events)
@@ -403,9 +415,9 @@ def test_compress_trigger_and_assembly(monkeypatch):
 
     def spy(llm_cfg, messages, tools=None, usage_out=None):
         seen.append(list(messages))
-        return {"role": "assistant", "content": "嗯。"}
+        yield {"type": "text", "delta": "嗯。"}
 
-    monkeypatch.setattr(llm, "chat_completion", spy)
+    monkeypatch.setattr(llm, "chat_stream", spy)
     list(turn.run_turn("再来"))
     sys_msgs = [m for m in seen[0] if m["role"] == "system"]
     assert len(sys_msgs) == 2
@@ -433,7 +445,7 @@ def test_compress_rolls_old_summary(monkeypatch):
 def test_compress_below_threshold_noop(monkeypatch):
     _seed(4)
     monkeypatch.setattr(compress, "Thread", _InlineThread)
-    monkeypatch.setattr(llm, "chat_completion", _fake_chat("好。", prompt_tokens=1))
+    monkeypatch.setattr(llm, "chat_stream", _fake_chat("好。", prompt_tokens=1))
     list(turn.run_turn("hi"))
     assert _live_summary() == ""
     assert len(checkpoint.live_messages()) == 10

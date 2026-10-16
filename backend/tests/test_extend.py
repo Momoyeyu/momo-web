@@ -414,16 +414,16 @@ def test_run_turn_extends_tools_and_dispatches(monkeypatch):
     def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
         seen_tools.append(tools)
         if len(seen_tools) == 1:
-            return {
-                "role": "assistant",
-                "content": None,
-                "tool_calls": [_tool_call("tavily_search", '{"q":"x"}')],
+            yield {
+                "type": "tool_calls",
+                "calls": [_tool_call("tavily_search", '{"q":"x"}')],
             }
+            return
         tool_msgs = [m for m in messages if m.get("role") == "tool"]
         assert tool_msgs[-1]["content"] == "mcp says hi"
-        return {"role": "assistant", "content": "查到了。"}
+        yield {"type": "text", "delta": "查到了。"}
 
-    monkeypatch.setattr(llm, "chat_completion", fake_chat)
+    monkeypatch.setattr(llm, "chat_stream", fake_chat)
     events = list(turn.run_turn("帮我搜一下"))
     assert [e["text"] for e in events if e["t"] == "sentence"] == ["查到了。"]
     # 注入声明 = 内置 + 拓展
@@ -438,8 +438,8 @@ def test_run_turn_without_extensions_passes_static_tools(monkeypatch):
 
     def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
         assert tools is TOOLS  # 无拓展 → 静态表原样下发
-        return {"role": "assistant", "content": "好。"}
+        yield {"type": "text", "delta": "好。"}
 
-    monkeypatch.setattr(llm, "chat_completion", fake_chat)
+    monkeypatch.setattr(llm, "chat_stream", fake_chat)
     events = list(turn.run_turn("hi"))
     assert [e["text"] for e in events if e["t"] == "sentence"] == ["好。"]

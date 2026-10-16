@@ -197,3 +197,21 @@ def test_prompt_language_switch_keeps_neutral_defaults():
         p = _prompt(lang, persona=dict(_EMPTY_PERSONA))
         assert name_line in p
         assert age_line in p
+
+
+def test_prompt_includes_output_style_section_in_all_languages():
+    """一轮可多次输出 + 工具调用前先说明：三语都必须有（阶段二的提示词改动）。
+
+    这几条直接决定前端「逐句可见/逐句朗读」的观感，缺一条模型就可能整段吐。
+    """
+    zh = _prompt("zh")
+    assert "## 输出方式" in zh
+    assert "分多次输出" in zh and "再去调用" in zh and "空白" in zh
+
+    en = _prompt("en")
+    assert "## How you speak" in en
+    assert "several separate outputs" in en and "empty content" in en
+
+    ja = _prompt("ja")
+    assert "## 話し方" in ja
+    assert "何度も出力" in ja and "空の内容" in ja
