@@ -164,19 +164,27 @@ test("形象 tab：偏好与 Live2D 模型左右并排且等宽", async ({ page 
   await expect(page.getByText("Live2D 模型", { exact: true })).toHaveCount(0);
 });
 
-test("探测按钮与同列「显示」按钮同宽，结果态不裁字", async ({ page }) => {
+test("探测按钮定宽：出结果不变宽（同列输入框与上下行按钮因此不位移）", async ({ page }) => {
   await openTab(page, "模型");
   const probe = page.locator(".probe-btn").first();
-  const toggle = page.locator(".key-toggle:not(.probe-btn)").first();
 
   const idle = await probe.boundingBox();
-  const show = await toggle.boundingBox();
-  expect(Math.abs((idle?.width ?? 0) - (show?.width ?? 0))).toBeLessThan(2);
+
+  // 定宽的直接证据：把文案换成长度超过空闲态的结果，宽度必须纹丝不动。
+  // （用 min-width + 自适应就会在这里变宽 → 同列输入框缩放、上下行按钮错位）
+  const forced = await probe.evaluate((el) => {
+    const prev = el.textContent;
+    el.textContent = "✗ 999ms";
+    const w = el.getBoundingClientRect().width;
+    el.textContent = prev;
+    return w;
+  });
+  expect(Math.abs(forced - (idle?.width ?? 0))).toBeLessThan(0.5);
 
   await probe.click();
   await expect(probe).toHaveClass(/probe-ok|probe-err/, { timeout: 25_000 });
 
-  // 结果态：文字宽（Range 实测）不超过按钮可用宽，且整体仍在合理区间
+  // 真跑一轮后：宽度仍与空闲态一致，且结果文字放得下（Range 实测）
   const m = await probe.evaluate((el) => {
     const range = document.createRange();
     range.selectNodeContents(el);
@@ -186,8 +194,9 @@ test("探测按钮与同列「显示」按钮同宽，结果态不裁字", async
       box: el.getBoundingClientRect().width,
     };
   });
+  expect(Math.abs(m.box - (idle?.width ?? 0))).toBeLessThan(0.5);
   expect(m.text).toBeLessThanOrEqual(m.client + 0.5);
-  expect(m.box).toBeGreaterThanOrEqual(51);
+  expect(m.box).toBeGreaterThanOrEqual(60);
   expect(m.box).toBeLessThan(90);
 
   await expect(probe).toHaveText("测试", { timeout: 10_000 });

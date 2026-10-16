@@ -117,7 +117,7 @@ export const ja: Dict = {
     showKey: "表示",
     hideKey: "隠す",
     test: "テスト",
-    testNeedUrl: "未入力",
+    testNeedUrl: "なし",
     testFail: "失敗",
     extHint:
       "外部 MCP サーバーを登録すると、そのツールは次のターンから momo が使えます。接続できないサーバーは注入されません。",

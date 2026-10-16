@@ -306,15 +306,17 @@ button.ghost.danger:hover {
   font-size: 12px;
 }
 
-/* 「测试」结果直接显示在按钮上。
-   宽度取 min-width 而非定宽：空闲态与同列「显示」按钮同宽（实测 zh/ja 51px、en 59px，
-   故取 51px 让中/日文完全对齐），出结果时按内容自然变宽——
-   最坏一档 en「✗ no URL」需 68.5px，靠定宽就得掐到 1px 余量，换字体即裁字；
-   自适应则任何字体/平台都不会裁。
-   注意别用 scrollWidth 判定是否溢出：<button> 溢出时内容被居中裁掉，scrollWidth 不变大。 */
+/* 「测试」结果直接显示在按钮上，**定宽**：结果不能改变按钮宽度，
+   否则同列的输入框会跟着缩放、上下两行的按钮就对不齐了。
+   宽度 = 最坏一档的自然宽度 + 余量。实测（12px 字体，见下）：
+     ✓ 999ms 66.5   ✗ 未入力 60.9   ✗ failed 57.9   ✗ no URL 68.5   ✗ 404 46.5
+   失败/未配置文案已按「只留值」精简（失败/失敗/fail、未填/なし/none），
+   故最坏一档是 ✓ 999ms = 66.5px，取 70px 留 3.5px。
+   注意别用 scrollWidth 判定是否溢出：<button> 溢出时内容被居中裁掉，scrollWidth 不变大；
+   要量得把 width 设 auto 量自然宽度。 */
 .probe-btn {
   flex: none;
-  min-width: 51px;
+  width: 70px;
   padding-left: 0.4em;
   padding-right: 0.4em;
   text-align: center;

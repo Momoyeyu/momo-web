@@ -117,8 +117,8 @@ export const en: Dict = {
     showKey: "Show",
     hideKey: "Hide",
     test: "Test",
-    testNeedUrl: "no URL",
-    testFail: "failed",
+    testNeedUrl: "none",
+    testFail: "fail",
     extHint:
       "Registered MCP servers expose their tools to momo from the next turn on; unreachable servers are simply not injected.",
     extAdd: "＋ Add MCP server",
