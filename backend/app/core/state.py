@@ -23,7 +23,12 @@ DEFAULT_EMBEDDING_URL = os.environ.get(
 ).rstrip("/")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("MOMO_EMBEDDING_MODEL", "bge-m3")
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+# 数据目录（momo.db + momo.yaml）。env 可覆盖——用于测试隔离与多实例共存，
+# 免得跑集成测试时写坏真实配置。
+DATA_DIR = Path(
+    os.environ.get("MOMO_DATA_DIR")
+    or (Path(__file__).resolve().parent.parent.parent / "data")
+)
 STATE_PATH = DATA_DIR / "momo.yaml"
 
 # 内置 Hiyori 的资源清单（与前端 BUILTIN_RESOURCES 保持一致；
