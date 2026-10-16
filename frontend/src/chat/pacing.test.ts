@@ -6,7 +6,7 @@ describe("pacing", () => {
     expect(charsPerSec(0)).toBeCloseTo(15);
     expect(charsPerSec(100)).toBe(Infinity);
     expect(charsPerSec(50)).toBeGreaterThan(charsPerSec(0));
-    expect(charsPerSec(50)).toBeLessThan(120);
+    expect(charsPerSec(50)).toBeCloseTo(15 * Math.pow(8, 0.5), 1); // ≈42.4
     expect(charsPerSec(150)).toBe(Infinity); // 越界钳制
   });
 
@@ -14,6 +14,7 @@ describe("pacing", () => {
     expect(sentencePauseMs(0)).toBe(2000);
     expect(sentencePauseMs(100)).toBe(100);
     expect(sentencePauseMs(50)).toBeCloseTo(1050, -2);
+    expect(sentencePauseMs(-50)).toBe(2000); // 越界钳制：低于 0% 仍按 0% 算
   });
 
   it("无 TTS 驻留 = 停顿基准 × (1 + 句长折算)", () => {

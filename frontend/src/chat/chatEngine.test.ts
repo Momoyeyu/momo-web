@@ -292,7 +292,7 @@ describe("解析层资源清单过滤", () => {
     eng.dispose();
   });
 
-  it("句到即进转写：不等回合结束，backlog 就能看到已到的句子", async () => {
+  it("句到即进 backlog：不等回合结束就能看到已到的句子", async () => {
     let release: () => void = () => {};
     const gate = new Promise<void>((r) => {
       release = r;

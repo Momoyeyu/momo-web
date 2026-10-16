@@ -18,7 +18,8 @@ describe("Button 的类串映射（必须与封装前的 className 逐字一致�
     expect(cls({})).toBeUndefined();
     expect(cls({ variant: "ghost" })).toBe("ghost");
     expect(cls({ size: "sm" })).toBe("small");
-    expect(cls({ variant: "ghost", size: "sm" })).toBe("ghost small");  });
+    expect(cls({ variant: "ghost", size: "sm" })).toBe("ghost small");
+  });
 
   it("className 逃生口：页面私有类原样拼在末尾", () => {
     expect(cls({ variant: "ghost", className: "key-toggle" })).toBe(
