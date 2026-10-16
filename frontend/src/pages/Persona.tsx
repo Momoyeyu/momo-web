@@ -9,6 +9,7 @@ import type { PersonaCard } from "../lib/types";
 import { DEFAULT_PERSONA } from "../lib/store";
 import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
 import Pager from "../ui/Pager";
+import AvatarPanel from "./Avatar";
 import DetailModal from "../components/DetailModal";
 import EditableItem from "../ui/EditableItem";
 import IconButton from "../ui/IconButton";
@@ -122,7 +123,10 @@ export default function PersonaPanel({
           </div>
         </div>
       </section>
-      <section className="panel persona-section">
+      {/* 形象与偏好并排：两者都是「列表 + 底部翻页/留白」的形态，等宽成一栏后
+          高度自然对齐（.settings-cols 的 align-items: stretch）。 */}
+      <div className="settings-cols">
+        <section className="panel persona-section">
         <h2>{t("persona.preferences")}</h2>
         <div className="mem-toolbar">
           <input
@@ -203,6 +207,14 @@ export default function PersonaPanel({
           </div>
         </div>
       </section>
+        <section className="panel persona-section">
+          <h2>
+            {t("settings.groups.avatar")}
+            <span className="req">*</span>
+          </h2>
+          <AvatarPanel />
+        </section>
+      </div>
       {detail !== null && (
         <DetailModal text={detail} onClose={() => setDetail(null)} />
       )}

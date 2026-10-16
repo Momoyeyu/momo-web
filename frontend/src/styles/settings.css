@@ -136,6 +136,20 @@
   padding: 0;
 }
 
+/* 通用页内的子分组框（语言设置 / 语音设置）：外层已是 .panel 卡片，
+   这里用更暗的底 + 更淡的描边做「框中框」，与右栏的分组标题同一套排布。
+   内层 .opt-row 的左右内缩与 .opt-group 的 4px 对齐。 */
+.opt-sub {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+  background: var(--input-bg);
+  padding: 0 14px 4px;
+}
+
+.opt-sub + .opt-sub {
+  margin-top: 14px;
+}
+
 /* 模型配置页内分块标题（LLM/ASR/TTS/形象）。 */
 .opt-group {
   margin: 22px 4px 4px;
@@ -291,6 +305,20 @@
   margin-top: 4px;
 }
 
+/* 形象栏与「偏好」并排后，动作清单（每项一行）会单方面把两栏拉得很高：
+   限高内滚，两栏高度才谈得上对齐。 */
+.res-scroll {
+  max-height: 22vh;
+  overflow-y: auto;
+}
+
+/* 形象栏落在半宽列内时缩略图卡片改单列：双列下每格仅约 260px，
+   英文徽标（Built-in）会被挤成两行、模型名只剩「Hiy…」；
+   单列后与左栏「偏好」的整行卡片形态一致，也顺带对齐。 */
+.persona-tab .avatar-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .res-group {
   margin: 10px 4px 0;
 }
@@ -336,10 +364,15 @@ button.ghost.danger:hover {
   font-size: 12px;
 }
 
-/* 「测试」结果直接显示在按钮上——固定宽度（三语同宽、最坏文案不省略）。 */
+/* 「测试」结果直接显示在按钮上。
+   宽度取 min-width 而非定宽：空闲态与同列「显示」按钮同宽（实测 zh/ja 51px、en 59px，
+   故取 51px 让中/日文完全对齐），出结果时按内容自然变宽——
+   最坏一档 en「✗ no URL」需 68.5px，靠定宽就得掐到 1px 余量，换字体即裁字；
+   自适应则任何字体/平台都不会裁。
+   注意别用 scrollWidth 判定是否溢出：<button> 溢出时内容被居中裁掉，scrollWidth 不变大。 */
 .probe-btn {
   flex: none;
-  width: 96px;
+  min-width: 51px;
   padding-left: 0.4em;
   padding-right: 0.4em;
   text-align: center;

@@ -1,4 +1,4 @@
-// 人设面板：基本信息写盘、偏好卡片（增 / 编辑 / 详情弹窗 / 删）。
+// 形象面板：基本信息写盘、偏好卡片（增 / 编辑 / 详情弹窗 / 删）。
 //
 // persona 存在 momo.yaml，配置改动由 useStateRestore 整体还原，故无需手工清理。
 import { expect, test } from "@playwright/test";
@@ -9,7 +9,7 @@ test.afterEach(restore);
 
 const TAG = "e2e偏好";
 
-/** 人设「基本信息」用的是 .field / .field-label（与设置页行式表单项不同）。 */
+/** 形象页「基本信息」用的是 .field / .field-label（与设置页行式表单项不同）。 */
 const personaField = (page: import("@playwright/test").Page, label: string) =>
   page
     .locator(".persona-tab .field")
@@ -19,7 +19,7 @@ const prefCard = (page: import("@playwright/test").Page, text: string) =>
   page.locator(".persona-section .list-item").filter({ hasText: text });
 
 test("基本信息：改名称即写盘", async ({ page, request }) => {
-  await openTab(page, "人设");
+  await openTab(page, "形象");
   const name = personaField(page, "名称").locator("input");
   await name.fill("momo-e2e");
   await waitSaved(page);
@@ -29,7 +29,7 @@ test("基本信息：改名称即写盘", async ({ page, request }) => {
 });
 
 test("偏好：添加 → 出现在列表 → 编辑 → 详情弹窗 → 删除", async ({ page, request }) => {
-  await openTab(page, "人设");
+  await openTab(page, "形象");
   const original = ((await readState(request)).persona as { preferences: string[] })
     .preferences.length;
 
@@ -73,7 +73,7 @@ test("偏好：添加 → 出现在列表 → 编辑 → 详情弹窗 → 删除
 });
 
 test("偏好编辑态取消：新增的空条目被撤掉，数量回到原值", async ({ page, request }) => {
-  await openTab(page, "人设");
+  await openTab(page, "形象");
   const original = ((await readState(request)).persona as { preferences: string[] })
     .preferences.length;
 

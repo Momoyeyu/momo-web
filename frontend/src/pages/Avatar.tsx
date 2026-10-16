@@ -392,10 +392,11 @@ export default function AvatarPanel() {
           <h3 className="opt-group">{t("avatar.resources")}</h3>
           <p className="muted avatar-hint">{t("avatar.resHint")}</p>
           {hasRes ? (
-            <>
+            /* 清单可能很长（每个动作一行）：限高内滚，别把同栏的「偏好」拉出一大片留白 */
+            <div className="res-scroll">
               {resGroup("expressions", t("avatar.expList"))}
               {resGroup("motions", t("avatar.motionList"))}
-            </>
+            </div>
           ) : (
             <p className="muted">{t("avatar.resEmpty")}</p>
           )}

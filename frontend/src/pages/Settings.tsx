@@ -42,7 +42,6 @@ import Pager from "../ui/Pager";
 import Select from "../ui/Select";
 import PersonaPanel from "./Persona";
 import MemoryPanel from "./Memory";
-import AvatarPanel from "./Avatar";
 import "../styles/settings.css";
 
 type EndpointSection = "llm" | "asr" | "tts" | "embedding";
@@ -514,21 +513,27 @@ export default function Settings() {
     });
   };
 
-  /** 按钮内联文案：running→「…」，否则 ✓/✗ + 简短结果。 */
+  /**
+   * 按钮内联文案：running→「…」，否则 ✓/✗ + 简短结果。
+   *
+   * 只显示「值」不带说明，好让定宽按钮容得下最坏一档：
+   *   延迟 ≥1s 记成 1.2s（否则 1234ms 会把按钮撑破）
+   *   HTTP 状态码只留数字（✗ 404 比 ✗ HTTP 404 短，且与 ✓ 122ms 对称）
+   */
   const probeLabel = (sec: EndpointSection): { text: string; cls: string } => {
     const r = probes[sec];
     if (!r) return { text: t("settings.test"), cls: "" };
     if (r === "running") return { text: "…", cls: "probe-info" };
-    const detail =
-      r.ok && /^\d+ms$/.test(r.detail)
-        ? r.detail
-        : r.detail === "unconfigured"
-          ? t("settings.testNeedUrl")
-          : /^(unreachable|timeout|connect failed|bad url|closed)/.test(
-                r.detail,
-              )
-            ? t("settings.testFail")
-            : r.detail;
+    const ms = /^(\d+)ms$/.exec(r.detail);
+    const detail = ms
+      ? Number(ms[1]) >= 1000
+        ? `${(Number(ms[1]) / 1000).toFixed(1)}s`
+        : r.detail
+      : r.detail === "unconfigured"
+        ? t("settings.testNeedUrl")
+        : /^(unreachable|timeout|connect failed|bad url|closed)/.test(r.detail)
+          ? t("settings.testFail")
+          : r.detail.replace(/^HTTP /, "");
     return {
       text: `${r.ok ? "✓" : "✗"} ${detail}`,
       cls: r.ok ? "probe-ok" : "probe-err",
@@ -727,7 +732,11 @@ export default function Settings() {
             <div className="settings-body">
               {tab === "general" && (
                 <div className="settings-cols">
-                <section className="panel settings-col opt-list">
+                {/* 左栏：语言 / 语音两个子框，与右栏「对话框设置」同构 */}
+                <section className="panel settings-col">
+                  <div className="opt-sub">
+                    <h3 className="opt-group">{t("settings.groups.lang")}</h3>
+                    <div className="opt-list">
                   <FieldRow label={t("settings.langLabel")}>
                     <Select
                       value={settings.general.lang}
@@ -759,6 +768,12 @@ export default function Settings() {
                       }
                     />
                   </FieldRow>
+                    </div>
+                  </div>
+
+                  <div className="opt-sub">
+                    <h3 className="opt-group">{t("settings.groups.voice")}</h3>
+                    <div className="opt-list">
                   <FieldRow
                     label={t("settings.voiceInput")}
                     extra={!asrConfigured ? t("settings.voiceNeedAsr") : undefined}
@@ -792,12 +807,8 @@ export default function Settings() {
                       onChange={(v) => patchGeneral({ voiceVolume: v })}
                     />
                   </FieldRow>
-                  <FieldRow label={t("settings.showStatus")}>
-                    <Switch
-                      on={settings.general.showStatus}
-                      onChange={(v) => patchGeneral({ showStatus: v })}
-                    />
-                  </FieldRow>
+                    </div>
+                  </div>
                 </section>
                 {/* 对话框设置子组：三滑块 + 预览同组联动，预览钉在面板底缘。 */}
                 <section className="panel settings-col">
@@ -821,6 +832,13 @@ export default function Settings() {
                     <Slider
                       value={settings.general.sentenceSpeed}
                       onChange={(v) => patchGeneral({ sentenceSpeed: v })}
+                    />
+                  </FieldRow>
+                  {/* 原在左栏；归到对话框设置后两栏高度也更均衡 */}
+                  <FieldRow label={t("settings.showStatus")}>
+                    <Switch
+                      on={settings.general.showStatus}
+                      onChange={(v) => patchGeneral({ showStatus: v })}
                     />
                   </FieldRow>
                   </div>
@@ -895,16 +913,11 @@ export default function Settings() {
                       onChange={(e) => patchEndpoint("tts", "voice", e.target.value)}
                     />
                   </FieldRow>
+                  {/* 合成语言不单独配置：跟随「通用」页的对话语言
+                      （见 i18n 的 resolvePromptLang 与 services/ttsClient.ts）。 */}
 
                 </section>
                 </div>
-                <section className="panel settings-full">
-                  <h3 className="opt-group">
-                    {t("settings.groups.avatar")}
-                    <span className="req">*</span>
-                  </h3>
-                  <AvatarPanel />
-                </section>
                 </>
               )}
 
