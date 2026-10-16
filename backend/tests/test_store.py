@@ -98,3 +98,23 @@ def test_read_state_non_mapping_returns_none():
     store.STATE_PATH.write_text("- just\n- a\n- list\n", encoding="utf-8")
     assert store.read_state() is None
     assert store.get_state() == {}
+
+
+def test_fresh_install_ships_no_initial_preferences_or_memories():
+    """回归保护：新装不带任何初始偏好与记忆，全部由用户自己添加。
+
+    历史上出厂状态种过示例偏好（DEFAULT_PERSONA.preferences）与初始记忆
+    （前端 DEFAULT_PINS，随 momo.db 存储迁移进了 DB）。两者都已移除，
+    这条用例钉住它 —— 谁再种回来就会红。
+    """
+    from app.services import memory
+
+    st = store.load()
+    assert st["persona"]["preferences"] == []
+    assert memory.list_memories() == []
+
+
+def test_fresh_install_yaml_has_no_stale_pins_key():
+    """旧格式的 pins 键（初始记忆）已废弃：State 模型里没有它，不该再出现。"""
+    st = store.load()
+    assert "pins" not in st
