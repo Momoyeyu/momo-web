@@ -9,13 +9,13 @@ import {
   getChatEngine,
   subscribeTranscript,
   transcriptVersion,
-} from "../chat/engine";
-import type { EngineHandlers } from "../chat/engine";
+} from "../chat/engineInstance";
+import type { EngineHandlers } from "../chat/engineInstance";
 import type { ChatStatus } from "../lib/types";
 import { navigate } from "../router";
 import { useT } from "../i18n";
 import { ServiceError } from "../lib/errors";
-import { getState, personaName, subscribe } from "../lib/store";
+import { getState, speakerName, subscribe } from "../lib/store";
 import Button from "../ui/Button";
 import DialogBox from "../components/DialogBox";
 import "../styles/chat.css";
@@ -31,7 +31,7 @@ export default function Chat() {
   const t = useT();
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
   useSyncExternalStore(subscribe, getState);
-  const name = personaName();
+  const name = speakerName();
   const showStatus = getState().settings.general.showStatus;
   // 语音输入开关 + ASR 配置双重门控（与设置页「通用」同一个开关）。
   const micAllowed =

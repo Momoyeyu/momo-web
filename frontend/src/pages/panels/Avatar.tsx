@@ -17,20 +17,20 @@ import {
   newId,
   subscribe,
   update,
-} from "../lib/store";
-import type { AvatarMeta, AvatarResources } from "../lib/types";
-import { CARD_PAGE_SIZE, clampPage } from "../lib/paging";
-import { deleteBlob, getBlob, putBlob } from "../lib/idb";
-import { checkManifest, listManifests } from "../live2d/avatarZip";
-import { getStage } from "../live2d/stage";
-import { useT } from "../i18n";
-import Button from "../ui/Button";
-import IconButton from "../ui/IconButton";
-import Modal from "../ui/Modal";
-import Pager from "../ui/Pager";
-import Select from "../ui/Select";
-import "../styles/persona.css";
-import "../styles/controls.css";
+} from "../../lib/store";
+import type { AvatarMeta, AvatarResources } from "../../lib/types";
+import { CARD_PAGE_SIZE, clampPage } from "../../lib/paging";
+import { deleteBlob, getBlob, putBlob } from "../../lib/idb";
+import { checkManifest, listManifests } from "../../live2d/avatarZip";
+import { getStage } from "../../live2d/stage";
+import { useT } from "../../i18n";
+import Button from "../../ui/Button";
+import IconButton from "../../ui/IconButton";
+import Modal from "../../ui/Modal";
+import Pager from "../../ui/Pager";
+import Select from "../../ui/Select";
+import "../../styles/persona.css";
+import "../../styles/controls.css";
 
 const BUILTIN_NAME = "Hiyori";
 /** 内置模型的缩略图（静态资源直出）。 */
@@ -299,13 +299,13 @@ export default function AvatarPanel() {
     const items = avatar.resources?.[kind] ?? [];
     if (!items.length) return null;
     return (
-      <div className="res-group">
-        <div className="res-group-title muted">{label}</div>
+      <div className="avatar-res-group">
+        <div className="avatar-res-group-title muted">{label}</div>
         {items.map((r) => (
-          <div key={r.name} className="res-row">
-            <span className="res-name">{r.name}</span>
+          <div key={r.name} className="avatar-res-row">
+            <span className="avatar-res-name">{r.name}</span>
             <input
-              className="res-desc"
+              className="avatar-res-desc"
               value={r.desc}
               placeholder={t("avatar.descPh")}
               onChange={(e) => setDesc(avatar.id, kind, r.name, e.target.value)}
@@ -329,9 +329,9 @@ export default function AvatarPanel() {
 
   return (
     <>
-      <div className="mem-toolbar">
+      <div className="list-toolbar">
         <input
-          className="mem-search"
+          className="list-search"
           placeholder={t("avatar.searchPh")}
           value={query}
           onChange={(e) => {
@@ -421,7 +421,7 @@ export default function AvatarPanel() {
       </div>
 
       <div className="col-foot">
-        <div className="mem-foot">
+        <div className="list-foot">
           <Pager page={pg.page} pages={pg.pages} onChange={setPage} />
         </div>
       </div>
@@ -507,7 +507,7 @@ export default function AvatarPanel() {
           </div>
           <p className="muted avatar-hint">{t("avatar.resHint")}</p>
           {hasRes(resAvatar) ? (
-            <div className="res-scroll">
+            <div className="avatar-res-scroll">
               {resGroup(resAvatar, "expressions", t("avatar.expList"))}
               {resGroup(resAvatar, "motions", t("avatar.motionList"))}
             </div>

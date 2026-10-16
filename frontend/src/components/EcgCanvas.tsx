@@ -118,7 +118,7 @@ function program(
   return p;
 }
 
-export default function NebulaCanvas() {
+export default function EcgCanvas() {
   const ref = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -308,5 +308,5 @@ export default function NebulaCanvas() {
     }
   }, []);
 
-  return <canvas ref={ref} className="nebula-canvas" aria-hidden="true" />;
+  return <canvas ref={ref} className="ecg-canvas" aria-hidden="true" />;
 }

@@ -6,7 +6,7 @@ import type { TtsConfig } from "../lib/types";
 import { ServiceError } from "../lib/errors";
 
 interface SpeakOptions {
-  /** 合成语言 = 对话语言（调用方用 resolvePromptLang(cfg.general) 解析）。 */
+  /** 合成语言 = 对话语言（调用方用 resolveChatLang(cfg.general) 解析）。 */
   lang: string;
   signal?: AbortSignal;
   /** 每个到达的 PCM 块。 */

@@ -13,7 +13,7 @@ test("标题页：品牌 + tagline + 四个菜单项 + 星云背景", async ({ p
   await expect(page.locator(".title-logo")).toHaveText("momo");
   await expect(page.locator(".title-tagline")).not.toBeEmpty();
   await expect(page.locator(".menu-item")).toHaveCount(4);
-  await expect(page.locator(".nebula-canvas")).toHaveCount(1);
+  await expect(page.locator(".ecg-canvas")).toHaveCount(1);
   expect(await page.locator(".mi-label").allTextContents()).toEqual([
     "开始",
     "继续",

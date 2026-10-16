@@ -75,9 +75,9 @@ const DEFAULT_SETTINGS: Settings = {
   extensions: [],
 };
 
-/** 展示用的人设名。人设写死在 backend 的 prompt.PERSONA（设置页没有入口），
- *  前端只需显示名；改人设时两处一起改。 */
-export const PERSONA_NAME = "momo";
+/** 说话人显示名（铭牌、backlog 用）。人设本体在 backend/resources/soul.md，
+ *  前端只需要一个显示名 —— 改人设名时两处一起改。 */
+export const SPEAKER_NAME = "momo";
 
 function defaults(): PersistedState {
   return {
@@ -269,8 +269,8 @@ export function getSettings(): Settings {
 }
 
 /** 铭牌/说话人显示名：人设卡名留空时退回默认。 */
-export function personaName(): string {
-  return PERSONA_NAME;
+export function speakerName(): string {
+  return SPEAKER_NAME;
 }
 
 export function getAvatars(): AvatarMeta[] {

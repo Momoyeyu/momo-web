@@ -8,12 +8,12 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   getState,
-  personaName,
+  speakerName,
   subscribe,
   update,
 } from "../lib/store";
-import { getChatEngine } from "../chat/engine";
-import { SentenceSplitter } from "../chat/sentences";
+import { getChatEngine } from "../chat/engineInstance";
+import { SentenceSplitter } from "./dialogPreviewSplit";
 import { charsPerSec, dwellMs, sentencePauseMs } from "../chat/pacing";
 import type {
   McpExtension,
@@ -37,13 +37,13 @@ import Modal from "../ui/Modal";
 import Slider from "../ui/Slider";
 import Switch from "../ui/Switch";
 import Button from "../ui/Button";
-import AvatarPanel from "./Avatar";
+import AvatarPanel from "./panels/Avatar";
 import Hint from "../ui/Hint";
 import IconButton from "../ui/IconButton";
 import DialogBox from "../components/DialogBox";
 import Pager from "../ui/Pager";
 import Select from "../ui/Select";
-import MemoryPanel from "./Memory";
+import MemoryPanel from "./panels/Memory";
 import "../styles/settings.css";
 
 type EndpointSection = "llm" | "asr" | "tts" | "embedding";
@@ -863,7 +863,7 @@ export default function Settings() {
                   {/* 对话框实时预览：多句循环，逐字上屏 + 按切句速度换句 */}
                   <div className="col-foot">
                     <DialogPreview
-                      name={personaName()}
+                      name={speakerName()}
                       // 预览语言跟随「对话语言」：auto 回落到界面语言
                       sample={tFor(
                         settings.general.chatLang === "auto"
@@ -938,7 +938,7 @@ export default function Settings() {
                     />
                   </FieldRow>
                   {/* 合成语言不单独配置：跟随「通用」页的对话语言
-                      （见 i18n 的 resolvePromptLang 与 services/ttsClient.ts）。 */}
+                      （见 i18n 的 resolveChatLang 与 services/ttsClient.ts）。 */}
                 </section>
                 </div>
                 </>
@@ -947,14 +947,14 @@ export default function Settings() {
               {tab === "extend" && (
               /* 双栏：左 Live2D（原「形象」tab 唯一剩下的配置）、右 MCP 拓展 */
               <div className="settings-cols">
-              <section className="panel persona-section">
+              <section className="panel panel-stack">
               <h3 className="opt-group">
               {t("settings.groups.avatar")}
               <span className="req">*</span>
               </h3>
               <AvatarPanel />
               </section>
-              <section className="panel settings-col ext-panel">
+              <section className="panel panel-stack settings-col ext-panel">
                   <div className="panel-title-row">
                     <h3 className="opt-group">
                       {t("settings.groups.extensions")}
@@ -962,9 +962,9 @@ export default function Settings() {
                     {/* 这段说明是「说明书」性质：收进问号浮窗，不占版面 */}
                     <Hint text={t("settings.extHint")} side="down" />
                   </div>
-                  <div className="mem-toolbar">
+                  <div className="list-toolbar">
                   <input
-                  className="mem-search"
+                  className="list-search"
                   placeholder={t("settings.extSearchPh")}
                   value={extQuery}
                   onChange={(e) => {

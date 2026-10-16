@@ -8,8 +8,8 @@ import {
   getChatEngine,
   subscribeTranscript,
   transcriptVersion,
-} from "../chat/engine";
-import { getState, personaName, subscribe } from "../lib/store";
+} from "../chat/engineInstance";
+import { getState, speakerName, subscribe } from "../lib/store";
 import { navigate } from "../router";
 import { useT } from "../i18n";
 import Button from "../ui/Button";
@@ -25,7 +25,7 @@ export default function Backlog() {
   const [replaying, setReplaying] = useState<string | null>(null);
   const engine = getChatEngine();
   const messages = engine.history;
-  const name = personaName();
+  const name = speakerName();
   const idle = engine.status === "idle";
   // 回放可见反馈：TTS 未配置 / 语音静音时置灰 + tooltip 说明（点了也没声）。
   const ttsConfigured = getState().settings.tts.url.trim() !== "";

@@ -1,10 +1,9 @@
 /* 人格 tab（设置页内）：三块 panel（人设卡 / 用户画像 / 长期记忆）。 */
 /* 颜色与控件基线全部走 base.css 变量，这里只管排版。 */
 
-/* 左 Live2D 与右 MCP 两个面板共用同一套纵向版式：
-   标题行 / 工具条 / 列表 / 翻页器 之间的间距一致，两栏才会真正对齐。 */
-.persona-section,
-.ext-panel {
+/* 面板纵向版式：标题行 / 工具条 / 列表 / 翻页器 之间的间距一致。
+   左 Live2D 与右 MCP 共用它，两栏才会真正对齐。 */
+.panel-stack {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -14,7 +13,7 @@
 /* 面板小标题统一用 settings.css 的 .opt-group（金色小字），
    与「模型」等 tab 一致；这里不再单独定义 h2 样式。 */
 
-.persona-section p {
+.panel-stack p {
   margin: 0;
   font-size: 13px;
   line-height: 1.6;
@@ -28,8 +27,8 @@
 /* 注：原来的 .field / .field-label（标签在上的竖排字段）已随「基本信息」
    改用 ui/FieldRow 而移除 —— 全站表单项统一为「左标签 + 右控件」。 */
 
-.persona-section textarea,
-.mem-search {
+.panel-stack textarea,
+.list-search {
   width: 100%;
 }
 
@@ -87,7 +86,7 @@ button.danger:hover {
 }
 
 /* 底行：翻页器居中。 */
-.mem-foot {
+.list-foot {
   display: flex;
   justify-content: center;
 }
@@ -107,14 +106,14 @@ button.danger:hover {
   margin-left: 0;
 }
 
-.mem-toolbar {
+.list-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
-.mem-search {
+.list-search {
   flex: 1;
   min-width: 140px;
 }

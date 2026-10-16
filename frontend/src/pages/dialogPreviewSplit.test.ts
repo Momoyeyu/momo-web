@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SentenceSplitter } from "./sentences";
+import { SentenceSplitter } from "./dialogPreviewSplit";
 
 describe("SentenceSplitter", () => {
   it("强边界立刻成句", () => {

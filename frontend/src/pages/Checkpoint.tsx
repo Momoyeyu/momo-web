@@ -24,7 +24,7 @@ import {
   loadTranscript,
   subscribeTranscript,
   transcriptVersion,
-} from "../chat/engine";
+} from "../chat/engineInstance";
 import {
   navigate,
   fromRoute,

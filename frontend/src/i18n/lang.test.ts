@@ -2,7 +2,7 @@
 // 语义必须与后端 prompt._lang_of 保持一致。
 
 import { describe, expect, it } from "vitest";
-import { resolvePromptLang } from "./index";
+import { resolveChatLang } from "./index";
 import type { GeneralConfig } from "../lib/types";
 
 /**
@@ -13,25 +13,25 @@ import type { GeneralConfig } from "../lib/types";
 const g = (partial: Record<string, unknown>): GeneralConfig =>
   ({ lang: "zh", chatLang: "auto", ...partial }) as unknown as GeneralConfig;
 
-describe("resolvePromptLang", () => {
+describe("resolveChatLang", () => {
   it("显式对话语言优先于界面语言", () => {
-    expect(resolvePromptLang(g({ lang: "zh", chatLang: "ja" }))).toBe("ja");
-    expect(resolvePromptLang(g({ lang: "ja", chatLang: "en" }))).toBe("en");
+    expect(resolveChatLang(g({ lang: "zh", chatLang: "ja" }))).toBe("ja");
+    expect(resolveChatLang(g({ lang: "ja", chatLang: "en" }))).toBe("en");
   });
 
   it("auto / 空 → 回落界面语言", () => {
-    expect(resolvePromptLang(g({ lang: "ja", chatLang: "auto" }))).toBe("ja");
-    expect(resolvePromptLang(g({ lang: "en", chatLang: "" }))).toBe("en");
+    expect(resolveChatLang(g({ lang: "ja", chatLang: "auto" }))).toBe("ja");
+    expect(resolveChatLang(g({ lang: "en", chatLang: "" }))).toBe("en");
   });
 
   it("未知或缺失 → zh", () => {
-    expect(resolvePromptLang(g({ lang: "zh", chatLang: "fr" }))).toBe("zh");
-    expect(resolvePromptLang(g({ lang: "kl", chatLang: "auto" }))).toBe("zh");
-    expect(resolvePromptLang({} as GeneralConfig)).toBe("zh");
+    expect(resolveChatLang(g({ lang: "zh", chatLang: "fr" }))).toBe("zh");
+    expect(resolveChatLang(g({ lang: "kl", chatLang: "auto" }))).toBe("zh");
+    expect(resolveChatLang({} as GeneralConfig)).toBe("zh");
   });
 
   it("区域码按前缀归一（zh-CN / ja-JP）", () => {
-    expect(resolvePromptLang(g({ chatLang: "zh-CN" }))).toBe("zh");
-    expect(resolvePromptLang(g({ chatLang: "JA-jp" }))).toBe("ja");
+    expect(resolveChatLang(g({ chatLang: "zh-CN" }))).toBe("zh");
+    expect(resolveChatLang(g({ chatLang: "JA-jp" }))).toBe("ja");
   });
 });

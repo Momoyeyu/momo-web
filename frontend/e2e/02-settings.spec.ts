@@ -92,7 +92,7 @@ test("拓展 tab：登记 stdio MCP server → 出现在列表 → 删除", asyn
   await expect(hint).toHaveAttribute("aria-label", /MCP/);
   await expect(page.locator(".ext-panel .list-body")).toBeVisible();
 
-  await page.locator(".ext-panel .mem-toolbar .icon-btn").click();
+  await page.locator(".ext-panel .list-toolbar .icon-btn").click();
   await expect(page.locator(".modal-overlay")).toBeVisible();
 
   await fieldRow(page, "名称", ".ext-modal").locator("input").fill("e2e-echo");
@@ -213,15 +213,15 @@ test("拓展 tab：Live2D 与「记忆」同构（检索 + 加号 + 翻页），
   page,
 }) => {
   await openTab(page, "拓展");
-  const panel = page.locator(".persona-section").nth(0);
+  const panel = page.locator(".panel-stack").nth(0);
 
-  await expect(panel.locator(".mem-search")).toBeVisible();
+  await expect(panel.locator(".list-search")).toBeVisible();
   // 只取工具条的加号：卡片上还有编辑/删除两个 .icon-btn，多个匹配会触发严格模式报错
-  await expect(panel.locator(".mem-toolbar .icon-btn")).toBeVisible();
+  await expect(panel.locator(".list-toolbar .icon-btn")).toBeVisible();
   await expect(panel.locator(".list-pager")).toBeVisible();
   await expect(panel.locator(".list-item").first()).toBeVisible();
 
-  await panel.locator(".mem-toolbar .icon-btn").click();
+  await panel.locator(".list-toolbar .icon-btn").click();
   await expect(page.locator(".modal-overlay")).toBeVisible();
   await expect(page.locator(".modal-meta")).toHaveText("导入模型 (.zip)");
   await expect(page.locator(".avatar-drop")).toContainText("拖入");
@@ -242,19 +242,19 @@ test("拓展 tab：Live2D 与「记忆」同构（检索 + 加号 + 翻页），
 
 test("拓展 tab：点模型卡片弹出「表情与动作」，并可按名检索", async ({ page }) => {
   await openTab(page, "拓展");
-  const panel = page.locator(".persona-section").nth(0);
+  const panel = page.locator(".panel-stack").nth(0);
 
   // 检索过滤（内置 Hiyori 命中，乱词落空态）
-  await panel.locator(".mem-search").fill("Hiyori");
+  await panel.locator(".list-search").fill("Hiyori");
   await expect(panel.locator(".list-item").first()).toBeVisible();
-  await panel.locator(".mem-search").fill("no-such-model-xyz");
+  await panel.locator(".list-search").fill("no-such-model-xyz");
   await expect(panel.locator(".muted", { hasText: "没有匹配的模型" })).toBeVisible();
-  await panel.locator(".mem-search").fill("");
+  await panel.locator(".list-search").fill("");
 
   // 点卡片 → 弹窗里是该模型的清单，描述可编辑
   await panel.locator(".list-item").first().click();
   await expect(page.locator(".modal-meta")).toContainText("表情与动作");
-  const row = page.locator(".res-row").first();
+  const row = page.locator(".avatar-res-row").first();
   await expect(row).toBeVisible();
   const desc = row.locator("input");
   const before = await desc.inputValue();

@@ -3,26 +3,26 @@
 // 编辑 / 删除 / pin 切换 / 分页（每页 5 条），卡片点开详情弹窗。
 
 import { useEffect, useMemo, useState } from "react";
-import type { Memory } from "../lib/types";
+import type { Memory } from "../../lib/types";
 import {
   addMemory as apiAdd,
   deleteMemory as apiDelete,
   editMemory as apiEdit,
   setMemoryPinned as apiSetPinned,
   listMemories,
-} from "../services/memoryClient";
-import { clampPage } from "../lib/paging";
-import Pager from "../ui/Pager";
-import DetailModal from "../components/DetailModal";
-import EditableItem from "../ui/EditableItem";
-import IconButton from "../ui/IconButton";
-import Button from "../ui/Button";
-import AddItemModal from "../ui/AddItemModal";
-import Hint from "../ui/Hint";
-import { useT, currentLang } from "../i18n";
-import "../styles/persona.css";
-import "../styles/settings.css";
-import "../styles/controls.css";
+} from "../../services/memoryClient";
+import { clampPage } from "../../lib/paging";
+import Pager from "../../ui/Pager";
+import DetailModal from "../../components/DetailModal";
+import EditableItem from "../../ui/EditableItem";
+import IconButton from "../../ui/IconButton";
+import Button from "../../ui/Button";
+import AddItemModal from "../../ui/AddItemModal";
+import Hint from "../../ui/Hint";
+import { useT, currentLang } from "../../i18n";
+import "../../styles/persona.css";
+import "../../styles/settings.css";
+import "../../styles/controls.css";
 
 const LOCALE = { zh: "zh-CN", ja: "ja-JP", en: "en-US" } as const;
 const PAGE_SIZE = 5;
@@ -191,10 +191,10 @@ onClick={(e) => {
   );
 
   return (
-    <section className="panel persona-section mem-panel">
-      <div className="mem-toolbar">
+    <section className="panel panel-stack mem-panel">
+      <div className="list-toolbar">
         <input
-          className="mem-search"
+          className="list-search"
           placeholder={t("memory.searchPh")}
           value={query}
           onChange={(e) => {
@@ -217,7 +217,7 @@ onClick={(e) => {
         {shownSlice.map(memCard)}
       </div>
       <div className="col-foot">
-        <div className="mem-foot">
+        <div className="list-foot">
           <Pager page={pg.page} pages={pg.pages} onChange={setPage} />
         </div>
       </div>

@@ -12,8 +12,8 @@ import {
   newSession,
 } from "../services/checkpointClient";
 import { resyncPassthrough } from "../lib/store";
-import { loadTranscript } from "../chat/engine";
-import NebulaCanvas from "../components/NebulaCanvas";
+import { loadTranscript } from "../chat/engineInstance";
+import EcgCanvas from "../components/EcgCanvas";
 import Button from "../ui/Button";
 import type { CheckpointMeta } from "../lib/types";
 import "../styles/title.css";
@@ -99,7 +99,7 @@ export default function Title() {
 
   return (
     <div className="title-screen">
-      <NebulaCanvas />
+      <EcgCanvas />
       <header className="title-brand">
         <h1 className="title-logo">momo</h1>
         <div className="title-rule" />

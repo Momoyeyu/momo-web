@@ -26,7 +26,7 @@ export function currentLang(): Lang {
  * settings.general.chatLang；auto/缺失 → 回落界面语言 lang；未知 → zh。
  * 语义与后端 prompt._lang_of 对齐。
  */
-export function resolvePromptLang(g: GeneralConfig): Lang {
+export function resolveChatLang(g: GeneralConfig): Lang {
   const raw = String(g.chatLang || "").toLowerCase();
   const code = !raw || raw === "auto" ? String(g.lang || "zh").toLowerCase() : raw;
   for (const l of LANGS) {

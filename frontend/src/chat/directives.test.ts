@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dirAllowed, dueDirs } from "./dirs";
-import type { PendingDir } from "./dirs";
+import { dirAllowed, dueDirs } from "./directives";
+import type { PendingDir } from "./directives";
 import type { AvatarResources } from "../lib/types";
 
 const exp = (offset: number): PendingDir => ({

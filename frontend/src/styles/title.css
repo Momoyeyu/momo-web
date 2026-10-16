@@ -8,8 +8,8 @@
   background: var(--bg);
 }
 
-/* 星云粒子背景：铺满标题页，位于品牌/菜单之下。 */
-.nebula-canvas {
+/* 心电图粒子背景：铺满标题页，位于品牌/菜单之下。 */
+.ecg-canvas {
   position: absolute;
   inset: 0;
   width: 100%;

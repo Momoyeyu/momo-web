@@ -295,29 +295,29 @@
   width: min(680px, calc(100% - 64px));
 }
 
-.res-scroll {
+.avatar-res-scroll {
   max-height: 46vh;
   overflow-y: auto;
 }
 
-.res-group {
+.avatar-res-group {
   margin: 10px 4px 0;
 }
 
-.res-group-title {
+.avatar-res-group-title {
   margin-bottom: 6px;
   font-size: 12px;
   letter-spacing: 0.08em;
 }
 
-.res-row {
+.avatar-res-row {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 4px 0;
 }
 
-.res-name {
+.avatar-res-name {
   flex: none;
   min-width: 140px;
   max-width: 200px;
@@ -329,7 +329,7 @@
   color: var(--text-dim);
 }
 
-.res-desc {
+.avatar-res-desc {
   flex: 1;
   min-width: 0;
 }
@@ -426,6 +426,8 @@
   flex: 1;
   min-height: 0;
 }
+
+/* 拓展面板 = .panel-stack 版式 + 单栏撑满 */
 
 /* 面板标题行：标题 + 右侧问号。外边距沿用 .opt-group 的默认值，
    首位时同样收紧（标题原来自己是首个子元素，现在被这层包住）。 */

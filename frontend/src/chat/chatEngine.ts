@@ -16,15 +16,15 @@ import type {
   CheckpointMessage,
   Settings,
 } from "../lib/types";
-import { resolvePromptLang } from "../i18n";
+import { resolveChatLang } from "../i18n";
 import { streamSpeech } from "../services/ttsClient";
 import {
   chat,
   interrupt as sendInterrupt,
   type SentenceDir,
 } from "../services/chatClient";
-import { dueDirs, dirAllowed } from "./dirs";
-import type { PendingDir } from "./dirs";
+import { dueDirs, dirAllowed } from "./directives";
+import type { PendingDir } from "./directives";
 import { charsPerSec, dwellMs, sentencePauseMs } from "./pacing";
 
 interface ChatEngineEvents {
@@ -208,7 +208,7 @@ export class ChatEngine {
     this.safe(() => this.player.stop());
     return streamSpeech(cfg.tts, m.text, {
       // 回放与实时合成同一口径：语言 = 对话语言
-      lang: resolvePromptLang(cfg.general),
+      lang: resolveChatLang(cfg.general),
       onChunk: (pcm) => {
         if (this.disposed) return;
         this.safe(() => this.player.push(pcm));
@@ -553,7 +553,7 @@ export class ChatEngine {
     let req: Promise<void>;
     try {
       req = streamSpeech(cfg.tts, sentence, {
-        lang: resolvePromptLang(cfg.general),
+        lang: resolveChatLang(cfg.general),
         signal,
         onChunk: (pcm) => {
           tts.chunks.push(pcm);

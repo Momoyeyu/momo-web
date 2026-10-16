@@ -57,7 +57,7 @@ vi.mock("../live2d/stage", () => ({
 }));
 
 import { chat, interrupt } from "../services/chatClient";
-import { ChatEngine } from "./turn";
+import { ChatEngine } from "./chatEngine";
 import { getSettings, update } from "../lib/store";
 import type { ChatMessage } from "../lib/types";
 

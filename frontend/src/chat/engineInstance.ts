@@ -5,7 +5,7 @@
 // transcript 版本号：任何消息事件 +1，供 React 外部存储订阅（backlog 页用）。
 
 import type { ChatMessage, ChatStatus, CheckpointMessage } from "../lib/types";
-import { ChatEngine } from "./turn";
+import { ChatEngine } from "./chatEngine";
 
 export interface EngineHandlers {
   onStatus?: (s: ChatStatus) => void;
