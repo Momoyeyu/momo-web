@@ -1,6 +1,6 @@
 """POST /api/chat：SSE 端点（ReAct 编排在 services/turn.py）。
 
-事件格式：`data: {...}\n\n`，事件见 docs/backend-api.md。
+事件格式：`data: {...}\n\n`，事件类型见 models.SseEvent。
 成功回合末尾发 {"t":"done"}；失败发 {"t":"error"} 后直接结束（不发 done）。
 """
 from __future__ import annotations

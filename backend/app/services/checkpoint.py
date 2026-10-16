@@ -144,14 +144,14 @@ def _trim_live(c: sqlite3.Connection) -> None:
 
 
 def interrupt_turn(user: str, assistant: str) -> None:
-    """打断落账调和：代际 +1（在途回合的落账作废），并把 live 尾对
-    （user,assistant）修正为「用户实际看到的」状态：
+    """打断落账调和：代际 +1（在途回合的落账作废），并让 live 的**本回合**与
+    「用户实际看到的文本」对齐：
 
-    - 回复已落账（末对就是本回合）→ 截断/删除 assistant 行
-    - user 已落账、回复未落账（打断发生在生成中）→ 补写已展示部分（空则不写）
-    - 尾对不匹配（回合没到 backend）→ 直接补写整个结果
+    - 本回合 user 行还在（内容匹配）→ 其后的 assistant 行按前缀对齐：
+      整句保留、没看到的删除、只剩半句就补一行（回复还没落账则整段补上）
+    - 本回合 user 行都没落账（回合没到 backend）→ 直接补写整个结果
 
-    幂等：重复打断同一回合不会重复写 user 行。
+    幂等：重复打断同一回合不会重复写 user 行（对齐收敛到同一状态）。
     """
     user = str(user or "")
     assistant = str(assistant or "")
@@ -159,21 +159,25 @@ def interrupt_turn(user: str, assistant: str) -> None:
         c.execute(
             "UPDATE sessions SET generation=generation+1 WHERE id=?", (LIVE_ID,)
         )
-        rows = c.execute(
-            "SELECT rowid, role, text FROM messages WHERE session_id=?"
-            " ORDER BY seq DESC LIMIT 2",
-            (LIVE_ID,),
-        ).fetchall()
-        last = rows[0] if rows else None
         now = now_iso()
-        # 句级落账后，本回合的行 = 最后一条（内容匹配的）user 行之后的全部 assistant 行。
-        # 用户看到的文本应当是这些句子的**前缀**（可能还差半句），据此对齐：
-        # 整句保留、没看到的删除、只剩半句就补一行 —— 幂等（重复打断收敛到同一状态）。
-        user_idx = next(
-            (i for i, r in enumerate(rows) if r["role"] == "user"), None
-        )
-        if user_idx is not None and rows[user_idx]["text"] == user:
-            turn_rows = list(reversed(rows[:user_idx]))  # 本回合 assistant 行（按 seq 升序）
+        # 本回合 = 最后一条 user 行（内容需匹配）及其之后的全部 assistant 行。
+        # 不能只取最后两行：句级落账下一回合会有多条 assistant 行，那时最后两行都是
+        # assistant，看不到 user 行，会被误判成「回合没到 backend」而重复插入 user。
+        last_user = c.execute(
+            "SELECT seq, text FROM messages WHERE session_id=? AND role='user'"
+            " ORDER BY seq DESC LIMIT 1",
+            (LIVE_ID,),
+        ).fetchone()
+
+        if last_user and last_user["text"] == user:
+            turn_rows = c.execute(
+                "SELECT rowid, text FROM messages"
+                " WHERE session_id=? AND role='assistant' AND seq > ? ORDER BY seq",
+                (LIVE_ID, last_user["seq"]),
+            ).fetchall()
+            # 用户看到的是这些句子的**前缀**（可能还差半句）：整句保留、没看到的删掉、
+            # 只剩半句就补一行；一句都还没落账时 turn_rows 为空，这里直接补整段。
+            # 幂等：重复打断收敛到同一状态。
             acc = ""
             keep = 0
             for r in turn_rows:
@@ -191,28 +195,20 @@ def interrupt_turn(user: str, assistant: str) -> None:
                     " VALUES(?,?,?,?,?)",
                     (LIVE_ID, _next_seq(c, LIVE_ID), "assistant", rest, now),
                 )
-        elif last and last["role"] == "user" and last["text"] == user:
+        elif user:
+            # 回合没走到 backend（SSE 没到就被打断）：把结果补成一致
+            seq = _next_seq(c, LIVE_ID)
+            c.execute(
+                "INSERT INTO messages(session_id,seq,role,text,at)"
+                " VALUES(?,?,?,?,?)",
+                (LIVE_ID, seq, "user", user, now),
+            )
             if assistant:
                 c.execute(
                     "INSERT INTO messages(session_id,seq,role,text,at)"
                     " VALUES(?,?,?,?,?)",
-                    (LIVE_ID, _next_seq(c, LIVE_ID), "assistant", assistant, now),
+                    (LIVE_ID, seq + 1, "assistant", assistant, now),
                 )
-        else:
-            # 回合没走到 backend（SSE 没到就被打断）：把结果补成一致
-            if user:
-                seq = _next_seq(c, LIVE_ID)
-                c.execute(
-                    "INSERT INTO messages(session_id,seq,role,text,at)"
-                    " VALUES(?,?,?,?,?)",
-                    (LIVE_ID, seq, "user", user, now),
-                )
-                if assistant:
-                    c.execute(
-                        "INSERT INTO messages(session_id,seq,role,text,at)"
-                        " VALUES(?,?,?,?,?)",
-                        (LIVE_ID, seq + 1, "assistant", assistant, now),
-                    )
         c.execute(
             "UPDATE sessions SET updated_at=? WHERE id=?", (now, LIVE_ID)
         )

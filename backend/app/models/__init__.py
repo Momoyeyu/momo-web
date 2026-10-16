@@ -242,7 +242,7 @@ class ProbeResult(TypedDict):
     error: NotRequired[str]
 
 
-# ==================== SSE 事件（docs/backend-api.md 的契约） ====================
+# ==================== SSE 事件（契约见 backend/openapi.json 与 /docs） ====================
 
 ErrorService = Literal["llm", "backend"]
 

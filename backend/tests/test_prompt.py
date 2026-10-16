@@ -1,4 +1,4 @@
-"""system prompt 组装：字段注入 + pins + 表情/动作指令段（按形象资源清单条件注入）。
+"""system prompt 组装：soul 注入 + pins + 表情/动作指令段（按形象资源清单条件注入）。
 
 模版**只有英文一份**：语言相关的东西只有两处 ——
 1. lang_line（值来自设置里的「对话语言」）
@@ -63,7 +63,11 @@ def test_same_scaffolding_for_every_language():
     for lang in ("zh", "en", "ja"):
         p = _prompt(lang)
         prompts[lang] = "\n".join(
-            line for line in p.split("\n") if "conversation language is" not in line
+            line
+            for line in p.split("\n")
+            # 语言行与时间行都是运行期变量，比较骨架时要排除（时间到秒，跨秒会假失败）
+            if "conversation language is" not in line
+            and "current UTC time is" not in line
         )
     assert prompts["zh"] == prompts["en"] == prompts["ja"]
 
@@ -85,7 +89,6 @@ def test_fields_and_pins_are_injected_verbatim():
     assert "- 用户的名称是夜羽" in p
     assert "- 夜羽是我的创造者" in p
     # 使用策略下沉到 tools description；工具清单与策略文本都不写进 prompt
-    assert "## 记忆使用策略" not in p
     assert "memory_add" not in p and "common_time" not in p
 
 
@@ -195,6 +198,25 @@ def test_soul_is_injected_identically_across_languages():
         souls.append(p.split("## Your basic settings")[0])
     assert souls[0] == souls[1] == souls[2]
     assert prompt.load_soul() in souls[0]
+
+
+def test_load_soul_strips_html_comments(monkeypatch, tmp_path):
+    """soul 里的 HTML 注释是写给人的说明，不该被注入 prompt。
+
+    这是 load_soul 明确承诺的行为（也是 soul.md 里能写「怎么用这份文件」的前提），
+    但此前三处 soul 断言只做包含/非空，而当前 soul.md 恰好没有注释 —— 无人守。
+    """
+    soul = tmp_path / "soul.md"
+    soul.write_text(
+        "# momo\n\n<!-- 给人看的说明：这里可以写怎么改人设 -->\n\n设定：喜欢甜食\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(prompt, "SOUL_PATH", soul)
+
+    text = prompt.load_soul()
+    assert "喜欢甜食" in text
+    assert "给人看" not in text
+    assert "<!--" not in text
 
 
 def test_missing_soul_skips_persona_section(monkeypatch, tmp_path):

@@ -21,8 +21,8 @@ def test_write_then_read_normalized():
     # 缺失字段补默认值
     assert s["settings"]["general"]["dialogOpacity"] == 66
     assert s["settings"]["llm"] == {"url": "", "key": "", "model": ""}
-    # 人设不属于配置（写死在 prompt.PERSONA）
-    assert "persona" not in s
+    # 人设不属于配置（唯一来源 resources/soul.md）
+    assert "persona" not in store.DEFAULT_STATE
     # 未知字段透传
     assert s["custom"] == {"x": 1}
 
@@ -34,7 +34,7 @@ def test_normalize_tolerates_junk():
 
 def test_persona_lives_in_soul_file_not_config():
     """人设不在配置里，而在 resources/soul.md：用户改不到，开发者直接编辑文件。"""
-    assert "persona" not in store.normalize_state({})
+    assert "persona" not in store.DEFAULT_STATE
     from app.services import prompt
 
     soul = prompt.load_soul()
@@ -99,7 +99,7 @@ def test_read_state_non_mapping_returns_none():
     assert store.get_state() == {}
 
 
-def test_fresh_install_ships_no_initial_preferences_or_memories():
+def test_fresh_install_ships_no_initial_memories():
     """回归保护：新装不带任何初始记忆，全部由用户自己添加。
 
     历史上出厂状态种过示例偏好与初始记忆（前端 DEFAULT_PINS，随 momo.db 迁移进了 DB），

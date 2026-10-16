@@ -1,6 +1,5 @@
 """切句器单测：边界口径、引号保护、指令原子性、流式一致性。
 
-对应 docs/sentences-plan.md §9 的验收清单。
 """
 
 from __future__ import annotations

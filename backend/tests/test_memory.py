@@ -52,7 +52,7 @@ def test_dedup_jaccard():
     base = "momo喜欢吃草莓蛋糕和巧克力"
     memory.add_memory(base)
     with pytest.raises(memory.MemoryError) as e:
-        memory.add_memory(base + "哦")  # bigram Jaccard = 12/13 > 0.85
+        memory.add_memory(base + "哦")  # bigram Jaccard = 14/15 > 0.85
     assert e.value.kind == "duplicate"
 
     # 相似度低 → 不判重

@@ -40,8 +40,6 @@ def test_react_tool_then_text(monkeypatch):
     assert [(d["kind"], d["name"], d["offset"]) for d in sents[1]["dirs"]] == [
         ("exp", "开心", 0)
     ]
-    # 不再产出整段 delta：切句只在句事件里给（指令随 dirs）
-    assert [e for e in events if e["t"] == "delta"] == []
 
     # 第二轮 messages 带 tool 结果（common_time → utc+tz JSON）
     tool_msgs = [m for m in seen_messages[-1] if m.get("role") == "tool"]

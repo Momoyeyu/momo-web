@@ -315,7 +315,7 @@ def test_interrupt_empty_display_deletes_reply():
     assert _live_texts() == ["在吗"]
 
 
-def test_interrupt_kills_pending_commit():
+def test_interrupt_kills_pending_landing():
     """打断先于回复落账：代际 +1 使在途 append_sentence 作废。"""
     gen = checkpoint.generation()
     assert checkpoint.begin_turn("在吗", gen, "t")
@@ -338,6 +338,47 @@ def test_interrupt_turn_never_reached_backend():
     _seed(1, "旧")
     checkpoint.interrupt_turn("新问", "看到一点")
     assert _live_texts() == ["旧问0", "旧答0", "新问", "看到一点"]
+
+
+def _add_multi_turn(user: str, sentences: list[str], at: str = "t") -> None:
+    """落一个**多句**回合：句级落账下每句一行。
+
+    单句回合（add_turn）测不到对齐逻辑 —— 本回合只有一行 assistant 时，
+    「最后两行」刚好是 [assistant, user]，看不出取行的边界错误。
+    """
+    gen = checkpoint.generation()
+    assert checkpoint.begin_turn(user, gen, at)
+    for sentence in sentences:
+        assert checkpoint.append_sentence(sentence, gen, at)
+
+
+def test_interrupt_multi_sentence_seen_all():
+    """多句回合、用户看全：行原样保留，且不得重复插 user 行。"""
+    _add_multi_turn("在吗", ["第一句。", "第二句。"])
+    checkpoint.interrupt_turn("在吗", "第一句。第二句。")
+    assert _live_texts() == ["在吗", "第一句。", "第二句。"]
+
+
+def test_interrupt_multi_sentence_partial():
+    """多句回合、用户看到一句半：整句保留、未看到的删掉、半句补一行。"""
+    _add_multi_turn("在吗", ["第一句。", "第二句。"])
+    checkpoint.interrupt_turn("在吗", "第一句。第二")
+    assert _live_texts() == ["在吗", "第一句。", "第二"]
+
+
+def test_interrupt_multi_sentence_none_seen():
+    """多句回合、一句都没看到：本回合 assistant 行全删，user 行只留一条。"""
+    _add_multi_turn("在吗", ["第一句。", "第二句。", "第三句。"])
+    checkpoint.interrupt_turn("在吗", "")
+    assert _live_texts() == ["在吗"]
+
+
+def test_interrupt_multi_sentence_idempotent():
+    """多句回合重复打断：收敛到同一状态（不重复插 user 行）。"""
+    _add_multi_turn("在吗", ["第一句。", "第二句。"])
+    checkpoint.interrupt_turn("在吗", "第一句。")
+    checkpoint.interrupt_turn("在吗", "第一句。")
+    assert _live_texts() == ["在吗", "第一句。"]
 
 
 def test_interrupt_idempotent_no_double_user():
