@@ -24,6 +24,8 @@ test.afterEach(async ({ request }) => {
 test("控件态：输入为空时发送禁用，工具条与状态条齐备", async ({ page }) => {
   await gotoRoute(page, "chat");
 
+  // 状态已并进对话框：与铭牌同排、不再是页面左上角的浮标
+  await expect(page.locator(".dialog-box .nameplate-row .chat-status")).toHaveCount(1);
   await expect(page.locator(".chat-status")).toContainText("空闲");
   await expect(page.locator(".nameplate")).not.toBeEmpty();
 

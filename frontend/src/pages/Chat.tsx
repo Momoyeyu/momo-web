@@ -132,17 +132,22 @@ export default function Chat() {
 
   return (
     <div className="chat-page">
-      {showStatus && (
-        <div className={`chat-status status-${status}`}>
-          <span className="dot" />
-          {t(STATUS_LABEL_KEYS[status])}
-        </div>
-      )}
-
       {error && <div className="chat-error">{error}</div>}
 
       <div className="dialog-zone">
-        <DialogBox name={name} text={subtitle || <span className="muted">……</span>}>
+        <DialogBox
+          name={name}
+          text={subtitle || <span className="muted">……</span>}
+          // 状态并进对话框（铭牌右侧），不再是页面左上角的浮标
+          status={
+            showStatus ? (
+              <div className={`chat-status status-${status}`}>
+                <span className="dot" />
+                {t(STATUS_LABEL_KEYS[status])}
+              </div>
+            ) : undefined
+          }
+        >
           <div className="input-row">
             <input
               value={input}

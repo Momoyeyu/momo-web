@@ -21,25 +21,24 @@
   pointer-events: auto;
 }
 
+/* 状态标注：与铭牌同排、压在对话框上缘（见 .nameplate-row）。
+   比铭牌轻一档——无描边、暗底、暗字，圆点带状态色。 */
 .chat-status {
-  position: absolute;
-  top: 18px;
-  left: 20px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
+  gap: 7px;
+  padding: 3px 12px;
   border-radius: var(--r-md);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  backdrop-filter: blur(12px);
-  font-size: 13px;
+  background: rgba(16, 12, 20, 0.72);
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+  letter-spacing: 0.06em;
   color: var(--text-dim);
 }
 
 .chat-status .dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--text-dim);
 }
@@ -136,10 +135,17 @@
 }
 
 /* 角色铭牌：压在对话框上缘。 */
-.nameplate {
+/* 角色铭牌：压在对话框上缘；状态标注与它同排，故这排统一负责定位。 */
+.nameplate-row {
   position: absolute;
   top: -13px;
   left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nameplate {
   padding: 3px 16px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-md);
