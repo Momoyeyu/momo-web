@@ -702,7 +702,6 @@ export default function Settings() {
       <input
         type={showKey[sec] ? "text" : "password"}
         value={settings[sec].key}
-        placeholder={t("settings.keyPh")}
         onChange={(e) => patchEndpoint(sec, "key", e.target.value)}
       />
       <Button
