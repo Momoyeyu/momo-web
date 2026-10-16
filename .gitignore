@@ -1,6 +1,4 @@
-# 内部文档（前后端契约、运维手册等）不入库：仓库要推到 GitHub
 docs/
-
 node_modules/
 dist/
 __pycache__/
