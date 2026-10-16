@@ -152,7 +152,7 @@ class MemoryCreated(TypedDict):
 class StoredMessage(TypedDict):
     """momo.db 里的一条会话消息（落库形态，不含指令）。
 
-    role 只会有两个值——begin_turn 写 user、commit_reply 写 assistant。
+    role 只会有两个值——begin_turn 写 user、append_sentence 写 assistant。
     """
 
     role: Role
@@ -260,6 +260,27 @@ class DeltaEvent(TypedDict):
     text: str
 
 
+class SentenceDir(TypedDict):
+    """句子携带的指令（kind=exp 切表情 / motion 播动作，offset 为句内位置）。"""
+
+    kind: Literal["exp", "motion"]
+    name: str
+    offset: int
+
+
+class SentenceEvent(TypedDict):
+    """一句话落账后的推送：正文已剥离指令，指令随 dirs 一起下发。
+
+    切句由后端唯一口径完成（core/sentences.py），前端不再切句。
+    """
+
+    t: Literal["sentence"]
+    no: int
+    text: str
+    dirs: list[SentenceDir]
+    at: str
+
+
 class ErrorEvent(TypedDict):
     t: Literal["error"]
     message: str
@@ -271,5 +292,5 @@ class DoneEvent(TypedDict):
 
 
 #: agent 层产出的事件（done 由 api 层在回合成功后追加）。
-TurnEvent = DeltaEvent | ErrorEvent
-SseEvent = DeltaEvent | ErrorEvent | DoneEvent
+TurnEvent = DeltaEvent | SentenceEvent | ErrorEvent
+SseEvent = DeltaEvent | SentenceEvent | ErrorEvent | DoneEvent

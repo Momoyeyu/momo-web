@@ -305,11 +305,11 @@ def test_interrupt_empty_display_deletes_reply():
 
 
 def test_interrupt_kills_pending_commit():
-    """打断先于回复落账：代际 +1 使在途 commit_reply 作废。"""
+    """打断先于回复落账：代际 +1 使在途 append_sentence 作废。"""
     gen = checkpoint.generation()
     assert checkpoint.begin_turn("在吗", gen, "t")
     checkpoint.interrupt_turn("在吗", "")
-    assert checkpoint.commit_reply("完整回复", gen, "t") is False
+    assert checkpoint.append_sentence("完整回复", gen, "t") is False
     assert _live_texts() == ["在吗"]  # 回复没落库
 
 
@@ -318,7 +318,7 @@ def test_interrupt_pending_with_seen_text():
     gen = checkpoint.generation()
     assert checkpoint.begin_turn("在吗", gen, "t")
     checkpoint.interrupt_turn("在吗", "看到了一半")
-    assert checkpoint.commit_reply("完整回复", gen, "t") is False
+    assert checkpoint.append_sentence("完整回复", gen, "t") is False
     assert _live_texts() == ["在吗", "看到了一半"]
 
 
@@ -346,7 +346,7 @@ def test_load_invalidates_inflight_turn(monkeypatch):
     gen = checkpoint.generation()
     assert checkpoint.begin_turn("途中的问题", gen, "t9")
     client.post(f"/api/checkpoints/{sid}/load")  # 代际 +1
-    assert checkpoint.commit_reply("迟到回复", gen, "t9") is False
+    assert checkpoint.append_sentence("迟到回复", gen, "t9") is False
     assert _live_texts() == ["甲问0", "甲答0"]  # 迟到回复没落进新会话
     # auto 槽里留有被顶掉的现场（含途中 user 消息）
     autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
@@ -505,7 +505,7 @@ def test_live_cap_boundary_never_splits_turn():
     # 使 103 - 100 = 3 的裁剪点落在「答1」（assistant）上
     checkpoint.begin_turn("落单的问1", gen, "t")
     checkpoint.begin_turn("落单的问2", gen, "t")
-    assert checkpoint.commit_reply("答", gen, "t") is True
+    assert checkpoint.append_sentence("答", gen, "t") is True
     msgs = checkpoint.live_messages()
     assert len(msgs) == 101  # 多留一条
     assert msgs[0]["role"] == "user"  # 回合不被从中间切开

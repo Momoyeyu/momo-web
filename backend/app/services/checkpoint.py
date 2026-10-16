@@ -97,8 +97,12 @@ def begin_turn(text: str, gen: int, at: str) -> bool:
         return True
 
 
-def commit_reply(text: str, gen: int, at: str) -> bool:
-    """assistant 落账：代际一致才写入；读档/打断后 gen 漂移 → 丢弃。
+def append_sentence(text: str, gen: int, at: str) -> bool:
+    """assistant 单句落账：代际一致才写入；读档/打断后 gen 漂移 → 丢弃。
+
+    一次回复会调用 N 次（一回合 N 句，DB 里就是 N 行 assistant）。回合边界由
+    其后的 user 行界定，因此不需要额外的 turn_id 列：合并回放、裁剪、打断
+    都可以由「user 行 = 回合起点」这条规则推出（见 turn._merge_assistant）。
 
     写入成功后同事务内裁剪 live.messages 至上限。
     """
@@ -435,7 +439,7 @@ def _write_auto(c: sqlite3.Connection, summary: str) -> None:
 def load_checkpoint(sid: str) -> CheckpointDetail:
     """加载存档覆盖当前会话；当前会话非空先存入 auto 槽。返回存档全文。
 
-    代际 +1：load 之后在途回合的 commit_reply 全部作废（其 user
+    代际 +1：load 之后在途回合的 append_sentence 全部作废（其 user
     行已随原 live 进 auto 槽）。
     """
     _guard_snapshot_id(sid)
@@ -473,7 +477,7 @@ def load_checkpoint(sid: str) -> CheckpointDetail:
 def new_session() -> None:
     """开启新会话：live 非空先快照进 auto 槽，然后清空 live。
 
-    代际 +1：在途回合的 commit_reply 全部作废（其 user 行已随原
+    代际 +1：在途回合的 append_sentence 全部作废（其 user 行已随原
     live 进 auto 槽）。
     """
     with db.tx() as c:

@@ -32,9 +32,21 @@ def test_react_tool_then_text(monkeypatch):
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
 
     events = list(turn.run_turn("在吗"))
-    deltas = [e["text"] for e in events if e["t"] == "delta"]
-    # 按标点切段、保留标点
-    assert deltas == ["你好呀。", "<exp>开心</exp>今天很开心！"]
+
+    # 句事件：唯一口径切句，正文剥离指令，指令随 dirs 下发
+    sents = [e for e in events if e["t"] == "sentence"]
+    assert [(e["no"], e["text"]) for e in sents] == [
+        (0, "你好呀。"),
+        (1, "今天很开心！"),
+    ]
+    assert sents[0]["dirs"] == []
+    assert [(d["kind"], d["name"], d["offset"]) for d in sents[1]["dirs"]] == [
+        ("exp", "开心", 0)
+    ]
+    # 过渡期兼容：给旧前端发一次完整原文（含指令），行为与改造前一致
+    assert [e["text"] for e in events if e["t"] == "delta"] == [
+        "你好呀。<exp>开心</exp>今天很开心！"
+    ]
 
     # 第二轮 messages 带 tool 结果（common_time → utc+tz JSON）
     tool_msgs = [m for m in seen_messages[-1] if m.get("role") == "tool"]
@@ -43,11 +55,12 @@ def test_react_tool_then_text(monkeypatch):
     payload = json.loads(tool_msgs[0]["content"])
     assert "utc" in payload and "tz" in payload
 
-    # history 追加并落盘（指令已剥离，SSE delta 仍推原始文本）
+    # 句级落账：一回合两句 = 两行 assistant（回合边界由其后的 user 行界定）
     h = checkpoint.live_messages()
-    assert [m["role"] for m in h] == ["user", "assistant"]
+    assert [m["role"] for m in h] == ["user", "assistant", "assistant"]
     assert h[0]["text"] == "在吗"
-    assert h[1]["text"] == "你好呀。今天很开心！"
+    assert h[1]["text"] == "你好呀。"
+    assert h[2]["text"] == "今天很开心！"
 
 
 def test_llm_error_yields_error_event(monkeypatch):
@@ -137,3 +150,22 @@ def test_tool_memory_update_dispatch():
         ),
     )
     assert "pin" in msg["content"]
+
+
+def test_merge_assistant_groups_sentences_per_turn():
+    """回放给 LLM 前，同回合的多句 assistant 必须合并成一条。"""
+    merged = turn._merge_assistant(
+        [
+            {"role": "user", "text": "问1", "at": "t"},
+            {"role": "assistant", "text": "答1。", "at": "t"},
+            {"role": "assistant", "text": "答2。", "at": "t"},
+            {"role": "user", "text": "问2", "at": "t"},
+            {"role": "assistant", "text": "答3。", "at": "t"},
+        ]
+    )
+    assert merged == [
+        {"role": "user", "content": "问1"},
+        {"role": "assistant", "content": "答1。答2。"},
+        {"role": "user", "content": "问2"},
+        {"role": "assistant", "content": "答3。"},
+    ]

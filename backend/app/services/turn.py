@@ -5,9 +5,9 @@
 
     build_messages    节点 B：system prompt + 摘要 + 最近窗口 + 本回合输入
     react             节点 R→D→E→CNT：LLM 调用与工具回填，≤5 轮
-    checkpoint.*      user 落账 / assistant 落账（代际校验）
+    checkpoint.*      user 落账 / assistant **逐句**落账（代际校验）
     compress.*        回合末按用量触发后台压缩（不阻塞推流）
-    common.sentences  节点 H：切句
+    core.sentences    节点 H：切句（唯一口径，前端不再切句）
 """
 
 from __future__ import annotations
@@ -16,11 +16,10 @@ from dataclasses import dataclass
 from typing import Any, Iterator
 
 from ..core import llm, mcp
-from ..core.directives import strip_directives
-from ..core.sentences import split_segments
+from ..core.sentences import split_sentences
 from ..core import db
 from ..core.state import load as load_state
-from ..models import ChatMessage, ErrorEvent, State, TurnEvent
+from ..models import ChatMessage, ErrorEvent, State, StoredMessage, TurnEvent
 from . import checkpoint, compress, memory
 from .capability import TOOLS, builtin_names, run_call
 from .prompt import build_system_prompt
@@ -58,13 +57,29 @@ def run_turn(text: str) -> Iterator[TurnEvent]:
             yield reply.error  # 节点 ERR（不发 done，由 api 层决定）
             return
 
-        # 节点 G：指令剥离后落账；代际漂移（读档/打断）则静默收尾
-        if not checkpoint.commit_reply(strip_directives(reply.text), gen, at):
-            return
-        compress.maybe_compress(reply.prompt_tokens)  # 不阻塞本回合推流
+        # 节点 H 前置：先触发压缩（不阻塞本回合推流）
+        compress.maybe_compress(reply.prompt_tokens)
 
-        for segment in split_segments(reply.text):  # 节点 H
-            yield {"t": "delta", "text": segment}
+        # 节点 H：切句（唯一口径，已剥离指令）→ 逐句落账 → 推句事件。
+        # 代际漂移（读档/打断）时静默丢弃剩余句子。
+        for no, sent in enumerate(split_sentences(reply.text)):
+            if not checkpoint.append_sentence(sent.text, gen, at):
+                return
+            yield {
+                "t": "sentence",
+                "no": no,
+                "text": sent.text,
+                "dirs": [
+                    {"kind": d.kind, "name": d.name, "offset": d.offset}
+                    for d in sent.dirs
+                ],
+                "at": at,
+            }
+            # (见文件末尾的过渡期 delta)
+        # 过渡期兼容：给尚未切到句事件的前端发一次完整原文（含指令），
+        # 它自己的切句器与指令解析器照旧工作 —— 行为与改造前完全一致。
+        # 前端切到句事件后删掉这一行。
+        yield {"t": "delta", "text": reply.text}
 
 
 # ==================== 节点实现 ====================
@@ -78,12 +93,32 @@ def build_messages(state: State, text: str) -> list[ChatMessage]:
     summary = checkpoint.live_summary().strip()
     if summary:
         messages.append({"role": "system", "content": SUMMARY_PREFIX + summary})
-    for past in checkpoint.live_messages()[-HISTORY_WINDOW:]:
-        # role 过滤是防御（老数据/手工写入）：正常落库只有 user/assistant
-        if past["role"] in ("user", "assistant"):
-            messages.append({"role": past["role"], "content": past["text"]})
+    for past in _merge_assistant(checkpoint.live_messages())[-HISTORY_WINDOW:]:
+        messages.append(past)
     messages.append({"role": "user", "content": text})
     return messages
+
+
+def _merge_assistant(msgs: list[StoredMessage]) -> list[ChatMessage]:
+    """把同一回合的多条 assistant 句子合并回一条，再进历史窗口。
+
+    句级落库后，一回合在 DB 里是 N 条连续 assistant 行；直接回放会让模型看到
+    「一回合 N 条 assistant」，干扰它对对话结构的判断（同类项目踩过这个坑：
+    hermes-agent 的 "merge consecutive assistant messages before API replay"）。
+    合并后再取窗口，上下文与改造前等价 —— 因此 HISTORY_WINDOW 的语义不必改。
+
+    回合边界由 user 行界定，故「连续 assistant 必属同回合」成立。
+    """
+    out: list[ChatMessage] = []
+    for m in msgs:
+        # role 过滤是防御（老数据/手工写入）：正常落库只有 user/assistant
+        if m["role"] not in ("user", "assistant"):
+            continue
+        if m["role"] == "assistant" and out and out[-1]["role"] == "assistant":
+            out[-1]["content"] += m["text"]
+        else:
+            out.append({"role": m["role"], "content": m["text"]})
+    return out
 
 
 def react(

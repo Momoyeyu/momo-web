@@ -20,4 +20,4 @@ def add_turn(user: str, assistant: str, at: str = "2025-01-01T00:00:00+00:00"):
     """测试助手：向 live 会话落一对 user/assistant（模拟已完成的回合）。"""
     gen = checkpoint.generation()
     checkpoint.begin_turn(user, gen, at)
-    checkpoint.commit_reply(assistant, gen, at)
+    checkpoint.append_sentence(assistant, gen, at)
