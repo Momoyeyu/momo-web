@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceError } from "../lib/errors";
 import { speechUrl, streamSpeech } from "./ttsClient";
 
-const CFG = { key: "", voice: "", lang: "zh" };
+const CFG = { key: "", voice: "" };
+
+/** TTS 合成语言是请求参数（= 对话语言），不是端点配置。 */
+const LANG = "zh";
 
 function streamResponse(chunks: Uint8Array[]): Response {
   const stream = new ReadableStream<Uint8Array>({
@@ -48,6 +51,7 @@ describe("streamSpeech", () => {
     );
     const got: number[][] = [];
     await streamSpeech({ url: "http://h", ...CFG }, "hi", {
+      lang: LANG,
       onChunk: (pcm) => got.push([...pcm]),
     });
     // [1] 滞留 → [1,2] 对齐下送；[3] 滞留 → [3,4] 下送；尾 [5] 单字节丢弃。
@@ -64,6 +68,7 @@ describe("streamSpeech", () => {
     );
     const got: number[][] = [];
     await streamSpeech({ url: "http://h", ...CFG }, "hi", {
+      lang: LANG,
       onChunk: (pcm) => got.push([...pcm]),
     });
     expect(got).toEqual([
@@ -85,7 +90,7 @@ describe("streamSpeech", () => {
     const err = await streamSpeech(
       { url: "http://h", ...CFG },
       "hi",
-      { onChunk: () => {} },
+      { lang: LANG, onChunk: () => {} },
     ).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ServiceError);
     expect(err).toMatchObject({
@@ -106,7 +111,7 @@ describe("streamSpeech", () => {
     const err = await streamSpeech(
       { url: "http://h", ...CFG },
       "hi",
-      { onChunk: () => {} },
+      { lang: LANG, onChunk: () => {} },
     ).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ServiceError);
     expect(err).toMatchObject({ service: "tts", failure: "unreachable" });
@@ -115,7 +120,8 @@ describe("streamSpeech", () => {
   it("sends Authorization only when key is set", async () => {
     const spy = vi.fn(async (_url: string, _init: RequestInit) => streamResponse([]));
     vi.stubGlobal("fetch", spy);
-    await streamSpeech({ url: "http://h", key: "k1", voice: "", lang: "zh" }, "hi", {
+    await streamSpeech({ url: "http://h", key: "k1", voice: "" }, "hi", {
+      lang: LANG,
       onChunk: () => {},
     });
     const init = spy.mock.calls[0][1] as RequestInit;
@@ -150,6 +156,7 @@ describe("streamSpeech", () => {
     );
     await expect(
       streamSpeech({ url: "http://h", ...CFG }, "hi", {
+        lang: LANG,
         signal: controller.signal,
         onChunk: () => {},
       }),

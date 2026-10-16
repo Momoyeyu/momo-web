@@ -178,17 +178,16 @@ def reject_duplicate(content: str, exclude_id: str | None = None) -> None:
 
 
 def embedding_config() -> dict[str, Any]:
-    """当前生效的 embedding 配置。
+    """当前生效的 embedding 配置；没配服务地址就返回 {}。
 
-    设置页「通用-语义检索」关闭（general.semanticSearch=false）时返回 {}，
-    与 url 未配置等价——调用方走词面兜底。
+    语义召回没有独立开关：配了 embedding 就走语义，没配就走词面兜底
+    （与 embed.embed 对空 url 的判定同一口径，model 留空有出厂默认）。
     """
-    state = load_state()
-    if state["settings"]["general"]["semanticSearch"] is False:
-        return {}
-    cfg = state["settings"]["embedding"]
+    cfg = load_state()["settings"]["embedding"]
     # isinstance 是真防御：momo.yaml 被写成非 dict 时降级为「未配置」
-    return cfg if isinstance(cfg, dict) else {}
+    if not isinstance(cfg, dict):
+        return {}
+    return cfg if str(cfg.get("url") or "").strip() else {}
 
 
 def semantic_rank(query: str, candidates: list[Memory]) -> list[MemoryRef] | None:

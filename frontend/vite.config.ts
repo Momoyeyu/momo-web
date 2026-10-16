@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 // dev 代理：浏览器直连遇到无 CORS 头的服务（如本地 momo-svc）时，
@@ -47,5 +47,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // e2e/ 是 Playwright 的 spec（要真浏览器 + 跑着的实例），不归 vitest 收集；
+    // 否则 pnpm test 会去执行 playwright 的 test.beforeEach 并整批报错。
+    exclude: [...configDefaults.exclude, "e2e/**"],
   },
 });

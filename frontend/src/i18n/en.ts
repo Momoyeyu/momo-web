@@ -96,8 +96,6 @@ export const en: Dict = {
     voiceNeedTts: "Set up TTS in the Models tab first",
     voiceInput: "Voice input",
     voiceNeedAsr: "Set up ASR in the Models tab first",
-    semanticSearch: "Semantic recall",
-    embNeedCfg: "Set up Embedding in the Models tab first",
     previewSample:
       "Welcome back! How was your day? Feel free to tell me anything on your mind.",
     langs: { zh: "中文", ja: "日本語", en: "English" },
@@ -106,7 +104,6 @@ export const en: Dict = {
     model: "Model",
     svcUrl: "Service URL",
     voice: "Voice",
-    speechLang: "Language",
     keyPh: "Leave empty to skip auth header (for local unauthenticated services)",
     llmUrlPh: "https://api.deepseek.com",
     llmModelPh: "deepseek-chat",

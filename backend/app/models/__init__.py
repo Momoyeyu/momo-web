@@ -35,7 +35,6 @@ class TtsConfig(TypedDict):
     url: str
     key: str
     voice: str
-    lang: str
 
 
 class EmbeddingConfig(TypedDict):
@@ -66,7 +65,6 @@ class GeneralSettings(TypedDict):
     voiceVolume: int
     showStatus: bool
     voiceInput: bool
-    semanticSearch: bool
 
 
 class Settings(TypedDict):

@@ -4,7 +4,7 @@
 
 import { useSyncExternalStore } from "react";
 import { getSettings, subscribe } from "../lib/store";
-import type { Lang } from "../lib/types";
+import type { GeneralConfig, Lang } from "../lib/types";
 import { zh } from "./zh";
 import type { Dict } from "./zh";
 import { ja } from "./ja";
@@ -21,18 +21,28 @@ export function currentLang(): Lang {
 }
 
 /**
- * momo 对话语言（settings.general.chatLang；auto/缺失 → 回落界面语言）。
- * prompt 组装与出厂默认人设都按它选语言，语义与后端 prompt._lang_of 对齐；
- * 取词用 tFor(promptLang(), …) 而不是 t()（后者跟界面语言）。
+ * 解析对话语言（纯函数，便于非组件处与测试使用）。
+ *
+ * settings.general.chatLang；auto/缺失 → 回落界面语言 lang；未知 → zh。
+ * 语义与后端 prompt._lang_of 对齐。
  */
-export function promptLang(): Lang {
-  const g = getSettings().general;
+export function resolvePromptLang(g: GeneralConfig): Lang {
   const raw = String(g.chatLang || "").toLowerCase();
   const code = !raw || raw === "auto" ? String(g.lang || "zh").toLowerCase() : raw;
   for (const l of LANGS) {
     if (code.startsWith(l)) return l;
   }
   return "zh";
+}
+
+/**
+ * momo 对话语言（settings.general.chatLang；auto/缺失 → 回落界面语言）。
+ *
+ * prompt 组装、出厂默认人设、TTS 合成语言都按它选，语义与后端
+ * prompt._lang_of 对齐；取词用 tFor(promptLang(), …) 而不是 t()（后者跟界面语言）。
+ */
+export function promptLang(): Lang {
+  return resolvePromptLang(getSettings().general);
 }
 
 function lookup(dict: Dict, key: string): string | undefined {

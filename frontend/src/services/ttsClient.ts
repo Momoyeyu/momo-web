@@ -6,6 +6,8 @@ import type { TtsConfig } from "../lib/types";
 import { ServiceError } from "../lib/errors";
 
 interface SpeakOptions {
+  /** 合成语言 = 对话语言（调用方用 resolvePromptLang(cfg.general) 解析）。 */
+  lang: string;
   signal?: AbortSignal;
   /** 每个到达的 PCM 块。 */
   onChunk: (pcm: Uint8Array) => void;
@@ -57,7 +59,7 @@ export async function streamSpeech(
       body: JSON.stringify({
         input: text,
         response_format: "pcm",
-        lang: cfg.lang,
+        lang: opts.lang,
         voice: cfg.voice || undefined,
         model: "momo-tts",
       }),

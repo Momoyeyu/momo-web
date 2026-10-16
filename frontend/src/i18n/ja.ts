@@ -96,8 +96,6 @@ export const ja: Dict = {
     voiceNeedTts: "先に「モデル」タブで TTS を設定してください",
     voiceInput: "音声入力",
     voiceNeedAsr: "先に「モデル」タブで ASR を設定してください",
-    semanticSearch: "意味検索",
-    embNeedCfg: "先に「モデル」タブで Embedding を設定してください",
     previewSample:
       "おかえりなさい！今日はどんな一日でしたか？何でも聞かせてくださいね。",
     langs: { zh: "中文", ja: "日本語", en: "English" },
@@ -106,7 +104,6 @@ export const ja: Dict = {
     model: "モデル",
     svcUrl: "サービスアドレス",
     voice: "ボイス（voice）",
-    speechLang: "言語",
     keyPh: "空欄なら認証ヘッダーを送りません（ローカル無認証サービス向け）",
     llmUrlPh: "https://api.deepseek.com",
     llmModelPh: "deepseek-chat",

@@ -18,7 +18,8 @@ export interface TtsConfig {
   url: string;
   key: string;
   voice: string;
-  lang: string;
+  // 语言不在这里：TTS 合成语言跟随**对话语言**（settings.general.chatLang），
+  // 由调用方按请求传入（见 services/ttsClient.ts 的 SpeakOptions.lang）。
 }
 
 /** 语义检索 embedding 端点（http(s)://…，POST /v1/embeddings，OpenAI 对齐）。
@@ -33,7 +34,7 @@ export interface EmbeddingConfig {
 export type Lang = "zh" | "ja" | "en";
 
 /** 通用设置（语言等，与具体服务无关）。 */
-interface GeneralConfig {
+export interface GeneralConfig {
   /** 界面语言（产品 UI）。 */
   lang: Lang;
   /** momo 对话语言；"auto" = 跟随界面语言。 */
@@ -51,7 +52,6 @@ interface GeneralConfig {
   /** 语音输入（ASR 麦克风）；asr.url 未配置时强制为关。 */
   voiceInput: boolean;
   /** 记忆语义检索（embedding）；embedding.url 未配置时强制为关。 */
-  semanticSearch: boolean;
 }
 
 /** MCP 拓展登记项：外部 MCP server 的连接配置（backend 每回合按此连接并

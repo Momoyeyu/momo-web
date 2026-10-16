@@ -65,11 +65,10 @@ const DEFAULT_SETTINGS: Settings = {
     voiceVolume: 100,
     showStatus: true,
     voiceInput: true,
-    semanticSearch: true,
   },
   llm: { url: "https://api.deepseek.com", key: "", model: "deepseek-chat" },
   asr: { url: "ws://127.0.0.1:7810/v1/listen", key: "" },
-  tts: { url: "http://127.0.0.1:7811", key: "", voice: "", lang: "zh" },
+  tts: { url: "http://127.0.0.1:7811", key: "", voice: "" },
   embedding: { url: "http://10.106.130.222:11434", key: "", model: "bge-m3" },
   extensions: [],
 };

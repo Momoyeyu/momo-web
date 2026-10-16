@@ -120,18 +120,21 @@ def test_edit_excludes_self_in_dedup():
     assert edited["content"].endswith("！")
 
 
-def test_semantic_search_switch(monkeypatch):
-    """设置页「语义检索」关掉 → _embed_cfg 返回 {}，与未配置等价。"""
+def test_embedding_config_needs_url():
+    """语义召回只看 embedding 是否配置——开关本身已移除。
+
+    没配服务地址 → {}（调用方走词面兜底）；配了 → 原样返回。
+    """
     from app.core import state as cfg
 
     state = cfg.normalize_state(None)
-    state["settings"]["general"]["semanticSearch"] = False
+    state["settings"]["embedding"]["url"] = ""
     cfg.write_state(state)
     assert memory.embedding_config() == {}
 
-    state["settings"]["general"]["semanticSearch"] = True
+    state["settings"]["embedding"]["url"] = "http://127.0.0.1:11434"
     cfg.write_state(state)
-    assert memory.embedding_config().get("url")
+    assert memory.embedding_config().get("url") == "http://127.0.0.1:11434"
 
 
 def test_search_jaccard_fallback(monkeypatch):

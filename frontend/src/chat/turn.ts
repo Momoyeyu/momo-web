@@ -16,6 +16,7 @@ import type {
   CheckpointMessage,
   Settings,
 } from "../lib/types";
+import { resolvePromptLang } from "../i18n";
 import { DirectiveParser } from "../llm/directives";
 import type { DirectiveEvent } from "../llm/directives";
 import { streamSpeech } from "../services/ttsClient";
@@ -194,6 +195,8 @@ export class ChatEngine {
     if (!cfg.tts.url) return Promise.resolve();
     this.safe(() => this.player.stop());
     return streamSpeech(cfg.tts, m.text, {
+      // 回放与实时合成同一口径：语言 = 对话语言
+      lang: resolvePromptLang(cfg.general),
       onChunk: (pcm) => {
         if (this.disposed) return;
         this.safe(() => this.player.push(pcm));
@@ -568,6 +571,7 @@ export class ChatEngine {
     let req: Promise<void>;
     try {
       req = streamSpeech(cfg.tts, sentence, {
+        lang: resolvePromptLang(cfg.general),
         signal,
         onChunk: (pcm) => {
           tts.chunks.push(pcm);

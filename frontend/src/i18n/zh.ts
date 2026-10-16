@@ -96,8 +96,6 @@ export const zh = {
     voiceNeedTts: "先在「模型」tab 配置 TTS",
     voiceInput: "语音输入",
     voiceNeedAsr: "先在「模型」tab 配置 ASR",
-    semanticSearch: "语义检索",
-    embNeedCfg: "先在「模型」tab 配置 Embedding",
     previewSample:
       "夜羽大人，欢迎回来。今天过得怎么样？有想聊的事尽管告诉我哦。",
     langs: { zh: "中文", ja: "日本語", en: "English" },
@@ -106,7 +104,6 @@ export const zh = {
     model: "模型",
     svcUrl: "服务地址",
     voice: "音色（voice）",
-    speechLang: "语言",
     keyPh: "留空则不发送鉴权头（本地无鉴权服务适用）",
     llmUrlPh: "https://api.deepseek.com",
     llmModelPh: "deepseek-chat",

@@ -72,11 +72,10 @@ DEFAULT_STATE: dict[str, Any] = {
             "voiceVolume": 100,
             "showStatus": True,
             "voiceInput": True,
-            "semanticSearch": True,
         },
         "llm": {"url": "", "key": "", "model": ""},
         "asr": {"url": "", "key": ""},
-        "tts": {"url": "", "key": "", "voice": "", "lang": "zh"},
+        "tts": {"url": "", "key": "", "voice": ""},
         # 语义检索端点（设置页「模型」tab 可改）；url 留空 = 只用词面召回
         "embedding": {
             "url": DEFAULT_EMBEDDING_URL,

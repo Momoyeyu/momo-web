@@ -465,7 +465,6 @@ export default function Settings() {
   const [voiceMuted, setVoiceMuted] = useState(getChatEngine().muted);
   const ttsConfigured = settings.tts.url.trim() !== "";
   const asrConfigured = settings.asr.url.trim() !== "";
-  const embConfigured = settings.embedding.url.trim() !== "";
 
   const toggleVoice = (on: boolean): void => {
     const eng = getChatEngine();
@@ -793,19 +792,6 @@ export default function Settings() {
                       onChange={(v) => patchGeneral({ voiceVolume: v })}
                     />
                   </FieldRow>
-                  <FieldRow
-                    label={t("settings.semanticSearch")}
-                    extra={!embConfigured ? t("settings.embNeedCfg") : undefined}
-                  >
-                    <Switch
-                      on={embConfigured && settings.general.semanticSearch}
-                      disabled={!embConfigured}
-                      title={
-                        !embConfigured ? t("settings.embNeedCfg") : undefined
-                      }
-                      onChange={(v) => patchGeneral({ semanticSearch: v })}
-                    />
-                  </FieldRow>
                   <FieldRow label={t("settings.showStatus")}>
                     <Switch
                       on={settings.general.showStatus}
@@ -907,18 +893,6 @@ export default function Settings() {
                       value={settings.tts.voice}
                       placeholder={t("settings.voicePh")}
                       onChange={(e) => patchEndpoint("tts", "voice", e.target.value)}
-                    />
-                  </FieldRow>
-                  <FieldRow label={t("settings.speechLang")}>
-                    <Select
-                      value={settings.tts.lang}
-                      options={[
-                        { value: "zh", label: "中文" },
-                        { value: "en", label: "English" },
-                        { value: "ja", label: "日本語" },
-                        { value: "auto", label: "auto" },
-                      ]}
-                      onChange={(v) => patchEndpoint("tts", "lang", v)}
                     />
                   </FieldRow>
 
