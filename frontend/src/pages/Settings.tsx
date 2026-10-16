@@ -83,13 +83,17 @@ function DialogPreview({
   opacity,
   textSpeed,
   sentenceSpeed,
+  showStatus,
 }: {
   name: string;
   sample: string;
   opacity: number;
   textSpeed: number;
   sentenceSpeed: number;
+  /** 预览也要跟着「显示对话状态」开关（状态条已是对话框本体的一部分）。 */
+  showStatus: boolean;
 }) {
+  const t = useT();
   const [text, setText] = useState("");
 
   useEffect(() => {
@@ -129,7 +133,18 @@ function DialogPreview({
       className="dialog-preview"
       style={{ "--dialog-alpha": opacity / 100 } as React.CSSProperties}
     >
-      <DialogBox name={name} text={text} />
+      <DialogBox
+        name={name}
+        text={text}
+        status={
+          showStatus ? (
+            <div className="chat-status status-idle">
+              <span className="dot" />
+              {t("chat.idle")}
+            </div>
+          ) : undefined
+        }
+      />
     </div>
   );
 }
@@ -732,11 +747,12 @@ export default function Settings() {
             <div className="settings-body">
               {tab === "general" && (
                 <div className="settings-cols">
-                {/* 左栏：语言 / 语音两个子框，与右栏「对话框设置」同构 */}
+                {/* 左栏：语言 / 语音两个独立面板，与右栏「对话框设置」同级；
+                    末块吃掉剩余高度，两栏总高因此对齐 */}
+                <div className="settings-stack">
                 <section className="panel settings-col">
-                  <div className="opt-sub">
-                    <h3 className="opt-group">{t("settings.groups.lang")}</h3>
-                    <div className="opt-list">
+                  <h3 className="opt-group">{t("settings.groups.lang")}</h3>
+                  <div className="opt-list">
                   <FieldRow label={t("settings.langLabel")}>
                     <Select
                       value={settings.general.lang}
@@ -768,12 +784,12 @@ export default function Settings() {
                       }
                     />
                   </FieldRow>
-                    </div>
                   </div>
+                </section>
 
-                  <div className="opt-sub">
-                    <h3 className="opt-group">{t("settings.groups.voice")}</h3>
-                    <div className="opt-list">
+                <section className="panel settings-col">
+                  <h3 className="opt-group">{t("settings.groups.voice")}</h3>
+                  <div className="opt-list">
                   <FieldRow
                     label={t("settings.voiceInput")}
                     extra={!asrConfigured ? t("settings.voiceNeedAsr") : undefined}
@@ -807,9 +823,9 @@ export default function Settings() {
                       onChange={(v) => patchGeneral({ voiceVolume: v })}
                     />
                   </FieldRow>
-                    </div>
                   </div>
                 </section>
+                </div>
                 {/* 对话框设置子组：三滑块 + 预览同组联动，预览钉在面板底缘。 */}
                 <section className="panel settings-col">
                   <h3 className="opt-group">
@@ -856,6 +872,7 @@ export default function Settings() {
                       opacity={settings.general.dialogOpacity}
                       textSpeed={settings.general.textSpeed}
                       sentenceSpeed={settings.general.sentenceSpeed}
+                      showStatus={settings.general.showStatus}
                     />
                   </div>
                 </section>

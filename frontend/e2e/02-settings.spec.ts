@@ -126,12 +126,27 @@ test("拓展 tab：登记 stdio MCP server → 出现在列表 → 删除", asyn
   await expect(page.locator(".ext-row").filter({ hasText: "e2e-echo" })).toHaveCount(0);
 });
 
-test("通用 tab：语言/语音各成一框，语义检索开关已移除", async ({ page }) => {
+test("通用 tab：语言/语音是与对话框设置同级的两个面板，语义检索开关已移除", async ({
+  page,
+}) => {
   await openTab(page, "通用");
 
-  // 左栏两个子框，标题按顺序
-  const subs = await page.locator(".settings-cols .opt-sub .opt-group").allTextContents();
-  expect(subs).toEqual(["语言设置", "语音设置"]);
+  // 左栏是两个**独立面板**（不再是套在一个面板里的子框）：第一列 2 项
+  const stack = page.locator(".settings-cols > .settings-stack > .panel");
+  await expect(stack).toHaveCount(2);
+  expect(await stack.locator(".opt-group").allTextContents()).toEqual([
+    "语言设置",
+    "语音设置",
+  ]);
+  // 第二列 1 项，与左栏的两个面板同级（都是 .settings-cols 的子级）
+  await expect(page.locator(".settings-cols > .panel")).toHaveCount(1);
+
+  // 两栏总高对齐
+  const [left, right] = await Promise.all([
+    page.locator(".settings-stack").boundingBox(),
+    page.locator(".settings-cols > .panel").boundingBox(),
+  ]);
+  expect(Math.abs((left?.height ?? 0) - (right?.height ?? 0))).toBeLessThan(2);
 
   // 语义检索不再有开关（改为按 embedding 是否配置自动判定，后端有单测钉住）
   await expect(page.getByText("语义检索", { exact: true })).toHaveCount(0);
@@ -141,6 +156,14 @@ test("通用 tab：语言/语音各成一框，语义检索开关已移除", asy
   await expect(
     dialogPanel.locator(".opt-label").filter({ hasText: "显示对话状态" }),
   ).toBeVisible();
+
+  // 预览与对话页一致：状态条属于对话框本体，跟着「显示对话状态」开关
+  const preview = page.locator(".dialog-preview .chat-status");
+  await expect(preview).toHaveCount(1);
+  await expect(preview).toContainText("空闲");
+  await dialogPanel.locator(".opt-row", { hasText: "显示对话状态" }).locator(".switch").click();
+  await waitSaved(page);
+  await expect(page.locator(".dialog-preview .chat-status")).toHaveCount(0);
 });
 
 test("形象 tab：偏好与 Live2D 模型左右并排且等宽", async ({ page }) => {

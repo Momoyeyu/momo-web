@@ -136,18 +136,18 @@
   padding: 0;
 }
 
-/* 通用页内的子分组框（语言设置 / 语音设置）：外层已是 .panel 卡片，
-   这里用更暗的底 + 更淡的描边做「框中框」，与右栏的分组标题同一套排布。
-   内层 .opt-row 的左右内缩与 .opt-group 的 4px 对齐。 */
-.opt-sub {
-  border: 1px solid var(--line-soft);
-  border-radius: var(--r-md);
-  background: var(--input-bg);
-  padding: 0 14px 4px;
+/* 通用页左栏：语言设置 / 语音设置是两个**独立面板**，与右栏「对话框设置」同级
+   （原来它们套在一个外层 panel 里，视觉上比右栏低一级）。
+   末块吃掉剩余高度，两栏总高因此对齐。 */
+.settings-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 
-.opt-sub + .opt-sub {
-  margin-top: 14px;
+.settings-stack > .panel:last-child {
+  flex: 1;
 }
 
 /* 模型配置页内分块标题（LLM/ASR/TTS/形象）。 */
