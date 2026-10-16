@@ -15,8 +15,12 @@ const personaField = (page: import("@playwright/test").Page, label: string) =>
     .locator(".persona-tab .field")
     .filter({ has: page.locator(".field-label", { hasText: label }) });
 
+/** 偏好面板：.persona-section 依次是 基本信息 / 偏好 / Live2D 模型，取第 2 块。 */
+const prefPanel = (page: import("@playwright/test").Page) =>
+  page.locator(".persona-section").nth(1);
+
 const prefCard = (page: import("@playwright/test").Page, text: string) =>
-  page.locator(".persona-section .list-item").filter({ hasText: text });
+  prefPanel(page).locator(".list-item").filter({ hasText: text });
 
 test("基本信息：改名称即写盘", async ({ page, request }) => {
   await openTab(page, "形象");
@@ -34,9 +38,9 @@ test("偏好：添加 → 出现在列表 → 编辑 → 详情弹窗 → 删除
     .preferences.length;
 
   // 添加：IconButton 追加空条目并直接进入编辑态
-  await page.locator(".persona-section .mem-toolbar .icon-btn").click();
+  await prefPanel(page).locator(".mem-toolbar .icon-btn").click();
   const editing = page
-    .locator(".persona-section .list-item")
+    .locator(".list-item")
     .filter({ has: page.locator(".list-edit") });
   await editing.locator("input").fill(`${TAG}喜欢苏打水`);
   await editing.getByText("保存").click();
@@ -57,7 +61,7 @@ test("偏好：添加 → 出现在列表 → 编辑 → 详情弹窗 → 删除
   // 内联编辑：改内容
   await prefCard(page, `${TAG}喜欢苏打水`).getByText("编辑").click();
   const editBox = page
-    .locator(".persona-section .list-item")
+    .locator(".list-item")
     .filter({ has: page.locator(".list-edit") });
   await editBox.locator("input").fill(`${TAG}喜欢气泡水`);
   await editBox.getByText("保存").click();
@@ -77,9 +81,9 @@ test("偏好编辑态取消：新增的空条目被撤掉，数量回到原值",
   const original = ((await readState(request)).persona as { preferences: string[] })
     .preferences.length;
 
-  await page.locator(".persona-section .mem-toolbar .icon-btn").click();
+  await prefPanel(page).locator(".mem-toolbar .icon-btn").click();
   const editing = page
-    .locator(".persona-section .list-item")
+    .locator(".list-item")
     .filter({ has: page.locator(".list-edit") });
   await editing.getByText("取消").click();
   await waitSaved(page);

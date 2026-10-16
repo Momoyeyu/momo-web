@@ -204,5 +204,9 @@ export const en: Dict = {
     motionList: "Motions",
     descPh: "Meaning (optional)",
     resEmpty: "This model has no controllable expressions or motions.",
+    searchPh: "Filter models…",
+    importLabel: "Import a model",
+    pickZip: "Choose a .zip file",
+    empty: "No matching model.",
   },
 };

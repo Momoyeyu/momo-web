@@ -192,3 +192,49 @@ test("探测按钮与同列「显示」按钮同宽，结果态不裁字", async
 
   await expect(probe).toHaveText("测试", { timeout: 10_000 });
 });
+
+test("形象 tab：与「偏好」同构（检索 + 加号 + 翻页），加号开导入弹窗", async ({
+  page,
+}) => {
+  await openTab(page, "形象");
+  const panel = page.locator(".persona-section").nth(2);
+
+  await expect(panel.locator(".mem-search")).toBeVisible();
+  await expect(panel.locator(".icon-btn")).toBeVisible();
+  await expect(panel.locator(".list-pager")).toBeVisible();
+  await expect(panel.locator(".list-item").first()).toBeVisible();
+
+  await panel.locator(".icon-btn").click();
+  await expect(page.locator(".modal-overlay")).toBeVisible();
+  await expect(page.locator(".modal-meta")).toHaveText("导入模型 (.zip)");
+  await expect(page.locator(".modal-foot button").first()).toHaveText("选择 zip 文件");
+
+  await page.locator(".modal-foot").getByText("取消").click();
+  await expect(page.locator(".modal-overlay")).toBeHidden();
+});
+
+test("形象 tab：点模型卡片弹出「表情与动作」，并可按名检索", async ({ page }) => {
+  await openTab(page, "形象");
+  const panel = page.locator(".persona-section").nth(2);
+
+  // 检索过滤（内置 Hiyori 命中，乱词落空态）
+  await panel.locator(".mem-search").fill("Hiyori");
+  await expect(panel.locator(".list-item").first()).toBeVisible();
+  await panel.locator(".mem-search").fill("no-such-model-xyz");
+  await expect(panel.locator(".muted", { hasText: "没有匹配的模型" })).toBeVisible();
+  await panel.locator(".mem-search").fill("");
+
+  // 点卡片 → 弹窗里是该模型的清单，描述可编辑
+  await panel.locator(".list-item").first().click();
+  await expect(page.locator(".modal-meta")).toContainText("表情与动作");
+  const row = page.locator(".res-row").first();
+  await expect(row).toBeVisible();
+  const desc = row.locator("input");
+  const before = await desc.inputValue();
+  await desc.fill("e2e-描述");
+  await expect(desc).toHaveValue("e2e-描述");
+  await desc.fill(before); // 还原
+
+  await page.locator(".modal-foot").getByText("关闭").click();
+  await expect(page.locator(".modal-overlay")).toBeHidden();
+});

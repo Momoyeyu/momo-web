@@ -202,5 +202,9 @@ export const ja: Dict = {
     motionList: "モーション",
     descPh: "意味（任意）",
     resEmpty: "このモデルには操作できる表情・モーションがありません。",
+    searchPh: "モデルを検索…",
+    importLabel: "モデルを読み込む",
+    pickZip: "zip ファイルを選択",
+    empty: "一致するモデルがありません。",
   },
 };

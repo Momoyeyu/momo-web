@@ -163,38 +163,20 @@
   margin-top: 4px;
 }
 
-/* --- 形象（Live2D 模型管理）：缩略图卡片网格 --- */
+/* --- 形象（Live2D 模型管理）：与「偏好」同构的卡片列表 --- */
 
-.avatar-panel {
-  padding: 4px;
-}
-
-.avatar-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.avatar-card {
+/* 卡片正文：缩略图 + 名称/文件名两行（.list-content 自带的单行截断不适用此行）。 */
+.avatar-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: var(--panel-hover);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
-}
-
-.avatar-card.active {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent-soft), 0 2px 14px var(--accent-glow);
+  gap: 10px;
+  min-width: 0;
 }
 
 .avatar-thumb {
   flex: none;
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   object-fit: cover;
   /* 纹理是全身立绘：对齐顶部只露头。 */
   object-position: top;
@@ -233,11 +215,6 @@
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
-.avatar-ops {
-  display: flex;
-  gap: 8px;
-}
-
 .avatar-meta {
   font-size: 12px;
   white-space: nowrap;
@@ -245,78 +222,43 @@
   text-overflow: ellipsis;
 }
 
-.avatar-add {
-  flex-direction: column;
-  justify-content: center;
-  border-style: dashed;
-  color: var(--text-dim);
-  cursor: pointer;
-  min-height: 78px;
-}
-
-.avatar-add:hover:not(:disabled) {
+/* 当前使用的模型：卡片描边点亮 */
+.avatar-current {
   border-color: var(--accent);
-  color: var(--accent-strong);
-  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent-soft), 0 2px 14px var(--accent-glow);
 }
 
-.avatar-add:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.avatar-add-plus {
-  font-size: 20px;
-  line-height: 1;
-}
-
-.avatar-add-label {
-  font-size: 13px;
-}
-
+/* 导入弹窗里的多 manifest 选择行 */
 .avatar-pending {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-top: 12px;
   padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
   font-size: 13px;
 }
 
 .avatar-hint {
-  margin: 12px 4px 0;
+  margin: 12px 0 0;
   font-size: 12px;
 }
 
 .avatar-error {
-  margin: 10px 4px 0;
+  margin: 10px 0 0;
   font-size: 13px;
   color: var(--danger-text);
 }
 
-/* 语义层：表情/动作资源名 + 可编辑描述 */
-
-.avatar-res {
-  margin-top: 12px;
-  padding-bottom: 10px;
+/* 表情与动作弹窗：清单可能很长（每项一行），限高内滚 */
+.avatar-res-modal {
+  width: min(680px, calc(100% - 64px));
 }
 
-.avatar-res .avatar-hint {
-  margin-top: 4px;
-}
-
-/* 形象栏与「偏好」并排后，动作清单（每项一行）会单方面把两栏拉得很高：
-   限高内滚，两栏高度才谈得上对齐。 */
 .res-scroll {
-  max-height: 22vh;
+  max-height: 46vh;
   overflow-y: auto;
-}
-
-/* 形象栏落在半宽列内时缩略图卡片改单列：双列下每格仅约 260px，
-   英文徽标（Built-in）会被挤成两行、模型名只剩「Hiy…」；
-   单列后与左栏「偏好」的整行卡片形态一致，也顺带对齐。 */
-.persona-tab .avatar-grid {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .res-group {

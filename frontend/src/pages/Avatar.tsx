@@ -1,5 +1,10 @@
-// 形象面板（设置页「模型」内分块）：Live2D 模型导入/切换/删除。
-// 与记忆条目同级——导入/切换/删除是即时操作，不走设置草稿。
+// 形象面板（设置页「形象」tab 右栏）：Live2D 模型导入/切换/删除。
+//
+// 形态与左栏「偏好」一致：检索框 + 右侧加号 → 卡片列表 → 底部翻页器；
+// 两个动作各自走弹窗，列表本身保持紧凑：
+//   - 加号 → 导入弹窗（选 zip、多 manifest 时选入口）
+//   - 点卡片 → 该模型的「表情与动作」弹窗（描述供 momo 理解何时使用）
+//
 // zip 本体与纹理缩略图存 IndexedDB，元信息进 PersistedState；
 // 加载失败回退内置模型，不阻断聊天。
 
@@ -14,12 +19,18 @@ import {
   update,
 } from "../lib/store";
 import type { AvatarMeta, AvatarResources } from "../lib/types";
+import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
 import { deleteBlob, getBlob, putBlob } from "../lib/idb";
 import { checkManifest, listManifests } from "../live2d/avatarZip";
 import { getStage } from "../live2d/stage";
 import { useT } from "../i18n";
-import Select from "../ui/Select";
 import Button from "../ui/Button";
+import IconButton from "../ui/IconButton";
+import Modal from "../ui/Modal";
+import Pager from "../ui/Pager";
+import Select from "../ui/Select";
+import "../styles/persona.css";
+import "../styles/controls.css";
 
 const BUILTIN_NAME = "Hiyori";
 /** 内置模型的缩略图（静态资源直出）。 */
@@ -92,6 +103,24 @@ export default function AvatarPanel() {
     manifests: string[];
   } | null>(null);
   const [manifest, setManifest] = useState("");
+  // 两个弹窗：导入 / 表情与动作（后者记录目标模型 id）
+  const [importOpen, setImportOpen] = useState(false);
+  const [resId, setResId] = useState<string | null>(null);
+
+  // 列表检索 + 分页（与「偏好」同一套）
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
+
+  const hits = avatars.filter((a) => {
+    const q = query.trim().toLowerCase();
+    return !q || `${a.name} ${a.manifest}`.toLowerCase().includes(q);
+  });
+  const pg = clampPage(page, hits.length);
+  const slice = hits.slice(
+    pg.page * LIST_PAGE_SIZE,
+    (pg.page + 1) * LIST_PAGE_SIZE,
+  );
+  const resAvatar = resId ? (avatars.find((a) => a.id === resId) ?? null) : null;
 
   const activate = (id: string): void => {
     if (id === activeId) return;
@@ -99,23 +128,22 @@ export default function AvatarPanel() {
     reloadStage();
   };
 
-  // 旧数据懒回填：当前形象是导入模型且还没解析过 resources 时，
-  // 从 IndexedDB 的 zip 里读 manifest 补清单（desc 留空）。
-  useEffect(() => {
-    const active = getAvatars().find((a) => a.id === getAvatarId());
-    if (!active || active.builtin || active.resources) return;
-    let alive = true;
+  /** 旧数据懒回填：导入模型还没解析过 resources 时，从 IndexedDB 的 zip
+   * 里读 manifest 补清单（desc 留空）。当前形象与弹窗打开的那个都走这里。 */
+  const backfillResources = (id: string): void => {
+    const a = getAvatars().find((x) => x.id === id);
+    if (!a || a.builtin || a.resources) return;
     void (async () => {
-      const blob = await getBlob(active.id);
+      const blob = await getBlob(a.id);
       if (!blob) return;
       const zip = await JSZip.loadAsync(blob);
-      const check = await checkManifest(zip, active.manifest);
-      if (!alive || "error" in check) return;
+      const check = await checkManifest(zip, a.manifest);
+      if ("error" in check) return;
       update({
-        avatars: getAvatars().map((a) =>
-          a.id === active.id
+        avatars: getAvatars().map((x) =>
+          x.id === a.id
             ? {
-                ...a,
+                ...x,
                 resources: {
                   expressions: check.resources.expressions.map((name) => ({
                     name,
@@ -127,14 +155,21 @@ export default function AvatarPanel() {
                   })),
                 },
               }
-            : a,
+            : x,
         ),
       });
     })();
-    return () => {
-      alive = false;
-    };
+  };
+
+  useEffect(() => {
+    backfillResources(activeId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId]);
+
+  useEffect(() => {
+    if (resId) backfillResources(resId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resId]);
 
   const doImport = async (
     zip: JSZip,
@@ -159,7 +194,7 @@ export default function AvatarPanel() {
       manifest: manifestPath,
       size: file.size,
       addedAt: new Date().toISOString(),
-      // 导入即解析资源清单；desc 留空待用户在下方语义层编辑。
+      // 导入即解析资源清单；desc 留空待用户在「表情与动作」弹窗里编辑。
       resources: {
         expressions: check.resources.expressions.map((name) => ({
           name,
@@ -185,6 +220,7 @@ export default function AvatarPanel() {
     });
     setPending(null);
     setError(null);
+    setImportOpen(false);
     reloadStage();
   };
 
@@ -227,33 +263,18 @@ export default function AvatarPanel() {
     void deleteBlob(id);
     void deleteBlob(`${id}:thumb`);
     if (activeId === id) reloadStage();
+    if (resId === id) setResId(null);
   };
 
-  const cardOps = (a: AvatarMeta): React.ReactNode => (
-    <span className="avatar-ops">
-      {activeId !== a.id && (
-        <Button variant="ghost" onClick={() => activate(a.id)}>
-          {t("avatar.use")}
-        </Button>
-      )}
-      {!a.builtin && (
-        <Button variant="ghost" danger onClick={() => remove(a.id)}>
-          {t("avatar.delete")}
-        </Button>
-      )}
-    </span>
-  );
-
-  const active = avatars.find((a) => a.id === activeId);
-
   const setDesc = (
+    avatarId: string,
     kind: keyof AvatarResources,
     name: string,
     desc: string,
   ): void => {
     update({
       avatars: getAvatars().map((a) =>
-        a.id === activeId && a.resources
+        a.id === avatarId && a.resources
           ? {
               ...a,
               resources: {
@@ -269,10 +290,11 @@ export default function AvatarPanel() {
   };
 
   const resGroup = (
+    avatar: AvatarMeta,
     kind: keyof AvatarResources,
     label: string,
   ): React.ReactNode => {
-    const items = active?.resources?.[kind] ?? [];
+    const items = avatar.resources?.[kind] ?? [];
     if (!items.length) return null;
     return (
       <div className="res-group">
@@ -284,7 +306,7 @@ export default function AvatarPanel() {
               className="res-desc"
               value={r.desc}
               placeholder={t("avatar.descPh")}
-              onChange={(e) => setDesc(kind, r.name, e.target.value)}
+              onChange={(e) => setDesc(avatar.id, kind, r.name, e.target.value)}
             />
           </div>
         ))}
@@ -292,63 +314,117 @@ export default function AvatarPanel() {
     );
   };
 
-  const hasRes =
-    !!active?.resources &&
-    (active.resources.expressions.length > 0 ||
-      active.resources.motions.length > 0);
+  const hasRes = (avatar: AvatarMeta): boolean =>
+    !!avatar.resources &&
+    (avatar.resources.expressions.length > 0 ||
+      avatar.resources.motions.length > 0);
+
+  const closeImport = (): void => {
+    setImportOpen(false);
+    setPending(null);
+    setError(null);
+  };
 
   return (
-    <div className="avatar-panel">
-      <div className="avatar-grid">
-        {/* 模型清单（内置条目也在 avatars[] 里，位于首位） */}
-        {avatars.map((a) => (
-          <div
-            key={a.id}
-            className={`avatar-card${activeId === a.id ? " active" : ""}`}
-          >
-            {a.builtin ? (
-              <img
-                className="avatar-thumb"
-                src={BUILTIN_THUMB}
-                alt=""
-                draggable={false}
-              />
-            ) : (
-              <AvatarThumb meta={a} />
-            )}
-            <div className="avatar-info">
-              <div className="avatar-title">
-                <span className="avatar-name">{a.name || BUILTIN_NAME}</span>
-                {a.builtin && (
-                  <span className="badge">{t("avatar.builtin")}</span>
-                )}
-              </div>
-              <div className="avatar-meta muted">
-                {a.manifest}
-                {a.builtin ? "" : ` · ${fmtSize(a.size)}`}
-              </div>
-            </div>
-            {activeId === a.id ? (
-              <span className="badge badge-active">{t("avatar.inUse")}</span>
-            ) : (
-              cardOps(a)
-            )}
-          </div>
-        ))}
-
-        {/* 导入入口卡片 */}
-        <Button
-          className="avatar-card avatar-add"
-          disabled={busy}
-          onClick={() => fileRef.current?.click()}
-        >
-          <span className="avatar-add-plus">＋</span>
-          <span className="avatar-add-label">
-            {busy ? t("avatar.importing") : t("avatar.importBtn")}
-          </span>
-        </Button>
+    <>
+      <div className="mem-toolbar">
+        <input
+          className="mem-search"
+          placeholder={t("avatar.searchPh")}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(0);
+          }}
+        />
+        <IconButton
+          icon="plus"
+          label={t("avatar.importLabel")}
+          onClick={() => {
+            setError(null);
+            setPending(null);
+            setImportOpen(true);
+          }}
+        />
       </div>
 
+      <div className="field col-grow">
+        {slice.map((a) => (
+          <div
+            key={a.id}
+            className={`list-item list-open${
+              a.id === activeId ? " avatar-current" : ""
+            }`}
+            onClick={() => setResId(a.id)}
+          >
+            <div className="list-content avatar-row">
+              {a.builtin ? (
+                <img
+                  className="avatar-thumb"
+                  src={BUILTIN_THUMB}
+                  alt=""
+                  draggable={false}
+                />
+              ) : (
+                <AvatarThumb meta={a} />
+              )}
+              <div className="avatar-info">
+                <div className="avatar-title">
+                  <span className="avatar-name">{a.name || BUILTIN_NAME}</span>
+                  {a.builtin && (
+                    <span className="badge">{t("avatar.builtin")}</span>
+                  )}
+                  {a.id === activeId && (
+                    <span className="badge badge-active">
+                      {t("avatar.inUse")}
+                    </span>
+                  )}
+                </div>
+                <div className="avatar-meta muted">
+                  {a.manifest}
+                  {a.builtin ? "" : ` · ${fmtSize(a.size)}`}
+                </div>
+              </div>
+            </div>
+            <div className="list-ops">
+              {a.id !== activeId && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    activate(a.id);
+                  }}
+                >
+                  {t("avatar.use")}
+                </Button>
+              )}
+              {!a.builtin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  danger
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    remove(a.id);
+                  }}
+                >
+                  {t("avatar.delete")}
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+        {hits.length === 0 && <p className="muted">{t("avatar.empty")}</p>}
+      </div>
+
+      <div className="col-foot">
+        <div className="mem-foot">
+          <Pager page={pg.page} pages={pg.pages} onChange={setPage} />
+        </div>
+      </div>
+
+      {/* 导入走弹窗：加号不再是列表里的一格 */}
       <input
         ref={fileRef}
         type="file"
@@ -359,49 +435,72 @@ export default function AvatarPanel() {
           e.target.value = "";
         }}
       />
-
-      {/* 多 manifest 选择 */}
-      {pending && (
-        <div className="avatar-pending panel">
-          <span className="muted">{t("avatar.pickManifest")}</span>
-          <Select
-            value={manifest}
-            options={pending.manifests.map((m) => ({ value: m, label: m }))}
-            onChange={setManifest}
-          />
-          <Button
-            disabled={busy}
-            onClick={() => {
-              setBusy(true);
-              void doImport(pending.zip, pending.file, manifest).finally(() =>
-                setBusy(false),
-              );
-            }}
-          >
-            {t("avatar.confirmImport")}
-          </Button>
-        </div>
+      {importOpen && (
+        <Modal onClose={closeImport}>
+          <div className="modal-meta muted">{t("avatar.importBtn")}</div>
+          <p className="muted avatar-hint">{t("avatar.importHint")}</p>
+          {pending && (
+            <div className="avatar-pending">
+              <span className="muted">{t("avatar.pickManifest")}</span>
+              <Select
+                value={manifest}
+                options={pending.manifests.map((m) => ({
+                  value: m,
+                  label: m,
+                }))}
+                onChange={setManifest}
+              />
+              <Button
+                disabled={busy}
+                onClick={() => {
+                  setBusy(true);
+                  void doImport(pending.zip, pending.file, manifest).finally(
+                    () => setBusy(false),
+                  );
+                }}
+              >
+                {t("avatar.confirmImport")}
+              </Button>
+            </div>
+          )}
+          {error && <p className="avatar-error">{error}</p>}
+          <div className="modal-foot">
+            <Button
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+            >
+              {busy ? t("avatar.importing") : t("avatar.pickZip")}
+            </Button>
+            <Button variant="ghost" onClick={closeImport}>
+              {t("common.cancel")}
+            </Button>
+          </div>
+        </Modal>
       )}
 
-      <p className="muted avatar-hint">{t("avatar.importHint")}</p>
-      {error && <p className="avatar-error">{error}</p>}
-
-      {/* 语义层：当前形象的表情/动作清单，desc 供 momo 理解何时使用 */}
-      {active && (
-        <div className="panel avatar-res">
-          <h3 className="opt-group">{t("avatar.resources")}</h3>
+      {/* 表情与动作：点卡片才弹，描述写回该模型 */}
+      {resAvatar && (
+        <Modal
+          className="avatar-res-modal"
+          onClose={() => setResId(null)}
+        >
+          <div className="modal-meta muted">
+            {t("avatar.resources")} · {resAvatar.name || BUILTIN_NAME}
+          </div>
           <p className="muted avatar-hint">{t("avatar.resHint")}</p>
-          {hasRes ? (
-            /* 清单可能很长（每个动作一行）：限高内滚，别把同栏的「偏好」拉出一大片留白 */
+          {hasRes(resAvatar) ? (
             <div className="res-scroll">
-              {resGroup("expressions", t("avatar.expList"))}
-              {resGroup("motions", t("avatar.motionList"))}
+              {resGroup(resAvatar, "expressions", t("avatar.expList"))}
+              {resGroup(resAvatar, "motions", t("avatar.motionList"))}
             </div>
           ) : (
             <p className="muted">{t("avatar.resEmpty")}</p>
           )}
-        </div>
+          <div className="modal-foot">
+            <Button onClick={() => setResId(null)}>{t("common.close")}</Button>
+          </div>
+        </Modal>
       )}
-    </div>
+    </>
   );
 }
