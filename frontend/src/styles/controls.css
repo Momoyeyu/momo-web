@@ -434,7 +434,9 @@
 .list-body {
   display: flex;
   flex-direction: column;
-  min-height: 234px;
+  /* 按一页 5 条预留高度：5 × (卡片 70 + 间距 8) = 390。
+     配套常量见 lib/paging.ts 的 CARD_PAGE_SIZE —— 改一处必须改另一处。 */
+  min-height: 390px;
 }
 
 /* 编辑态回到纵向：输入框在上、保存/取消在下 */

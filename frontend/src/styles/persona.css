@@ -7,7 +7,10 @@
   gap: 20px;
 }
 
-.persona-section {
+/* 左 Live2D 与右 MCP 两个面板共用同一套纵向版式：
+   标题行 / 工具条 / 列表 / 翻页器 之间的间距一致，两栏才会真正对齐。 */
+.persona-section,
+.ext-panel {
   display: flex;
   flex-direction: column;
   gap: 12px;
