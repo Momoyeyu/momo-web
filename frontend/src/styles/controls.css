@@ -442,8 +442,7 @@
   white-space: nowrap;
 }
 
-/* 右侧操作列：纯图标，与正文垂直居中。
-   图标按钮在这里收小一档（34 → 28），与图钉等自带样式的操作项同尺寸。 */
+/* 右侧操作列：纯图标，与正文垂直居中。 */
 .list-ops {
   flex: none;
   display: flex;
@@ -451,15 +450,26 @@
   gap: 4px;
 }
 
-.list-ops .icon-btn,
-.list-ops .mem-pinicon {
+/* 行内图标尺寸（对应 IconButton 的 size="sm"）：显式声明，
+   不再靠「谁在里面」的祖先选择器限定 —— 换一处容器就漏一次。 */
+.icon-btn-sm {
   width: 28px;
   height: 28px;
   padding: 4px;
 }
 
+/* 图钉等自带样式的操作项，在操作列里对齐图标尺寸 */
 .list-ops .mem-pinicon {
+  width: 28px;
+  height: 28px;
+  padding: 4px;
   margin-left: 0;
+}
+
+/* 已采用/已开启：常驻显示，只换外观（用「消失」表达会让同列后面的按钮位移） */
+.icon-btn.on {
+  color: var(--accent);
+  border-color: var(--line-strong);
 }
 
 .list-edit textarea {

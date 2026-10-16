@@ -51,6 +51,7 @@ export default function EditableItem({
             {actions}
             <IconButton
               icon="edit"
+              size="sm"
               label={t("common.edit")}
               tip={t("common.edit")}
               onClick={(e) => {
@@ -61,6 +62,7 @@ export default function EditableItem({
             {onDelete && (
               <IconButton
                 icon="trash"
+                size="sm"
                 danger
                 label={t("common.del")}
                 tip={t("common.del")}

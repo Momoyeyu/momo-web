@@ -37,6 +37,7 @@ import Modal from "../ui/Modal";
 import Slider from "../ui/Slider";
 import Switch from "../ui/Switch";
 import Button from "../ui/Button";
+import IconButton from "../ui/IconButton";
 import DialogBox from "../components/DialogBox";
 import Pager from "../ui/Pager";
 import Select from "../ui/Select";
@@ -242,14 +243,14 @@ function KvEditor({
             placeholder={t("settings.extKvVal")}
             onChange={(e) => setPair(i, k, e.target.value)}
           />
-          <Button
-            variant="ghost"
-            size="sm"
-            danger
-            onClick={() => onChange(pairs.filter((_, j) => j !== i))}
-          >
-            {t("common.del")}
-          </Button>
+<IconButton
+              icon="trash"
+              size="sm"
+              danger
+              label={t("common.del")}
+              tip={t("common.del")}
+              onClick={() => onChange(pairs.filter((_, j) => j !== i))}
+            />
         </div>
       ))}
       <Button
@@ -964,25 +965,25 @@ export default function Settings() {
                           }
                         />
                         {extDot(i, ext)}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setExtEditing(i)}
-                        >
-                          {t("common.edit")}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          danger
-                          onClick={() =>
-                            patchExtensions(
-                              settings.extensions.filter((_, j) => j !== i),
-                            )
-                          }
-                        >
-                          {t("common.del")}
-                        </Button>
+<IconButton
+                            icon="edit"
+                            size="sm"
+                            label={t("common.edit")}
+                            tip={t("common.edit")}
+                            onClick={() => setExtEditing(i)}
+                          />
+                          <IconButton
+                            icon="trash"
+                            size="sm"
+                            danger
+                            label={t("common.del")}
+                            tip={t("common.del")}
+                            onClick={() =>
+                              patchExtensions(
+                                settings.extensions.filter((_, j) => j !== i),
+                              )
+                            }
+                          />
                       </div>
                     ))}
                   </div>

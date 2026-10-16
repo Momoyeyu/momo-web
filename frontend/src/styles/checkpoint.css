@@ -165,8 +165,8 @@
   position: absolute;
   right: 6px;
   bottom: 6px;
-  padding: 0 7px;
-  font-size: 11px;
+  /* 尺寸由 .icon-btn-sm 决定。原来这里的 padding/font-size 是死声明：
+     persona.css 的 button.small 特异性更高（0,1,1 > 0,1,0）一直覆盖着它。 */
   opacity: 0;
 }
 

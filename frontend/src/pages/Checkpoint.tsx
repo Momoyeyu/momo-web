@@ -38,6 +38,7 @@ import {
 } from "../lib/checkpointGrid";
 import { useT, currentLang } from "../i18n";
 import Button from "../ui/Button";
+import IconButton from "../ui/IconButton";
 import Pager from "../ui/Pager";
 import PageHeader from "../ui/PageHeader";
 import "../styles/checkpoint.css";
@@ -226,19 +227,19 @@ export default function Checkpoint() {
                   onClick={() => openCell(c)}
                 >
                   {cardBody(c.save, slotNo(c.slot))}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    danger
-                    className="slot-del"
-                    disabled={busy || saveBlocked}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (c.save) void remove(c.save);
-                    }}
-                  >
-                    {t("common.del")}
-                  </Button>
+<IconButton
+                      icon="trash"
+                      size="sm"
+                      danger
+                      className="slot-del"
+                      label={t("common.del")}
+                      tip={t("common.del")}
+                      disabled={busy || saveBlocked}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (c.save) void remove(c.save);
+                      }}
+                    />
                 </div>
               ) : (
                 <div

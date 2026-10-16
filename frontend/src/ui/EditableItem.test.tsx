@@ -32,10 +32,10 @@ describe("EditableItem：正文左 / 图标操作列右", () => {
     expect(html.indexOf("list-ops")).toBeGreaterThan(html.indexOf("list-main"));
     // 编辑/删除已是纯图标按钮（靠 aria-label + data-tip 而非可见文字）
     expect(html).toMatch(
-      /<button[^>]*class="icon-btn tip tip-r"[^>]*aria-label="编辑"/,
+      /<button[^>]*class="icon-btn icon-btn-sm tip tip-r"[^>]*aria-label="编辑"/,
     );
     expect(html).toMatch(
-      /<button[^>]*class="icon-btn danger tip tip-r"[^>]*aria-label="删除"/,
+      /<button[^>]*class="icon-btn icon-btn-sm danger tip tip-r"[^>]*aria-label="删除"/,
     );
     // actions（图钉）排在编辑之前，同一列
     expect(html.indexOf("mem-pinicon")).toBeLessThan(html.indexOf("aria-label=\"编辑\""));

@@ -389,30 +389,30 @@ export default function AvatarPanel() {
               </div>
             </div>
             <div className="list-ops">
-              {a.id !== activeId && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    activate(a.id);
-                  }}
-                >
-                  {t("avatar.use")}
-                </Button>
-              )}
+{/* 「使用」常驻并按激活态点亮：按钮消失会让后面的删除钮左移 */}
+              <IconButton
+                icon="check"
+                size="sm"
+                label={t("avatar.use")}
+                tip={t("avatar.use")}
+                active={a.id === activeId}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  activate(a.id);
+                }}
+              />
               {!a.builtin && (
-                <Button
-                  variant="ghost"
+                <IconButton
+                  icon="trash"
                   size="sm"
                   danger
+                  label={t("avatar.delete")}
+                  tip={t("avatar.delete")}
                   onClick={(e) => {
                     e.stopPropagation();
                     remove(a.id);
                   }}
-                >
-                  {t("avatar.delete")}
-                </Button>
+                />
               )}
             </div>
           </div>
