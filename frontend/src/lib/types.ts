@@ -31,6 +31,15 @@ export interface EmbeddingConfig {
 }
 
 /** 界面语言（i18n）；新增语言同时在 i18n/ 注册字典。 */
+// 与后端契约同形的类型由 OpenAPI 生成（api/types.ts），这里只转出 ——
+// 页面继续从 lib/types 取类型，不必关心它们从哪来。
+export type { Memory } from "../api/types";
+export type {
+  CheckpointDetail as CheckpointSave,
+  CheckpointMeta,
+  StoredMessage as CheckpointMessage,
+} from "../api/types";
+
 export type Lang = "zh" | "ja" | "en";
 
 /** 通用设置（语言等，与具体服务无关）。 */
@@ -88,13 +97,6 @@ export interface Settings {
 }
 
 /** 记忆条目（backend /api/memories 返回；pinned=true 即初始记忆 pin）。 */
-export interface Memory {
-  id: string;
-  content: string;
-  createdAt: string;
-  pinned: boolean;
-}
-
 /** Live2D 资源语义层条目：资源名 + 可编辑的含义描述（写给 LLM 看）。 */
 export interface AvatarResource {
   /** 表情 = FileReferences.Expressions[].Name；动作 = "组名/序号"。 */
@@ -138,31 +140,8 @@ export interface ChatMessage {
 export type ChatStatus = "idle" | "listening" | "thinking" | "speaking";
 
 /** 存档里的单条消息（backend history 快照；无前端 id）。 */
-export interface CheckpointMessage {
-  role: "user" | "assistant";
-  text: string;
-  at: string;
-}
-
 /** 存档槽列表项（GET /api/checkpoints；preview = 末条消息截断）。 */
-export interface CheckpointMeta {
-  id: string;
-  title: string;
-  /** 自动存档槽：load 前 backend 自动写入，不占手动槽位。 */
-  auto: boolean;
-  /** 手动槽位号 1–120（auto 槽为 null）。 */
-  slot: number | null;
-  createdAt: string;
-  updatedAt: string;
-  preview: string;
-}
-
 /** 存档全文（GET /api/checkpoints/{id} 与 load 返回）。 */
-export interface CheckpointSave extends CheckpointMeta {
-  summary: string;
-  messages: CheckpointMessage[];
-}
-
 /** /api/state 持久化载荷（backend momo.yaml ↔ localStorage 缓存共用 schema）。
  *  初始记忆（pin）与会话历史在 momo.db，不在此 schema。 */
 export interface PersistedState {

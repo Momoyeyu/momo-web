@@ -2,6 +2,7 @@
 // 保存 = 快照 backend 当前会话；读取 = 存档覆盖当前会话（返回全文供引擎灌入）。
 
 import { apiFetch, apiJson, jsonInit } from "./http";
+import type { CheckpointCreated, LiveTranscript } from "../api/types";
 import type {
   CheckpointMessage,
   CheckpointMeta,
@@ -15,10 +16,7 @@ export function listCheckpoints(): Promise<CheckpointMeta[]> {
 }
 
 /** 当前 live 会话全文：启动时恢复 backlog/字幕（backend momo.db 权威）。 */
-export function liveTranscript(): Promise<{
-  summary: string;
-  messages: CheckpointMessage[];
-}> {
+export function liveTranscript(): Promise<LiveTranscript> {
   return apiJson<{ summary: string; messages: CheckpointMessage[] }>(
     `${API}/live`,
   );
@@ -28,7 +26,7 @@ export function liveTranscript(): Promise<{
 export async function createCheckpoint(
   title?: string,
   slot?: number,
-): Promise<{ id: string; slot: number }> {
+): Promise<CheckpointCreated> {
   return apiJson<{ id: string; slot: number }>(
     API,
     jsonInit("POST", { title, slot }),

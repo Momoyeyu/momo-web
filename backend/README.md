@@ -1,6 +1,16 @@
 # momo-web backend
 
-momo web 版的 Python FastAPI 后端（契约见 `docs/backend-api.md`，将来移植 Rust，模块边界保持清晰直白）。
+momo web 版的 Python FastAPI 后端（将来移植 Rust，模块边界保持清晰直白）。
+
+接口契约**由代码生成，不要手写文档**：
+
+- 人看：启动后访问 `/docs`（Swagger UI）或 `/redoc`
+- 机器用：`openapi.json` 提交进仓库（协作者可见）。改了接口就重新导出：
+
+      .venv/bin/python scripts/export_openapi.py
+
+  `tests/test_openapi.py` 会校验它与代码一致 —— 忘了重新导出就会红
+- 前端消费：`cd frontend && pnpm gen:api` 生成 `src/api/schema.d.ts`
 
 ## 运行
 

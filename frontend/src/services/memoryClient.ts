@@ -2,6 +2,7 @@
 
 import { apiFetch, apiJson, jsonInit } from "./http";
 import type { Memory } from "../lib/types";
+import type { MemoryCreated } from "../api/types";
 
 const API = "/api/memories";
 
@@ -14,7 +15,7 @@ export async function addMemory(
   content: string,
   pinned = false,
 ): Promise<string> {
-  const res = await apiJson<{ id: string }>(
+  const res = await apiJson<MemoryCreated>(
     API,
     jsonInit("POST", { content, pinned }),
   );
