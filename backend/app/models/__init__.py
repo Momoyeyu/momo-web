@@ -76,16 +76,6 @@ class Settings(TypedDict):
     extensions: list[Extension]
 
 
-class Persona(TypedDict):
-    """人设卡。identity/personality 允许为空串——空即回落到该对话语言的出厂文案。"""
-
-    name: str
-    identity: str
-    age: int
-    personality: str
-    preferences: list[str]
-
-
 class Resource(TypedDict):
     """形象的一个表情或动作；desc 是给模型看的语义描述。"""
 
@@ -112,13 +102,15 @@ class Avatar(TypedDict):
 class State(TypedDict):
     """归一化后的完整配置（`store.normalize_state` 的产物）。
 
+    **不含人设**：名称/年龄/身份/性格写死在 prompt.PERSONA，用户改不到
+    （避免用户在设置里乱玩人设），改人设＝改那个常量。
+
     归一化保证这些键都存在，因此内部消费方无需防御式下钻。
     注意：这是**读视图**——momo.yaml 里 schema 外的键会原样透传（PUT 时原样带回），
     所以实际 dict 可能比这里多键。
     """
 
     settings: Settings
-    persona: Persona
     avatars: list[Avatar]
     avatarId: str
 

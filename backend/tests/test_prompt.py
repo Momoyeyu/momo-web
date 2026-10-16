@@ -15,15 +15,19 @@ _PINS = ["用户的名称是夜羽", "夜羽是我的创造者"]
 
 
 def _state(lang: str, **over):
+    """构造 state。**刻意塞一份假人设**：人设写死在 prompt.PERSONA，
+
+    配置里的值绝不该被读取 —— 于是每个 prompt 断言都在顺带验证这一点。
+    """
     return store.normalize_state(
         {
             "settings": {"general": {"lang": lang}},
             "persona": {
-                "name": "momo",
-                "identity": "AI",
-                "age": 16,
-                "personality": "乖巧听话",
-                "preferences": ["喜欢甜食", "讨厌吵闹"],
+                "name": "配置里的名字",
+                "identity": "配置里的身份",
+                "age": 99,
+                "personality": "配置里的性格",
+                "preferences": ["配置里的偏好"],
             },
             **over,
         }
@@ -73,16 +77,18 @@ def test_fields_and_pins_are_injected_verbatim():
     # 模版是英文
     assert "# Persona Configuration" in p
     assert "## Your basic information" in p
-    assert "## Your preferences" in p
     assert "## Your initial memories" in p
     assert "# Memory Configuration" in p
     # 注入的是中文内容（原样插入，模版不参与翻译）
+    # 人设来自写死的 PERSONA，而不是上面那份假配置
     assert "- Your name is momo" in p
-    assert "- Your identity is AI" in p
+    assert "- Your identity is 人工智能" in p
     assert "- You are 16 years old" in p
     assert "- Your personality is 乖巧听话" in p
-    assert "- 喜欢甜食" in p
-    assert "- 讨厌吵闹" in p
+    assert "配置里的" not in p
+    # 偏好功能已删除：整段（含头）都不该出现
+    assert "## Your preferences" not in p
+    assert "- 配置里的偏好" not in p
     assert "- 用户的名称是夜羽" in p
     assert "- 夜羽是我的创造者" in p
     # 使用策略下沉到 tools description；工具清单与策略文本都不写进 prompt
@@ -122,71 +128,6 @@ def test_unknown_lang_falls_back_zh():
 
 
 # ---------------- 出厂回落（内容，按语言取） ----------------
-
-
-def test_empty_persona_falls_back_to_defaults():
-    """用户在设置页清空人设字段 → prompt 装配出厂默认值。"""
-    p = _prompt(
-        "zh",
-        persona={
-            "name": "",
-            "identity": "",
-            "age": None,
-            "personality": "",
-            "preferences": [],
-        },
-    )
-    assert "- Your name is momo" in p
-    assert "- Your identity is 由夜羽开发的AI" in p
-    assert "- You are 16 years old" in p
-    assert "- Your personality is 乖巧听话" in p
-    # 偏好是列表型配置：空 = 整段不注入（含头），不回落默认值。
-    assert "## Your preferences" not in p
-
-
-_EMPTY_PERSONA = {
-    "name": "",
-    "identity": "",
-    "age": None,
-    "personality": "",
-    "preferences": [],
-}
-
-
-def test_content_defaults_follow_language_but_template_does_not():
-    """模版恒为英文，只有**内容**（身份/性格回落）随语言变。"""
-    ja = _prompt("ja", persona=dict(_EMPTY_PERSONA))
-    assert "- Your identity is 夜羽が開発したAI" in ja
-    assert "- Your personality is おとなしくて素直" in ja
-    assert "由夜羽开发的AI" not in ja
-
-    en = _prompt("en", persona=dict(_EMPTY_PERSONA))
-    assert "- Your identity is an AI assistant" in en
-    assert "- Your personality is sweet and obedient" in en
-
-    # 三语用的是同一套英文标签
-    for p in (ja, en):
-        assert "# Persona Configuration" in p
-        assert "## Your basic information" in p
-
-
-def test_content_defaults_follow_chat_lang_not_ui_lang():
-    """回落内容跟对话语言（chatLang），不跟界面语言（lang）。"""
-    p = _prompt(
-        "zh",
-        settings={"general": {"lang": "zh", "chatLang": "ja"}},
-        persona=dict(_EMPTY_PERSONA),
-    )
-    assert "- Your identity is 夜羽が開発したAI" in p
-    assert "由夜羽开发的AI" not in p
-
-
-def test_name_and_age_defaults_are_language_independent():
-    """name/age 与语言无关：三语都回落 momo / 16，且标签相同。"""
-    for lang in ("zh", "en", "ja"):
-        p = _prompt(lang, persona=dict(_EMPTY_PERSONA))
-        assert "- Your name is momo" in p
-        assert "- You are 16 years old" in p
 
 
 # ---------------- 行为配置（指令段） ----------------
@@ -253,3 +194,14 @@ def test_output_style_section_present_for_every_language():
         assert "## How you speak" in p
         assert "several separate outputs" in p
         assert "empty content" in p
+
+
+def test_persona_is_identical_across_languages():
+    """人设写死且与对话语言无关：三语的基本信息段完全相同。"""
+    infos = []
+    for lang in ("zh", "en", "ja"):
+        p = _prompt(lang)
+        block = p.split("## Your basic information")[1].split("##")[0]
+        infos.append(block)
+    assert infos[0] == infos[1] == infos[2]
+    assert "人工智能" in infos[0]

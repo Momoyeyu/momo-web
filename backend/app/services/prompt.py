@@ -14,11 +14,17 @@ from __future__ import annotations
 from typing import Any
 
 from ..models import State
-from ..core.state import DEFAULT_STATE
 from ..core.time import now_info
 
 _LANG_NAMES = {"zh": "中文", "en": "English", "ja": "日本語"}
-_DEFAULT_PERSONA: dict[str, Any] = DEFAULT_STATE["persona"]
+#: 出厂人设：**写死**。设置页没有对应入口，用户改不到 ——
+#: 要改人设就改这里（这是唯一入口）。
+PERSONA: dict[str, Any] = {
+    "name": "momo",
+    "age": 16,
+    "identity": "人工智能",
+    "personality": "乖巧听话",
+}
 
 # 段落顺序：人格配置（基本信息/偏好/基本设定）→ 记忆配置（仅初始记忆）
 # → 输出方式 → 行为配置（表情/动作）。{...} 由 builder 注入。
@@ -39,7 +45,6 @@ _T: dict[str, Any] = {
         "You are {age} years old",
         "Your personality is {personality}",
     ),
-    "prefs_head": "## Your preferences",
     "settings_head": "## Your basic settings",
     "lang_line": (
         "Your conversation language is {lang}; talk with the user in that "
@@ -72,14 +77,6 @@ _T: dict[str, Any] = {
         "Directives are never displayed or read aloud; names outside the "
         "lists are invalid. Use &lt; or &gt; for literal angle brackets in text."
     ),
-}
-
-#: 人设字段留空时的出厂回落。这是**内容**（会被人设段注入），不是模版措辞，
-#: 所以仍按对话语言取；与前端 persona.defaults.* 同一份文案。
-_DEFAULTS: dict[str, dict[str, str]] = {
-    "zh": {"identity": "由夜羽开发的AI", "personality": "乖巧听话"},
-    "en": {"identity": "an AI assistant", "personality": "sweet and obedient"},
-    "ja": {"identity": "夜羽が開発したAI", "personality": "おとなしくて素直"},
 }
 
 
@@ -135,21 +132,9 @@ def build_system_prompt(
     """
     lang = _lang_of(state)
     t = _T  # 模版只有一份（英文），不再按语言取
-    # 空字段回落出厂人设：用户在设置里清空=回到初始状态，
-    # prompt 侧始终装配默认值（与前端 placeholder 显示同一份文案）。
-    # identity/personality 留空时按当前对话语言取 _DEFAULTS（内容是文案，随语言变），
-    # 不把某一种语言写死；name/age 与语言无关，仍取 store 默认值。
-    persona = dict(state["persona"])
-    if not str(persona.get("name") or "").strip():
-        persona["name"] = _DEFAULT_PERSONA["name"]
-    for key in ("identity", "personality"):
-        if not str(persona.get(key) or "").strip():
-            persona[key] = _DEFAULTS[lang][key]
-    if not isinstance(persona.get("age"), (int, float)) or isinstance(
-        persona.get("age"), bool
-    ):
-        persona["age"] = _DEFAULT_PERSONA["age"]
-    # 偏好是列表型配置：空 = 无偏好，不回落默认；装配侧按条件注入（含头）。
+    # 人设写死（见 PERSONA）：不从配置读，用户也没有入口改。
+    persona = PERSONA
+    # 初始记忆（pins）由调用方注入（momo.db 里 pinned=1 的行）。
     pins = [
         p.strip() for p in (pins or []) if isinstance(p, str) and p.strip()
     ]
@@ -158,7 +143,7 @@ def build_system_prompt(
 
     sections: list[str] = []
 
-    # # 人格配置：基本信息 / 偏好 / 基本设定
+    # # 人格配置：基本信息 / 基本设定
     info = "\n".join(
         "- " + line.format(
             name=str(persona["name"]).strip(),
@@ -168,7 +153,6 @@ def build_system_prompt(
         )
         for line in t["info_lines"]
     )
-    prefs = [str(p).strip() for p in (persona.get("preferences") or []) if str(p).strip()]
     settings = "\n".join(
         "- " + line
         for line in (
@@ -181,10 +165,6 @@ def build_system_prompt(
         t["persona_head"] + "\n\n" + t["basic_head"] + "\n" + info,
         t["settings_head"] + "\n" + settings,
     ]
-    if prefs:
-        persona_blocks.insert(
-            1, t["prefs_head"] + "\n" + "\n".join(f"- {p}" for p in prefs)
-        )
     sections.append("\n\n".join(persona_blocks))
 
     # # 记忆配置：仅初始记忆；pins 为空时整块不出现。

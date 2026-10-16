@@ -86,15 +86,6 @@ DEFAULT_STATE: dict[str, Any] = {
         # MCP 拓展清单（{name,transport,enabled} + stdio{command,args,env} / http{endpoint,headers}）
         "extensions": [],
     },
-    # 与前端 DEFAULT_PERSONA 保持一致：identity/personality 留空，prompt 组装时
-    # 按对话语言回落到 prompt._T[lang] 的出厂文案；preferences 空 = 无偏好。
-    "persona": {
-        "name": "momo",
-        "identity": "",
-        "personality": "",
-        "age": 16,
-        "preferences": [],
-    },
     "avatars": [_BUILTIN_AVATAR],
     "avatarId": "builtin",
 }

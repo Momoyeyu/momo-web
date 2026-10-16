@@ -21,26 +21,28 @@ def test_write_then_read_normalized():
     # 缺失字段补默认值
     assert s["settings"]["general"]["dialogOpacity"] == 66
     assert s["settings"]["llm"] == {"url": "", "key": "", "model": ""}
-    assert s["persona"]["name"] == "momo"
+    # 人设不属于配置（写死在 prompt.PERSONA）
+    assert "persona" not in s
     # 未知字段透传
     assert s["custom"] == {"x": 1}
 
 
 def test_normalize_tolerates_junk():
-    s = store.normalize_state({"persona": None, "custom": "oops"})
-    assert s["persona"]["name"] == "momo"
+    s = store.normalize_state({"custom": "oops"})
     assert s["custom"] == "oops"  # 非 None 值原样透传（容错，不强行纠正类型）
 
 
-def test_default_persona_keeps_text_fields_empty():
-    """出厂人设不把某一种语言的文案写成配置数据：identity/personality 留空
-    （由 prompt 按语言回落），preferences 不种默认值（空 = 无偏好）。"""
-    p = store.normalize_state({})["persona"]
-    assert p["name"] == "momo"
-    assert p["age"] == 16
-    assert p["identity"] == ""
-    assert p["personality"] == ""
-    assert p["preferences"] == []
+def test_persona_is_hardcoded_not_configurable():
+    """人设写死在 prompt.PERSONA：不属于配置，用户也没有入口改。"""
+    assert "persona" not in store.normalize_state({})
+    from app.services import prompt
+
+    assert prompt.PERSONA == {
+        "name": "momo",
+        "age": 16,
+        "identity": "人工智能",
+        "personality": "乖巧听话",
+    }
 
 
 def test_put_state_roundtrip():
@@ -109,8 +111,7 @@ def test_fresh_install_ships_no_initial_preferences_or_memories():
     """
     from app.services import memory
 
-    st = store.load()
-    assert st["persona"]["preferences"] == []
+    assert "persona" not in store.load()  # 偏好功能已删除，人设也不再进配置
     assert memory.list_memories() == []
 
 
