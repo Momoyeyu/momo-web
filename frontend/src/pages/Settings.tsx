@@ -724,7 +724,6 @@ export default function Settings() {
 
   return (
     <div className="settings-page">
-      {/* 顶部 tab 条：独立全宽容器，页签均分铺满 */}
       <nav className="tabstrip">
         <div className="tabstrip-inner">
           {TABS.map((id) => (
@@ -738,8 +737,6 @@ export default function Settings() {
           ))}
         </div>
       </nav>
-
-      {/* 中部内容区 */}
       <div className="settings-scroll">
         <div className="settings-content">
           {tab === "memory" ? (
@@ -959,7 +956,6 @@ export default function Settings() {
                     <h3 className="opt-group">
                       {t("settings.groups.extensions")}
                     </h3>
-                    {/* 这段说明是「说明书」性质：收进问号浮窗，不占版面 */}
                     <Hint text={t("settings.extHint")} side="down" />
                   </div>
                   <div className="list-toolbar">

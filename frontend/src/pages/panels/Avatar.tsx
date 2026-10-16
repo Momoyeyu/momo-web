@@ -1,6 +1,6 @@
-// 形象面板（设置页「形象」tab 右栏）：Live2D 模型导入/切换/删除。
+// 形象面板（「拓展」tab 左栏）：Live2D 模型导入/切换/删除。
 //
-// 形态与左栏「偏好」一致：检索框 + 右侧加号 → 卡片列表 → 底部翻页器；
+// 形态与 MCP 面板同一套：检索框 + 右侧加号 → 卡片列表 → 底部翻页器；
 // 两个动作各自走弹窗，列表本身保持紧凑：
 //   - 加号 → 导入弹窗（选 zip、多 manifest 时选入口）
 //   - 点卡片 → 该模型的「表情与动作」弹窗（描述供 momo 理解何时使用）
@@ -109,7 +109,7 @@ export default function AvatarPanel() {
   /** 拖放区高亮（拖入中）。 */
   const [dragging, setDragging] = useState(false);
 
-  // 列表检索 + 分页（与「偏好」同一套）
+  // 列表检索 + 分页（与 MCP 面板同一套）
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
 

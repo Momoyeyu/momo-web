@@ -1,4 +1,4 @@
-// 对话语言解析：prompt 文案、出厂默认人设、TTS 合成语言共用这一个入口，
+// 对话语言解析：prompt 文案、对话语言、TTS 合成语言共用这一个入口，
 // 语义必须与后端 prompt._lang_of 保持一致。
 
 import { describe, expect, it } from "vitest";

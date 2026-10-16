@@ -422,15 +422,12 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  /* 等高：偏好（单行文字）与形象（缩略图两行）两类卡片对齐到同一高度，
-     左右两栏的行才能在水平方向对齐 */
+  /* 等高：不同卡片内容行数不同，统一高度后左右两栏的行才能对齐 */
   min-height: 70px;
 }
 
-/* 卡片列表容器：条目自带 margin-bottom，故这里不再加 gap（间距统一 8px）；
-   并**无论几条都按一页 3 条预留高度** —— 3 × (70 + 8) = 234，
-   两侧面板因此始终等高、翻页器也停在同一条线上。
-   与 lib/paging.ts 的 CARD_PAGE_SIZE 配套，改一处要同时改另一处。 */
+/* 卡片列表容器：条目自带 margin-bottom，故这里不再加 gap（间距统一 8px）。
+   无论实际几条都按一页预留满高度，两侧面板因此始终等高、翻页器也停在同一线上。 */
 .list-body {
   display: flex;
   flex-direction: column;

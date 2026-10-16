@@ -149,7 +149,6 @@ onClick={(e) => {
             void togglePin(m);
           }}
         >
-          {/* 图钉：pinned=实心金，unpinned=金色描边 */}
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M9 4h6l-1.2 6.2L17 13.4V15H7v-1.6l3.2-3.2L9 4z"

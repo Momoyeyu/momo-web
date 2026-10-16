@@ -1,7 +1,7 @@
 """配置服务：momo.yaml 的整体读写。
 
 分层约定：HTTP 层只与本层交互，不直接 import config/。
-YAML 读写与默认值归一化在 `app/config/state.py`。
+YAML 读写与默认值归一化在 `app/core/state.py`。
 
 这里暂时只是透传——留这一层是为了让「api → service → config」这条线
 无条件成立（可被 tests/test_layering.py 机械检查），也给将来的载荷校验/

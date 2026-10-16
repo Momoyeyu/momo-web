@@ -4,7 +4,7 @@
 调用方必须读注释才知道键名。集中到这里后：
 
 - 调用点自解释：`state["settings"]["llm"]["url"]` 无需注释；
-- 归一化边界（`store.normalize_state`）之后的字段存在性由类型承诺，
+- 归一化边界（`state.normalize_state`）之后的字段存在性由类型承诺，
   于是那层 `(state.get("settings") or {}).get(...) or {}` 的死防御可以删掉；
 - `Literal` 别名取代魔法字符串（角色、SSE 事件名、transport）。
 
@@ -100,9 +100,9 @@ class Avatar(TypedDict):
 
 
 class State(TypedDict):
-    """归一化后的完整配置（`store.normalize_state` 的产物）。
+    """归一化后的完整配置（`state.normalize_state` 的产物）。
 
-    **不含人设**：名称/年龄/身份/性格写死在 prompt.PERSONA，用户改不到
+    **不含人设**：名称/年龄/身份/性格写死在 resources/soul.md，用户改不到
     （避免用户在设置里乱玩人设），改人设＝改那个常量。
 
     归一化保证这些键都存在，因此内部消费方无需防御式下钻。

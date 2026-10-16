@@ -14,7 +14,7 @@ export default function DialogBox({
   status,
   children,
 }: {
-  /** 铭牌文案（人格名称）。 */
+  /** 铭牌文案（说话人显示名，见 backend/resources/soul.md）。 */
   name: string;
   /** 字幕内容：当前句 / 预览文本。 */
   text: ReactNode;

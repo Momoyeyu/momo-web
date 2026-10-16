@@ -25,7 +25,7 @@ export default function AddItemModal({
   /** 弹窗顶部的一行灰字标题。 */
   title: string;
   placeholder?: string;
-  /** 多行内容用 textarea（记忆），单行用 input（偏好）。 */
+  /** 多行内容用 textarea（记忆），单行用 input。 */
   multiline?: boolean;
   /** 输入框下方的附加选项（如记忆的 PIN 开关）。 */
   extra?: ReactNode;

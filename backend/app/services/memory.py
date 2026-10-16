@@ -1,19 +1,17 @@
-"""长期记忆服务：四个操作的编排。
+"""长期记忆服务：四个操作的编排，机制全部沉在别处。
 
-本文件上半部就是 `modules/memory.md` 的四张流程图，机制全部沉在别处：
-
-    add_memory     校验 → 去重 → 写入
+    add_memory      校验 → 去重 → 写入
     search_memories 候选集 → 语义召回（embedding 不可用则词面降级）
-    update_memory  校验 → 存在性 → 去重 → 改写内容（旧向量失效）
-    delete_memory  删行（连同向量行）
+    update_memory   校验 → 存在性 → 去重 → 改写内容（旧向量失效）
+    delete_memory   删行（连同向量行）
 
 机制层：
-    repository/memories.py   memories 表 SQL
-    repository/vectors.py    memory_vec（sqlite-vec）读写
-    client/embed.py          embedding 调用
-    common/text.py           归一化与 bigram Jaccard
+    models/memories.py   memories 表 SQL
+    models/vectors.py    memory_vec（sqlite-vec）读写
+    core/embed.py        embedding 调用
+    core/text.py         归一化与 bigram Jaccard
 
-能力层的 pin 拦截（工具不可改/删初始记忆）不在这里——见 service/capability.py。
+pin 拦截（工具不可改/删初始记忆）不在这里 —— 见 services/capability.py。
 """
 
 from __future__ import annotations

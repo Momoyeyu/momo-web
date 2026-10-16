@@ -1,5 +1,5 @@
 // localStorage 持久化 + useSyncExternalStore 订阅。
-// 所有跨页面共享状态（设置/人设/初始记忆 pin/形象清单）的唯一入口。
+// 所有跨页面共享状态（设置/形象清单）的唯一入口。
 // 普通记忆与对话历史归 backend 管，不进本 store。
 
 import type {

@@ -6,7 +6,7 @@
 sqlite-vec 扩展缺失、或维度与当前 embedding 不符 → 表不可用（ensure 返回 False），
 service 据此把召回降级为词面匹配；记忆的读写本身不依赖向量。
 
-事务约定同 repository/memories.py：读走 db.query()，写接收调用方的连接。
+事务约定同 models/memories.py：读走 db.query()，写接收调用方的连接。
 """
 
 from __future__ import annotations

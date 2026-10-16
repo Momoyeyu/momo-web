@@ -1,4 +1,4 @@
-"""拓展模块：把已启用 MCP server 的工具导入 ReAct 循环（modules/extend.md）。
+"""拓展模块：把已启用 MCP server 的工具导入 ReAct 循环（core/mcp.py）。
 
 - 设置页登记 {name, transport(stdio|http), enabled} + stdio 分支
   {command, args[], env{}} + http 分支 {endpoint, headers{}}

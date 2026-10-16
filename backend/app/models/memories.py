@@ -2,7 +2,7 @@
 
 只做 SQL：不含校验、去重策略、召回排序——那些是 service 层的规则。
 
-事务约定（与 config/db.py 的单连接 + BEGIN IMMEDIATE 配套）：
+事务约定（与 core/db.py 的单连接 + BEGIN IMMEDIATE 配套）：
 - 读：`all_rows` / `row_by_id` / `exists` 走 db.query()，不显式开事务；
 - 写：接收调用方的连接，由 service 用 `with db.tx() as conn:` 决定事务边界，
       这样「改内容 + 删旧向量」能落在同一个事务里。

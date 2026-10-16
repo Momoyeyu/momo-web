@@ -113,8 +113,6 @@ export async function* chat(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buf = "";
-
-  // 逐行解析：一行一个 data: 事件
   const lines: string[] = [];
   const handleLine = (line: string): ChatEvent | null => {
     const t = line.trim();

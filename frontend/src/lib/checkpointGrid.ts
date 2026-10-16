@@ -6,9 +6,9 @@ import type { CheckpointMode } from "../router";
 
 const GRID_COLS = 4;
 const GRID_ROWS = 3;
-export const PER_PAGE = GRID_COLS * GRID_ROWS; // 12
+export const PER_PAGE = GRID_COLS * GRID_ROWS;
 export const MAX_PAGES = 10;
-export const MAX_SLOT = PER_PAGE * MAX_PAGES; // 120
+export const MAX_SLOT = PER_PAGE * MAX_PAGES;
 
 /** 一格：槽位号 + 该槽存档（空槽为 null）。 */
 export interface SlotCell {

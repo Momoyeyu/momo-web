@@ -154,7 +154,7 @@
   flex: 1;
 }
 
-/* 模型配置页内分块标题（LLM/ASR/TTS/形象）。 */
+/* 模型配置页内分块标题（LLM/ASR/TTS）。 */
 .opt-group {
   margin: 22px 4px 4px;
   font-size: 12px;
@@ -167,7 +167,7 @@
   margin-top: 4px;
 }
 
-/* --- 形象（Live2D 模型管理）：与「偏好」同构的卡片列表 --- */
+/* --- Live2D 模型管理：与 MCP 面板同构的卡片列表 --- */
 
 /* 卡片正文：缩略图 + 名称/文件名两行（.list-content 自带的单行截断不适用此行）。 */
 .avatar-row {
@@ -390,7 +390,6 @@
   pointer-events: none;
 }
 
-/* --- 人格/记忆面板复用的双栏表单 --- */
 
 /* 表单项统一走 controls.css 的 .opt-row / .opt-label（ui/FieldRow），
    不再有「标签在上」的 .field 竖排形态。 */

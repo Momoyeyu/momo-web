@@ -210,7 +210,7 @@ export class Live2DStage {
     core.setParameterValueById("ParamMouthOpenY", clamped);
   }
 
-  /** 表情资源名清单（settings.expressions[].Name；无表情文件 → 空集）。 */
+  /** 表情资源名清单（AvatarMeta.resources；无表情文件 → 空集）。 */
   private expressionNames(): Set<string> {
     const names = new Set<string>();
     const list = this.model?.internalModel?.settings?.expressions;
@@ -296,7 +296,7 @@ export class Live2DStage {
 
 let stage: Live2DStage | null = null;
 
-/** 全局舞台单例（Title 与 Chat 共享同一形象）。 */
+/** 全局舞台单例。标题页用不透明底色盖住画布，因此立绘实际只在对话页可见。 */
 export function getStage(): Live2DStage {
   stage ??= new Live2DStage();
   return stage;

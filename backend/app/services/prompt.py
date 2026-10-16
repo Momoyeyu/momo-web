@@ -133,7 +133,7 @@ def build_system_prompt(
 ) -> str:
     """按契约模板组装 system prompt；初始记忆/表情/动作段按条件注入。
 
-    state：必须是 store.normalize_state() 的产物——字段存在性由该边界保证，
+    state：必须是 state.normalize_state() 的产物——字段存在性由该边界保证，
     本函数因此直接下标访问，不再做防御式下钻。
     pins：初始记忆文本列表（momo.db memories.pinned=1；由调用方注入，
     state 里已不含 pin 数据）。

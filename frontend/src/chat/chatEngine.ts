@@ -107,7 +107,7 @@ interface Turn {
 const INTERRUPT_DEBOUNCE_MS = 300;
 const DISPLAY_TICK_MS = 40;
 
-/** 句事件里的指令 → 展示层用的 PendingDir；清单外的静默丢弃（action.md）。 */
+/** 句事件里的指令 → 展示层用的 PendingDir；清单外的静默丢弃。 */
 function filterDirs(
   dirs: SentenceDir[],
   res: Parameters<typeof dirAllowed>[2],
@@ -482,7 +482,7 @@ export class ChatEngine {
   }
 
   private async runTurn(turn: Turn, cfg: Settings, userText: string): Promise<void> {
-    // 清单校验（action.md）：指令值不在当前形象资源清单中 → 静默丢弃。
+    // 清单校验：指令值不在当前形象资源清单中 → 静默丢弃。
     // 回合开始取一次快照，与注入提示词的清单同源；清单缺失时不拦（stage 兜底）。
     const resources = getAvatars().find(
       (a) => a.id === getAvatarId(),

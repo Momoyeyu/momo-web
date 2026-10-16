@@ -1,13 +1,10 @@
 """一回合的编排：组装 → ReAct → 落账 → 切句推流。
 
-对应 `meta/loop.md` 的主流程图——`run_turn` 的每一行就是图上的一个节点，
-细节都在下方函数或别的层：
-
-    build_messages    节点 B：system prompt + 摘要 + 最近窗口 + 本回合输入
-    react             节点 R→D→E→CNT→H：流式 LLM 调用、工具回填、边到边切句推流，≤5 轮
+    build_messages    system prompt + 摘要 + 最近窗口 + 本回合输入
+    react             流式 LLM 调用、工具回填、边到边切句推流，≤5 轮
     checkpoint.*      user 落账 / assistant **逐句**落账（代际校验）
     compress.*        回合末按用量触发后台压缩（不阻塞推流）
-    core.sentences    节点 H：切句（唯一口径，前端不再切句）
+    core.sentences    切句（唯一口径，前端不再切句）
 """
 
 from __future__ import annotations
@@ -33,7 +30,7 @@ SUMMARY_PREFIX = "以下是本次对话此前部分的摘要，其后的最新�
 
 
 def run_turn(text: str) -> Iterator[TurnEvent]:
-    """一回合：yield 增量/错误事件（结束即返回）。流程见 meta/loop.md。"""
+    """一回合：yield 增量/错误事件（结束即返回）。流程见 services/turn.py。"""
     state = load_state()
     messages = build_messages(state, text)  # 节点 B
 

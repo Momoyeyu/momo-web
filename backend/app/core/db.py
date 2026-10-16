@@ -89,7 +89,7 @@ def conn() -> sqlite3.Connection:
                     c.enable_load_extension(True)
                     sqlite_vec.load(c)
                 except Exception:
-                    pass  # vec 不可用时 repository.vectors.ensure 会失败 → 词面召回
+                    pass  # vec 不可用时 models.vectors.ensure 会失败 → 词面召回
             c.executescript(_SCHEMA)
             _ensure_live(c)
             c.commit()

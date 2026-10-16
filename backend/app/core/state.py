@@ -107,7 +107,7 @@ def normalize_state(state: dict[str, Any] | None) -> State:
     """任意（可能残缺）state → 合并默认值后的完整 state。
 
     这是**形状保证边界**：返回值的字段必然齐全，因此下游消费方
-    （agent/loop、agent/compress、memory、agent/prompt）直接下标访问即可，
+    （services/turn、services/compress、memory、services/prompt）直接下标访问即可，
     不需要 `(state.get("settings") or {}).get(...) or {}` 那层防御。
     """
     merged = _merge(DEFAULT_STATE, state if isinstance(state, dict) else {})

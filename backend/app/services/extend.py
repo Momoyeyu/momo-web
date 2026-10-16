@@ -1,7 +1,7 @@
 """拓展服务：MCP server 的注册与连通性探测。
 
 分层约定：HTTP 层只与本层交互，不直接 import client/。
-真正的连接、工具适配与跨线程桥在 `app/client/mcp.py`。
+真正的连接、工具适配与跨线程桥在 `app/core/mcp.py`。
 """
 
 from __future__ import annotations
