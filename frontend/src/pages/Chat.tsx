@@ -165,6 +165,7 @@ export default function Chat() {
               className={micOn ? "mic-on" : undefined}
               onClick={toggleMic}
               disabled={!micAllowed}
+              aria-label={t("chat.mic")}
               title={
                 !micAllowed
                   ? t("chat.micNeedCfg")
