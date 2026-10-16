@@ -18,9 +18,7 @@ if TYPE_CHECKING:
 
 # 出厂默认：embedding 端点与模型（env 可覆盖）。放 core 层，
 # 这样 core 不反向依赖任何上层（models/services/api）。
-DEFAULT_EMBEDDING_URL = os.environ.get(
-    "MOMO_EMBEDDING_URL", "http://10.106.130.222:11434"
-).rstrip("/")
+DEFAULT_EMBEDDING_URL = os.environ.get("MOMO_EMBEDDING_URL", "").rstrip("/")
 DEFAULT_EMBEDDING_MODEL = os.environ.get("MOMO_EMBEDDING_MODEL", "bge-m3")
 
 # 数据目录（momo.db + momo.yaml）。env 可覆盖——用于测试隔离与多实例共存，
@@ -76,11 +74,14 @@ DEFAULT_STATE: dict[str, Any] = {
         "llm": {"url": "", "key": "", "model": ""},
         "asr": {"url": "", "key": ""},
         "tts": {"url": "", "key": "", "voice": ""},
-        # 语义检索端点（设置页「模型」tab 可改）；url 留空 = 只用词面召回
+        # 语义检索端点（设置页「模型」tab 可改）。
+        # url 留空 = 未配置语义检索，只用词面召回；env（MOMO_EMBEDDING_*）可覆盖。
+        # model 不预填：DEFAULT_EMBEDDING_MODEL 只作「填了 url 却没填 model」时的
+        # 内部兜底（见 core/embed.py），不作为出厂配置展示给用户。
         "embedding": {
             "url": DEFAULT_EMBEDDING_URL,
             "key": "",
-            "model": DEFAULT_EMBEDDING_MODEL,
+            "model": "",
         },
         # MCP 拓展清单（{name,transport,enabled} + stdio{command,args,env} / http{endpoint,headers}）
         "extensions": [],

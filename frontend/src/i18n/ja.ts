@@ -166,7 +166,7 @@ export const ja: Dict = {
     prefAdd: "追加",
     prefSearchPh: "嗜好を検索…",
     prefEmpty: "一致する嗜好がありません。",
-    preferencesPh: "例：いちごケーキが好き",
+    preferencesPh: "例：甘いものが好き",
     // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
     defaults: {
       identity: "夜羽が開発したAI",

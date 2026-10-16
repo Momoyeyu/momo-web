@@ -136,7 +136,7 @@ export interface PersonaCard {
   age: number;
   /** 性格描述（自由文本）。 */
   personality: string;
-  /** 偏好列表（如「喜欢草莓蛋糕」「讨厌苦的东西」）。 */
+  /** 偏好列表（用户自己添加，如「喜欢甜食」）。 */
   preferences: string[];
 }
 

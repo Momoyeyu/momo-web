@@ -2,7 +2,7 @@
 // 麦克风挂起/恢复语义、解析层资源清单过滤。
 // 外部依赖全部 mock：chatClient(SSE)、ttsClient、asrClient、capture、player、stage。
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../services/chatClient", () => ({
   chat: vi.fn(),
@@ -100,6 +100,19 @@ function makeEngine(): { eng: ChatEngine; done: ChatMessage[] } {
   });
   return { eng, done };
 }
+
+beforeEach(() => {
+  // 出厂配置不再预填任何服务地址（新用户 clone 后自己填），而引擎在 llm.url 为空
+  // 时会拒绝发回合。所以这里显式注入一份假的 —— 测试不该依赖「仓库预填了地址」。
+  update({
+    settings: {
+      ...getSettings(),
+      llm: { url: "http://llm.test", key: "", model: "test-model" },
+      asr: { url: "ws://asr.test/v1/listen", key: "" },
+      tts: { url: "http://tts.test", key: "", voice: "" },
+    },
+  });
+});
 
 afterEach(() => {
   vi.clearAllMocks();

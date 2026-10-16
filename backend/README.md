@@ -16,7 +16,7 @@ uv run uvicorn app.main:app --port 7821
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `MOMO_EMBEDDING_URL` | `http://10.106.130.222:11434` | OpenAI 兼容 embedding 服务（`POST {url}/v1/embeddings`） |
+| `MOMO_EMBEDDING_URL` | 空（仅词面检索） | OpenAI 兼容 embedding 服务（`POST {url}/v1/embeddings`） |
 | `MOMO_EMBEDDING_MODEL` | `bge-m3` | embedding 模型名 |
 
 LLM 配置不走 env，走 `state.settings.llm`（`{url}/v1/chat/completions`，key 空则不带 auth）。

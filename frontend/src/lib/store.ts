@@ -66,10 +66,13 @@ const DEFAULT_SETTINGS: Settings = {
     showStatus: true,
     voiceInput: true,
   },
-  llm: { url: "https://api.deepseek.com", key: "", model: "deepseek-chat" },
-  asr: { url: "ws://127.0.0.1:7810/v1/listen", key: "" },
-  tts: { url: "http://127.0.0.1:7811", key: "", voice: "" },
-  embedding: { url: "http://10.106.130.222:11434", key: "", model: "bge-m3" },
+  // 服务地址与模型一律留空：新用户按输入框里的灰色提示自己填。
+  // 这里曾经预填过 deepseek / 本机端口 / 某台内网 embedding 服务器的地址 ——
+  // 那些是开发者的环境，不该随仓库发给每个 clone 的人。
+  llm: { url: "", key: "", model: "" },
+  asr: { url: "", key: "" },
+  tts: { url: "", key: "", voice: "" },
+  embedding: { url: "", key: "", model: "" },
   extensions: [],
 };
 

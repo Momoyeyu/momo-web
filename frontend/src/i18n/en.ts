@@ -166,7 +166,7 @@ export const en: Dict = {
     prefAdd: "Add",
     prefSearchPh: "Filter preferences…",
     prefEmpty: "No matching preferences.",
-    preferencesPh: "e.g. likes strawberry cake",
+    preferencesPh: "e.g. likes sweets",
     // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
     defaults: {
       // 小写开头：同一份文案也塞进 "Your identity is {identity}" / "Your personality is {personality}"。

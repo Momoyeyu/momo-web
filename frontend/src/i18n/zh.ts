@@ -166,7 +166,7 @@ export const zh = {
     prefAdd: "添加",
     prefSearchPh: "检索偏好…",
     prefEmpty: "没有匹配的偏好。",
-    preferencesPh: "例如：喜欢草莓蛋糕",
+    preferencesPh: "例如：喜欢甜食",
     // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
     defaults: {
       identity: "由夜羽开发的AI",
