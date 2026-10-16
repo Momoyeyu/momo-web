@@ -74,12 +74,18 @@ const DEFAULT_SETTINGS: Settings = {
   extensions: [],
 };
 
+/**
+ * 出厂人设。identity/personality 留空：它们是「按对话语言取」的文案，由
+ * i18n 的 persona.defaults.*（placeholder）与 backend prompt 的 _T（注入回落）
+ * 各自解析，不把某一种语言写死成配置数据。
+ * preferences 不种默认值：空 = 无偏好，prompt 侧整段不注入。
+ */
 export const DEFAULT_PERSONA: PersonaCard = {
   name: "momo",
-  identity: "由夜羽开发的AI",
+  identity: "",
+  personality: "",
   age: 16,
-  personality: "乖巧听话",
-  preferences: ["喜欢草莓蛋糕", "讨厌苦的东西"],
+  preferences: [],
 };
 
 function defaults(): PersistedState {

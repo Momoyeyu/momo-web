@@ -12,7 +12,7 @@ export const en: Dict = {
     pageOf: "{cur} / {total}",
   },
   title: {
-    tagline: "More than a chat bot",
+    tagline: "Can you feel my heart?",
     start: "Start",
     continue: "Continue",
     config: "Config",
@@ -58,7 +58,6 @@ export const en: Dict = {
     load: "Load",
     autoBadge: "AUTO",
     emptySlot: "Empty slot",
-    pageOf: "{cur} / {total}",
     confirmLoad: "Load \"{title}\"? The current session will be stored in the auto save first.",
     confirmOverwrite: "Overwrite \"{title}\"? The current session will be written to this slot.",
     confirmDelete: "Delete \"{title}\"? The slot will be freed.",
@@ -118,8 +117,9 @@ export const en: Dict = {
     voicePh: "Leave empty for service default voice",
     showKey: "Show",
     hideKey: "Hide",
-    test: "Test connection",
-    testNeedUrl: "fill in the URL first",
+    test: "Test",
+    testNeedUrl: "no URL",
+    testFail: "failed",
     extHint:
       "Registered MCP servers expose their tools to momo from the next turn on; unreachable servers are simply not injected.",
     extAdd: "＋ Add MCP server",
@@ -164,21 +164,20 @@ export const en: Dict = {
     age: "Age",
     personality: "Personality",
     preferences: "Preferences",
-    prefAdd: "+ Add",
+    prefAdd: "Add",
     prefSearchPh: "Filter preferences…",
     prefEmpty: "No matching preferences.",
     preferencesPh: "e.g. likes strawberry cake",
+    // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
+    defaults: {
+      // 小写开头：同一份文案也塞进 "Your identity is {identity}" / "Your personality is {personality}"。
+      identity: "an AI assistant",
+      personality: "sweet and obedient",
+    },
   },
   memory: {
-    pinsTitle: "Pinned Memories",
-    pinsDesc:
-      "Things momo knows from birth (your name, your relationship…). Always remembered in chats — never forgotten or rewritten.",
-    pinSearchPh: "Filter initial memories…",
-    pinAdd: "+ Add",
-    normalTitle: "Memories",
-    normalDesc:
-      "What momo noted down during chats; you can also add, edit or delete entries here.",
-    add: "+ Add",
+    pinTip: "Pinned memories stay in the prompt — always remembered, never rewritten.",
+    newTitle: "Add memory",
     searchPh: "Search memories…",
     empty: "No matching memories.",
     confirmDelete: "Delete this memory?",

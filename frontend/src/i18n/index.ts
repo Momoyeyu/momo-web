@@ -20,6 +20,21 @@ export function currentLang(): Lang {
   return getSettings().general.lang;
 }
 
+/**
+ * momo 对话语言（settings.general.chatLang；auto/缺失 → 回落界面语言）。
+ * prompt 组装与出厂默认人设都按它选语言，语义与后端 prompt._lang_of 对齐；
+ * 取词用 tFor(promptLang(), …) 而不是 t()（后者跟界面语言）。
+ */
+export function promptLang(): Lang {
+  const g = getSettings().general;
+  const raw = String(g.chatLang || "").toLowerCase();
+  const code = !raw || raw === "auto" ? String(g.lang || "zh").toLowerCase() : raw;
+  for (const l of LANGS) {
+    if (code.startsWith(l)) return l;
+  }
+  return "zh";
+}
+
 function lookup(dict: Dict, key: string): string | undefined {
   let cur: unknown = dict;
   for (const seg of key.split(".")) {
@@ -32,6 +47,21 @@ function lookup(dict: Dict, key: string): string | undefined {
 /** 取翻译；缺失时回落中文，再回落 key 本身。{k} 用 vars 替换。 */
 export function t(key: string, vars?: Record<string, string>): string {
   let s = lookup(DICTS[currentLang()], key) ?? lookup(zh, key) ?? key;
+  if (vars) {
+    for (const [k, v] of Object.entries(vars)) {
+      s = s.replaceAll(`{${k}}`, v);
+    }
+  }
+  return s;
+}
+
+/** 指定语言取词（不跟随界面语言）——用于按「对话语言」渲染的预览文案。 */
+export function tFor(
+  lang: Lang,
+  key: string,
+  vars?: Record<string, string>,
+): string {
+  let s = lookup(DICTS[lang], key) ?? lookup(zh, key) ?? key;
   if (vars) {
     for (const [k, v] of Object.entries(vars)) {
       s = s.replaceAll(`{${k}}`, v);

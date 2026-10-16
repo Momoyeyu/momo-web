@@ -12,7 +12,7 @@ export const zh = {
     pageOf: "{cur} / {total}",
   },
   title: {
-    tagline: "不只是聊天机器人",
+    tagline: "你能感受到我的心吗",
     start: "开始",
     continue: "继续",
     config: "设置",
@@ -58,7 +58,6 @@ export const zh = {
     load: "读档",
     autoBadge: "AUTO",
     emptySlot: "空槽位",
-    pageOf: "{cur} / {total}",
     confirmLoad: "读取「{title}」？当前会话会先存入自动存档",
     confirmOverwrite: "覆盖「{title}」？当前会话内容将写入该槽",
     confirmDelete: "删除「{title}」？该槽位将被释放",
@@ -72,7 +71,7 @@ export const zh = {
     tabs: {
       general: "通用",
       models: "模型",
-      persona: "人格",
+      persona: "人设",
       memory: "记忆",
       extend: "拓展",
     },
@@ -118,8 +117,9 @@ export const zh = {
     voicePh: "留空使用服务默认音色",
     showKey: "显示",
     hideKey: "隐藏",
-    test: "测试连接",
-    testNeedUrl: "先填写地址",
+    test: "测试",
+    testNeedUrl: "未填地址",
+    testFail: "连接失败",
     extHint:
       "登记外部 MCP server 后，它的工具会从下一轮对话起对 momo 可用；连不上的 server 不会注入工具。",
     extAdd: "＋ 添加 MCP server",
@@ -164,21 +164,19 @@ export const zh = {
     age: "年龄",
     personality: "性格",
     preferences: "偏好",
-    prefAdd: "+ 添加",
+    prefAdd: "添加",
     prefSearchPh: "检索偏好…",
     prefEmpty: "没有匹配的偏好。",
     preferencesPh: "例如：喜欢草莓蛋糕",
+    // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
+    defaults: {
+      identity: "由夜羽开发的AI",
+      personality: "乖巧听话",
+    },
   },
   memory: {
-    pinsTitle: "初始记忆",
-    pinsDesc:
-      "momo 天生就知道的事（你的名字、你们的关系……）。对话中始终记得，不会被遗忘或改写。",
-    pinSearchPh: "检索初始记忆…",
-    pinAdd: "+ 添加",
-    normalTitle: "普通记忆",
-    normalDesc:
-      "momo 在对话中自己记下的内容，也可以在这里手动增删改。",
-    add: "+ 添加",
+    pinTip: "PIN 的记忆常驻注入对话：始终记得，不会被遗忘或改写。",
+    newTitle: "添加记忆",
     searchPh: "检索记忆…",
     empty: "没有匹配的记忆。",
     confirmDelete: "删除这条记忆？",

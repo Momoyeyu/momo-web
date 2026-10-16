@@ -12,7 +12,7 @@ export const ja: Dict = {
     pageOf: "{cur} / {total}",
   },
   title: {
-    tagline: "チャットボット以上の存在",
+    tagline: "私の心、感じる？",
     start: "はじめる",
     continue: "つづきから",
     config: "設定",
@@ -58,7 +58,6 @@ export const ja: Dict = {
     load: "ロード",
     autoBadge: "AUTO",
     emptySlot: "空きスロット",
-    pageOf: "{cur} / {total}",
     confirmLoad: "「{title}」をロードしますか？現在の会話は先にオートセーブへ保存されます。",
     confirmOverwrite: "「{title}」を上書きしますか？現在の会話内容がこのスロットに書き込まれます。",
     confirmDelete: "「{title}」を削除しますか？このスロットは解放されます。",
@@ -72,7 +71,7 @@ export const ja: Dict = {
     tabs: {
       general: "一般",
       models: "モデル",
-      persona: "人格",
+      persona: "キャラ",
       memory: "記憶",
       extend: "拡張",
     },
@@ -118,8 +117,9 @@ export const ja: Dict = {
     voicePh: "空欄ならサービス既定の音色",
     showKey: "表示",
     hideKey: "隠す",
-    test: "接続テスト",
-    testNeedUrl: "先にURLを入力",
+    test: "テスト",
+    testNeedUrl: "URL未入力",
+    testFail: "接続失敗",
     extHint:
       "外部 MCP サーバーを登録すると、そのツールは次のターンから momo が使えます。接続できないサーバーは注入されません。",
     extAdd: "＋ MCP サーバーを追加",
@@ -164,21 +164,19 @@ export const ja: Dict = {
     age: "年齢",
     personality: "性格",
     preferences: "好み",
-    prefAdd: "+ 追加",
+    prefAdd: "追加",
     prefSearchPh: "嗜好を検索…",
     prefEmpty: "一致する嗜好がありません。",
     preferencesPh: "例：いちごケーキが好き",
+    // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
+    defaults: {
+      identity: "夜羽が開発したAI",
+      personality: "おとなしくて素直",
+    },
   },
   memory: {
-    pinsTitle: "初期記憶",
-    pinsDesc:
-      "momo が生まれつき知っていること（あなたの名前、二人の関係……）。会話中は常に覚えていて、忘れたり書き換えられたりしません。",
-    pinSearchPh: "初期記憶を検索…",
-    pinAdd: "+ 追加",
-    normalTitle: "記憶",
-    normalDesc:
-      "momo が会話の中で自分で記録した内容。ここで手動で追加・編集・削除もできます。",
-    add: "+ 追加",
+    pinTip: "PIN した記憶は常にプロンプトへ注入されます。忘れたり書き換えられたりしません。",
+    newTitle: "記憶を追加",
     searchPh: "記憶を検索…",
     empty: "一致する記憶がありません。",
     confirmDelete: "この記憶を削除しますか？",
