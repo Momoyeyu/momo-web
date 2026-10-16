@@ -25,8 +25,10 @@ _FOLD_RATIO = 0.5
 _lock = Lock()
 
 _PROMPT = (
-    "你是对话记录整理器。把给出的对话压缩成一段连贯摘要，保留关键事实、约定、"
-    "未完成的请求与人物关系；只输出摘要正文，不要任何前后缀。"
+    "You compress conversation logs into one coherent summary. Keep key facts, "
+    "agreements, unfinished requests and relationships between characters. "
+    "Write the summary in the language the conversation is in. "
+    "Output the summary body only — no preamble, no postscript."
 )
 
 

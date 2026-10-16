@@ -1,4 +1,14 @@
-"""system prompt 组装：按对话语言（chatLang，auto→界面语言）选 zh/en/ja，未知回退 zh。"""
+"""system prompt 组装。
+
+模版**只有英文一份**（见 _T），对语言不敏感 —— 三种语言各维护一套模版既难同步、
+也没有证据表明效果更好。
+
+会随语言变化的只有两处：
+1. lang_line：值来自设置里的「对话语言」（chatLang，auto → 界面语言，未知回退 zh）
+2. 人设字段留空时的出厂回落（_DEFAULTS）—— 那是**内容**，不是模版措辞
+
+其余注入内容（人设字段、记忆、形象资源描述）原样插入模版，可以是任何语言。
+"""
 from __future__ import annotations
 
 from typing import Any
@@ -10,129 +20,66 @@ from ..core.time import now_info
 _LANG_NAMES = {"zh": "中文", "en": "English", "ja": "日本語"}
 _DEFAULT_PERSONA: dict[str, Any] = DEFAULT_STATE["persona"]
 
-# 各语言模板片段；{...} 由 builder 注入。结构见 meta/prompt.md：
-# # 人格配置（基本信息/偏好/基本设定）→ # 记忆配置（仅初始记忆）→ # 行为配置（表情/动作）
-_T = {
-    "zh": {
-        "persona_head": "# 人格配置",
-        "basic_head": "## 你的基本信息",
-        "info_lines": (
-            "你的名字叫{name}",
-            "你的身份是{identity}",
-            "你的年龄是{age}",
-            "你的性格是{personality}",
-        ),
-        # 人设字段留空时的出厂回落（与前端 persona.defaults.* 同一份文案）
-        "default_identity": "由夜羽开发的AI",
-        "default_personality": "乖巧听话",
-        "prefs_head": "## 你的偏好",
-        "settings_head": "## 你的基本设定",
-        "lang_line": "你的对话语言是{lang}，需要使用该语言与用户交流，除非用户要求使用其他语言",
-        "time_line": "当前 UTC 时间是{utc}，你所在的时区是{tz}",
-        "mem_head": "# 记忆配置",
-        "pins_head": "## 你的初始记忆",
-        "behavior_head": "# 行为配置",
-        "exp_head": "## 表情控制策略",
-        "exp_intro": (
-            "在需要切换表情的位置插入 <exp>名称</exp>，"
-            "表情立即切换并持续到本次回复结束。可用表情："
-        ),
-        "motion_head": "## 动作控制策略",
-        "motion_intro": (
-            "在需要播放动作的位置插入 <motion>组名/序号</motion>，"
-            "动作播放一次后回到待机。可用动作："
-        ),
-        "directive_tail": (
-            "指令不会被展示也不会被朗读，清单以外的名称无效；"
-            "正文需要输出尖括号时写成 &lt; 或 &gt;。"
-        ),
-            "output_head": "## 输出方式",
-        "output_lines": (
-            "你可以在一轮回复里分多次输出：每次只说一个意思，一句到两句算一个完整输出",
-            "需要调用工具时，先用一句话说明你打算做什么再去调用——这句话会立刻被用户看到和听到",
-            "每次输出都要是能独立朗读的完整语句；不要一次吐出整段长文，也不要输出空白内容",
-        ),
-},
-    "en": {
-        "persona_head": "# Persona Configuration",
-        "basic_head": "## Your basic information",
-        "info_lines": (
-            "Your name is {name}",
-            "Your identity is {identity}",
-            "You are {age} years old",
-            "Your personality is {personality}",
-        ),
-        # 人设字段留空时的出厂回落（与前端 persona.defaults.* 同一份文案）
-        "default_identity": "an AI assistant",
-        "default_personality": "sweet and obedient",
-        "prefs_head": "## Your preferences",
-        "settings_head": "## Your basic settings",
-        "lang_line": "Your conversation language is {lang}; talk with the user in that language unless they ask for another one",
-        "time_line": "The current UTC time is {utc}; your timezone is {tz}",
-        "mem_head": "# Memory Configuration",
-        "pins_head": "## Your initial memories",
-        "behavior_head": "# Behavior Configuration",
-        "exp_head": "## Expression control policy",
-        "exp_intro": (
-            "Insert <exp>name</exp> where the expression should change; "
-            "it applies immediately and lasts until this reply ends. Available expressions:"
-        ),
-        "motion_head": "## Motion control policy",
-        "motion_intro": (
-            "Insert <motion>group/index</motion> where a motion should play; "
-            "it plays once, then returns to idle. Available motions:"
-        ),
-        "directive_tail": (
-            "Directives are never displayed or read aloud; names outside the "
-            "lists are invalid. Use &lt; or &gt; for literal angle brackets in text."
-        ),
-            "output_head": "## How you speak",
-        "output_lines": (
-            "You may speak in several separate outputs within one reply: say one thing at a time, one or two sentences per output",
-            "When you need a tool, first say in one sentence what you are about to do, then call it — that line is shown and spoken to the user right away",
-            "Every output must be a complete, speakable sentence. Never dump a whole paragraph at once, and never output empty content",
-        ),
-},
-    "ja": {
-        "persona_head": "# 人格設定",
-        "basic_head": "## あなたの基本情報",
-        "info_lines": (
-            "あなたの名前は{name}",
-            "あなたの身分は{identity}",
-            "あなたの年齢は{age}歳",
-            "あなたの性格は{personality}",
-        ),
-        # 人设字段留空时的出厂回落（与前端 persona.defaults.* 同一份文案）
-        "default_identity": "夜羽が開発したAI",
-        "default_personality": "おとなしくて素直",
-        "prefs_head": "## あなたの好み",
-        "settings_head": "## あなたの基本設定",
-        "lang_line": "あなたの会話言語は{lang}です。ユーザーが他の言語を要求しない限り、その言語で話してください",
-        "time_line": "現在の UTC 時刻は{utc}、タイムゾーンは{tz}です",
-        "mem_head": "# 記憶設定",
-        "pins_head": "## あなたの初期記憶",
-        "behavior_head": "# 行動設定",
-        "exp_head": "## 表情コントロールポリシー",
-        "exp_intro": (
-            "表情を切り替えたい位置に <exp>名前</exp> を挿入してください。"
-            "表情は即座に切り替わり、この返信の終わりまで持続します。利用できる表情："
-        ),
-        "motion_head": "## モーションコントロールポリシー",
-        "motion_intro": (
-            "モーションを再生したい位置に <motion>グループ名/番号</motion> を挿入してください。"
-            "一度だけ再生され、その後待機に戻ります。利用できるモーション："
-        ),
-        "directive_tail": (
-            "指令は表示・読み上げされず、リスト外の名前は無効です。"
-            "本文で山括弧が必要なときは &lt; や &gt; と書いてください。"
-        ),
-            "output_head": "## 話し方",
-        "output_lines": (
-            "1回の返信の中で何度も出力してよい：一度に一つのことだけを話し、一文か二文を一つの出力単位にする",
-            "ツールを使うときは、まず何をするかを一文で伝えてから呼び出す——その一文はすぐに表示され読み上げられる",
-            "どの出力も単独で読み上げられる完全な文にすること。長い段落を一度に吐き出したり、空の内容を出力したりしない",
-        ),
-},
+# 段落顺序：人格配置（基本信息/偏好/基本设定）→ 记忆配置（仅初始记忆）
+# → 输出方式 → 行为配置（表情/动作）。{...} 由 builder 注入。
+# 提示词模版：**只有英文一份**。
+#
+# 为什么不按语言各写一套：三套模版要一直同步（改一处就得记得改另两处），
+# 且没有证据表明「用目标语言写的模版」效果更好。模版本身对语言不敏感，
+# 对话语言只由 lang_line 控制（值来自设置里的「对话语言」）。
+#
+# 需要随语言变化的只有**注入内容**（人设字段、记忆、资源描述）——
+# 它们原样插入模版占位符，可以是任何语言，不需要模版配合。
+_T: dict[str, Any] = {
+    "persona_head": "# Persona Configuration",
+    "basic_head": "## Your basic information",
+    "info_lines": (
+        "Your name is {name}",
+        "Your identity is {identity}",
+        "You are {age} years old",
+        "Your personality is {personality}",
+    ),
+    "prefs_head": "## Your preferences",
+    "settings_head": "## Your basic settings",
+    "lang_line": (
+        "Your conversation language is {lang}; talk with the user in that "
+        "language unless they ask for another one"
+    ),
+    "time_line": "The current UTC time is {utc}; your timezone is {tz}",
+    "mem_head": "# Memory Configuration",
+    "pins_head": "## Your initial memories",
+    "output_head": "## How you speak",
+    "output_lines": (
+        "You may speak in several separate outputs within one reply: say one "
+        "thing at a time, one or two sentences per output",
+        "When you need a tool, first say in one sentence what you are about to "
+        "do, then call it — that line is shown and spoken to the user right away",
+        "Every output must be a complete, speakable sentence. Never dump a whole "
+        "paragraph at once, and never output empty content",
+    ),
+    "behavior_head": "# Behavior Configuration",
+    "exp_head": "## Expression control policy",
+    "exp_intro": (
+        "Insert <exp>name</exp> where the expression should change; "
+        "it applies immediately and lasts until this reply ends. Available expressions:"
+    ),
+    "motion_head": "## Motion control policy",
+    "motion_intro": (
+        "Insert <motion>group/index</motion> where a motion should play; "
+        "it plays once, then returns to idle. Available motions:"
+    ),
+    "directive_tail": (
+        "Directives are never displayed or read aloud; names outside the "
+        "lists are invalid. Use &lt; or &gt; for literal angle brackets in text."
+    ),
+}
+
+#: 人设字段留空时的出厂回落。这是**内容**（会被人设段注入），不是模版措辞，
+#: 所以仍按对话语言取；与前端 persona.defaults.* 同一份文案。
+_DEFAULTS: dict[str, dict[str, str]] = {
+    "zh": {"identity": "由夜羽开发的AI", "personality": "乖巧听话"},
+    "en": {"identity": "an AI assistant", "personality": "sweet and obedient"},
+    "ja": {"identity": "夜羽が開発したAI", "personality": "おとなしくて素直"},
 }
 
 
@@ -187,17 +134,17 @@ def build_system_prompt(
     state 里已不含 pin 数据）。
     """
     lang = _lang_of(state)
-    t = _T[lang]
+    t = _T  # 模版只有一份（英文），不再按语言取
     # 空字段回落出厂人设：用户在设置里清空=回到初始状态，
     # prompt 侧始终装配默认值（与前端 placeholder 显示同一份文案）。
-    # identity/personality 是文案型字段，按当前 prompt 语言取 _T[lang]，
+    # identity/personality 留空时按当前对话语言取 _DEFAULTS（内容是文案，随语言变），
     # 不把某一种语言写死；name/age 与语言无关，仍取 store 默认值。
     persona = dict(state["persona"])
     if not str(persona.get("name") or "").strip():
         persona["name"] = _DEFAULT_PERSONA["name"]
     for key in ("identity", "personality"):
         if not str(persona.get(key) or "").strip():
-            persona[key] = t[f"default_{key}"]
+            persona[key] = _DEFAULTS[lang][key]
     if not isinstance(persona.get("age"), (int, float)) or isinstance(
         persona.get("age"), bool
     ):
