@@ -166,23 +166,32 @@ def interrupt_turn(user: str, assistant: str) -> None:
             (LIVE_ID,),
         ).fetchall()
         last = rows[0] if rows else None
-        prev = rows[1] if len(rows) > 1 else None
         now = now_iso()
-        if (
-            last
-            and last["role"] == "assistant"
-            and prev
-            and prev["role"] == "user"
-            and prev["text"] == user
-        ):
-            # 已落账的完整回复：截到已展示文本（空 = 用户一个字没看到 → 删行）
-            if assistant:
+        # 句级落账后，本回合的行 = 最后一条（内容匹配的）user 行之后的全部 assistant 行。
+        # 用户看到的文本应当是这些句子的**前缀**（可能还差半句），据此对齐：
+        # 整句保留、没看到的删除、只剩半句就补一行 —— 幂等（重复打断收敛到同一状态）。
+        user_idx = next(
+            (i for i, r in enumerate(rows) if r["role"] == "user"), None
+        )
+        if user_idx is not None and rows[user_idx]["text"] == user:
+            turn_rows = list(reversed(rows[:user_idx]))  # 本回合 assistant 行（按 seq 升序）
+            acc = ""
+            keep = 0
+            for r in turn_rows:
+                if assistant.startswith(acc + r["text"]):
+                    acc += r["text"]
+                    keep += 1
+                else:
+                    break
+            for r in turn_rows[keep:]:
+                c.execute("DELETE FROM messages WHERE rowid=?", (r["rowid"],))
+            rest = assistant[len(acc) :]
+            if rest:
                 c.execute(
-                    "UPDATE messages SET text=? WHERE rowid=?",
-                    (assistant, last["rowid"]),
+                    "INSERT INTO messages(session_id,seq,role,text,at)"
+                    " VALUES(?,?,?,?,?)",
+                    (LIVE_ID, _next_seq(c, LIVE_ID), "assistant", rest, now),
                 )
-            else:
-                c.execute("DELETE FROM messages WHERE rowid=?", (last["rowid"],))
         elif last and last["role"] == "user" and last["text"] == user:
             if assistant:
                 c.execute(

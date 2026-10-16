@@ -94,6 +94,7 @@ function makeEngine(): { eng: ChatEngine; done: ChatMessage[] } {
     onUserMessage: () => {},
     onAssistantStart: () => {},
     onDisplay: () => {},
+    onSentence: () => {},
     onAssistantDone: (m) => done.push(m),
     onError: () => {},
   });
@@ -107,7 +108,9 @@ afterEach(() => {
 describe("打断落账一致性（seenText）", () => {
   it("打断时本地落账与回传都是用户实际看到的文本", async () => {
     chatMock.mockImplementation(async function* () {
-      yield { t: "delta" as const, text: "第一句。第二句。第三句还在写" };
+      for (const [no, text] of ["第一句。", "第二句。", "第三句。"].entries()) {
+        yield { t: "sentence" as const, no, text, dirs: [], at: "" };
+      }
       yield { t: "done" as const };
     });
     const { eng } = makeEngine();
@@ -131,7 +134,7 @@ describe("打断落账一致性（seenText）", () => {
 
   it("一个字都没看到就不落账（assistant 可空）", async () => {
     chatMock.mockImplementation(async function* () {
-      yield { t: "delta" as const, text: "还没来得及看。" };
+      yield { t: "sentence" as const, no: 0, text: "还没来得及看。", dirs: [], at: "" };
       await new Promise(() => {}); // 回合悬挂，无人看屏
     });
     const { eng, done } = makeEngine();
@@ -153,7 +156,7 @@ describe("interrupt → send 顺序", () => {
     const order: string[] = [];
     chatMock.mockImplementation(async function* (text: string) {
       order.push(`chat:${text}`);
-      yield { t: "delta" as const, text: "在写。" };
+      yield { t: "sentence" as const, no: 0, text: "在写。", dirs: [], at: "" };
       await new Promise(() => {}); // 悬挂保持回合存活
     });
     const { eng } = makeEngine();
@@ -241,8 +244,21 @@ describe("解析层资源清单过滤", () => {
     // 内置 Hiyori：expressions 空表、motions 含 Idle/0…8 与 TapBody/0。
     chatMock.mockImplementation(async function* () {
       yield {
-        t: "delta" as const,
-        text: "好<exp>bad_exp</exp>。<motion>Idle/0</motion>呐<motion>Nope/9</motion>！",
+        t: "sentence" as const,
+        no: 0,
+        text: "好。",
+        dirs: [{ kind: "exp" as const, name: "bad_exp", offset: 0 }],
+        at: "",
+      };
+      yield {
+        t: "sentence" as const,
+        no: 1,
+        text: "呐！",
+        dirs: [
+          { kind: "motion" as const, name: "Idle/0", offset: 0 },
+          { kind: "motion" as const, name: "Nope/9", offset: 0 },
+        ],
+        at: "",
       };
       yield { t: "done" as const };
     });
@@ -263,25 +279,27 @@ describe("解析层资源清单过滤", () => {
     eng.dispose();
   });
 
-  it("指令 offset 按 trim 后句文本折算（前导空白不计）", async () => {
+  it("句到即进转写：不等回合结束，backlog 就能看到已到的句子", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
     chatMock.mockImplementation(async function* () {
-      yield {
-        t: "delta" as const,
-        text: "  你好<motion>Idle/0</motion>还有半句。",
-      };
+      yield { t: "sentence" as const, no: 0, text: "第一句。", dirs: [], at: "" };
+      await gate; // 回合悬停：后面的句子还没到
+      yield { t: "sentence" as const, no: 1, text: "第二句。", dirs: [], at: "" };
       yield { t: "done" as const };
     });
     const { eng } = makeEngine();
     eng.sendText("hi");
     await tick();
-    const turn = internals(eng).turn;
-    expect(turn).toBeTruthy();
-    clearInterval(turn!.timer);
 
-    // pending="  你好"（4）但句成「你好还有半句。」——指令在「你好」后，offset=2。
-    expect(turn!.sentences[0].dirs).toEqual([
-      { kind: "motion", name: "Idle/0", offset: 2 },
-    ]);
+    // 回合尚未结束，第一句已经在转写里（这正是改造前做不到的事）
+    expect(eng.history.map((m) => m.text)).toEqual(["hi", "第一句。"]);
+
+    release();
+    await tick();
+    expect(eng.history.map((m) => m.text)).toEqual(["hi", "第一句。", "第二句。"]);
     eng.dispose();
   });
 });

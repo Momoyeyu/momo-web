@@ -13,6 +13,8 @@ export interface EngineHandlers {
   onAssistantStart?: (id: string) => void;
   /** 当前句上屏文本（整串替换语义）。 */
   onDisplay?: (text: string) => void;
+  /** 一句话已落账并进入转写（流式期间 backlog 就能看到）。 */
+  onSentence?: (m: ChatMessage) => void;
   onAssistantDone?: (m: ChatMessage) => void;
   onError?: (e: Error) => void;
 }
@@ -69,6 +71,10 @@ export function getChatEngine(): ChatEngine {
       },
       onDisplay: (text) => {
         handlers.onDisplay?.(text);
+        bump();
+      },
+      onSentence: (m) => {
+        handlers.onSentence?.(m);
         bump();
       },
       onAssistantDone: (m) => {

@@ -17,11 +17,12 @@ import type {
   Settings,
 } from "../lib/types";
 import { resolvePromptLang } from "../i18n";
-import { DirectiveParser } from "../llm/directives";
-import type { DirectiveEvent } from "../llm/directives";
 import { streamSpeech } from "../services/ttsClient";
-import { chat, interrupt as sendInterrupt } from "../services/chatClient";
-import { SentenceSplitter, lastSentence } from "./sentences";
+import {
+  chat,
+  interrupt as sendInterrupt,
+  type SentenceDir,
+} from "../services/chatClient";
 import { dueDirs, dirAllowed } from "./dirs";
 import type { PendingDir } from "./dirs";
 import { charsPerSec, dwellMs, sentencePauseMs } from "./pacing";
@@ -34,6 +35,8 @@ interface ChatEngineEvents {
   onAssistantStart(id: string): void;
   /** 当前句上屏文本（整串替换语义；仅变化时推）。 */
   onDisplay(text: string): void;
+  /** 一句话已落账并进入转写（流式期间 backlog 就能看到）。 */
+  onSentence(m: ChatMessage): void;
   onAssistantDone(m: ChatMessage): void;
   onError(e: Error): void;
 }
@@ -92,16 +95,25 @@ interface Turn {
   pushIndex: number;
   inflight: number;
   disp: DisplayState;
-  /** splitter.pending 快照：生产中未断句的尾部（逐字上屏的另一半）。 */
+  /** 恒定为空。切句已全部在 backend 完成，前端不再持有「未断句尾部」；
+   *  保留字段是为了不牵动展示层对「生产中文案」的分支（它读到的就是空串）。 */
   tail: string;
-  /** 解析到但未成句的指令：offset = 到达时 pending 长度；成句时挂到该句。 */
-  pendingDirs: PendingDir[];
+  /** 本轮已 push 进转写的句子条数（打断时按「实际看到」重建尾部用）。 */
+  pushed: number;
   /** 播放 tick（setInterval id；构造期占位 0）。 */
   timer: ReturnType<typeof setInterval> | number;
 }
 
 const INTERRUPT_DEBOUNCE_MS = 300;
 const DISPLAY_TICK_MS = 40;
+
+/** 句事件里的指令 → 展示层用的 PendingDir；清单外的静默丢弃（action.md）。 */
+function filterDirs(
+  dirs: SentenceDir[],
+  res: Parameters<typeof dirAllowed>[2],
+): PendingDir[] {
+  return dirs.filter((d) => dirAllowed(d.kind, d.name, res));
+}
 
 function toError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e));
@@ -228,7 +240,8 @@ export class ChatEngine {
     const last = [...this.history]
       .reverse()
       .find((m) => m.role === "assistant");
-    this.lastDisplay = last ? lastSentence(last.text) : "";
+    // 落库已是句级（一句一行），末条即最后一句，无需再切
+      this.lastDisplay = last ? last.text : "";
     this.events.onDisplay(this.lastDisplay);
   }
 
@@ -284,7 +297,7 @@ export class ChatEngine {
       inflight: 0,
       disp: { idx: 0, reveal: 0, doneAt: 0, pausedUntil: 0, emitted: "" },
       tail: "",
-      pendingDirs: [],
+      pushed: 0,
       timer: 0,
     };
     this.turn = turn;
@@ -447,9 +460,14 @@ export class ChatEngine {
     const done = persist
       ? sendInterrupt(turn.userText, seen)
       : Promise.resolve();
+    // 各句已逐句进转写；打断时按「用户实际看到的」重建本轮尾部，
+    // 与回传 backend 的 seen 同源（backend 用同一规则裁剪 DB 里的本轮行）。
+    if (turn.pushed > 0) {
+      this.history.splice(this.history.length - turn.pushed, turn.pushed);
+    }
     if (seen) {
       const msg: ChatMessage = {
-        id: turn.id,
+        id: `${turn.id}-seen`,
         role: "assistant",
         text: seen,
         at: new Date().toISOString(),
@@ -464,90 +482,55 @@ export class ChatEngine {
   }
 
   private async runTurn(turn: Turn, cfg: Settings, userText: string): Promise<void> {
-    const parser = new DirectiveParser();
-    const splitter = new SentenceSplitter();
-    // 解析层清单校验（action.md）：指令值不在当前形象资源清单中 → 静默丢弃。
+    // 清单校验（action.md）：指令值不在当前形象资源清单中 → 静默丢弃。
     // 回合开始取一次快照，与注入提示词的清单同源；清单缺失时不拦（stage 兜底）。
     const resources = getAvatars().find(
       (a) => a.id === getAvatarId(),
     )?.resources;
 
-    // 指令后的首个文本片常带前导空格/换行，剥掉避免字幕顶格留白。
-    let afterTag = false;
-    const feedEvents = (events: DirectiveEvent[]): void => {
-      for (const e of events) {
-        if (this.turn !== turn) return;
-        if (e.kind === "text") {
-          const delta = afterTag ? e.text.replace(/^\s+/, "") : e.text;
-          afterTag = false;
-          if (!delta) continue;
-          turn.text += delta;
-          for (const s of splitter.push(delta)) this.pushSentence(turn, cfg, s);
-          turn.tail = splitter.pending;
-        } else {
-          afterTag = true;
-          const name = e.kind === "exp" ? e.name : e.id;
-          if (!dirAllowed(e.kind, name, resources)) continue; // 清单外静默丢弃
-          // 不立即驱动舞台：记录其在未断句尾部的偏移，展示游标越过才触发。
-          // buf 成句时会 trim()，偏移按 trim 后文本折算——剥掉前导空白。
-          turn.pendingDirs.push({
-            kind: e.kind,
-            name,
-            offset: splitter.pending.trimStart().length,
-          });
-        }
-      }
-    };
-
-    // LLM 调用在 backend（system prompt/历史/记忆工具由它组装），
-    // 前端只发本回合文本、收 SSE delta。
+    // LLM 调用与切句都在 backend（system prompt/历史/记忆工具/句边界由它负责），
+    // 前端只发本回合文本、收逐句事件。句事件自带 dirs（含句内偏移），
+    // 因此这里不再需要指令流式解析，也不再持有「未断句尾部」。
     try {
       for await (const ev of chat(userText, turn.abort.signal)) {
         if (this.turn !== turn) return; // 已被打断
-        if (ev.t === "delta") {
-          feedEvents(parser.push(ev.text));
+        if (ev.t === "sentence") {
+          turn.text += ev.text;
+          this.pushSentence(turn, cfg, ev.text, filterDirs(ev.dirs, resources));
         } else if (ev.t === "error") {
           throw new ServiceError("llm", "http", 0, ev.message);
         }
-        // done：流结束，走统一收尾
+        // delta：过渡期遗留（整段原文），新前端不再消费；done：走统一收尾
       }
     } catch (err) {
       if (this.turn === turn) this.events.onError(toError(err));
     }
-    if (this.turn !== turn) return; // 已被打断，部分文本由 interruptNow 落账
-
-    feedEvents(parser.flush());
-    const tail = splitter.flush();
-    if (tail && tail.trim()) this.pushSentence(turn, cfg, tail);
-    turn.tail = "";
-    // 末句之后的尾随指令：挂到队列末句（offset=句长，句末触发）；队列空则立即派发。
-    if (turn.pendingDirs.length) {
-      const last = turn.sentences[turn.sentences.length - 1];
-      if (last) {
-        for (const d of turn.pendingDirs) {
-          last.dirs.push({ ...d, offset: last.text.length });
-        }
-      } else {
-        for (const d of turn.pendingDirs) this.fireDir(d);
-      }
-      turn.pendingDirs = [];
-    }
+    if (this.turn !== turn) return; // 已被打断，已落句子由 interruptNow 对齐
     turn.llmDone = true;
     this.maybeFinish(turn);
   }
 
   /** 一句成句 → 入展示队列（tts=null 时走驻留），并立刻发 streamSpeech 并发合成。 */
-  private pushSentence(turn: Turn, cfg: Settings, sentence: string): void {
+  private pushSentence(
+    turn: Turn,
+    cfg: Settings,
+    sentence: string,
+    dirs: PendingDir[],
+  ): void {
     if (turn.finished) return;
-    // 成句时收走累积的待触发指令：offset 即其在本句内的字符位置。
-    const item: SentItem = {
-      text: sentence,
-      tts: null,
-      dirs: turn.pendingDirs,
-      dirIdx: 0,
-    };
-    turn.pendingDirs = [];
+    const item: SentItem = { text: sentence, tts: null, dirs, dirIdx: 0 };
     turn.sentences.push(item);
+    // 句落账即进转写：**流式期间 backlog 就能看到这一句**，不必等回合结束。
+    // id 用「回合 id + 句序」，与重载后按行重建的转写形态一致。
+    const msg: ChatMessage = {
+      id: `${turn.id}-${turn.sentences.length - 1}`,
+      role: "assistant",
+      text: sentence,
+      at: new Date().toISOString(),
+    };
+    turn.pushed += 1;
+    this.history.push(msg);
+    this.events.onSentence(msg);
     if (this.voiceMuted || turn.audioAbort.signal.aborted) return;
     if (!cfg.tts.url) {
       this.reportTtsOnce(turn, new ServiceError("tts", "unconfigured"));
@@ -721,15 +704,10 @@ export class ChatEngine {
     turn.finished = true;
     clearInterval(turn.timer);
     this.turn = null;
+    // 各句已在 pushSentence 里逐句落账，这里只发「回合结束」信号
     if (turn.text.trim()) {
-      const msg: ChatMessage = {
-        id: turn.id,
-        role: "assistant",
-        text: turn.text,
-        at: new Date().toISOString(),
-      };
-      this.history.push(msg);
-      this.events.onAssistantDone(msg);
+      const last = [...this.history].reverse().find((m) => m.role === "assistant");
+      if (last) this.events.onAssistantDone(last);
     }
     // 表情持续到本次回复结束：回合完成复位。
     this.tryStage((st) => st.resetExpression());

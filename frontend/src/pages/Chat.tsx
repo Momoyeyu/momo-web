@@ -11,7 +11,6 @@ import {
   transcriptVersion,
 } from "../chat/engine";
 import type { EngineHandlers } from "../chat/engine";
-import { lastSentence } from "../chat/sentences";
 import type { ChatStatus } from "../lib/types";
 import { navigate } from "../router";
 import { useT } from "../i18n";
@@ -127,7 +126,8 @@ export default function Chat() {
     .find((m) => m.role === "assistant");
   const subtitle = streamActive
     ? streamText || "…"
-    : streamText || (lastAssistant ? lastSentence(lastAssistant.text) : "");
+    // 转写已是句级：末条 assistant 就是最后一句，切句全在 backend
+    : streamText || (lastAssistant ? lastAssistant.text : "");
   const busy = status === "thinking" || status === "speaking";
 
   return (

@@ -425,7 +425,7 @@ def test_run_turn_extends_tools_and_dispatches(monkeypatch):
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
     events = list(turn.run_turn("帮我搜一下"))
-    assert [e["text"] for e in events if e["t"] == "delta"] == ["查到了。"]
+    assert [e["text"] for e in events if e["t"] == "sentence"] == ["查到了。"]
     # 注入声明 = 内置 + 拓展
     names = {d["function"]["name"] for d in seen_tools[0]}
     assert "tavily_search" in names and "memory_add" in names
@@ -442,4 +442,4 @@ def test_run_turn_without_extensions_passes_static_tools(monkeypatch):
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
     events = list(turn.run_turn("hi"))
-    assert [e["text"] for e in events if e["t"] == "delta"] == ["好。"]
+    assert [e["text"] for e in events if e["t"] == "sentence"] == ["好。"]

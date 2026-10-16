@@ -1,6 +1,9 @@
-// 流式句切：把 LLM 增量文本切成可送 TTS 的句子。
-// 强边界：。！？!?…\n 立刻成句；弱边界：，、；;：: 在缓冲超过阈值时成句；
-// flush() 吐出收尾残余。纯函数可测。
+// **仅供设置页「对话框预览」演示切句**：把那段固定样例切成句子，
+// 好让预览演示句间停顿。
+//
+// 真实对话的切句**不在这里** —— 后端 app/core/sentences.py 是唯一口径
+// （见 docs/sentences-plan.md），前端只消费后端下发的 sentence 事件。
+// 两边规则不同是刻意的：这里只求演示观感，不需要与后端逐字一致。
 
 const STRONG = new Set(["。", "！", "？", "!", "?", "…", "\n"]);
 const WEAK = new Set(["，", "、", "；", ";", "：", ":"]);
@@ -56,11 +59,4 @@ export class SentenceSplitter {
     this.buf = "";
     return s ? s : null;
   }
-}
-
-/** 末句提取：整段过句切器，取最后一句（含未断句尾部；读档/回退字幕用）。 */
-export function lastSentence(text: string): string {
-  const sp = new SentenceSplitter();
-  const parts = sp.push(text);
-  return sp.flush() ?? parts[parts.length - 1] ?? "";
 }

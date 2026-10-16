@@ -43,10 +43,8 @@ def test_react_tool_then_text(monkeypatch):
     assert [(d["kind"], d["name"], d["offset"]) for d in sents[1]["dirs"]] == [
         ("exp", "开心", 0)
     ]
-    # 过渡期兼容：给旧前端发一次完整原文（含指令），行为与改造前一致
-    assert [e["text"] for e in events if e["t"] == "delta"] == [
-        "你好呀。<exp>开心</exp>今天很开心！"
-    ]
+    # 不再产出整段 delta：切句只在句事件里给（指令随 dirs）
+    assert [e for e in events if e["t"] == "delta"] == []
 
     # 第二轮 messages 带 tool 结果（common_time → utc+tz JSON）
     tool_msgs = [m for m in seen_messages[-1] if m.get("role") == "tool"]
@@ -112,9 +110,7 @@ def test_tool_memory_ops_via_react(monkeypatch):
 
     monkeypatch.setattr(llm, "chat_completion", fake_chat)
     events = list(turn.run_turn("帮我记一下"))
-    assert [e for e in events if e["t"] == "delta"] == [
-        {"t": "delta", "text": "记好了！"}
-    ]
+    assert [e["text"] for e in events if e["t"] == "sentence"] == ["记好了！"]
 
     tool_msgs = [m for m in rounds[-1] if m.get("role") == "tool"]
     assert json.loads(tool_msgs[0]["content"])["ok"] is True

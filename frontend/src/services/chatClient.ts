@@ -3,7 +3,10 @@
 // 前端只消费最终回答的增量 token。
 //
 // SSE 协议（每行 `data: <json>`）：
-//   {"t":"delta","text":"…"}            回答增量（<exp>/<motion> 指令内联在 text 里）
+//   {"t":"sentence","no","text","dirs","at"}  一句话已落账（正文已剥离指令，
+//                                         dirs 是该句要触发的表情/动作及句内偏移）
+//   {"t":"delta","text":"…"}            过渡期遗留：整段原文（含指令）。
+//                                         新前端只认 sentence，收到 delta 忽略。
 //   {"t":"done"}                       回合结束
 //   {"t":"error","message":"…"}        回合失败（yield 给调用方映射成 Error）
 
@@ -32,7 +35,15 @@ export function interrupt(user: string, assistant: string): Promise<void> {
   }
 }
 
-type ChatEvent =
+/** 句子携带的指令：kind=exp 切表情 / motion 播动作，offset 为句内字符位置。 */
+export interface SentenceDir {
+  kind: "exp" | "motion";
+  name: string;
+  offset: number;
+}
+
+export type ChatEvent =
+  | { t: "sentence"; no: number; text: string; dirs: SentenceDir[]; at: string }
   | { t: "delta"; text: string }
   | { t: "done" }
   | { t: "error"; message: string };
@@ -48,7 +59,23 @@ function isAbortError(e: unknown): boolean {
 /** 解析一行 SSE data 负载为 ChatEvent；不可识别返回 null。 */
 function parseEvent(data: string): ChatEvent | null {
   try {
-    const j = JSON.parse(data) as { t?: unknown; text?: unknown; message?: unknown };
+    const j = JSON.parse(data) as {
+      t?: unknown;
+      text?: unknown;
+      message?: unknown;
+      no?: unknown;
+      dirs?: unknown;
+      at?: unknown;
+    };
+    if (j.t === "sentence" && typeof j.text === "string") {
+      return {
+        t: "sentence",
+        no: typeof j.no === "number" ? j.no : 0,
+        text: j.text,
+        dirs: Array.isArray(j.dirs) ? (j.dirs as SentenceDir[]) : [],
+        at: typeof j.at === "string" ? j.at : "",
+      };
+    }
     if (j.t === "delta" && typeof j.text === "string") {
       return { t: "delta", text: j.text };
     }

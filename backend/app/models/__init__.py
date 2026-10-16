@@ -256,6 +256,9 @@ ErrorService = Literal["llm", "backend"]
 
 
 class DeltaEvent(TypedDict):
+    """整段原文增量。**当前后端不再产出**（切句改为句事件，见 SentenceEvent），
+    保留类型是为了 SSE 契约向后兼容：老客户端认 delta，新客户端只认 sentence。"""
+
     t: Literal["delta"]
     text: str
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SentenceSplitter, lastSentence } from "./sentences";
+import { SentenceSplitter } from "./sentences";
 
 describe("SentenceSplitter", () => {
   it("强边界立刻成句", () => {
@@ -69,24 +69,5 @@ describe("SentenceSplitter", () => {
     const s = new SentenceSplitter();
     expect(s.push("什么？！真的假的")).toEqual(["什么？！"]);
     expect(s.flush()).toBe("真的假的");
-  });
-});
-
-describe("lastSentence 末句提取", () => {
-  it("取最后一个完整句", () => {
-    expect(lastSentence("第一句。第二句。第三句。")).toBe("第三句。");
-  });
-
-  it("未断句尾部优先（比最后完整句更靠后）", () => {
-    expect(lastSentence("前面说完了。尾巴还在写")).toBe("尾巴还在写");
-  });
-
-  it("整段就是一句", () => {
-    expect(lastSentence("只有一句")).toBe("只有一句");
-  });
-
-  it("空文本返回空串", () => {
-    expect(lastSentence("")).toBe("");
-    expect(lastSentence("  ")).toBe("");
   });
 });

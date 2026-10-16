@@ -391,7 +391,7 @@ def test_compress_trigger_and_assembly(monkeypatch):
     )
 
     events = list(turn.run_turn("继续"))
-    assert any(e["t"] == "delta" for e in events)
+    assert any(e["t"] == "sentence" for e in events)
 
     assert _live_summary() == "摘要一"
     # 落盘后 10 条 → 折 4 条（完整回合取整）→ 剩 6
