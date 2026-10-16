@@ -295,3 +295,27 @@ test("形象 tab：点模型卡片弹出「表情与动作」，并可按名检�
   await page.locator(".modal-foot").getByText("关闭").click();
   await expect(page.locator(".modal-overlay")).toBeHidden();
 });
+
+test("通用 tab：语言下拉展开后不被下面的「语音设置」面板盖住", async ({ page }) => {
+  await openTab(page, "通用");
+
+  await fieldRow(page, "对话语言").locator(".sel-face").click();
+  const list = page.locator(".sel-list");
+  await expect(list).toBeVisible();
+
+  // 层叠问题的可靠判据是命中测试：选项列底部那个点，谁在最上层。
+  // 若被面板盖住，elementFromPoint 返回的是面板而不是选项列。
+  const hit = await list.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.bottom - 6);
+    return {
+      inside: !!top && el.contains(top),
+      who: top ? `${top.tagName}.${String(top.className)}`.slice(0, 60) : "(null)",
+    };
+  });
+  expect(hit.inside, `命中到 ${hit.who} —— 选项列被别的面板盖住了`).toBe(true);
+
+  // 选项可点（能选到非首项，说明整列都在最上层）
+  await page.locator(".sel-opt").filter({ hasText: "日本語" }).click();
+  await expect(page.locator(".stab-label").first()).toHaveText("通用"); // 界面语言未变
+});

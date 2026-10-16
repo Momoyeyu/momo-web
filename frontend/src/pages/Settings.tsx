@@ -750,7 +750,8 @@ export default function Settings() {
                 {/* 左栏：语言 / 语音两个独立面板，与右栏「对话框设置」同级；
                     末块吃掉剩余高度，两栏总高因此对齐 */}
                 <div className="settings-stack">
-                <section className="panel settings-col">
+                {/* panel-raised：面板里的下拉展开时要盖住下面的「语音设置」 */}
+                <section className="panel settings-col panel-raised">
                   <h3 className="opt-group">{t("settings.groups.lang")}</h3>
                   <div className="opt-list">
                   <FieldRow label={t("settings.langLabel")}>
