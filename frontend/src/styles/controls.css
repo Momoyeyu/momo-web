@@ -385,30 +385,29 @@
   bottom: auto;
 }
 
-/* 圈内问号：悬停/聚焦时给出解释。说明性长句不该直接排在页面上，收进这里。 */
+/* 圈内问号（ui/Hint）：悬停/聚焦时给出解释。
+   图标自带圆环与问号（Lucide circle-help），所以这里不画 border/background；
+   尺寸按 em，比相邻文字略小一丢丢，且跟随所在位置的字号。 */
 .hint {
   flex: none;
-  width: 16px;
-  height: 16px;
+  width: 1em;
+  height: 1em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--line-strong);
-  border-radius: 50%;
   color: var(--text-dim);
-  font-size: 11px;
-  line-height: 1;
   cursor: help;
 }
 
-.hint::before {
-  content: "?";
+.hint > svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .hint:hover,
 .hint:focus-visible {
   color: var(--accent);
-  border-color: var(--accent);
   outline: none;
 }
 

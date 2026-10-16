@@ -27,4 +27,12 @@ describe("Hint", () => {
     const html = renderToStaticMarkup(createElement(Hint, { text: TEXT }));
     expect(html).toContain('tabindex="0"');
   });
+
+  it("用图标画圆与问号（不是 CSS 圆环 + 文字问号）", () => {
+    // 图标自带圆环：问号天然居中、线宽与圆环统一，且随尺寸缩放
+    const html = renderToStaticMarkup(createElement(Hint, { text: TEXT }));
+    expect(html).toContain("<svg");
+    expect(html).toContain("<circle");
+    expect(html).toContain('stroke="currentColor"');
+  });
 });
