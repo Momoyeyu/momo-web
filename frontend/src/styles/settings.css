@@ -341,15 +341,15 @@ button.ghost.danger:hover {
   font-size: 12px;
 }
 
-/* 「测试」结果直接显示在按钮上，**定宽**：结果不能改变按钮宽度，
-   否则同列的输入框会跟着缩放、上下两行的按钮就对不齐了。
-   宽度 = 最坏一档的自然宽度 + 余量。实测（12px 字体，见下）：
+/* 模型页同一列的行内动作按钮（「测试」与「显示」）**共用同一个定宽**：
+   各自调宽度就会像之前那样按下一个又忘了另一个，同列按钮始终对不齐。
+   70px = 最坏一档的自然宽度 + 余量。实测（12px 字体）：
      ✓ 999ms 66.5   ✗ 未入力 60.9   ✗ failed 57.9   ✗ no URL 68.5   ✗ 404 46.5
    失败/未配置文案已按「只留值」精简（失败/失敗/fail、未填/なし/none），
-   故最坏一档是 ✓ 999ms = 66.5px，取 70px 留 3.5px。
+   故最坏一档是 ✓ 999ms = 66.5px；70px 保证结果出现时宽度不变。
    注意别用 scrollWidth 判定是否溢出：<button> 溢出时内容被居中裁掉，scrollWidth 不变大；
    要量得把 width 设 auto 量自然宽度。 */
-.probe-btn {
+.row-btn {
   flex: none;
   width: 70px;
   padding-left: 0.4em;
@@ -357,6 +357,9 @@ button.ghost.danger:hover {
   text-align: center;
   white-space: nowrap;
 }
+
+/* .probe-btn 只作标记（状态色见 .probe-ok / .probe-err，宽度走 .row-btn），
+   同时供选择器与用例定位「探测按钮」。 */
 
 .probe-ok,
 .probe-err,

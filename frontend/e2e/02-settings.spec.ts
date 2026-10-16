@@ -196,11 +196,15 @@ test("形象 tab：偏好与 Live2D 模型左右并排且等宽", async ({ page 
   await expect(page.getByText("Live2D 模型", { exact: true })).toHaveCount(0);
 });
 
-test("探测按钮定宽：出结果不变宽（同列输入框与上下行按钮因此不位移）", async ({ page }) => {
+test("探测按钮定宽：出结果不变宽，且与同列「显示」同宽", async ({ page }) => {
   await openTab(page, "模型");
   const probe = page.locator(".probe-btn").first();
+  // 同列的「显示」按钮：两者共用 .row-btn 的定宽，必须完全等宽
+  const show = page.locator(".key-toggle.row-btn:not(.probe-btn)").first();
 
   const idle = await probe.boundingBox();
+  const showBox = await show.boundingBox();
+  expect(Math.abs((idle?.width ?? 0) - (showBox?.width ?? 0))).toBeLessThan(0.5);
 
   // 定宽的直接证据：把文案换成长度超过空闲态的结果，宽度必须纹丝不动。
   // （用 min-width + 自适应就会在这里变宽 → 同列输入框缩放、上下行按钮错位）
@@ -227,6 +231,8 @@ test("探测按钮定宽：出结果不变宽（同列输入框与上下行按�
     };
   });
   expect(Math.abs(m.box - (idle?.width ?? 0))).toBeLessThan(0.5);
+  // 出结果后仍与「显示」等宽（这正是之前「改了测试忘了显示」的地方）
+  expect(Math.abs(m.box - (showBox?.width ?? 0))).toBeLessThan(0.5);
   expect(m.text).toBeLessThanOrEqual(m.client + 0.5);
   expect(m.box).toBeGreaterThanOrEqual(60);
   expect(m.box).toBeLessThan(90);

@@ -572,7 +572,7 @@ export default function Settings() {
       />
       <Button
         variant="ghost"
-        className={`key-toggle probe-btn ${probeLabel(sec).cls}`}
+        className={`key-toggle row-btn probe-btn ${probeLabel(sec).cls}`}
         onClick={() => runProbe(sec)}
         disabled={probes[sec] !== undefined}
       >
@@ -706,7 +706,7 @@ export default function Settings() {
       />
       <Button
         variant="ghost"
-        className="key-toggle"
+        className="key-toggle row-btn"
         onClick={() => setShowKey((s) => ({ ...s, [sec]: !s[sec] }))}
       >
         {showKey[sec] ? t("settings.hideKey") : t("settings.showKey")}
