@@ -1019,7 +1019,9 @@ export default function Settings() {
                     ))}
                   </div>
                   <div className="col-foot">
-                  <Pager page={extPg.page} pages={extPg.pages} onChange={setExtPage} />
+                    <div className="list-foot">
+                      <Pager page={extPg.page} pages={extPg.pages} onChange={setExtPage} />
+                    </div>
                   </div>
                 </section>
                 </div>
