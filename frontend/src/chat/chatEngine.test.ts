@@ -58,7 +58,7 @@ vi.mock("../live2d/stage", () => ({
 
 import { chat, interrupt } from "../services/chatClient";
 import { ChatEngine } from "./chatEngine";
-import { getSettings, update } from "../lib/store";
+import { getAvatars, getSettings, update } from "../lib/store";
 import type { ChatMessage } from "../lib/types";
 
 const chatMock = vi.mocked(chat);
@@ -253,8 +253,11 @@ describe("麦克风开关语义", () => {
 });
 
 describe("解析层资源清单过滤", () => {
-  it("清单外指令静默丢弃、清单内随句携带（内置形象清单）", async () => {
-    // 内置 Hiyori：expressions 空表、motions 含 Idle/0…8 与 TapBody/0。
+  it("清单外指令静默丢弃、清单内随句携带（当前形象的资源清单）", async () => {
+    // 从 store 取一个真实存在的动作名 —— 不把内置清单抄进测试，否则改内置资源时
+    // 要在两处同步维护。
+    const known = getAvatars()[0].resources?.motions?.[0]?.name;
+    expect(known, "内置形象应当带动作清单").toBeTruthy();
     chatMock.mockImplementation(async function* () {
       yield {
         t: "sentence" as const,
@@ -268,7 +271,7 @@ describe("解析层资源清单过滤", () => {
         no: 1,
         text: "呐！",
         dirs: [
-          { kind: "motion" as const, name: "Idle/0", offset: 0 },
+          { kind: "motion" as const, name: known!, offset: 0 },
           { kind: "motion" as const, name: "Nope/9", offset: 0 },
         ],
         at: "",
@@ -283,11 +286,11 @@ describe("解析层资源清单过滤", () => {
     clearInterval(turn!.timer);
 
     expect(turn!.sentences.map((s) => s.text)).toEqual(["好。", "呐！"]);
-    // exp 不在清单（expressions 为空）→ 丢；Nope/9 不在 motions → 丢；
-    // Idle/0 在清单 → 挂在「呐！」上（offset=0，指令在句首）。
+    // exp 不在清单（内置形象没有表情资源）→ 丢；Nope/9 不在 motions → 丢；
+    // 而在清单的那个动作 → 挂在「呐！」上（offset=0，指令在句首）。
     expect(turn!.sentences[0].dirs).toEqual([]);
     expect(turn!.sentences[1].dirs).toEqual([
-      { kind: "motion", name: "Idle/0", offset: 0 },
+      { kind: "motion", name: known, offset: 0 },
     ]);
     eng.dispose();
   });

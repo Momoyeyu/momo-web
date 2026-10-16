@@ -29,7 +29,7 @@ describe("EditableItem：正文左 / 图标操作列右", () => {
     // 头部行与正文都在 .list-main 里 —— 这正是「正文能垂直居中」的前提
     expect(html).toMatch(/class="list-main"[\s\S]*10\/15 22:53[\s\S]*正文/);
     // 操作列排在正文之后
-    expect(html.indexOf("list-ops")).toBeGreaterThan(html.indexOf("list-main"));
+    expect(html).toMatch(/class="list-main"[\s\S]*class="list-ops"/);
     // 编辑/删除已是纯图标按钮（靠 aria-label + data-tip 而非可见文字）
     expect(html).toMatch(
       /<button[^>]*class="icon-btn icon-btn-sm tip tip-r"[^>]*aria-label="编辑"/,
@@ -38,7 +38,7 @@ describe("EditableItem：正文左 / 图标操作列右", () => {
       /<button[^>]*class="icon-btn icon-btn-sm danger tip tip-r"[^>]*aria-label="删除"/,
     );
     // actions（图钉）排在编辑之前，同一列
-    expect(html.indexOf("mem-pinicon")).toBeLessThan(html.indexOf("aria-label=\"编辑\""));
+    expect(html).toMatch(/mem-pinicon[\s\S]*aria-label="编辑"/);
     // 不再有文字按钮
     expect(html).not.toMatch(/>\s*编辑\s*</);
   });
