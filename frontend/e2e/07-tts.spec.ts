@@ -31,7 +31,7 @@ test("TTS 请求的 lang = 对话语言（日语/英语/auto 三种）", async (
   // assistant 行撤掉，排在它后面就必然找不到可回放条目（假失败）。
   await gotoRoute(page, "chat");
   await page.locator(".input-row input").fill(PROMPT);
-  await page.locator(".input-row button").first().click();
+  await page.getByLabel("发送").click();
 
   // 回合跑完（按钮可点）再断言；期间句子逐条落库，故这里等到的是真实持久化结果
   await gotoRoute(page, "backlog");

@@ -17,6 +17,7 @@ import { useT } from "../i18n";
 import { ServiceError } from "../lib/errors";
 import { getState, speakerName, subscribe } from "../lib/store";
 import Button from "../ui/Button";
+import Icon from "../ui/Icon";
 import DialogBox from "../components/DialogBox";
 import "../styles/chat.css";
 
@@ -157,12 +158,9 @@ export default function Chat() {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) send();
               }}
             />
-            <Button onClick={send} disabled={!input.trim()}>
-              {t("chat.send")}
-            </Button>
             <Button
               variant={micOn ? "solid" : "ghost"}
-              className={micOn ? "mic-on" : undefined}
+              className={`mic-btn${micOn ? " mic-on" : ""}`}
               onClick={toggleMic}
               disabled={!micAllowed}
               aria-label={t("chat.mic")}
@@ -174,7 +172,17 @@ export default function Chat() {
                     : t("chat.micTitleOff")
               }
             >
-              🎤
+              <Icon name="mic" />
+            </Button>
+            <Button
+              variant="solid"
+              className="send-btn"
+              onClick={send}
+              disabled={!input.trim()}
+              aria-label={t("chat.send")}
+              title={t("chat.send")}
+            >
+              <Icon name="send" />
             </Button>
             {busy && (
               <Button
@@ -191,27 +199,36 @@ export default function Chat() {
       {/* 底部工具条：对照 VN 底部 icon 栏，操作聚拢右侧，返回标题收尾 */}
       <div className="chat-toolbar">
         <div className="tb-side">
-          <Button className="tb" onClick={() => navigate("backlog")}>
-            {t("chat.backlog")}
+          <Button
+            className="tb"
+            aria-label={t("chat.backlog")}
+            title={t("chat.backlog")}
+            onClick={() => navigate("backlog")}
+          >
+            <Icon name="backlog" />
           </Button>
           <Button
             className="tb"
             disabled={busy}
-            title={busy ? t("checkpoint.busySave") : undefined}
+            title={busy ? t("checkpoint.busySave") : t("checkpoint.save")}
+            aria-label={t("checkpoint.save")}
             onClick={() => navigate("checkpoint", { checkpointMode: "save" })}
           >
-            {t("checkpoint.save")}
+            <Icon name="save" />
           </Button>
           <Button
             className="tb"
+            aria-label={t("checkpoint.load")}
+            title={t("checkpoint.load")}
             onClick={() => navigate("checkpoint", { checkpointMode: "load" })}
           >
-            {t("checkpoint.load")}
+            <Icon name="load" />
           </Button>
           <Button
             className={`tb${muted || !ttsConfigured ? " tb-off" : ""}`}
             onClick={toggleVoice}
             disabled={!ttsConfigured}
+            aria-label={muted ? t("chat.voiceOff") : t("chat.voiceOn")}
             title={
               !ttsConfigured
                 ? t("chat.voiceNeedCfg")
@@ -220,13 +237,23 @@ export default function Chat() {
                   : t("chat.voiceTitleOn")
             }
           >
-            {muted ? t("chat.voiceOff") : t("chat.voiceOn")}
+            <Icon name={muted ? "voiceOff" : "voice"} />
           </Button>
-          <Button className="tb" onClick={() => navigate("settings")}>
-            {t("settings.title")}
+          <Button
+            className="tb"
+            aria-label={t("settings.title")}
+            title={t("settings.title")}
+            onClick={() => navigate("settings")}
+          >
+            <Icon name="gear" />
           </Button>
-          <Button className="tb" onClick={() => navigate("title")}>
-            {t("common.backTitle")}
+          <Button
+            className="tb"
+            aria-label={t("common.backTitle")}
+            title={t("common.backTitle")}
+            onClick={() => navigate("title")}
+          >
+            <Icon name="home" />
           </Button>
         </div>
       </div>

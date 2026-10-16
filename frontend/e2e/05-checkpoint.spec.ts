@@ -11,7 +11,7 @@ import { gotoRoute } from "./helpers";
 /** 存档入口在对话页工具条（标题页没有可保存的现场）。 */
 async function openSaveMode(page: Page): Promise<void> {
   await gotoRoute(page, "chat");
-  await page.locator(".tb", { hasText: "存档" }).click();
+  await page.getByLabel("存档").click();
   await expect(page.locator(".checkpoint-panel.checkpoint-save")).toBeVisible();
 }
 

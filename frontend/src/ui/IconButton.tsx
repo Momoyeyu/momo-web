@@ -3,21 +3,9 @@
 // 纯图标没有可见文字，可发现性靠 tip（悬停浮窗）与 label（读屏）两者都给。
 import type { MouseEvent } from "react";
 
-import "../styles/controls.css";
+import { ICONS, type IconName } from "./icons";
 
-const PATHS = {
-  /** 「+ 添加条目」——与 ui/AddItemModal 软绑定：代码分开写，但总是成对使用。
-      列表用「+」添加条目时，内容一律由那个弹窗收集。 */
-  plus: ["M12 5v14M5 12h14"],
-  edit: ["M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1z"],
-  trash: [
-    "M5 7h14",
-    "M10 7V5h4v2",
-    "M6.6 7l.8 12.2a1 1 0 0 0 1 .8h7.2a1 1 0 0 0 1-.8L17.4 7",
-  ],
-  /** 采用 / 选中（如「使用该形象」）。 */
-  check: ["M5 13l4 4L19 7"],
-} as const;
+import "../styles/controls.css";
 
 export default function IconButton({
   label,
@@ -35,7 +23,7 @@ export default function IconButton({
   onClick: (e: MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
   /** 内置图标名。 */
-  icon?: keyof typeof PATHS;
+  icon?: IconName;
   /** 悬停浮窗文案。 */
   tip?: string;
   /** 危险操作（删除等）：hover 转红。 */
@@ -50,7 +38,7 @@ export default function IconButton({
   /** 附加类（多为定位，如存档卡的 .slot-del）。 */
   className?: string;
 }) {
-  const paths: readonly string[] | undefined = icon ? PATHS[icon] : undefined;
+  const paths = icon ? ICONS[icon] : undefined;
   const cls = [
     "icon-btn",
     size === "sm" ? "icon-btn-sm" : "",

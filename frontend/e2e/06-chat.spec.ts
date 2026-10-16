@@ -30,14 +30,17 @@ test("控件态：输入为空时发送禁用，工具条与状态条齐备", as
   await expect(page.locator(".chat-status")).toContainText("空闲");
   await expect(page.locator(".nameplate")).not.toBeEmpty();
 
-  const send = page.locator(".input-row button").first();
+  const send = page.getByLabel("发送");
   await expect(send).toBeDisabled();
   await page.locator(".input-row input").fill("x");
   await expect(send).toBeEnabled();
   await page.locator(".input-row input").fill("");
 
-  const toolbar = await page.locator(".chat-toolbar .tb").allTextContents();
-  expect(toolbar).toEqual(["记录", "存档", "读档", "语音·开", "设置", "返回标题"]);
+  // 工具条已全部图标化：可见文案转为 aria-label（鼠标看 tooltip、读屏看这个）
+  const labels = await page
+    .locator(".chat-toolbar .tb")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
+  expect(labels).toEqual(["记录", "存档", "读档", "语音·开", "设置", "返回标题"]);
 });
 
 test("真实回合：发送 → 逐句上屏 → 落账 → backlog 可见，且指令被剥离", async ({
@@ -48,7 +51,7 @@ test("真实回合：发送 → 逐句上屏 → 落账 → backlog 可见，且
   const before = (await liveRows(request)).length;
 
   await page.locator(".input-row input").fill(PROMPT);
-  await page.locator(".input-row button").first().click();
+  await page.getByLabel("发送").click();
 
   // 后端落账是权威信号。注意回合是「先写 user 行，LLM 回来后再写 assistant 行」，
   // 所以不能只等条数变多——要等尾行变成 assistant。
