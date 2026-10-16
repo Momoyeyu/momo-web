@@ -2,7 +2,7 @@
 
 模版**只有英文一份**：语言相关的东西只有两处 ——
 1. lang_line（值来自设置里的「对话语言」）
-2. 人设字段留空时的出厂回落文案（_DEFAULTS，属于「注入内容」）
+2. 人设原本（resources/soul.md 是唯一来源，这里只验证注入行为）
 其余注入内容（人设字段、记忆、资源描述）原样插入，可以是任何语言。
 """
 
@@ -15,9 +15,9 @@ _PINS = ["用户的名称是夜羽", "夜羽是我的创造者"]
 
 
 def _state(lang: str, **over):
-    """构造 state。**刻意塞一份假人设**：人设写死在 prompt.PERSONA，
+    """构造 state。**刻意塞一份假人设**：人设唯一来源是 resources/soul.md，
 
-    配置里的值绝不该被读取 —— 于是每个 prompt 断言都在顺带验证这一点。
+    配置里的同名字段绝不该被读取 —— 于是每个 prompt 断言都在顺带验证这一点。
     """
     return store.normalize_state(
         {
@@ -27,7 +27,6 @@ def _state(lang: str, **over):
                 "identity": "配置里的身份",
                 "age": 99,
                 "personality": "配置里的性格",
-                "preferences": ["配置里的偏好"],
             },
             **over,
         }
@@ -46,7 +45,7 @@ def test_every_template_fragment_is_language_neutral():
 
     这条是本次设计的底线 —— 谁再往 _T 里塞「## 输出方式」这类本地化措辞就会红。
     标点不限（英文里的破折号、引号本来就不是 ASCII）。按语言变化的只能是
-    内容（_DEFAULTS）与语言行。
+    内容（soul 原文）与语言行。
     """
     fragments: list[str] = []
     for value in prompt._T.values():
@@ -58,7 +57,7 @@ def test_every_template_fragment_is_language_neutral():
 
 
 def test_same_scaffolding_for_every_language():
-    """三语的模版骨架完全相同，差异只有 lang_line 那一行。"""
+    """模版只有一份：三种语言拿到的骨架逐字相同，差异只有 lang_line 那一行。"""
     # 用同一份人设（内容固定），逐语言比对：去掉语言行后应逐字相同
     prompts = {}
     for lang in ("zh", "en", "ja"):
@@ -80,12 +79,9 @@ def test_fields_and_pins_are_injected_verbatim():
     assert "# Memory Configuration" in p
     # 人设段 = soul 文件原文（中文内容原样注入，模版不参与翻译）
     soul = prompt.load_soul()
-    assert soul and soul in p
-    assert "- 名称：momo" in p
-    assert "配置里的" not in p  # 配置里的人设一概不读
-    # 偏好功能已删除：整段（含头）都不该出现
-    assert "## Your preferences" not in p
-    assert "- 配置里的偏好" not in p
+    assert soul, "soul 文件应存在且非空"
+    assert soul in p  # 原文注入；不假设内容 —— soul 是用户随时会改的文件
+    assert "配置里的" not in p  # 配置里的人设字段一概不读（上面那份假人设整体不进 prompt）
     assert "- 用户的名称是夜羽" in p
     assert "- 夜羽是我的创造者" in p
     # 使用策略下沉到 tools description；工具清单与策略文本都不写进 prompt
@@ -123,8 +119,6 @@ def test_chat_lang_overrides_ui_lang():
 def test_unknown_lang_falls_back_zh():
     assert "Your conversation language is 中文" in _prompt("fr")
 
-
-# ---------------- 出厂回落（内容，按语言取） ----------------
 
 
 # ---------------- 行为配置（指令段） ----------------
@@ -200,7 +194,7 @@ def test_soul_is_injected_identically_across_languages():
         p = _prompt(lang)
         souls.append(p.split("## Your basic settings")[0])
     assert souls[0] == souls[1] == souls[2]
-    assert "# momo" in souls[0]
+    assert prompt.load_soul() in souls[0]
 
 
 def test_missing_soul_skips_persona_section(monkeypatch, tmp_path):

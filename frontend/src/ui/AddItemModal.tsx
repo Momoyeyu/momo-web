@@ -16,17 +16,12 @@ import "../styles/modal.css";
 
 export default function AddItemModal({
   title,
-  placeholder,
-  multiline,
   extra,
   onSave,
   onCancel,
 }: {
   /** 弹窗顶部的一行灰字标题。 */
   title: string;
-  placeholder?: string;
-  /** 多行内容用 textarea（记忆），单行用 input。 */
-  multiline?: boolean;
   /** 输入框下方的附加选项（如记忆的 PIN 开关）。 */
   extra?: ReactNode;
   /** 内容已 trim，非空才会回调。 */
@@ -42,33 +37,18 @@ export default function AddItemModal({
   return (
     <Modal onClose={onCancel} className="add-modal">
       <div className="modal-meta muted">{title}</div>
-      {multiline ? (
-        <textarea
-          className="add-field"
-          rows={4}
-          autoFocus
-          value={draft}
-          placeholder={placeholder}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onCancel();
-            // 多行用 ⌘/Ctrl+Enter 提交，单 Enter 留给换行
-            else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
-          }}
-        />
-      ) : (
-        <input
-          className="add-field"
-          autoFocus
-          value={draft}
-          placeholder={placeholder}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) save();
-            else if (e.key === "Escape") onCancel();
-          }}
-        />
-      )}
+      <textarea
+        className="add-field"
+        rows={4}
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onCancel();
+          // 多行：⌘/Ctrl+Enter 提交，单 Enter 留给换行
+          else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+        }}
+      />
       {extra}
       <div className="modal-foot">
         <Button variant="ghost" onClick={onCancel}>

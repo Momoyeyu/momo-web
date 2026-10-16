@@ -95,9 +95,6 @@ interface Turn {
   pushIndex: number;
   inflight: number;
   disp: DisplayState;
-  /** 恒定为空。切句已全部在 backend 完成，前端不再持有「未断句尾部」；
-   *  保留字段是为了不牵动展示层对「生产中文案」的分支（它读到的就是空串）。 */
-  tail: string;
   /** 本轮已 push 进转写的句子条数（打断时按「实际看到」重建尾部用）。 */
   pushed: number;
   /** 播放 tick（setInterval id；构造期占位 0）。 */
@@ -296,7 +293,6 @@ export class ChatEngine {
       pushIndex: 0,
       inflight: 0,
       disp: { idx: 0, reveal: 0, doneAt: 0, pausedUntil: 0, emitted: "" },
-      tail: "",
       pushed: 0,
       timer: 0,
     };
@@ -425,14 +421,13 @@ export class ChatEngine {
 
   // ---------- 内部 ----------
 
-  /** 用户实际看到的文本：已播完句全文 + 当前展示位的已显露字符
-   *  （当前位是未断句尾部时取 tail 的已显露前缀）。 */
+  /** 用户实际看到的文本：已播完句全文 + 当前展示位的已显露字符。 */
   private seenText(turn: Turn): string {
     const parts = turn.sentences
       .slice(0, Math.min(turn.disp.idx, turn.sentences.length))
       .map((s) => s.text);
     const active = turn.sentences[turn.disp.idx];
-    const cur = active ? active.text : turn.tail.trimStart();
+    const cur = active ? active.text : "";
     const n = Math.min(cur.length, Math.floor(turn.disp.reveal));
     if (n > 0) parts.push(cur.slice(0, n));
     return parts.join("");
@@ -609,21 +604,12 @@ export class ChatEngine {
 
     const g = getSettings().general;
     const active = turn.sentences[turn.disp.idx];
-    let fullText: string;
-    let complete: boolean;
-    if (active) {
-      fullText = active.text;
-      complete = true;
-    } else {
-      // 生产中的未断句尾部：跟着产出速度走（速率 = min(文字速度, 产出)）。
-      const tail = turn.tail.trimStart();
-      if (!tail) {
-        this.maybeFinish(turn);
-        return;
-      }
-      fullText = tail;
-      complete = false;
+    // 没有正在展示的句子：交给收尾判定（切句全在后端，前端不再有「未断句尾部」）
+    if (!active) {
+      this.maybeFinish(turn);
+      return;
     }
+    const fullText = active.text;
 
     // 逐字上屏：受文字速度封顶，不超过已产出长度。
     const target = fullText.length;
@@ -642,7 +628,6 @@ export class ChatEngine {
       this.events.onDisplay(shown);
       if (shown && this.phase === "thinking") this.setPhase("speaking");
     }
-    if (!complete) return;
 
     // 展示游标越过指令位置才派发（offset 越界收敛到句尾；句中途可切换）。
     const due = dueDirs(active.dirs, active.dirIdx, turn.disp.reveal, target);
@@ -694,7 +679,6 @@ export class ChatEngine {
     if (this.turn !== turn || turn.finished) return;
     if (!turn.llmDone || turn.inflight > 0) return;
     if (turn.disp.idx < turn.sentences.length) return; // 还有句没播完
-    if (turn.tail.trim()) return; // 尾部未落句（llmDone 后应已 flush，保险）
     if (turn.pushedAudio && this.playerPlaying()) return;
     this.completeTurn(turn);
   }

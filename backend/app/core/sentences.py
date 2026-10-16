@@ -271,7 +271,7 @@ class SentenceStream:
 
 
 def split_sentences(text: str) -> list[Sentence]:
-    """整段切句（非流式路径与测试用）；与逐块 push 结果一致。"""
+    """整段切句（测试与离线校验用）；结果与逐块 push + flush 完全一致。"""
     st = SentenceStream()
     out = st.push(text)
     out.extend(st.flush())

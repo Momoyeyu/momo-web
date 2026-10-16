@@ -226,7 +226,6 @@ onClick={(e) => {
       {adding && (
         <AddItemModal
           title={t("memory.newTitle")}
-          multiline
           onSave={(text) => void commitAdd(text, addPinned)}
           onCancel={() => {
             setAdding(false);
