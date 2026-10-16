@@ -99,7 +99,7 @@ export const en: Dict = {
     voiceInput: "Voice input",
     voiceNeedAsr: "Set up ASR in the Models tab first",
     previewSample:
-      "Welcome back, 夜羽! How was your day? Feel free to tell me anything on your mind.",
+      "Welcome back! How was your day? Feel free to tell me anything on your mind.",
     langs: { zh: "中文", ja: "日本語", en: "English" },
     apiUrl: "API URL",
     apiKey: "API Key",

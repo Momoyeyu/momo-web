@@ -99,7 +99,7 @@ export const ja: Dict = {
     voiceInput: "音声入力",
     voiceNeedAsr: "先に「モデル」タブで ASR を設定してください",
     previewSample:
-      "夜羽、おかえりなさい！今日はどんな一日でしたか？何でも聞かせてくださいね。",
+      "おかえりなさい！今日はどんな一日でしたか？何でも聞かせてくださいね。",
     langs: { zh: "中文", ja: "日本語", en: "English" },
     apiUrl: "API アドレス",
     apiKey: "API キー",

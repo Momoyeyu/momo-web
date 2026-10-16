@@ -99,7 +99,7 @@ export const zh = {
     voiceInput: "语音输入",
     voiceNeedAsr: "先在「模型」tab 配置 ASR",
     previewSample:
-      "夜羽，欢迎回来。今天过得怎么样？有想聊的事尽管告诉我哦。",
+      "欢迎回来。今天过得怎么样？有想聊的事尽管告诉我哦。",
     langs: { zh: "中文", ja: "日本語", en: "English" },
     apiUrl: "API 地址",
     apiKey: "API Key",
