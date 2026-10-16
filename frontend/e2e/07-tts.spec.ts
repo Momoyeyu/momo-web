@@ -2,13 +2,21 @@
 // 而不是界面语言、也不是 TTS 自己的字段。
 //
 // 走 backlog 的「回放」路径验证：它和实时回合共用同一处语言解析，
-// 但不发 /api/chat、不写 live，是对这个需求最干净的观测点。
+// 是对这个需求最干净的观测点。
 // 拦下 /v1/audio/speech 读请求体，不依赖 mac-studio 上真实的 TTS。
 import { expect, test } from "@playwright/test";
 import { gotoRoute, readState, useStateRestore, writeState } from "./helpers";
 
 const restore = useStateRestore();
-test.afterEach(restore);
+
+// 本用例要先自己造一个可回放的回合，收尾时把它的 assistant 行撤掉（幂等）。
+const PROMPT = "只回复两个字：收到";
+test.afterEach(async ({ request }) => {
+  await request.post("/api/chat/interrupt", {
+    data: { user: PROMPT, assistant: "" },
+  });
+  await restore({ request });
+});
 
 type Body = { input?: string; lang?: string; voice?: string };
 
@@ -19,8 +27,17 @@ test("TTS 请求的 lang = 对话语言（日语/英语/auto 三种）", async (
     await route.fulfill({ status: 200, headers: { "Content-Type": "audio/pcm" }, body: "" });
   });
 
+  // 先自己造一个回合：不能依赖别的 spec 留下的数据 —— 06-chat 的收尾会把它自己的
+  // assistant 行撤掉，排在它后面就必然找不到可回放条目（假失败）。
+  await gotoRoute(page, "chat");
+  await page.locator(".input-row input").fill(PROMPT);
+  await page.locator(".input-row button").first().click();
+
+  // 回合跑完（按钮可点）再断言；期间句子逐条落库，故这里等到的是真实持久化结果
   await gotoRoute(page, "backlog");
-  await expect(page.locator(".bl-replay:not([disabled])").first()).toBeVisible();
+  await expect(page.locator(".bl-replay:not([disabled])").first()).toBeVisible({
+    timeout: 30_000,
+  });
 
   // auto 的期望值 = 界面语言（useStateRestore 已把 lang 固定为 zh）
   const cases: [string, string][] = [

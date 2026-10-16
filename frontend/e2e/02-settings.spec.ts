@@ -216,11 +216,12 @@ test("拓展 tab：Live2D 与「记忆」同构（检索 + 加号 + 翻页），
   const panel = page.locator(".persona-section").nth(0);
 
   await expect(panel.locator(".mem-search")).toBeVisible();
-  await expect(panel.locator(".icon-btn")).toBeVisible();
+  // 只取工具条的加号：卡片上还有编辑/删除两个 .icon-btn，多个匹配会触发严格模式报错
+  await expect(panel.locator(".mem-toolbar .icon-btn")).toBeVisible();
   await expect(panel.locator(".list-pager")).toBeVisible();
   await expect(panel.locator(".list-item").first()).toBeVisible();
 
-  await panel.locator(".icon-btn").click();
+  await panel.locator(".mem-toolbar .icon-btn").click();
   await expect(page.locator(".modal-overlay")).toBeVisible();
   await expect(page.locator(".modal-meta")).toHaveText("导入模型 (.zip)");
   await expect(page.locator(".avatar-drop")).toContainText("拖入");

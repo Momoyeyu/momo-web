@@ -142,7 +142,6 @@ export async function* chat(
         const ev = handleLine(lines.shift()!);
         if (!ev) continue;
         yield ev;
-        if (ev.t !== "delta") return;
       }
     }
   } catch (e) {
