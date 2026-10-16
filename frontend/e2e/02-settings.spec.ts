@@ -107,6 +107,13 @@ test("端点探测：可点、出结果、2.5s 后自动复原", async ({ page }
 
 test("拓展 tab：登记 stdio MCP server → 出现在列表 → 删除", async ({ page }) => {
   await openTab(page, "拓展");
+  // 「说明书」性质的说明收进了问号浮窗：正文里不该再有那段长句，
+  // 但说明本身要能在浮窗里拿到（鼠标走 data-tip，读屏走 aria-label）。
+  // 直接查内容而不是类名：以后就算换了类名，只要长句又排回版面上就会红
+  await expect(page.locator(".ext-panel")).not.toContainText("下一轮对话起");
+  const hint = page.locator(".ext-panel .hint").first();
+  await expect(hint).toHaveAttribute("data-tip", /MCP/);
+  await expect(hint).toHaveAttribute("aria-label", /MCP/);
   await expect(page.locator(".ext-list")).toBeVisible();
 
   await page.locator(".ext-add").click();

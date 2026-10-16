@@ -374,8 +374,42 @@
   transform: none;
 }
 
-.tip:hover::after {
+.tip:hover::after,
+.tip:focus-visible::after {
   opacity: 1;
+}
+
+/* 朝下弹的浮窗：元素贴在面板顶部时用（朝上会被滚动容器裁掉）。 */
+.tip.tip-b::after {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+
+/* 圈内问号：悬停/聚焦时给出解释。说明性长句不该直接排在页面上，收进这里。 */
+.hint {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1;
+  cursor: help;
+}
+
+.hint::before {
+  content: "?";
+}
+
+.hint:hover,
+.hint:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+  outline: none;
 }
 
 /* ===== EditableItem：可编辑列表卡片 ===== */

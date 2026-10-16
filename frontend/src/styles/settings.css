@@ -442,9 +442,21 @@ button.ghost.danger:hover {
   min-height: 0;
 }
 
-.ext-hint {
-  margin: 2px 4px 10px;
-  font-size: 12px;
+/* 面板标题行：标题 + 右侧问号。外边距沿用 .opt-group 的默认值，
+   首位时同样收紧（标题原来自己是首个子元素，现在被这层包住）。 */
+.panel-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 22px 4px 4px;
+}
+
+.panel-title-row:first-child {
+  margin-top: 4px;
+}
+
+.panel-title-row .opt-group {
+  margin: 0;
 }
 
 .ext-list {

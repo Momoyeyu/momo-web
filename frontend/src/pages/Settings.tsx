@@ -37,6 +37,7 @@ import Modal from "../ui/Modal";
 import Slider from "../ui/Slider";
 import Switch from "../ui/Switch";
 import Button from "../ui/Button";
+import Hint from "../ui/Hint";
 import IconButton from "../ui/IconButton";
 import DialogBox from "../components/DialogBox";
 import Pager from "../ui/Pager";
@@ -946,10 +947,13 @@ export default function Settings() {
               {tab === "extend" && (
                 /* 拓展是设置页唯一单栏页：整行通宽列表，编辑走居中弹窗。 */
                 <section className="panel settings-col ext-panel">
-                  <h3 className="opt-group">
-                    {t("settings.groups.extensions")}
-                  </h3>
-                  <p className="muted ext-hint">{t("settings.extHint")}</p>
+                  <div className="panel-title-row">
+                    <h3 className="opt-group">
+                      {t("settings.groups.extensions")}
+                    </h3>
+                    {/* 这段说明是「说明书」性质：收进问号浮窗，不占版面 */}
+                    <Hint text={t("settings.extHint")} />
+                  </div>
                   <div className="ext-list col-grow">
                     {extSlice.map(({ ext, i }) => (
                       <div className="ext-row" key={i}>
