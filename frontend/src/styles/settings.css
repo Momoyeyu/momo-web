@@ -330,64 +330,22 @@ button.ghost.danger:hover {
   border-color: var(--danger-line);
 }
 
-.opt-row {
-  display: flex;
-  align-items: center;
-  gap: 28px;
-  padding: 15px 4px;
-  border-bottom: 1px solid var(--line-soft);
-}
-
-.opt-row:last-child {
-  border-bottom: none;
-}
-
-.opt-label {
-  flex: none;
-  width: 180px;
-  font-size: 14px;
-  color: var(--text-dim);
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-}
-
-.opt-extra {
-  flex: none;
-  margin-left: 6px;
-  color: var(--accent-strong);
-  font-size: 12px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-/* 必填标记：标签/组标题后的 * */
-.req {
-  margin-left: 4px;
-  color: var(--danger);
-}
-
-.opt-ctl {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.opt-ctl input[type="text"],
-.opt-ctl input[type="password"],
-.opt-ctl input:not([type]) {
-  flex: 1;
-  min-width: 0;
-}
-
 .key-toggle {
   flex: none;
   padding: 0.5em 1em;
   font-size: 12px;
 }
 
-/* 「测试连接」结果：内联在 URL 行右侧 */
+/* 「测试」结果直接显示在按钮上——固定宽度（三语同宽、最坏文案不省略）。 */
+.probe-btn {
+  flex: none;
+  width: 96px;
+  padding-left: 0.4em;
+  padding-right: 0.4em;
+  text-align: center;
+  white-space: nowrap;
+}
+
 .probe-ok,
 .probe-err,
 .probe-info {
@@ -405,54 +363,6 @@ button.ghost.danger:hover {
   opacity: 0.6;
 }
 
-/* --- 开关（圆角矩形槽 + 圆角方块钮） --- */
-
-.opt-switch {
-  position: relative;
-  flex: none;
-  width: 46px;
-  height: 25px;
-  padding: 0;
-  border-radius: var(--r-md);
-  border: 1px solid var(--line);
-  background: var(--line-soft);
-  transition:
-    background 0.18s ease,
-    border-color 0.18s ease;
-}
-
-.opt-switch .knob {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 17px;
-  height: 17px;
-  border-radius: var(--r-sm);
-  background: var(--text-dim);
-  transition:
-    left 0.18s ease,
-    background 0.18s ease;
-}
-
-.opt-switch:hover {
-  box-shadow: none;
-}
-
-.opt-switch.on {
-  background: var(--accent-soft);
-  border-color: var(--accent);
-}
-
-.opt-switch.on .knob {
-  left: 24px;
-  background: var(--accent);
-}
-
-.opt-switch:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
 /* --- 对话框透明度预览（复用 chat 的 dialog-box 外观） --- */
 
 .dialog-preview {
@@ -466,48 +376,6 @@ button.ghost.danger:hover {
   pointer-events: none;
 }
 
-/* --- 滑块（透明度/音量） --- */
-
-.opt-ctl input[type="range"] {
-  appearance: none;
-  flex: 1;
-  height: 6px;
-  padding: 0;
-  border: none;
-  border-radius: var(--r-sm);
-  background: var(--line);
-  outline: none;
-  cursor: pointer;
-}
-
-/* 菱形 thumb：与标题菜单 ◆ 饰标同一母题。 */
-.opt-ctl input[type="range"]:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.opt-ctl input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  width: 13px;
-  height: 13px;
-  margin-top: 0;
-  border-radius: var(--r-xs);
-  background: var(--accent);
-  border: none;
-  transform: rotate(45deg);
-  box-shadow: 0 0 8px var(--accent-glow);
-}
-
-.opt-ctl input[type="range"]::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
-  border-radius: var(--r-xs);
-  background: var(--accent);
-  border: none;
-  transform: rotate(45deg);
-}
-
-
 /* --- 人格/记忆面板复用的双栏表单 --- */
 
 .fields-grid {
@@ -516,22 +384,8 @@ button.ghost.danger:hover {
   gap: 18px 28px;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field.span2 {
-  grid-column: span 2;
-}
-
-.field-label {
-  font-size: 13px;
-  color: var(--text-dim);
-  letter-spacing: 0.08em;
-}
-
+/* .field / .field-label 的基础样式归 persona.css（唯一定义处——此前两份定义值不同、
+   谁生效取决于打包顺序）。 */
 
 /* --- 底部操作条（独立全宽容器） --- */
 
@@ -555,12 +409,6 @@ button.ghost.danger:hover {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-/* URL 合法性检查：非法值红描边 + 行内红字提示。 */
-.opt-ctl input.invalid {
-  border-color: var(--danger);
-  box-shadow: 0 0 0 1px var(--danger-line);
 }
 
 /* --- 拓展 tab：唯一单栏页——整行通宽列表 + 居中配置弹窗 --- */
@@ -662,18 +510,7 @@ button.ghost.danger:hover {
   margin-top: 14px;
 }
 
-/* --- 居中弹窗：背景变暗，点背景关闭（未保存丢弃） --- */
-
-.modal-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--backdrop);
-  backdrop-filter: blur(10px);
-}
+/* --- 拓展配置弹窗：Modal(ui/Modal) + 尺寸覆盖 --- */
 
 .ext-modal {
   width: min(620px, calc(100% - 64px));
@@ -712,15 +549,6 @@ button.ghost.danger:hover {
   justify-content: flex-end;
   gap: 10px;
   margin: 8px 0 4px;
-}
-
-/* 多行控件行（键值对编辑器）：标签顶对齐。 */
-.opt-row.top {
-  align-items: flex-start;
-}
-
-.opt-row.top .opt-label {
-  padding-top: 9px;
 }
 
 /* 键值对编辑器：KEY = value 行可增删。 */

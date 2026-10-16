@@ -51,6 +51,11 @@ export async function deleteCheckpoint(id: string): Promise<void> {
   await apiFetch(`${API}/${id}`, { method: "DELETE" });
 }
 
+/** 开启新会话：live 非空先快照进 auto 槽，然后清空 live。 */
+export async function newSession(): Promise<void> {
+  await apiFetch(`${API}/live/new`, { method: "POST" });
+}
+
 /** 读取存档：覆盖当前会话，返回存档全文（messages 灌进引擎）。 */
 export function loadCheckpoint(id: string): Promise<CheckpointSave> {
   return apiJson<CheckpointSave>(`${API}/${id}/load`, { method: "POST" });

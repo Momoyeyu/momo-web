@@ -32,6 +32,9 @@
   gap: 18px;
 }
 
+/* 字段（标签 + 控件竖排）——唯一定义处。
+   settings.css 里曾有一份重复定义且 .field-label 多一个 letter-spacing；
+   打包顺序决定谁生效（settings.css 在后），这里合并为一份并保留当时生效的值。 */
 .field {
   display: flex;
   flex-direction: column;
@@ -41,6 +44,7 @@
 .field-label {
   font-size: 13px;
   color: var(--text-dim);
+  letter-spacing: 0.08em;
 }
 
 .field input,
@@ -51,11 +55,11 @@
 }
 
 .field textarea,
-.persona-section > textarea,
-.mem-edit textarea {
+.persona-section > textarea {
   resize: vertical;
   line-height: 1.6;
 }
+/* 注：`.list-edit textarea` 的同款规则归 controls.css（EditableItem 自带）。 */
 
 .row {
   display: flex;
@@ -79,6 +83,70 @@ button.danger:hover {
 
 /* ---- 记忆区 ---- */
 
+/* 记忆 tab：单栏面板铺满内容区高度。 */
+.mem-panel {
+  min-height: min(560px, 72vh);
+}
+
+/* 卡片右上角图钉钮：pinned=实心金 / unpinned=金色描边；hover 出说明浮窗。 */
+.mem-pinicon {
+  position: relative;
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-sm);
+  color: var(--accent);
+  opacity: 0.55;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.mem-pinicon svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.mem-pinicon:hover {
+  opacity: 0.9;
+}
+
+.mem-pinicon.on {
+  opacity: 1;
+}
+
+/* 底行：翻页器居中。 */
+.mem-foot {
+  display: flex;
+  justify-content: center;
+}
+
+/* 添加记忆弹窗内的 PIN 选项：卡片同款图钉 + 标签。 */
+.mem-pinopt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  user-select: none;
+}
+
+/* 弹窗内图钉：去掉卡片上的 auto 右推。 */
+.mem-pinopt .mem-pinicon {
+  margin-left: 0;
+}
+
+.mem-add-text {
+  width: 100%;
+  resize: vertical;
+  line-height: 1.6;
+}
+
 .mem-toolbar {
   display: flex;
   align-items: center;
@@ -86,115 +154,9 @@ button.danger:hover {
   flex-wrap: wrap;
 }
 
-/* 列表底行：左侧 [+ 添加]，右侧翻页器。 */
-.list-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.list-foot > .row {
-  flex: 1;
-  min-width: 0;
-}
-
-.list-pager {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pager-text {
-  font-size: 12px;
-  color: var(--text-dim);
-  letter-spacing: 0.08em;
-  font-variant-numeric: tabular-nums;
-}
-
 .mem-search {
   flex: 1;
   min-width: 140px;
 }
 
-.mem-item {
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
 
-/* 可点开详情弹窗的卡片（非编辑态）。 */
-.mem-item.mem-open {
-  cursor: pointer;
-}
-
-.mem-item.mem-open:hover {
-  border-color: var(--line-strong);
-}
-
-.mem-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-}
-
-/* 卡片正文统一单行截断；全文走详情弹窗。 */
-.mem-content {
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mem-ops {
-  display: flex;
-  gap: 8px;
-}
-
-/* ---- 详情弹窗：背景变暗、点背景关闭、只读全文 + [关闭] ---- */
-
-.detail-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--backdrop);
-  backdrop-filter: blur(6px);
-}
-
-.detail-modal {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: min(520px, 92vw);
-  max-height: 70vh;
-  padding: 18px 20px;
-  background: var(--panel-solid);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-}
-
-.detail-meta {
-  font-size: 12px;
-}
-
-.detail-body {
-  overflow: auto;
-  font-size: 14px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.detail-foot {
-  display: flex;
-  justify-content: flex-end;
-}

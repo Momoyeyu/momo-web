@@ -12,6 +12,8 @@ import {
 import { getState, personaName, subscribe } from "../lib/store";
 import { navigate } from "../router";
 import { useT } from "../i18n";
+import Button from "../ui/Button";
+import PageHeader from "../ui/PageHeader";
 import "../styles/backlog.css";
 
 export default function Backlog() {
@@ -45,12 +47,15 @@ export default function Backlog() {
   return (
     <div className="backlog-page">
       <div className="backlog-panel">
-        <header className="backlog-head">
-          <h1>{t("backlog.title")}</h1>
-          <button className="ghost" onClick={() => navigate("chat")}>
-            {t("common.backChat")}
-          </button>
-        </header>
+        <PageHeader
+          className="backlog-head"
+          title={t("backlog.title")}
+          actions={
+            <Button variant="ghost" onClick={() => navigate("chat")}>
+              {t("common.backChat")}
+            </Button>
+          }
+        />
 
         <div className="backlog-list" ref={listRef}>
           {messages.length === 0 && (
@@ -61,7 +66,7 @@ export default function Backlog() {
               <div className="bl-name">
                 {m.role === "user" ? t("chat.you") : name}
                 {m.role === "assistant" && (
-                  <button
+                  <Button
                     className="bl-replay"
                     disabled={!idle || replaying !== null || !ttsConfigured || muted}
                     title={
@@ -74,7 +79,7 @@ export default function Backlog() {
                     onClick={() => replay(m.id)}
                   >
                     {replaying === m.id ? "…" : `♪ ${t("backlog.replay")}`}
-                  </button>
+                  </Button>
                 )}
               </div>
               <div className="bl-text">{m.text}</div>

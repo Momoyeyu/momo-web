@@ -1,8 +1,8 @@
 // 人格面板（设置页 tab）：人设卡编辑。受控组件——
 // 每次修改直接写 store 落盘（设置页即改即生效）。
 // 布局按 prototype/setting：「基本信息」整行面板内左右两列，
-// 「偏好」独立整行面板（卡片式：正文单行截断、点击出详情弹窗，
-// 编辑/删除在卡片上操作）。
+// 「偏好」独立整行面板（卡片走 ui/EditableItem，与记忆页同一形态：
+// 正文单行截断、点击出详情弹窗，编辑/删除在卡片上操作）。
 
 import { useState } from "react";
 import type { PersonaCard } from "../lib/types";
@@ -10,7 +10,10 @@ import { DEFAULT_PERSONA } from "../lib/store";
 import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
 import Pager from "../ui/Pager";
 import DetailModal from "../components/DetailModal";
-import { useT } from "../i18n";
+import EditableItem from "../ui/EditableItem";
+import IconButton from "../ui/IconButton";
+import Button from "../ui/Button";
+import { useT, tFor, promptLang } from "../i18n";
 import "../styles/persona.css";
 
 export default function PersonaPanel({
@@ -93,7 +96,7 @@ export default function PersonaPanel({
               <span className="field-label">{t("persona.identity")}</span>
               <input
                 value={value.identity}
-                placeholder={DEFAULT_PERSONA.identity}
+                placeholder={tFor(promptLang(), "persona.defaults.identity")}
                 onChange={(e) => patch({ identity: e.target.value })}
               />
             </label>
@@ -112,7 +115,7 @@ export default function PersonaPanel({
               <span className="field-label">{t("persona.personality")}</span>
               <input
                 value={value.personality}
-                placeholder={DEFAULT_PERSONA.personality}
+                placeholder={tFor(promptLang(), "persona.defaults.personality")}
                 onChange={(e) => patch({ personality: e.target.value })}
               />
             </label>
@@ -121,26 +124,40 @@ export default function PersonaPanel({
       </section>
       <section className="panel persona-section">
         <h2>{t("persona.preferences")}</h2>
-        <input
-          className="mem-search"
-          placeholder={t("persona.prefSearchPh")}
-          value={prefQuery}
-          onChange={(e) => {
-            setPrefQuery(e.target.value);
-            setPrefPage(0);
-          }}
-        />
+        <div className="mem-toolbar">
+          <input
+            className="mem-search"
+            placeholder={t("persona.prefSearchPh")}
+            value={prefQuery}
+            onChange={(e) => {
+              setPrefQuery(e.target.value);
+              setPrefPage(0);
+            }}
+          />
+          <IconButton
+            icon="plus"
+            label={t("persona.prefAdd")}
+            onClick={addPref}
+            disabled={editingPref !== null}
+          />
+        </div>
         <div className="field col-grow">
           {prefSlice.map(({ text: p, i }) => (
-            <div
-              className={`mem-item${editingPref === i ? "" : " mem-open"}`}
+            <EditableItem
               key={i}
-              onClick={() => {
-                if (editingPref !== i) setDetail(p);
+              editing={editingPref === i}
+              onOpen={() => setDetail(p)}
+              onStartEdit={() => {
+                setEditingPref(i);
+                setPrefDraft(p);
               }}
-            >
-              {editingPref === i ? (
-                <div className="mem-edit">
+              onDelete={() =>
+                patch({
+                  preferences: value.preferences.filter((_, j) => j !== i),
+                })
+              }
+              edit={
+                <div className="list-edit">
                   <input
                     autoFocus
                     value={prefDraft}
@@ -155,62 +172,35 @@ export default function PersonaPanel({
                     }}
                   />
                   <div className="row">
-                    <button className="small" onClick={() => commitPref()}>
+                    <Button size="sm" onClick={() => commitPref()}>
                       {t("common.save")}
-                    </button>
-                    <button
-                      className="ghost small"
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => cancelPref(p)}
                     >
                       {t("common.cancel")}
-                    </button>
+                    </Button>
                   </div>
                 </div>
-              ) : (
-                <>
-                  <div className="mem-content">{p}</div>
-                  <div className="mem-ops">
-                    <button
-                      className="ghost small"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingPref(i);
-                        setPrefDraft(p);
-                      }}
-                    >
-                      {t("common.edit")}
-                    </button>
-                    <button
-                      className="ghost small danger"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        patch({
-                          preferences: value.preferences.filter(
-                            (_, j) => j !== i,
-                          ),
-                        });
-                      }}
-                    >
-                      {t("common.del")}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+              }
+            >
+              {p}
+            </EditableItem>
           ))}
           {prefHits.length === 0 && (
             <p className="muted">{t("persona.prefEmpty")}</p>
           )}
         </div>
-        <div className="list-foot">
-          <button className="ghost small" onClick={addPref}>
-            {t("persona.prefAdd")}
-          </button>
-          <Pager
-            page={pref.page}
-            pages={pref.pages}
-            onChange={setPrefPage}
-          />
+        <div className="col-foot">
+          <div className="mem-foot">
+            <Pager
+              page={pref.page}
+              pages={pref.pages}
+              onChange={setPrefPage}
+            />
+          </div>
         </div>
       </section>
       {detail !== null && (

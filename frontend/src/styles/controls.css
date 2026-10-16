@@ -115,3 +115,349 @@
   color: var(--accent-strong);
   border-left-color: var(--accent);
 }
+
+/* ===== FieldRow：行式表单项（左标签 + 右控件 + *必填 + 尾注） ===== */
+
+.opt-row {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 15px 4px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.opt-row:last-child {
+  border-bottom: none;
+}
+
+.opt-row.top {
+  align-items: flex-start;
+}
+
+.opt-row.top .opt-label {
+  padding-top: 9px;
+}
+
+.opt-label {
+  flex: none;
+  width: 180px;
+  font-size: 14px;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.req {
+  margin-left: 4px;
+  color: var(--danger);
+}
+
+.opt-ctl {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.opt-ctl input[type="text"],
+.opt-ctl input[type="password"],
+.opt-ctl input:not([type]) {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 非法值红描边（URL 校验等行内校验态）。 */
+.opt-ctl input.invalid {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 1px var(--danger-line);
+}
+
+.opt-extra {
+  flex: none;
+  margin-left: 6px;
+  color: var(--accent-strong);
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== Switch：圆角矩形槽 + 方块钮 ===== */
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 25px;
+  padding: 0;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--line-soft);
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.switch .knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 17px;
+  height: 17px;
+  border-radius: var(--r-sm);
+  background: var(--text-dim);
+  transition:
+    left 0.18s ease,
+    background 0.18s ease;
+}
+
+.switch:hover {
+  box-shadow: none;
+}
+
+.switch.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.switch.on .knob {
+  left: 24px;
+  background: var(--accent);
+}
+
+.switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ===== Slider：左金右灰轨道 + 菱形 thumb + 右端数值 ===== */
+
+.ux-range {
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  height: 6px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-sm);
+  background: var(--line);
+  outline: none;
+  cursor: pointer;
+}
+
+.ux-range:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ux-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: 0;
+  border-radius: var(--r-xs);
+  background: var(--accent);
+  border: none;
+  transform: rotate(45deg);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+.ux-range::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: var(--r-xs);
+  background: var(--accent);
+  border: none;
+  transform: rotate(45deg);
+}
+
+.slider-val {
+  flex: none;
+  margin-left: 6px;
+  color: var(--accent-strong);
+  font-size: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ===== IconButton：方形纯图标钮（[+]/图钉等） ===== */
+
+.icon-btn {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.icon-btn svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: none;
+  color: var(--accent);
+  border-color: var(--line-strong);
+}
+
+/* hover 描边加粗（与翻页箭头同理，不铺底色）。 */
+.icon-btn:hover:not(:disabled) svg path {
+  stroke-width: 2.6;
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ===== Tip：通用 hover 浮窗——任意元素加 class="tip" + data-tip 即可 =====
+   默认在元素上方居中；tip-r 右缘对齐（向右下不挡左侧）、tip-l 左缘对齐。 */
+
+.tip {
+  position: relative;
+}
+
+.tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  color: var(--text);
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  white-space: normal;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 30;
+}
+
+.tip.tip-r::after {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.tip.tip-l::after {
+  left: 0;
+  transform: none;
+}
+
+.tip:hover::after {
+  opacity: 1;
+}
+
+/* ===== EditableItem：可编辑列表卡片 ===== */
+
+.list-item {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 可点开详情弹窗的卡片（非编辑态）。 */
+.list-item.list-open {
+  cursor: pointer;
+}
+
+.list-item.list-open:hover {
+  border-color: var(--line-strong);
+}
+
+.list-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+/* 卡片正文统一单行截断；全文走详情弹窗。 */
+.list-content {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list-ops {
+  display: flex;
+  gap: 8px;
+}
+
+.list-edit textarea {
+  resize: vertical;
+  line-height: 1.6;
+}
+
+/* ===== Pager：一体式翻页胶囊 ‹ n/N › =====
+   外框一体、无内部分隔线；hover 加粗箭头（不铺底色）；单页时箭头置灰。 */
+
+.list-pager {
+  flex: none;
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.pager-btn {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-dim);
+  font-size: 14px;
+  padding: 4px 12px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.pager-btn:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: none;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.pager-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pager-text {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 12px;
+}

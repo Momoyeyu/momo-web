@@ -8,6 +8,20 @@
   background: var(--bg);
 }
 
+/* 星云粒子背景：铺满标题页，位于品牌/菜单之下。 */
+.nebula-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+}
+
+.title-brand,
+.title-menu {
+  z-index: 1;
+}
+
 .title-brand {
   position: absolute;
   top: 7vh;
@@ -60,7 +74,9 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  width: min(240px, 60vw);
+  /* 宽度按最长菜单项内容自适应（多语言文案长度不一），保底 240px。 */
+  width: fit-content;
+  min-width: min(240px, 60vw);
 }
 
 .menu-item {
@@ -114,11 +130,14 @@
 
 .mi-label {
   flex: 1;
+  white-space: nowrap;
 }
 
 /* 英文 hint 小字常显，悬停提亮。 */
 .mi-hint {
+  flex: none;
   font-size: 11px;
+  white-space: nowrap;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--text-dim);

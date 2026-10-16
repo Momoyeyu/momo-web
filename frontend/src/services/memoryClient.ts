@@ -25,6 +25,10 @@ export function editMemory(id: string, content: string): Promise<Memory> {
   return apiJson<Memory>(`${API}/${id}`, jsonInit("PATCH", { content }));
 }
 
+export function setMemoryPinned(id: string, pinned: boolean): Promise<Memory> {
+  return apiJson<Memory>(`${API}/${id}`, jsonInit("PATCH", { pinned }));
+}
+
 export async function deleteMemory(id: string): Promise<void> {
   await apiFetch(`${API}/${id}`, { method: "DELETE" });
 }

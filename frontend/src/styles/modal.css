@@ -1,0 +1,44 @@
+/* ===== 通用聚焦弹层：遮罩轻调暗 + 虚化 + 降饱和，弹窗居中 ===== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 12, 20, 0.38);
+  backdrop-filter: blur(10px) saturate(0.85) brightness(0.92);
+}
+
+.modal-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(520px, 92vw);
+  max-height: 70vh;
+  padding: 18px 20px;
+  background: var(--panel-solid);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+/* --- 弹窗内容常用部件（meta 行 / 可滚动正文 / 底部按钮行） --- */
+
+.modal-meta {
+  font-size: 12px;
+}
+
+.modal-body {
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.modal-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

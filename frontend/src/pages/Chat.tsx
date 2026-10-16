@@ -17,6 +17,8 @@ import { navigate } from "../router";
 import { useT } from "../i18n";
 import { ServiceError } from "../lib/errors";
 import { getState, personaName, subscribe } from "../lib/store";
+import Button from "../ui/Button";
+import DialogBox from "../components/DialogBox";
 import "../styles/chat.css";
 
 const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
@@ -140,13 +142,7 @@ export default function Chat() {
       {error && <div className="chat-error">{error}</div>}
 
       <div className="dialog-zone">
-        <div className="dialog-box">
-          <div className="nameplate">{name}</div>
-
-          <div className="subtitle">
-            {subtitle || <span className="muted">……</span>}
-          </div>
-
+        <DialogBox name={name} text={subtitle || <span className="muted">……</span>}>
           <div className="input-row">
             <input
               value={input}
@@ -156,11 +152,12 @@ export default function Chat() {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) send();
               }}
             />
-            <button onClick={send} disabled={!input.trim()}>
+            <Button onClick={send} disabled={!input.trim()}>
               {t("chat.send")}
-            </button>
-            <button
-              className={micOn ? "mic-on" : "ghost"}
+            </Button>
+            <Button
+              variant={micOn ? "solid" : "ghost"}
+              className={micOn ? "mic-on" : undefined}
               onClick={toggleMic}
               disabled={!micAllowed}
               title={
@@ -172,40 +169,40 @@ export default function Chat() {
               }
             >
               🎤
-            </button>
+            </Button>
             {busy && (
-              <button
-                className="ghost"
+              <Button
+                variant="ghost"
                 onClick={() => getChatEngine().interrupt()}
               >
                 {t("chat.stop")}
-              </button>
+              </Button>
             )}
           </div>
-        </div>
+        </DialogBox>
       </div>
 
       {/* 底部工具条：对照 VN 底部 icon 栏，操作聚拢右侧，返回标题收尾 */}
       <div className="chat-toolbar">
         <div className="tb-side">
-          <button className="tb" onClick={() => navigate("backlog")}>
+          <Button className="tb" onClick={() => navigate("backlog")}>
             {t("chat.backlog")}
-          </button>
-          <button
+          </Button>
+          <Button
             className="tb"
             disabled={busy}
             title={busy ? t("checkpoint.busySave") : undefined}
             onClick={() => navigate("checkpoint", { checkpointMode: "save" })}
           >
             {t("checkpoint.save")}
-          </button>
-          <button
+          </Button>
+          <Button
             className="tb"
             onClick={() => navigate("checkpoint", { checkpointMode: "load" })}
           >
             {t("checkpoint.load")}
-          </button>
-          <button
+          </Button>
+          <Button
             className={`tb${muted || !ttsConfigured ? " tb-off" : ""}`}
             onClick={toggleVoice}
             disabled={!ttsConfigured}
@@ -218,13 +215,13 @@ export default function Chat() {
             }
           >
             {muted ? t("chat.voiceOff") : t("chat.voiceOn")}
-          </button>
-          <button className="tb" onClick={() => navigate("settings")}>
+          </Button>
+          <Button className="tb" onClick={() => navigate("settings")}>
             {t("settings.title")}
-          </button>
-          <button className="tb" onClick={() => navigate("title")}>
+          </Button>
+          <Button className="tb" onClick={() => navigate("title")}>
             {t("common.backTitle")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

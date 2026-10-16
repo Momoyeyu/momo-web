@@ -32,12 +32,14 @@ import {
   type CheckpointMode,
 } from "../router";
 import {
-  MAX_PAGES,
   buildCells,
   pageCount,
   type SlotCell,
 } from "../lib/checkpointGrid";
 import { useT, currentLang } from "../i18n";
+import Button from "../ui/Button";
+import Pager from "../ui/Pager";
+import PageHeader from "../ui/PageHeader";
 import "../styles/checkpoint.css";
 import "../styles/persona.css";
 
@@ -178,12 +180,15 @@ export default function Checkpoint() {
   return (
     <div className="checkpoint-page">
       <div className={`checkpoint-panel checkpoint-${mode}`}>
-        <header className="checkpoint-head">
-          <h1>{t(`checkpoint.${mode}`)}</h1>
-          <button className="ghost" onClick={back}>
-            {t(fromRoute() === "chat" ? "common.backChat" : "common.backTitle")}
-          </button>
-        </header>
+        <PageHeader
+          className="checkpoint-head"
+          title={t(`checkpoint.${mode}`)}
+          actions={
+            <Button variant="ghost" onClick={back}>
+              {t(fromRoute() === "chat" ? "common.backChat" : "common.backTitle")}
+            </Button>
+          }
+        />
 
         <div className="checkpoint-body">
           {failed && (
@@ -221,8 +226,11 @@ export default function Checkpoint() {
                   onClick={() => openCell(c)}
                 >
                   {cardBody(c.save, slotNo(c.slot))}
-                  <button
-                    className="ghost small danger slot-del"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    danger
+                    className="slot-del"
                     disabled={busy || saveBlocked}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -230,7 +238,7 @@ export default function Checkpoint() {
                     }}
                   >
                     {t("common.del")}
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div
@@ -254,26 +262,7 @@ export default function Checkpoint() {
           </div>
 
           <footer className="checkpoint-pager">
-            <button
-              className="ghost small"
-              disabled={page === 0}
-              onClick={() => setPageIdx(page - 1)}
-            >
-              ‹
-            </button>
-            <span className="muted">
-              {t("checkpoint.pageOf", {
-                cur: String(page + 1),
-                total: String(pages),
-              })}
-            </span>
-            <button
-              className="ghost small"
-              disabled={page >= pages - 1 || page >= MAX_PAGES - 1}
-              onClick={() => setPageIdx(page + 1)}
-            >
-              ›
-            </button>
+            <Pager page={page} pages={pages} onChange={setPageIdx} />
           </footer>
         </div>
       </div>

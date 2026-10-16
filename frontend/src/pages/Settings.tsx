@@ -5,7 +5,7 @@
 // 即改即生效：每次修改直接 update() 落盘（localStorage + 防抖 PUT
 // /api/state），无草稿/保存概念——语言切换等立即生效。
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   getState,
   personaName,
@@ -20,7 +20,7 @@ import type {
   Settings as SettingsData,
 } from "../lib/types";
 import { fromRoute, navigate } from "../router";
-import { useT, LANGS } from "../i18n";
+import { useT, tFor, LANGS } from "../i18n";
 import {
   probeAsr,
   probeEmbedding,
@@ -32,6 +32,12 @@ import { probeExtension } from "../services/extClient";
 import type { ExtProbeResult } from "../services/extClient";
 import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
 import { parseMcpJson } from "../lib/mcpJson";
+import FieldRow from "../ui/FieldRow";
+import Modal from "../ui/Modal";
+import Slider from "../ui/Slider";
+import Switch from "../ui/Switch";
+import Button from "../ui/Button";
+import DialogBox from "../components/DialogBox";
 import Pager from "../ui/Pager";
 import Select from "../ui/Select";
 import PersonaPanel from "./Persona";
@@ -66,74 +72,6 @@ function urlError(sec: EndpointSection, url: string): boolean {
   } catch {
     return true;
   }
-}
-
-/** 行式设置项：左标签 + 右控件（柚子 config 式单行密度）。 */
-function OptRow({
-  label,
-  extra,
-  required,
-  top,
-  children,
-}: {
-  label: string;
-  /** 控件末尾小字（如滑块当前值/未配置提示）。 */
-  extra?: React.ReactNode;
-  /** 必填项：标签后加 * 标记。 */
-  required?: boolean;
-  /** 多行控件（键值对编辑器）：标签顶对齐而非居中。 */
-  top?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={`opt-row${top ? " top" : ""}`}>
-      <span className="opt-label">
-        {label}
-        {required && <span className="req">*</span>}
-      </span>
-      <div className="opt-ctl">
-        {children}
-        {extra && <span className="opt-extra">{extra}</span>}
-      </div>
-    </div>
-  );
-}
-
-/** 滑块已填充段着色：0–100 → 左金右灰的轨道渐变。 */
-function rangeFill(pct: number): React.CSSProperties {
-  return {
-    background: `linear-gradient(90deg, var(--accent) 0%, var(--accent) ${pct}%, var(--line) ${pct}%, var(--line) 100%)`,
-  };
-}
-
-/** 开关行控件：pill switch。 */
-function OptSwitch({
-  on,
-  onChange,
-  disabled,
-  title,
-}: {
-  on: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={on}
-      className={`opt-switch${on ? " on" : ""}`}
-      disabled={disabled}
-      title={title}
-      onClick={(e) => {
-        e.stopPropagation();
-        onChange(!on);
-      }}
-    >
-      <span className="knob" />
-    </button>
-  );
 }
 
 /**
@@ -192,10 +130,7 @@ function DialogPreview({
       className="dialog-preview"
       style={{ "--dialog-alpha": opacity / 100 } as React.CSSProperties}
     >
-      <div className="dialog-box">
-        <div className="nameplate">{name}</div>
-        <div className="subtitle">{text}</div>
-      </div>
+      <DialogBox name={name} text={text} />
     </div>
   );
 }
@@ -293,22 +228,24 @@ function KvEditor({
             placeholder={t("settings.extKvVal")}
             onChange={(e) => setPair(i, k, e.target.value)}
           />
-          <button
-            type="button"
-            className="ghost small danger"
+          <Button
+            variant="ghost"
+            size="sm"
+            danger
             onClick={() => onChange(pairs.filter((_, j) => j !== i))}
           >
             {t("common.del")}
-          </button>
+          </Button>
         </div>
       ))}
-      <button
-        type="button"
-        className="ghost small kv-add"
+      <Button
+        variant="ghost"
+        size="sm"
+        className="kv-add"
         onClick={() => onChange([...pairs, ["", ""]])}
       >
         {addLabel}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -357,25 +294,19 @@ function ExtConfigModal({
   const endpointErr = extEndpointError(form.endpoint);
 
   return (
-    <div className="modal-mask" onClick={onClose}>
-      <div
-        className="panel ext-modal"
-        role="dialog"
-        aria-modal="true"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <Modal onClose={onClose} className="ext-modal">
         <div className="ext-modal-head">
           <h3 className="opt-group">{t("settings.extCfgTitle")}</h3>
-          <button
-            type="button"
-            className="ghost small"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               setJsonOpen((o) => !o);
               setJsonErr(false);
             }}
           >
             {t("settings.extJsonBtn")}
-          </button>
+          </Button>
         </div>
         {jsonOpen && (
           <div className="ext-json">
@@ -392,19 +323,18 @@ function ExtConfigModal({
               {jsonErr && (
                 <span className="probe-err">{t("settings.extJsonErr")}</span>
               )}
-              <button
-                type="button"
-                className="small"
+              <Button
+                size="sm"
                 disabled={!jsonText.trim()}
                 onClick={applyJson}
               >
                 {t("settings.extJsonApply")}
-              </button>
+              </Button>
             </div>
           </div>
         )}
         <div className="opt-list">
-          <OptRow label={t("settings.extName")} required>
+          <FieldRow label={t("settings.extName")} required>
             <input
               value={form.name}
               placeholder={t("settings.extNamePh")}
@@ -413,8 +343,8 @@ function ExtConfigModal({
             {!form.name.trim() && (
               <span className="probe-err">{t("settings.required")}</span>
             )}
-          </OptRow>
-          <OptRow label={t("settings.extTransport")}>
+          </FieldRow>
+          <FieldRow label={t("settings.extTransport")}>
             <Select
               value={form.transport}
               options={[
@@ -431,10 +361,10 @@ function ExtConfigModal({
                 patch({ transport: v as McpExtension["transport"] })
               }
             />
-          </OptRow>
+          </FieldRow>
           {form.transport === "stdio" ? (
             <>
-              <OptRow label={t("settings.extCommand")} required>
+              <FieldRow label={t("settings.extCommand")} required>
                 <input
                   className={form.command.trim() ? undefined : "invalid"}
                   value={form.command}
@@ -444,25 +374,25 @@ function ExtConfigModal({
                 {!form.command.trim() && (
                   <span className="probe-err">{t("settings.required")}</span>
                 )}
-              </OptRow>
-              <OptRow label={t("settings.extArgs")}>
+              </FieldRow>
+              <FieldRow label={t("settings.extArgs")}>
                 <input
                   value={form.argsText}
                   placeholder={t("settings.extArgsPh")}
                   onChange={(e) => patch({ argsText: e.target.value })}
                 />
-              </OptRow>
-              <OptRow label={t("settings.extEnv")} top>
+              </FieldRow>
+              <FieldRow label={t("settings.extEnv")} top>
                 <KvEditor
                   pairs={form.envPairs}
                   onChange={(envPairs) => patch({ envPairs })}
                   addLabel={t("settings.extEnvAdd")}
                 />
-              </OptRow>
+              </FieldRow>
             </>
           ) : (
             <>
-              <OptRow label={t("settings.extEndpoint")} required>
+              <FieldRow label={t("settings.extEndpoint")} required>
                 <input
                   className={endpointErr ? "invalid" : undefined}
                   value={form.endpoint}
@@ -476,38 +406,36 @@ function ExtConfigModal({
                     <span className="probe-err">{t("settings.required")}</span>
                   )
                 )}
-              </OptRow>
-              <OptRow label={t("settings.extHeaders")} top>
+              </FieldRow>
+              <FieldRow label={t("settings.extHeaders")} top>
                 <KvEditor
                   pairs={form.headerPairs}
                   onChange={(headerPairs) => patch({ headerPairs })}
                   addLabel={t("settings.extHeaderAdd")}
                 />
-              </OptRow>
+              </FieldRow>
             </>
           )}
-          <OptRow label={t("settings.extEnabled")}>
-            <OptSwitch
+          <FieldRow label={t("settings.extEnabled")}>
+            <Switch
               on={form.enabled}
               onChange={(v) => patch({ enabled: v })}
             />
-          </OptRow>
+          </FieldRow>
         </div>
         <div className="ext-actions">
-          <button type="button" className="ghost key-toggle" onClick={onClose}>
+          <Button variant="ghost" className="key-toggle" onClick={onClose}>
             {t("common.cancel")}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
             className="key-toggle"
             disabled={!extFormValid(form)}
             onClick={() => onSave(formToExt(form))}
           >
             {t("common.save")}
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </Modal>
   );
 }
 
@@ -561,29 +489,51 @@ export default function Settings() {
     embedding: (s) => probeEmbedding(s.embedding),
   };
 
+  // 探测结果直接显示在按钮上，固定展示 PROBE_HOLD_MS 后复原；期间不可再点。
+  const PROBE_HOLD_MS = 2500;
+  const probeTimers = useRef<Partial<Record<EndpointSection, number>>>({});
+  useEffect(
+    () => () => {
+      for (const id of Object.values(probeTimers.current)) clearTimeout(id);
+    },
+    [],
+  );
+
   const runProbe = (sec: EndpointSection): void => {
-    if (probes[sec] === "running") return;
+    if (probes[sec] !== undefined) return;
     setProbes((p) => ({ ...p, [sec]: "running" }));
-    void PROBES[sec](settings).then((r) =>
-      setProbes((p) => ({ ...p, [sec]: r })),
-    );
+    void PROBES[sec](settings).then((r) => {
+      setProbes((p) => ({ ...p, [sec]: r }));
+      clearTimeout(probeTimers.current[sec]);
+      probeTimers.current[sec] = window.setTimeout(() => {
+        setProbes((p) => {
+          const n = { ...p };
+          delete n[sec];
+          return n;
+        });
+      }, PROBE_HOLD_MS);
+    });
   };
 
-  const probeText = (sec: EndpointSection): React.ReactNode => {
+  /** 按钮内联文案：running→「…」，否则 ✓/✗ + 简短结果。 */
+  const probeLabel = (sec: EndpointSection): { text: string; cls: string } => {
     const r = probes[sec];
-    if (!r) return null;
-    if (r === "running") return <span className="probe-info">…</span>;
+    if (!r) return { text: t("settings.test"), cls: "" };
+    if (r === "running") return { text: "…", cls: "probe-info" };
     const detail =
-      r.detail === "unconfigured"
-        ? t("settings.testNeedUrl")
-        : /^(unreachable|timeout|connect failed|bad url|closed)/.test(r.detail)
-          ? t("chat.errConn")
-          : r.detail;
-    return (
-      <span className={r.ok ? "probe-ok" : "probe-err"}>
-        {r.ok ? "✓" : "✗"} {detail}
-      </span>
-    );
+      r.ok && /^\d+ms$/.test(r.detail)
+        ? r.detail
+        : r.detail === "unconfigured"
+          ? t("settings.testNeedUrl")
+          : /^(unreachable|timeout|connect failed|bad url|closed)/.test(
+                r.detail,
+              )
+            ? t("settings.testFail")
+            : r.detail;
+    return {
+      text: `${r.ok ? "✓" : "✗"} ${detail}`,
+      cls: r.ok ? "probe-ok" : "probe-err",
+    };
   };
 
   const urlRow = (
@@ -591,7 +541,7 @@ export default function Settings() {
     phKey: string,
     required = false,
   ): React.ReactNode => (
-    <OptRow
+    <FieldRow
       label={sec === "llm" ? t("settings.apiUrl") : t("settings.svcUrl")}
       required={required}
     >
@@ -601,14 +551,14 @@ export default function Settings() {
         placeholder={t(phKey)}
         onChange={(e) => patchEndpoint(sec, "url", e.target.value)}
       />
-      <button
-        type="button"
-        className="ghost key-toggle"
+      <Button
+        variant="ghost"
+        className={`key-toggle probe-btn ${probeLabel(sec).cls}`}
         onClick={() => runProbe(sec)}
-        disabled={probes[sec] === "running"}
+        disabled={probes[sec] !== undefined}
       >
-        {t("settings.test")}
-      </button>
+        {probeLabel(sec).text}
+      </Button>
       {urlError(sec, settings[sec].url) ? (
         <span className="probe-err">{t("settings.invalidUrl")}</span>
       ) : (
@@ -617,8 +567,7 @@ export default function Settings() {
           <span className="probe-err">{t("settings.required")}</span>
         )
       )}
-      {probeText(sec)}
-    </OptRow>
+    </FieldRow>
   );
 
   // 返回目标与来源页一致：chat 进来回 chat，其余回 title。
@@ -729,21 +678,21 @@ export default function Settings() {
   };
 
   const keyRow = (sec: EndpointSection) => (
-    <OptRow label={t("settings.apiKey")}>
+    <FieldRow label={t("settings.apiKey")}>
       <input
         type={showKey[sec] ? "text" : "password"}
         value={settings[sec].key}
         placeholder={t("settings.keyPh")}
         onChange={(e) => patchEndpoint(sec, "key", e.target.value)}
       />
-      <button
-        type="button"
-        className="ghost key-toggle"
+      <Button
+        variant="ghost"
+        className="key-toggle"
         onClick={() => setShowKey((s) => ({ ...s, [sec]: !s[sec] }))}
       >
         {showKey[sec] ? t("settings.hideKey") : t("settings.showKey")}
-      </button>
-    </OptRow>
+      </Button>
+    </FieldRow>
   );
 
   return (
@@ -752,13 +701,13 @@ export default function Settings() {
       <nav className="tabstrip">
         <div className="tabstrip-inner">
           {TABS.map((id) => (
-            <button
+            <Button
               key={id}
               className={`stab${tab === id ? " active" : ""}`}
               onClick={() => setTab(id)}
             >
               <span className="stab-label">{t(`settings.tabs.${id}`)}</span>
-            </button>
+            </Button>
           ))}
         </div>
       </nav>
@@ -780,7 +729,7 @@ export default function Settings() {
               {tab === "general" && (
                 <div className="settings-cols">
                 <section className="panel settings-col opt-list">
-                  <OptRow label={t("settings.langLabel")}>
+                  <FieldRow label={t("settings.langLabel")}>
                     <Select
                       value={settings.general.lang}
                       options={LANGS.map((l) => ({
@@ -793,8 +742,8 @@ export default function Settings() {
                         })
                       }
                     />
-                  </OptRow>
-                  <OptRow label={t("settings.chatLang")}>
+                  </FieldRow>
+                  <FieldRow label={t("settings.chatLang")}>
                     <Select
                       value={settings.general.chatLang}
                       options={[
@@ -810,12 +759,12 @@ export default function Settings() {
                         })
                       }
                     />
-                  </OptRow>
-                  <OptRow
+                  </FieldRow>
+                  <FieldRow
                     label={t("settings.voiceInput")}
                     extra={!asrConfigured ? t("settings.voiceNeedAsr") : undefined}
                   >
-                    <OptSwitch
+                    <Switch
                       on={asrConfigured && settings.general.voiceInput}
                       disabled={!asrConfigured}
                       title={
@@ -823,12 +772,12 @@ export default function Settings() {
                       }
                       onChange={toggleVoiceInput}
                     />
-                  </OptRow>
-                  <OptRow
+                  </FieldRow>
+                  <FieldRow
                     label={t("settings.voiceOut")}
                     extra={!ttsConfigured ? t("settings.voiceNeedTts") : undefined}
                   >
-                    <OptSwitch
+                    <Switch
                       on={ttsConfigured && !voiceMuted}
                       disabled={!ttsConfigured}
                       title={
@@ -836,29 +785,19 @@ export default function Settings() {
                       }
                       onChange={toggleVoice}
                     />
-                  </OptRow>
-                  <OptRow
-                    label={t("settings.voiceVolume")}
-                    extra={`${settings.general.voiceVolume}%`}
-                  >
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
+                  </FieldRow>
+                  <FieldRow label={t("settings.voiceVolume")}>
+                    <Slider
                       disabled={voiceMuted || !ttsConfigured}
-                      style={rangeFill(settings.general.voiceVolume)}
                       value={settings.general.voiceVolume}
-                      onChange={(e) =>
-                        patchGeneral({ voiceVolume: Number(e.target.value) })
-                      }
+                      onChange={(v) => patchGeneral({ voiceVolume: v })}
                     />
-                  </OptRow>
-                  <OptRow
+                  </FieldRow>
+                  <FieldRow
                     label={t("settings.semanticSearch")}
                     extra={!embConfigured ? t("settings.embNeedCfg") : undefined}
                   >
-                    <OptSwitch
+                    <Switch
                       on={embConfigured && settings.general.semanticSearch}
                       disabled={!embConfigured}
                       title={
@@ -866,13 +805,13 @@ export default function Settings() {
                       }
                       onChange={(v) => patchGeneral({ semanticSearch: v })}
                     />
-                  </OptRow>
-                  <OptRow label={t("settings.showStatus")}>
-                    <OptSwitch
+                  </FieldRow>
+                  <FieldRow label={t("settings.showStatus")}>
+                    <Switch
                       on={settings.general.showStatus}
                       onChange={(v) => patchGeneral({ showStatus: v })}
                     />
-                  </OptRow>
+                  </FieldRow>
                 </section>
                 {/* 对话框设置子组：三滑块 + 预览同组联动，预览钉在面板底缘。 */}
                 <section className="panel settings-col">
@@ -880,60 +819,36 @@ export default function Settings() {
                     {t("settings.groups.dialog")}
                   </h3>
                   <div className="opt-list">
-                  <OptRow
-                    label={t("settings.dialogOpacity")}
-                    extra={`${settings.general.dialogOpacity}%`}
-                  >
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      style={rangeFill(settings.general.dialogOpacity)}
+                  <FieldRow label={t("settings.dialogOpacity")}>
+                    <Slider
                       value={settings.general.dialogOpacity}
-                      onChange={(e) =>
-                        patchGeneral({ dialogOpacity: Number(e.target.value) })
-                      }
+                      onChange={(v) => patchGeneral({ dialogOpacity: v })}
                     />
-                  </OptRow>
-                  <OptRow
-                    label={t("settings.textSpeed")}
-                    extra={`${settings.general.textSpeed}%`}
-                  >
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      style={rangeFill(settings.general.textSpeed)}
+                  </FieldRow>
+                  <FieldRow label={t("settings.textSpeed")}>
+                    <Slider
                       value={settings.general.textSpeed}
-                      onChange={(e) =>
-                        patchGeneral({ textSpeed: Number(e.target.value) })
-                      }
+                      onChange={(v) => patchGeneral({ textSpeed: v })}
                     />
-                  </OptRow>
-                  <OptRow
-                    label={t("settings.sentenceSpeed")}
-                    extra={`${settings.general.sentenceSpeed}%`}
-                  >
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      style={rangeFill(settings.general.sentenceSpeed)}
+                  </FieldRow>
+                  <FieldRow label={t("settings.sentenceSpeed")}>
+                    <Slider
                       value={settings.general.sentenceSpeed}
-                      onChange={(e) =>
-                        patchGeneral({ sentenceSpeed: Number(e.target.value) })
-                      }
+                      onChange={(v) => patchGeneral({ sentenceSpeed: v })}
                     />
-                  </OptRow>
+                  </FieldRow>
                   </div>
                   {/* 对话框实时预览：多句循环，逐字上屏 + 按切句速度换句 */}
                   <div className="col-foot">
                     <DialogPreview
                       name={state.persona.name || personaName()}
-                      sample={t("settings.previewSample")}
+                      // 预览语言跟随「对话语言」：auto 回落到界面语言
+                      sample={tFor(
+                        settings.general.chatLang === "auto"
+                          ? settings.general.lang
+                          : settings.general.chatLang,
+                        "settings.previewSample",
+                      )}
                       opacity={settings.general.dialogOpacity}
                       textSpeed={settings.general.textSpeed}
                       sentenceSpeed={settings.general.sentenceSpeed}
@@ -950,7 +865,7 @@ export default function Settings() {
                   <h3 className="opt-group">{t("settings.groups.llm")}</h3>
                   {urlRow("llm", "settings.llmUrlPh", true)}
                   {keyRow("llm")}
-                  <OptRow label={t("settings.model")} required>
+                  <FieldRow label={t("settings.model")} required>
                     <input
                       className={
                         settings.llm.model.trim() ? undefined : "invalid"
@@ -962,14 +877,14 @@ export default function Settings() {
                     {!settings.llm.model.trim() && (
                       <span className="probe-err">{t("settings.required")}</span>
                     )}
-                  </OptRow>
+                  </FieldRow>
 
                   <h3 className="opt-group">
                     {t("settings.groups.embedding")}
                   </h3>
                   {urlRow("embedding", "settings.embUrlPh")}
                   {keyRow("embedding")}
-                  <OptRow label={t("settings.model")}>
+                  <FieldRow label={t("settings.model")}>
                     <input
                       value={settings.embedding.model}
                       placeholder={t("settings.embModelPh")}
@@ -977,7 +892,7 @@ export default function Settings() {
                         patchEndpoint("embedding", "model", e.target.value)
                       }
                     />
-                  </OptRow>
+                  </FieldRow>
                 </section>
                 <section className="panel settings-col opt-list">
                   <h3 className="opt-group">{t("settings.groups.asr")}</h3>
@@ -987,14 +902,14 @@ export default function Settings() {
                   <h3 className="opt-group">{t("settings.groups.tts")}</h3>
                   {urlRow("tts", "settings.ttsUrlPh")}
                   {keyRow("tts")}
-                  <OptRow label={t("settings.voice")}>
+                  <FieldRow label={t("settings.voice")}>
                     <input
                       value={settings.tts.voice}
                       placeholder={t("settings.voicePh")}
                       onChange={(e) => patchEndpoint("tts", "voice", e.target.value)}
                     />
-                  </OptRow>
-                  <OptRow label={t("settings.speechLang")}>
+                  </FieldRow>
+                  <FieldRow label={t("settings.speechLang")}>
                     <Select
                       value={settings.tts.lang}
                       options={[
@@ -1005,7 +920,7 @@ export default function Settings() {
                       ]}
                       onChange={(v) => patchEndpoint("tts", "lang", v)}
                     />
-                  </OptRow>
+                  </FieldRow>
 
                 </section>
                 </div>
@@ -1033,7 +948,7 @@ export default function Settings() {
                           {ext.name || t("settings.extUnnamed")}
                         </span>
                         <span className="ext-badge">{ext.transport}</span>
-                        <OptSwitch
+                        <Switch
                           on={ext.enabled}
                           onChange={(v) =>
                             patchExtensions(
@@ -1044,16 +959,17 @@ export default function Settings() {
                           }
                         />
                         {extDot(i, ext)}
-                        <button
-                          type="button"
-                          className="ghost small"
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => setExtEditing(i)}
                         >
                           {t("common.edit")}
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost small danger"
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          danger
                           onClick={() =>
                             patchExtensions(
                               settings.extensions.filter((_, j) => j !== i),
@@ -1061,18 +977,18 @@ export default function Settings() {
                           }
                         >
                           {t("common.del")}
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
                   <div className="col-foot">
-                    <button
-                      type="button"
-                      className="ghost ext-add"
+                    <Button
+                      variant="ghost"
+                      className="ext-add"
                       onClick={() => setExtEditing(-1)}
                     >
                       {t("settings.extAdd")}
-                    </button>
+                    </Button>
                     <div className="ext-pagerline">
                       <Pager
                         page={extPg.page}
@@ -1092,9 +1008,9 @@ export default function Settings() {
       <footer className="footbar">
         <div className="footbar-inner">
           <div className="foot-right">
-            <button className="ghost" onClick={() => navigate(backRoute)}>
+            <Button variant="ghost" onClick={() => navigate(backRoute)}>
               {backLabel}
-            </button>
+            </Button>
           </div>
         </div>
       </footer>

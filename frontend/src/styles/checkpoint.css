@@ -174,21 +174,11 @@
   opacity: 1;
 }
 
-/* 翻页条 */
+/* 翻页条：只负责居中定位；控件外观与页码字距归 ui/Pager（controls.css）。
+   原先针对手写翻页器的 button/span 覆盖已随翻页器统一而失效，故移除。 */
 .checkpoint-pager {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 14px;
   padding-top: 12px;
-}
-
-.checkpoint-pager button {
-  min-width: 2.4em;
-}
-
-.checkpoint-pager span {
-  font-size: 12px;
-  letter-spacing: 0.1em;
-  font-variant-numeric: tabular-nums;
 }

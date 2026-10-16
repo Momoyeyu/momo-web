@@ -19,6 +19,7 @@ import { checkManifest, listManifests } from "../live2d/avatarZip";
 import { getStage } from "../live2d/stage";
 import { useT } from "../i18n";
 import Select from "../ui/Select";
+import Button from "../ui/Button";
 
 const BUILTIN_NAME = "Hiyori";
 /** 内置模型的缩略图（静态资源直出）。 */
@@ -231,14 +232,14 @@ export default function AvatarPanel() {
   const cardOps = (a: AvatarMeta): React.ReactNode => (
     <span className="avatar-ops">
       {activeId !== a.id && (
-        <button className="ghost" onClick={() => activate(a.id)}>
+        <Button variant="ghost" onClick={() => activate(a.id)}>
           {t("avatar.use")}
-        </button>
+        </Button>
       )}
       {!a.builtin && (
-        <button className="ghost danger" onClick={() => remove(a.id)}>
+        <Button variant="ghost" danger onClick={() => remove(a.id)}>
           {t("avatar.delete")}
-        </button>
+        </Button>
       )}
     </span>
   );
@@ -336,8 +337,7 @@ export default function AvatarPanel() {
         ))}
 
         {/* 导入入口卡片 */}
-        <button
-          type="button"
+        <Button
           className="avatar-card avatar-add"
           disabled={busy}
           onClick={() => fileRef.current?.click()}
@@ -346,7 +346,7 @@ export default function AvatarPanel() {
           <span className="avatar-add-label">
             {busy ? t("avatar.importing") : t("avatar.importBtn")}
           </span>
-        </button>
+        </Button>
       </div>
 
       <input
@@ -369,7 +369,7 @@ export default function AvatarPanel() {
             options={pending.manifests.map((m) => ({ value: m, label: m }))}
             onChange={setManifest}
           />
-          <button
+          <Button
             disabled={busy}
             onClick={() => {
               setBusy(true);
@@ -379,7 +379,7 @@ export default function AvatarPanel() {
             }}
           >
             {t("avatar.confirmImport")}
-          </button>
+          </Button>
         </div>
       )}
 

@@ -1,6 +1,6 @@
-// 记忆面板（设置页 tab）：初始记忆（pin，momo.db pinned 行）+
-// 普通记忆列表（backend /api/memories REST，检索/手动加/编辑/删除）。
-// 两类记忆都是真实行 id，条目级操作直达 backend。
+// 记忆面板（设置页 tab）：全部记忆统一列表——pinned 仅是 DB 字段
+// （常驻注入 prompt），前端不分栏；检索 / 弹窗添加（可选 PIN）/
+// 编辑 / 删除 / pin 切换 / 分页（每页 5 条），卡片点开详情弹窗。
 
 import { useEffect, useMemo, useState } from "react";
 import type { Memory } from "../lib/types";
@@ -8,18 +8,23 @@ import {
   addMemory as apiAdd,
   deleteMemory as apiDelete,
   editMemory as apiEdit,
+  setMemoryPinned as apiSetPinned,
   listMemories,
 } from "../services/memoryClient";
-import { LIST_PAGE_SIZE, clampPage } from "../lib/paging";
+import { clampPage } from "../lib/paging";
 import Pager from "../ui/Pager";
 import DetailModal from "../components/DetailModal";
+import EditableItem from "../ui/EditableItem";
+import IconButton from "../ui/IconButton";
+import Button from "../ui/Button";
+import Modal from "../ui/Modal";
 import { useT, currentLang } from "../i18n";
 import "../styles/persona.css";
 import "../styles/settings.css";
 import "../styles/controls.css";
 
 const LOCALE = { zh: "zh-CN", ja: "ja-JP", en: "en-US" } as const;
-const NEW_ID = "__new__";
+const PAGE_SIZE = 5;
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
@@ -38,13 +43,13 @@ export default function MemoryPanel() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
   const [query, setQuery] = useState("");
-  const [pinQuery, setPinQuery] = useState("");
-  const [memPage, setMemPage] = useState(0);
-  const [pinPage, setPinPage] = useState(0);
+  const [page, setPage] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState("");
-  // 「+ 添加」挂起的新条目草稿：NEW_ID 占位 id + 所属栏目标记。
-  const [draftPinned, setDraftPinned] = useState<boolean | null>(null);
+  // 「+ 添加」弹窗：内容草稿 + 是否 PIN。
+  const [adding, setAdding] = useState(false);
+  const [addDraft, setAddDraft] = useState("");
+  const [addPinned, setAddPinned] = useState(false);
   // 卡片点开的详情弹窗（只读全文）。
   const [detail, setDetail] = useState<Memory | null>(null);
 
@@ -61,65 +66,59 @@ export default function MemoryPanel() {
     void refresh();
   }, []);
 
-  const pins = useMemo(() => memories.filter((m) => m.pinned), [memories]);
-
+  // 检索 + 按创建时间倒序（命中集分页，越界钳回末页）
   const shown = useMemo<Memory[]>(() => {
     const q = query.trim().toLowerCase();
-    const list = memories
-      .filter((m) => !m.pinned)
-      .filter((m) => !q || m.content.toLowerCase().includes(q));
-    return [...list].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return memories
+      .filter((m) => !q || m.content.toLowerCase().includes(q))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [memories, query]);
-
-  // 初始记忆检索 + 两侧分页（命中集分页，越界钳回末页）
-  const pinHits = useMemo(() => {
-    const q = pinQuery.trim().toLowerCase();
-    return pins.filter((m) => !q || m.content.toLowerCase().includes(q));
-  }, [pins, pinQuery]);
-  const pinPg = clampPage(pinPage, pinHits.length);
-  const pinSlice = pinHits.slice(
-    pinPg.page * LIST_PAGE_SIZE,
-    (pinPg.page + 1) * LIST_PAGE_SIZE,
-  );
-  const memPg = clampPage(memPage, shown.length);
+  const pg = clampPage(page, shown.length, PAGE_SIZE);
   const shownSlice = shown.slice(
-    memPg.page * LIST_PAGE_SIZE,
-    (memPg.page + 1) * LIST_PAGE_SIZE,
+    pg.page * PAGE_SIZE,
+    (pg.page + 1) * PAGE_SIZE,
   );
-
-  const startAdd = (pinned: boolean): void => {
-    // 草稿卡顶到第一页；清掉检索词保证草稿可见
-    setDraftPinned(pinned);
-    setEditingId(NEW_ID);
-    setEditDraft("");
-    if (pinned) {
-      setPinQuery("");
-      setPinPage(0);
-    } else {
-      setQuery("");
-      setMemPage(0);
-    }
-  };
 
   const startEdit = (m: Memory): void => {
     setEditingId(m.id);
     setEditDraft(m.content);
   };
 
-  const commitEdit = async (): Promise<void> => {
-    const id = editingId;
-    const pinned = draftPinned;
+  const cancelEdit = (): void => {
     setEditingId(null);
     setEditDraft("");
-    setDraftPinned(null);
+  };
+
+  const commitEdit = async (): Promise<void> => {
+    const id = editingId;
+    cancelEdit();
     if (!id) return;
     try {
-      if (id === NEW_ID && pinned !== null) {
-        const c = editDraft.trim();
-        if (c) await apiAdd(c, pinned);
-      } else {
-        await apiEdit(id, editDraft.trim());
-      }
+      await apiEdit(id, editDraft.trim());
+      await refresh();
+    } catch {
+      setLoadFailed(true);
+    }
+  };
+
+  const commitAdd = async (): Promise<void> => {
+    const c = addDraft.trim();
+    const pinned = addPinned;
+    setAdding(false);
+    setAddDraft("");
+    setAddPinned(false);
+    if (!c) return;
+    try {
+      await apiAdd(c, pinned);
+      await refresh();
+    } catch {
+      setLoadFailed(true);
+    }
+  };
+
+  const togglePin = async (m: Memory): Promise<void> => {
+    try {
+      await apiSetPinned(m.id, !m.pinned);
       await refresh();
     } catch {
       setLoadFailed(true);
@@ -135,172 +134,145 @@ export default function MemoryPanel() {
     }
   };
 
-  const editRow = (m: Memory) =>
-    editingId === m.id ? (
-      <div className="mem-edit">
-        <textarea
-          rows={3}
-          value={editDraft}
-          onChange={(e) => setEditDraft(e.target.value)}
-        />
-        <div className="row">
-          <button className="small" onClick={() => void commitEdit()}>
-            {t("common.save")}
-          </button>
-          <button
-            className="ghost small"
-            onClick={() => {
-              setEditingId(null);
-              setEditDraft("");
-              setDraftPinned(null);
-            }}
-          >
-            {t("common.cancel")}
-          </button>
-        </div>
-      </div>
-    ) : (
-      <>
-        <div className="mem-head">
-          <span className="muted">{formatTime(m.createdAt)}</span>
-        </div>
-        <div className="mem-content">{m.content}</div>
-        <div className="mem-ops">
-          <button
-            className="ghost small"
-            onClick={(e) => {
-              e.stopPropagation();
-              startEdit(m);
-            }}
-          >
-            {t("common.edit")}
-          </button>
-          <button
-            className="ghost small danger"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (window.confirm(t("memory.confirmDelete"))) {
-                void remove(m.id);
-              }
-            }}
-          >
-            {t("common.del")}
-          </button>
-        </div>
-      </>
-    );
-
-  /** 非编辑态卡片可点开详情弹窗（编辑/删除钮 stopPropagation 不触发）。 */
+  /** 非编辑态卡片可点开详情弹窗（操作钮 stopPropagation 不触发）。 */
   const memCard = (m: Memory) => (
-    <div
-      className={`mem-item${editingId === m.id ? "" : " mem-open"}`}
+    <EditableItem
       key={m.id}
-      onClick={() => {
-        if (editingId !== m.id) setDetail(m);
-      }}
+      editing={editingId === m.id}
+      onOpen={() => setDetail(m)}
+      onStartEdit={() => startEdit(m)}
+      onDelete={() => void remove(m.id)}
+      deleteConfirm={t("memory.confirmDelete")}
+      head={
+        <>
+          <span className="muted">{formatTime(m.createdAt)}</span>
+          <Button
+            className={`mem-pinicon tip tip-r${m.pinned ? " on" : ""}`}
+            data-tip={t("memory.pinTip")}
+            onClick={(e) => {
+              e.stopPropagation();
+              void togglePin(m);
+            }}
+          >
+            {/* 图钉：pinned=实心金，unpinned=金色描边 */}
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M9 4h6l-1.2 6.2L17 13.4V15H7v-1.6l3.2-3.2L9 4z"
+                fill={m.pinned ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M12 15v5"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </Button>
+        </>
+      }
+      edit={
+        <div className="list-edit">
+          <textarea
+            rows={3}
+            value={editDraft}
+            onChange={(e) => setEditDraft(e.target.value)}
+          />
+          <div className="row">
+            <Button size="sm" onClick={() => void commitEdit()}>
+              {t("common.save")}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={cancelEdit}>
+              {t("common.cancel")}
+            </Button>
+          </div>
+        </div>
+      }
     >
-      {editRow(m)}
-    </div>
+      {m.content}
+    </EditableItem>
   );
 
-  /** 「+ 添加」挂起时的草稿卡（直接编辑态，提交才落 API）。 */
-  const draftCard = (pinned: boolean) =>
-    draftPinned === pinned && editingId === NEW_ID ? (
-      <div className="mem-item" key={NEW_ID}>
-        {editRow({
-          id: NEW_ID,
-          content: "",
-          createdAt: "",
-          pinned,
-        })}
-      </div>
-    ) : null;
-
   return (
-    /* 双栏：初始记忆 | 普通记忆；添加行钉在各面板底缘。 */
-    <div className="settings-cols">
-      {/* 1. 初始记忆（pin）：常驻事实，保存后进 system prompt 的「初始记忆」段 */}
-      <section className="panel persona-section settings-col">
-        <h2>{t("memory.pinsTitle")}</h2>
-        <p className="muted">{t("memory.pinsDesc")}</p>
-        <div className="mem-toolbar">
-          <input
-            className="mem-search"
-            placeholder={t("memory.pinSearchPh")}
-            value={pinQuery}
-            onChange={(e) => {
-              setPinQuery(e.target.value);
-              setPinPage(0);
-            }}
-          />
+    <section className="panel persona-section mem-panel">
+      <div className="mem-toolbar">
+        <input
+          className="mem-search"
+          placeholder={t("memory.searchPh")}
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(0);
+          }}
+        />
+        <IconButton
+          icon="plus"
+          label={t("memory.newTitle")}
+          onClick={() => setAdding(true)}
+          disabled={editingId !== null}
+        />
+      </div>
+      <div className="col-grow">
+        {loadFailed && <p className="muted">{t("memory.loadFailed")}</p>}
+        {!loadFailed && shown.length === 0 && (
+          <p className="muted">{t("memory.empty")}</p>
+        )}
+        {shownSlice.map(memCard)}
+      </div>
+      <div className="col-foot">
+        <div className="mem-foot">
+          <Pager page={pg.page} pages={pg.pages} onChange={setPage} />
         </div>
-        <div className="col-grow">
-          {draftCard(true)}
-          {loadFailed && <p className="muted">{t("memory.loadFailed")}</p>}
-          {pinSlice.map(memCard)}
-          {pinHits.length === 0 && !loadFailed && (
-            <p className="muted">{t("memory.empty")}</p>
-          )}
-        </div>
-        <div className="col-foot">
-          <div className="list-foot">
-            <button
-              className="ghost"
-              onClick={() => startAdd(true)}
-              disabled={editingId !== null}
-            >
-              {t("memory.pinAdd")}
-            </button>
-            <Pager
-              page={pinPg.page}
-              pages={pinPg.pages}
-              onChange={setPinPage}
-            />
-          </div>
-        </div>
-      </section>
+      </div>
 
-      {/* 2. 普通记忆：agent 工具写入 + 手动维护，数据在 backend */}
-      <section className="panel persona-section settings-col">
-        <h2>{t("memory.normalTitle")}</h2>
-        <p className="muted">{t("memory.normalDesc")}</p>
-        <div className="mem-toolbar">
-          <input
-            className="mem-search"
-            placeholder={t("memory.searchPh")}
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setMemPage(0);
-            }}
+      {/* 添加记忆弹窗：内容 + PIN 选项 */}
+      {adding && (
+        <Modal onClose={() => setAdding(false)}>
+          <div className="modal-meta muted">{t("memory.newTitle")}</div>
+          <textarea
+            className="mem-add-text"
+            rows={4}
+            autoFocus
+            value={addDraft}
+            onChange={(e) => setAddDraft(e.target.value)}
           />
-        </div>
-        <div className="col-grow">
-          {draftCard(false)}
-          {loadFailed && <p className="muted">{t("memory.loadFailed")}</p>}
-          {!loadFailed && shown.length === 0 && (
-            <p className="muted">{t("memory.empty")}</p>
-          )}
-
-          {shownSlice.map(memCard)}
-        </div>
-        <div className="col-foot">
-          <div className="list-foot">
-            <button
-              className="ghost"
-              onClick={() => startAdd(false)}
-              disabled={editingId !== null}
+          <div className="mem-pinopt">
+            {/* 与记忆卡片同款图钉：pinned=实心金 / unpinned=金色描边 */}
+            <Button
+              className={`mem-pinicon tip tip-l${addPinned ? " on" : ""}`}
+              data-tip={t("memory.pinTip")}
+              aria-pressed={addPinned}
+              onClick={() => setAddPinned((v) => !v)}
             >
-              {t("memory.add")}
-            </button>
-            <Pager
-              page={memPg.page}
-              pages={memPg.pages}
-              onChange={setMemPage}
-            />
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M9 4h6l-1.2 6.2L17 13.4V15H7v-1.6l3.2-3.2L9 4z"
+                  fill={addPinned ? "currentColor" : "none"}
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M12 15v5"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </Button>
+            <span>PIN</span>
           </div>
-        </div>
-      </section>
+          <div className="modal-foot">
+            <Button variant="ghost" onClick={() => setAdding(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={() => void commitAdd()}>{t("common.save")}</Button>
+          </div>
+        </Modal>
+      )}
+
       {detail && (
         <DetailModal
           meta={formatTime(detail.createdAt)}
@@ -308,6 +280,6 @@ export default function MemoryPanel() {
           onClose={() => setDetail(null)}
         />
       )}
-    </div>
+    </section>
   );
 }
