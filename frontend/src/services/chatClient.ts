@@ -1,6 +1,6 @@
 // backend chat 客户端：POST /api/chat {text} → SSE（text/event-stream）。
-// ReAct 循环、prompt 组装、记忆工具调用全部在 backend；
-// 前端只消费最终回答的增量 token。
+// ReAct 循环、prompt 组装、切句、记忆工具调用全部在 backend；
+// 前端只消费**句事件**（sentence）并逐句上屏/朗读。
 //
 // SSE 协议（每行 `data: <json>`）：
 //   {"t":"sentence","no","text","dirs","at"}  一句话已落账（正文已剥离指令，

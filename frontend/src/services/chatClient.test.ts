@@ -7,6 +7,7 @@
 // 单元测试全在 mock 这一层，所以只有这里能守住它。
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ServiceError } from "../lib/errors";
 import { chat, type ChatEvent } from "./chatClient";
 
 /** 按给定分片喂 SSE 响应，用来同时验证分片边界与事件顺序。 */
@@ -32,11 +33,25 @@ const sentence = (no: number, text: string) => ({
   at: "2026-01-01T00:00:00+00:00",
 });
 
+async function collect(signal?: AbortSignal): Promise<ChatEvent[]> {
+  const out: ChatEvent[] = [];
+  for await (const ev of chat("hi", signal)) out.push(ev);
+  return out;
+}
+
 async function drain(response: Response): Promise<ChatEvent[]> {
   vi.stubGlobal("fetch", vi.fn(async () => response));
-  const out: ChatEvent[] = [];
-  for await (const ev of chat("hi")) out.push(ev);
-  return out;
+  return collect();
+}
+
+/** 取迭代中抛出的错误（生成器不 reject，错误在迭代时抛出）。 */
+async function failureOf(signal?: AbortSignal): Promise<unknown> {
+  try {
+    await collect(signal);
+    return null;
+  } catch (e) {
+    return e;
+  }
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -88,5 +103,47 @@ describe("chat 的 SSE 消费", () => {
       "第一句。",
       "第二句。",
     ]);
+  });
+});
+
+describe("chat 的错误路径", () => {
+  it("HTTP 非 2xx → ServiceError(llm, http, 状态码)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 503 })));
+    const err = (await failureOf()) as ServiceError;
+    expect(err).toBeInstanceOf(ServiceError);
+    expect([err.service, err.failure, err.status]).toEqual(["llm", "http", 503]);
+  });
+
+  it("fetch 抛错 → ServiceError(llm, unreachable)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("network down");
+      }),
+    );
+    const err = (await failureOf()) as ServiceError;
+    expect(err).toBeInstanceOf(ServiceError);
+    expect([err.service, err.failure]).toEqual(["llm", "unreachable"]);
+  });
+
+  it("error 事件原样送达（由调用方映射成错误）", async () => {
+    const got = await drain(
+      sse([frame({ t: "error", message: "模型炸了" }), frame({ t: "done" })]),
+    );
+    expect(got[0]).toEqual({ t: "error", message: "模型炸了" });
+  });
+
+  it("中止（AbortError）→ 静默结束，不抛", async () => {
+    const ac = new AbortController();
+    ac.abort();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        const e = new Error("aborted");
+        e.name = "AbortError";
+        throw e;
+      }),
+    );
+    expect(await collect(ac.signal)).toEqual([]);
   });
 });
