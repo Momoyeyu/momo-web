@@ -106,6 +106,8 @@ export default function AvatarPanel() {
   // 两个弹窗：导入 / 表情与动作（后者记录目标模型 id）
   const [importOpen, setImportOpen] = useState(false);
   const [resId, setResId] = useState<string | null>(null);
+  /** 拖放区高亮（拖入中）。 */
+  const [dragging, setDragging] = useState(false);
 
   // 列表检索 + 分页（与「偏好」同一套）
   const [query, setQuery] = useState("");
@@ -464,13 +466,29 @@ export default function AvatarPanel() {
             </div>
           )}
           {error && <p className="avatar-error">{error}</p>}
+          {/* 拖放区：拖入 zip 或点击选文件（原来那格虚线「导入模型」的观感） */}
+          <div
+            className={`avatar-drop${dragging ? " dragging" : ""}`}
+            onClick={() => {
+              if (!busy) fileRef.current?.click();
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              void onPick(e.dataTransfer.files?.[0]);
+            }}
+          >
+            <span className="avatar-drop-plus">＋</span>
+            <span className="avatar-drop-label">
+              {busy ? t("avatar.importing") : t("avatar.dropHint")}
+            </span>
+          </div>
           <div className="modal-foot">
-            <Button
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-            >
-              {busy ? t("avatar.importing") : t("avatar.pickZip")}
-            </Button>
             <Button variant="ghost" onClick={closeImport}>
               {t("common.cancel")}
             </Button>

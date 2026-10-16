@@ -206,7 +206,7 @@ export const en: Dict = {
     resEmpty: "This model has no controllable expressions or motions.",
     searchPh: "Filter models…",
     importLabel: "Import a model",
-    pickZip: "Choose a .zip file",
+    dropHint: "Drop a .zip here, or click to choose",
     empty: "No matching model.",
   },
 };

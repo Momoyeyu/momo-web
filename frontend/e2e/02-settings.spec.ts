@@ -216,7 +216,17 @@ test("形象 tab：与「偏好」同构（检索 + 加号 + 翻页），加号�
   await panel.locator(".icon-btn").click();
   await expect(page.locator(".modal-overlay")).toBeVisible();
   await expect(page.locator(".modal-meta")).toHaveText("导入模型 (.zip)");
-  await expect(page.locator(".modal-foot button").first()).toHaveText("选择 zip 文件");
+  await expect(page.locator(".avatar-drop")).toContainText("拖入");
+
+  // 真拖一个文件进去：用非 zip 触发拒绝分支即可验证 onDrop 接上了，
+  // 且不会写入任何持久状态（错误只留在弹窗内）。
+  const dt = await page.evaluateHandle(() => {
+    const d = new DataTransfer();
+    d.items.add(new File(["x"], "a.txt", { type: "text/plain" }));
+    return d;
+  });
+  await page.locator(".avatar-drop").dispatchEvent("drop", { dataTransfer: dt });
+  await expect(page.locator(".avatar-error")).toHaveText("不是有效的 zip 文件");
 
   await page.locator(".modal-foot").getByText("取消").click();
   await expect(page.locator(".modal-overlay")).toBeHidden();

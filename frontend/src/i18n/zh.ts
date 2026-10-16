@@ -204,7 +204,7 @@ export const zh = {
     resEmpty: "该模型没有可用的表情/动作资源。",
     searchPh: "检索模型…",
     importLabel: "导入模型",
-    pickZip: "选择 zip 文件",
+    dropHint: "拖入 zip 文件，或点击选择",
     empty: "没有匹配的模型。",
   },
 };

@@ -228,6 +228,41 @@
   box-shadow: 0 0 0 1px var(--accent-soft), 0 2px 14px var(--accent-glow);
 }
 
+/* 导入弹窗里的拖放区：虚线框，可拖入也可点击（沿用原「导入模型」那格的观感） */
+.avatar-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 108px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  background: var(--input-bg);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.avatar-drop:hover,
+.avatar-drop.dragging {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.avatar-drop-plus {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.avatar-drop-label {
+  font-size: 13px;
+  text-align: center;
+}
+
 /* 导入弹窗里的多 manifest 选择行 */
 .avatar-pending {
   display: flex;

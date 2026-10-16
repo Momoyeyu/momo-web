@@ -204,7 +204,7 @@ export const ja: Dict = {
     resEmpty: "このモデルには操作できる表情・モーションがありません。",
     searchPh: "モデルを検索…",
     importLabel: "モデルを読み込む",
-    pickZip: "zip ファイルを選択",
+    dropHint: "zip をドロップ、またはクリックで選択",
     empty: "一致するモデルがありません。",
   },
 };
