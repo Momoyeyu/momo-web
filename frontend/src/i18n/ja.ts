@@ -71,7 +71,6 @@ export const ja: Dict = {
     tabs: {
       general: "一般",
       models: "モデル",
-      persona: "アバター",
       memory: "記憶",
       extend: "拡張",
     },
@@ -154,23 +153,6 @@ export const ja: Dict = {
     extStOff: "無効",
     extStRun: "確認中…",
 
-  },
-  persona: {
-    basic: "基本情報",
-    name: "名前",
-    identity: "アイデンティティ",
-    age: "年齢",
-    personality: "性格",
-    preferences: "好み",
-    prefAdd: "追加",
-    prefSearchPh: "嗜好を検索…",
-    prefEmpty: "一致する嗜好がありません。",
-    preferencesPh: "例：甘いものが好き",
-    // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
-    defaults: {
-      identity: "夜羽が開発したAI",
-      personality: "おとなしくて素直",
-    },
   },
   memory: {
     pinTip: "PIN した記憶は常にプロンプトへ注入されます。忘れたり書き換えられたりしません。",

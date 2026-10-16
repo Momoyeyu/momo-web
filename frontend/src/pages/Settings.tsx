@@ -37,22 +37,21 @@ import Modal from "../ui/Modal";
 import Slider from "../ui/Slider";
 import Switch from "../ui/Switch";
 import Button from "../ui/Button";
+import AvatarPanel from "./Avatar";
 import Hint from "../ui/Hint";
 import IconButton from "../ui/IconButton";
 import DialogBox from "../components/DialogBox";
 import Pager from "../ui/Pager";
 import Select from "../ui/Select";
-import PersonaPanel from "./Persona";
 import MemoryPanel from "./Memory";
 import "../styles/settings.css";
 
 type EndpointSection = "llm" | "asr" | "tts" | "embedding";
-type Section = "general" | "models" | "persona" | "memory" | "extend";
+type Section = "general" | "models" | "memory" | "extend";
 
 const TABS: Section[] = [
   "general",
   "models",
-  "persona",
   "memory",
   "extend",
 ];
@@ -735,14 +734,7 @@ export default function Settings() {
       {/* 中部内容区 */}
       <div className="settings-scroll">
         <div className="settings-content">
-          {tab === "persona" ? (
-            <PersonaPanel
-              value={state.persona}
-              onChange={(p) =>
-                update({ persona: { ...state.persona, ...p } })
-              }
-            />
-          ) : tab === "memory" ? (
+          {tab === "memory" ? (
             <MemoryPanel />
           ) : (
             <div className="settings-body">
@@ -863,7 +855,7 @@ export default function Settings() {
                   {/* 对话框实时预览：多句循环，逐字上屏 + 按切句速度换句 */}
                   <div className="col-foot">
                     <DialogPreview
-                      name={state.persona.name || personaName()}
+                      name={personaName()}
                       // 预览语言跟随「对话语言」：auto 回落到界面语言
                       sample={tFor(
                         settings.general.chatLang === "auto"
@@ -945,8 +937,16 @@ export default function Settings() {
               )}
 
               {tab === "extend" && (
-                /* 拓展是设置页唯一单栏页：整行通宽列表，编辑走居中弹窗。 */
-                <section className="panel settings-col ext-panel">
+              /* 双栏：左 Live2D（原「形象」tab 唯一剩下的配置）、右 MCP 拓展 */
+              <div className="settings-cols">
+              <section className="panel persona-section">
+              <h3 className="opt-group">
+              {t("settings.groups.avatar")}
+              <span className="req">*</span>
+              </h3>
+              <AvatarPanel />
+              </section>
+              <section className="panel settings-col ext-panel">
                   <div className="panel-title-row">
                     <h3 className="opt-group">
                       {t("settings.groups.extensions")}
@@ -1011,8 +1011,9 @@ export default function Settings() {
                     </div>
                   </div>
                 </section>
-              )}
-            </div>
+                </div>
+                )}
+                </div>
           )}
         </div>
       </div>

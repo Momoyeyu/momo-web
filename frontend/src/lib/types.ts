@@ -128,18 +128,6 @@ export interface AvatarMeta {
   resources?: AvatarResources;
 }
 
-/** 人设卡（persona 页可编辑；backend 渲染进 system prompt）。 */
-export interface PersonaCard {
-  name: string;
-  /** 身份描述（物种/自我认知）。 */
-  identity: string;
-  age: number;
-  /** 性格描述（自由文本）。 */
-  personality: string;
-  /** 偏好列表（用户自己添加，如「喜欢甜食」）。 */
-  preferences: string[];
-}
-
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -179,7 +167,6 @@ export interface CheckpointSave extends CheckpointMeta {
  *  初始记忆（pin）与会话历史在 momo.db，不在此 schema。 */
 export interface PersistedState {
   settings: Settings;
-  persona: PersonaCard;
   /** Live2D 模型清单（含内置条目；导入模型 blob 在 IndexedDB）。 */
   avatars: AvatarMeta[];
   /** 当前形象：avatars[].id。 */

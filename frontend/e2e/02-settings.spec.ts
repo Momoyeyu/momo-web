@@ -1,4 +1,4 @@
-// 设置页：五 tab、i18n 即时生效、出厂默认值跟随对话语言、控件写盘、端点探测、拓展登记。
+// 设置页：四 tab、i18n 即时生效、控件写盘、端点探测、拓展登记、Live2D 面板。
 //
 // 打的是真实实例，故：配置改动由 useStateRestore 整体快照还原；
 // 拓展记录只做「建 → 断言 → 删」。
@@ -21,7 +21,6 @@ test("五个 tab 齐全，可逐个切换", async ({ page }) => {
   expect(await page.locator(".stab-label").allTextContents()).toEqual([
     "通用",
     "模型",
-    "形象",
     "记忆",
     "拓展",
   ]);
@@ -29,7 +28,6 @@ test("五个 tab 齐全，可逐个切换", async ({ page }) => {
   const tabs: [string, string][] = [
     ["通用", ".settings-cols"],
     ["模型", ".settings-cols"],
-    ["形象", ".persona-tab"],
     ["记忆", ".mem-panel"],
     ["拓展", ".ext-panel"],
   ];
@@ -47,28 +45,6 @@ test("界面语言即时生效，且写回后端", async ({ page, request }) => 
   await expect(page.locator(".stab-label").first()).toHaveText("一般");
   const state = await readState(request);
   expect((state.settings as { general: { lang: string } }).general.lang).toBe("ja");
-});
-
-test("形象 tab 的出厂默认值跟随「对话语言」而非界面语言", async ({ page }) => {
-  const identity = (p: typeof page) =>
-    p
-      .locator(".field")
-      .filter({ has: p.getByText("身份", { exact: true }) })
-      .locator("input");
-
-  await openTab(page, "通用");
-  await pickSelect(page, "对话语言", "日本語"); // 界面保持中文
-  await waitSaved(page);
-
-  await page.locator(".stab", { hasText: "形象" }).click();
-  await expect(identity(page)).toHaveAttribute("placeholder", "夜羽が開発したAI");
-  await expect(page.locator(".stab-label").first()).toHaveText("通用"); // 界面没跟着变
-
-  await page.locator(".stab", { hasText: "通用" }).click();
-  await pickSelect(page, "对话语言", "English");
-  await waitSaved(page);
-  await page.locator(".stab", { hasText: "形象" }).click();
-  await expect(identity(page)).toHaveAttribute("placeholder", "an AI assistant");
 });
 
 test("滑块拖动即时反映数值并写盘", async ({ page, request }) => {
@@ -173,34 +149,20 @@ test("通用 tab：语言/语音是与对话框设置同级的两个面板，语
   await expect(page.locator(".dialog-preview .chat-status")).toHaveCount(0);
 });
 
-test("形象 tab：偏好与 Live2D 模型左右并排且等宽", async ({ page }) => {
-  await openTab(page, "形象");
+test("拓展 tab：Live2D 与 MCP 左右并排且等宽", async ({ page }) => {
+  await openTab(page, "拓展");
 
-  const cols = page.locator(".persona-tab > .settings-cols > .persona-section");
+  const cols = page.locator(".settings-cols > .panel");
   await expect(cols).toHaveCount(2);
-  await expect(cols.nth(0)).toContainText("偏好");
-  await expect(cols.nth(1)).toContainText("Live2D 模型");
+  await expect(cols.nth(0)).toContainText("Live2D 模型");
+  await expect(cols.nth(1)).toContainText("MCP");
 
-  // 等宽等高：列表区按一页 3 条预留高度，故两侧与条数无关地保持一致
   const [a, b] = await Promise.all([
     cols.nth(0).boundingBox(),
     cols.nth(1).boundingBox(),
   ]);
   expect(Math.abs((a?.width ?? 0) - (b?.width ?? 0))).toBeLessThan(2);
   expect(Math.abs((a?.height ?? 0) - (b?.height ?? 0))).toBeLessThan(2);
-
-  // 两侧卡片也等高（偏好单行 vs 形象带缩略图），行才能在水平方向对齐
-  const [cardL, cardR] = await Promise.all([
-    cols.nth(0).locator(".list-item").first().boundingBox(),
-    cols.nth(1).locator(".list-item").first().boundingBox(),
-  ]);
-  expect(Math.abs((cardL?.height ?? 0) - (cardR?.height ?? 0))).toBeLessThan(2);
-  expect(cardL?.height ?? 0).toBeGreaterThanOrEqual(70);
-
-  // 形象面板已从「模型」tab 移走
-  await page.locator(".stab", { hasText: "模型" }).click();
-  await expect(page.locator(".ext-panel, .settings-cols")).toBeVisible();
-  await expect(page.getByText("Live2D 模型", { exact: true })).toHaveCount(0);
 });
 
 test("探测按钮定宽：出结果不变宽，且与同列「显示」同宽", async ({ page }) => {
@@ -247,11 +209,11 @@ test("探测按钮定宽：出结果不变宽，且与同列「显示」同宽",
   await expect(probe).toHaveText("测试", { timeout: 10_000 });
 });
 
-test("形象 tab：与「偏好」同构（检索 + 加号 + 翻页），加号开导入弹窗", async ({
+test("拓展 tab：Live2D 与「记忆」同构（检索 + 加号 + 翻页），加号开导入弹窗", async ({
   page,
 }) => {
-  await openTab(page, "形象");
-  const panel = page.locator(".persona-section").nth(2);
+  await openTab(page, "拓展");
+  const panel = page.locator(".persona-section").nth(0);
 
   await expect(panel.locator(".mem-search")).toBeVisible();
   await expect(panel.locator(".icon-btn")).toBeVisible();
@@ -277,9 +239,9 @@ test("形象 tab：与「偏好」同构（检索 + 加号 + 翻页），加号�
   await expect(page.locator(".modal-overlay")).toBeHidden();
 });
 
-test("形象 tab：点模型卡片弹出「表情与动作」，并可按名检索", async ({ page }) => {
-  await openTab(page, "形象");
-  const panel = page.locator(".persona-section").nth(2);
+test("拓展 tab：点模型卡片弹出「表情与动作」，并可按名检索", async ({ page }) => {
+  await openTab(page, "拓展");
+  const panel = page.locator(".persona-section").nth(0);
 
   // 检索过滤（内置 Hiyori 命中，乱词落空态）
   await panel.locator(".mem-search").fill("Hiyori");

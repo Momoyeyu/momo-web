@@ -71,7 +71,6 @@ export const en: Dict = {
     tabs: {
       general: "General",
       models: "Models",
-      persona: "Avatar",
       memory: "Memory",
       extend: "Extensions",
     },
@@ -154,24 +153,6 @@ export const en: Dict = {
     extStOff: "Disabled",
     extStRun: "Probing…",
 
-  },
-  persona: {
-    basic: "Basic Info",
-    name: "Name",
-    identity: "Identity",
-    age: "Age",
-    personality: "Personality",
-    preferences: "Preferences",
-    prefAdd: "Add",
-    prefSearchPh: "Filter preferences…",
-    prefEmpty: "No matching preferences.",
-    preferencesPh: "e.g. likes sweets",
-    // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
-    defaults: {
-      // 小写开头：同一份文案也塞进 "Your identity is {identity}" / "Your personality is {personality}"。
-      identity: "an AI assistant",
-      personality: "sweet and obedient",
-    },
   },
   memory: {
     pinTip: "Pinned memories stay in the prompt — always remembered, never rewritten.",

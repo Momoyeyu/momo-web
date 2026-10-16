@@ -7,7 +7,6 @@ import type {
   AvatarResources,
   McpExtension,
   PersistedState,
-  PersonaCard,
   Settings,
 } from "./types";
 import { fetchState, putState } from "../services/stateClient";
@@ -76,24 +75,13 @@ const DEFAULT_SETTINGS: Settings = {
   extensions: [],
 };
 
-/**
- * 出厂人设。identity/personality 留空：它们是「按对话语言取」的文案，由
- * i18n 的 persona.defaults.*（placeholder）与 backend prompt 的 _T（注入回落）
- * 各自解析，不把某一种语言写死成配置数据。
- * preferences 不种默认值：空 = 无偏好，prompt 侧整段不注入。
- */
-export const DEFAULT_PERSONA: PersonaCard = {
-  name: "momo",
-  identity: "",
-  personality: "",
-  age: 16,
-  preferences: [],
-};
+/** 展示用的人设名。人设写死在 backend 的 prompt.PERSONA（设置页没有入口），
+ *  前端只需显示名；改人设时两处一起改。 */
+export const PERSONA_NAME = "momo";
 
 function defaults(): PersistedState {
   return {
     settings: structuredClone(DEFAULT_SETTINGS),
-    persona: structuredClone(DEFAULT_PERSONA),
     avatars: [builtinAvatar()],
     avatarId: AVATAR_BUILTIN,
   };
@@ -127,27 +115,10 @@ let backend: StorageLike = defaultBackend();
  * PUT 是整体替换，不透传会把它们抹掉。
  */
 let passthrough: Record<string, unknown> = {};
-const KNOWN_KEYS = new Set(["settings", "persona", "avatars", "avatarId"]);
+const KNOWN_KEYS = new Set(["settings", "avatars", "avatarId"]);
 
 const strArr = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
-
-/** persona 归一化：逐字段与默认合并。 */
-function normalizePersona(raw: unknown, d: PersonaCard): PersonaCard {
-  if (!raw || typeof raw !== "object") return d;
-  const o = raw as Record<string, unknown>;
-  return {
-    name: typeof o.name === "string" ? o.name : d.name,
-    identity: typeof o.identity === "string" ? o.identity : d.identity,
-    age:
-      typeof o.age === "number" && Number.isFinite(o.age) ? o.age : d.age,
-    personality:
-      typeof o.personality === "string" ? o.personality : d.personality,
-    preferences: Array.isArray(o.preferences)
-      ? strArr(o.preferences)
-      : d.preferences,
-  };
-}
 
 /** avatars 归一化：保证内置条目在首位；内置条目缺 resources 时补出厂清单
  * （导入条目缺省保留 undefined——设置页再按需懒解析 zip 补回）。 */
@@ -219,7 +190,6 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
       embedding: { ...d.settings.embedding, ...s?.embedding },
       extensions: normalizeExtensions(s?.extensions),
     },
-    persona: normalizePersona(parsed.persona, d.persona),
     avatars,
     avatarId:
       parsed.avatarId && avatars.some((a) => a.id === parsed.avatarId)
@@ -300,7 +270,7 @@ export function getSettings(): Settings {
 
 /** 铭牌/说话人显示名：人设卡名留空时退回默认。 */
 export function personaName(): string {
-  return state.persona.name || DEFAULT_PERSONA.name;
+  return PERSONA_NAME;
 }
 
 export function getAvatars(): AvatarMeta[] {

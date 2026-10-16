@@ -6,7 +6,7 @@
 // 那些是开发者的环境，随仓库发给每个 clone 的人既误导也不安全。
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_PERSONA, getSettings } from "./store";
+import { PERSONA_NAME, getSettings, getState } from "./store";
 
 describe("出厂配置不含任何预填信息", () => {
   it("服务地址与模型一律为空（输入框的灰色提示负责引导）", () => {
@@ -25,7 +25,8 @@ describe("出厂配置不含任何预填信息", () => {
     expect(s.extensions).toEqual([]);
   });
 
-  it("偏好为空：不种任何示例偏好", () => {
-    expect(DEFAULT_PERSONA.preferences).toEqual([]);
+  it("配置里没有人设：人设写死在 backend，前端只留展示名", () => {
+    expect(getState()).not.toHaveProperty("persona");
+    expect(PERSONA_NAME).toBe("momo");
   });
 });

@@ -71,7 +71,6 @@ export const zh = {
     tabs: {
       general: "通用",
       models: "模型",
-      persona: "形象",
       memory: "记忆",
       extend: "拓展",
     },
@@ -154,23 +153,6 @@ export const zh = {
     extStOff: "未启用",
     extStRun: "探测中…",
 
-  },
-  persona: {
-    basic: "基本信息",
-    name: "名称",
-    identity: "身份",
-    age: "年龄",
-    personality: "性格",
-    preferences: "偏好",
-    prefAdd: "添加",
-    prefSearchPh: "检索偏好…",
-    prefEmpty: "没有匹配的偏好。",
-    preferencesPh: "例如：喜欢甜食",
-    // 出厂默认人设：字段留空时 placeholder 与 prompt 回落都用它（按对话语言取）。
-    defaults: {
-      identity: "由夜羽开发的AI",
-      personality: "乖巧听话",
-    },
   },
   memory: {
     pinTip: "PIN 的记忆常驻注入对话：始终记得，不会被遗忘或改写。",
