@@ -48,8 +48,8 @@ void main(){
  float pulse=exp(-pow((p-.40)/.10,2.0));
  // 线心 / 光晕：光晕沿用较宽的散布，线心收得极紧 —— 视觉上「一条亮线 + 稀疏浮尘」
  float halo=aStyle.x;
- float width=(.013+.002*sin(u*14.0-t*.5))*(halo>.5?1.0:.16);
- float zj=position.z*(halo>.5?.014:.002);
+ float width=(.013+.002*sin(u*14.0-t*.5))*(halo>.5?1.0:.55);
+ float zj=position.z*(halo>.5?.014:.006);
  float across=position.y*width;
  float depth=position.z*.04+across*.6;
  vec2 uv=vec2(.5+(u-.5)*1.08,uWaveCentre+beat*.20+across+zj);
@@ -60,10 +60,10 @@ void main(){
  vDepth=clamp(.5+depth*1.9,0.0,1.0);
  // 亮度离线心越远越淡：亮线向两侧自然晕开，而不是一条硬边亮线
  float d=abs(across+zj);
- float falloff=.28+.72*exp(-d*58.0);
+ float falloff=.28+.72*exp(-d*34.0);
  // 亮度随信号高度自然变化：峰与波形处亮、平段落暗，整条线因此有起伏而非等亮
- float lift=.55+.45*clamp(abs(beat)*2.6,0.0,1.0);
- vAlpha=(.026+seed*.052)*filaments*tail*edges*bounds*(.5+1.2*pulse)*falloff*lift;
+ float lift=.50+.40*clamp(abs(beat)*2.6,0.0,1.0);
+ vAlpha=(.016+seed*.034)*filaments*tail*edges*bounds*(.5+1.2*pulse)*falloff*lift;
  float size=(.82+seed*.7+vDepth*.34)*(1.0+pulse*1.2)*uDpr;
  gl_PointSize=max(1.0,size);
  gl_Position=vec4(uv*2.0-1.0,0.0,1.0);
@@ -83,7 +83,7 @@ const QUAD_VERT =
   "precision highp float;attribute vec2 aPos;varying vec2 vUv;" +
   "void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.0,1.0);}";
 
-const COUNT = 11000;
+const COUNT = 6500;
 
 /** 确定性 PRNG（与原版同款 LCG），保证粒子分布稳定。 */
 function makeRandom(seed: number): () => number {
@@ -180,9 +180,9 @@ export default function EcgCanvas() {
     const styles = new Float32Array(COUNT * 2);
     for (let i = 0; i < COUNT; i++) {
       positions[i * 3] = rand();
-      // 六分之一做稀疏光晕（远离线心），其余贴着线心 —— 只有中心密、四周稀
-      const halo = i % 6 === 0;
-      const spread = halo ? 1.0 : 0.16;
+      // 三分之一做外围雾（分散），其余仍集中在波腹附近 —— 只是不再收成细线
+      const halo = i % 3 === 0;
+      const spread = halo ? 1.0 : 0.50;
       positions[i * 3 + 1] = Math.max(
         -3,
         Math.min(
