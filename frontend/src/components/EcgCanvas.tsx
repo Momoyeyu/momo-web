@@ -37,8 +37,8 @@ float beatHash(float n){return fract(sin(n*127.1)*43758.5453);}
 void main(){
  float u=fract(position.x-uTravel*.68);  // 粒子向左漂，与右移的波前对冲
  float seed=aStyle.y,t=uTime;
- // ~32bpm 持续右移；整屏 ~3.5 次心跳
- float phase=u*3.5-t*.54;
+ // ~32bpm 持续右移；整屏 ~6.5 次心跳（拍宽收窄，长宽比才不显得扁）
+ float phase=u*6.5-t*.54;
  float idx=floor(phase);
  float p=fract(phase);
  // 节律规整（正常心率）；每跳振幅自然起伏（0.75x~1.25x）
@@ -46,10 +46,10 @@ void main(){
  float beat=ecg(p)*amp;
  // R 峰附近粒子提亮+放大 → 每跳有一次「搏动」闪烁
  float pulse=exp(-pow((p-.40)/.10,2.0));
- float width=.022+.006*sin(u*14.0-t*.5);   // 线条横向厚度（微起伏）
+ float width=.014+.003*sin(u*14.0-t*.5);   // 带厚（越薄越像线条、越不成团）
  float across=position.y*width;
  float depth=position.z*.04+across*.6;
- vec2 uv=vec2(.5+(u-.5)*1.08,uWaveCentre+beat*.18+across+position.z*.014);
+ vec2 uv=vec2(.5+(u-.5)*1.08,uWaveCentre+beat*.20+across+position.z*.014);
  float edges=smoothstep(0.0,.03,u)*(1.0-smoothstep(.97,1.0,u));
  float bounds=smoothstep(.05,.14,uv.y)*(1.0-smoothstep(.68,.80,uv.y));
  float filaments=.63+.37*pow(.5+.5*sin(position.y*34.0),4.0);
@@ -75,7 +75,7 @@ const QUAD_VERT =
   "precision highp float;attribute vec2 aPos;varying vec2 vUv;" +
   "void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.0,1.0);}";
 
-const COUNT = 96000;
+const COUNT = 40000;
 
 /** 确定性 PRNG（与原版同款 LCG），保证粒子分布稳定。 */
 function makeRandom(seed: number): () => number {
