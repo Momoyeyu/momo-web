@@ -58,8 +58,13 @@ void main(){
  float filaments=.63+.37*pow(.5+.5*sin(position.y*34.0),4.0);
  float tail=mix(1.0,.28,smoothstep(1.0,2.9,abs(position.y)));
  vDepth=clamp(.5+depth*1.9,0.0,1.0);
- vAlpha=(.05+seed*.10)*filaments*tail*edges*bounds*(.5+1.2*pulse)*mix(1.0,.45,halo);
- float size=(1.0+seed*.9+vDepth*.4)*(1.0+pulse*1.3)*uDpr;
+ // 亮度离线心越远越淡：亮线向两侧自然晕开，而不是一条硬边亮线
+ float d=abs(across+zj);
+ float falloff=.28+.72*exp(-d*58.0);
+ // 亮度随信号高度自然变化：峰与波形处亮、平段落暗，整条线因此有起伏而非等亮
+ float lift=.55+.45*clamp(abs(beat)*2.6,0.0,1.0);
+ vAlpha=(.026+seed*.052)*filaments*tail*edges*bounds*(.5+1.2*pulse)*falloff*lift;
+ float size=(.82+seed*.7+vDepth*.34)*(1.0+pulse*1.2)*uDpr;
  gl_PointSize=max(1.0,size);
  gl_Position=vec4(uv*2.0-1.0,0.0,1.0);
 }`;
@@ -78,7 +83,7 @@ const QUAD_VERT =
   "precision highp float;attribute vec2 aPos;varying vec2 vUv;" +
   "void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.0,1.0);}";
 
-const COUNT = 15000;
+const COUNT = 11000;
 
 /** 确定性 PRNG（与原版同款 LCG），保证粒子分布稳定。 */
 function makeRandom(seed: number): () => number {
