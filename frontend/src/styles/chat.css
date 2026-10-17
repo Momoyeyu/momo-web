@@ -190,12 +190,17 @@
 
 /* 输入行两枚圆形图标按钮：左麦克风、右发送（对照参考截图的强调圆按钮）。
    发送用 variant="solid"，这里只负责把它压成圆形。 */
+/* 圆里的图标必须几何居中：inline SVG 默认按文字基线排布，会偏上约 2.5px，
+   所以这两枚圆形按钮用 flex 居中（实测修正前 dy=-2.5，修正后 0）。 */
 .input-row .mic-btn,
 .input-row .send-btn {
   width: 38px;
   height: 38px;
   padding: 0;
   border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .input-row .mic-on {
@@ -228,8 +233,11 @@
 }
 
 .chat-toolbar .tb {
-  /* 图标按钮：方形内距，不再预留文字宽度 */
+  /* 图标按钮：方形内距 + flex 居中（同 .mic-btn，避免图标按基线偏上） */
   padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: var(--r-sm);
   background: transparent;
