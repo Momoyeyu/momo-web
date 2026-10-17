@@ -29,7 +29,7 @@ varying float vAlpha,vDepth;
 float ecg(float p){
  return .10*exp(-pow((p-.16)/.050,2.0))
       -.11*exp(-pow((p-.355)/.016,2.0))
-      +1.00*exp(-pow((p-.400)/.013,2.0))
+      +0.85*smoothstep(.372,.384,p)*(1.0-smoothstep(.416,.428,p))
       -.24*exp(-pow((p-.445)/.018,2.0))
       +.20*exp(-pow((p-.640)/.065,2.0));
 }
@@ -46,16 +46,19 @@ void main(){
  float beat=ecg(p)*amp;
  // R 峰附近粒子提亮+放大 → 每跳有一次「搏动」闪烁
  float pulse=exp(-pow((p-.40)/.10,2.0));
- float width=.014+.003*sin(u*14.0-t*.5);   // 带厚（越薄越像线条、越不成团）
+ // 线心 / 光晕：光晕沿用较宽的散布，线心收得极紧 —— 视觉上「一条亮线 + 稀疏浮尘」
+ float halo=aStyle.x;
+ float width=(.013+.002*sin(u*14.0-t*.5))*(halo>.5?1.0:.16);
+ float zj=position.z*(halo>.5?.014:.002);
  float across=position.y*width;
  float depth=position.z*.04+across*.6;
- vec2 uv=vec2(.5+(u-.5)*1.08,uWaveCentre+beat*.20+across+position.z*.014);
+ vec2 uv=vec2(.5+(u-.5)*1.08,uWaveCentre+beat*.20+across+zj);
  float edges=smoothstep(0.0,.03,u)*(1.0-smoothstep(.97,1.0,u));
  float bounds=smoothstep(.05,.14,uv.y)*(1.0-smoothstep(.68,.80,uv.y));
  float filaments=.63+.37*pow(.5+.5*sin(position.y*34.0),4.0);
  float tail=mix(1.0,.28,smoothstep(1.0,2.9,abs(position.y)));
  vDepth=clamp(.5+depth*1.9,0.0,1.0);
- vAlpha=(.06+seed*.12)*filaments*tail*edges*bounds*(.5+1.2*pulse);
+ vAlpha=(.05+seed*.10)*filaments*tail*edges*bounds*(.5+1.2*pulse)*mix(1.0,.45,halo);
  float size=(1.0+seed*.9+vDepth*.4)*(1.0+pulse*1.3)*uDpr;
  gl_PointSize=max(1.0,size);
  gl_Position=vec4(uv*2.0-1.0,0.0,1.0);
@@ -75,7 +78,7 @@ const QUAD_VERT =
   "precision highp float;attribute vec2 aPos;varying vec2 vUv;" +
   "void main(){vUv=aPos*.5+.5;gl_Position=vec4(aPos,0.0,1.0);}";
 
-const COUNT = 40000;
+const COUNT = 15000;
 
 /** 确定性 PRNG（与原版同款 LCG），保证粒子分布稳定。 */
 function makeRandom(seed: number): () => number {
@@ -172,7 +175,9 @@ export default function EcgCanvas() {
     const styles = new Float32Array(COUNT * 2);
     for (let i = 0; i < COUNT; i++) {
       positions[i * 3] = rand();
-      const spread = i % 4 === 0 ? 0.95 : 0.44;
+      // 六分之一做稀疏光晕（远离线心），其余贴着线心 —— 只有中心密、四周稀
+      const halo = i % 6 === 0;
+      const spread = halo ? 1.0 : 0.16;
       positions[i * 3 + 1] = Math.max(
         -3,
         Math.min(
@@ -181,7 +186,7 @@ export default function EcgCanvas() {
         ),
       ) * spread;
       positions[i * 3 + 2] = rand() * 2 - 1;
-      styles[i * 2] = i % 2;
+      styles[i * 2] = halo ? 1 : 0;
       styles[i * 2 + 1] = rand();
     }
     const posBuf = gl.createBuffer();
