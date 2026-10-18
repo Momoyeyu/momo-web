@@ -1,8 +1,10 @@
 // 可编辑列表卡片：左侧正文（可选头部行 + 截断正文）+ 右侧图标操作列。
 // 操作图标化并与正文垂直居中，故单行正文在卡片里也是居中的；
 // 点击卡片打开详情；editing 时整卡换成 edit 传入的编辑表单（纵向）。
-import type { ReactNode } from "react";
+// 删除确认走自定义确认弹窗（ui/Confirm），不用原生 confirm。
+import { useState, type ReactNode } from "react";
 import { t } from "../i18n";
+import Confirm from "./Confirm";
 import IconButton from "./IconButton";
 import "../styles/controls.css";
 
@@ -32,6 +34,7 @@ export default function EditableItem({
   actions?: ReactNode;
   children: ReactNode;
 }) {
+  const [confirming, setConfirming] = useState(false);
   return (
     <div
       className={`list-item${editing ? " list-editing" : " list-open"}`}
@@ -68,14 +71,26 @@ export default function EditableItem({
                 tip={t("common.del")}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!deleteConfirm || window.confirm(deleteConfirm)) {
-                    onDelete();
-                  }
+                  if (deleteConfirm) setConfirming(true);
+                  else onDelete();
                 }}
               />
             )}
           </div>
         </>
+      )}
+      {confirming && deleteConfirm && (
+        <Confirm
+          title={t("common.del")}
+          message={deleteConfirm}
+          confirmLabel={t("common.del")}
+          danger
+          onConfirm={() => {
+            setConfirming(false);
+            onDelete?.();
+          }}
+          onCancel={() => setConfirming(false)}
+        />
       )}
     </div>
   );
