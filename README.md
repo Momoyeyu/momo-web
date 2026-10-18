@@ -1,6 +1,10 @@
-# momo-web
+# momo
 
-momo Web 版：React SPA 前端 + FastAPI 后端（前后端显式分离，frontend 将来原样进 Tauri WebView，backend 进 Rust Core）。
+一款类 Neuro-Sama 的交互式 AI 游戏。本仓库是早期的 Web Demo 版本，Working in Progress ...
+
+当前 Demo 覆盖的是游戏的基础交互层：视觉小说式的对话——Live2D 形象 + 语音输入/输出 + 流式字幕，配人格、记忆、存档槽位与拓展接入。
+
+技术上是 React SPA 前端 + FastAPI 后端（前后端显式分离，frontend 将来原样进 Tauri WebView，backend 进 Rust Core）。
 
 ## 跑起来
 
@@ -26,10 +30,11 @@ API 契约详见 `docs/backend-api.md`。
 
 ## 页面
 
-- **title**：主页，Live2D 形象（默认 Hiyori，可导入自托管模型）+ 右侧视觉小说式菜单
+- **title**：主页，视觉小说式菜单 + 心跳主题的动态背景
 - **chat**：VN 式底部对话框。文字输入或麦克风连续语音 → backend ReAct → SSE 流式回复 → 字幕 + TTS 播放 + 口型/表情；说话中可随时打断（语音 barge-in 或停止按钮）
 - **backlog**：回顾子页，视觉小说式历史回放
-- **settings**：通用 / 模型（LLM·ASR·TTS·形象四块）/ 人格 / 记忆；草稿+保存模型
+- **checkpoint**：存档 / 读档，固定 120 个槽位（10 页滑轨），auto 槽为读档前的自动备份
+- **settings**：通用 / 模型（LLM·ASR·TTS·Embedding·形象）/ 记忆 / 拓展（MCP）
 
 ## 验证
 
