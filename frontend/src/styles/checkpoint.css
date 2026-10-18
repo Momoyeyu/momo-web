@@ -1,5 +1,7 @@
-/* 存档槽位页：视觉小说式 3 行 × 4 列槽位网格 + AUTO 置顶卡 + 翻页条。
-   沿用 backlog 的遮罩 overlay + 居中面板。 */
+/* 存档槽位页：视觉小说式 3 行 × 4 列槽位网格 × 10 页横排滑轨 + AUTO 置顶卡。
+   背景是 RoPE 旋转网格（.grid-backdrop，见 base.css）：Save/Load 沿 0° 对称，
+   每翻一页转 36°（10 页满圈），拖拽跟手。
+   面板宽幅贴近 16:9 舞台，槽位卡片随之更舒展。 */
 
 .checkpoint-page {
   position: fixed;
@@ -8,20 +10,21 @@
   display: flex;
   align-items: stretch;
   justify-content: center;
-  background: var(--backdrop);
-  backdrop-filter: blur(10px);
-  padding: 5vh 16px;
+  padding: 5cqh 16px;
   animation: page-in 0.28s ease both;
 }
 
 .checkpoint-panel {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  width: min(760px, 94vw);
+  width: min(1200px, 92cqw);
   min-height: 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
+  backdrop-filter: blur(14px);
   overflow: hidden;
 }
 
@@ -62,14 +65,48 @@
   font-size: 13px;
 }
 
+/* 滑轨容器：10 页横排，拖拽跟手（横向手势交给 Pointer Events，纵向保留滚动） */
+.checkpoint-track-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+}
+
+.checkpoint-track-wrap:active {
+  cursor: grabbing;
+}
+
+.checkpoint-track {
+  display: flex;
+  height: 100%;
+  transition: transform 0.35s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: transform;
+}
+
+.checkpoint-track.dragging {
+  transition: none; /* 拖拽跟手：关掉过渡 */
+}
+
+.checkpoint-track-page {
+  flex: 0 0 100%;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+}
+
 /* 槽位网格：固定 4 列 × 3 行，卡片随格拉伸（卡片长宽比 = 格子长宽比） */
 .checkpoint-grid {
   flex: 1;
+  min-width: 0;
   min-height: 0;
+  height: 100%;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(3, 1fr);
-  gap: 10px;
+  gap: 12px;
 }
 
 /* 卡片：槽位号 + 时间 + 末句预览 */
@@ -127,6 +164,11 @@
   color: var(--accent);
 }
 
+/* AUTO 卡的时间标签给徽标让位，避免右上角重叠。 */
+.slot-auto .slot-card-top {
+  padding-right: 52px;
+}
+
 .slot-card-top {
   display: flex;
   align-items: baseline;
@@ -181,4 +223,11 @@
   align-items: center;
   justify-content: center;
   padding-top: 12px;
+}
+
+/* 动效弱化：滑轨瞬移落位（网格旋转在 GridBackdrop 内自行处理）。 */
+@media (prefers-reduced-motion: reduce) {
+  .checkpoint-track {
+    transition: none;
+  }
 }

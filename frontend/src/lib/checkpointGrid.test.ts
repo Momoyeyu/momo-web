@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_PAGES,
+  MAX_SLOT,
   PER_PAGE,
   buildCells,
   bySlot,
@@ -26,25 +27,9 @@ describe("bySlot", () => {
 });
 
 describe("pageCount", () => {
-  it("无存档 → 1 页", () => {
-    expect(pageCount([], "load")).toBe(1);
-    expect(pageCount([], "save")).toBe(1);
-  });
-
-  it("读档模式 = 实际存档页数，空页不可达", () => {
-    expect(pageCount([meta(5)], "load")).toBe(1);
-    expect(pageCount([meta(12)], "load")).toBe(1);
-    expect(pageCount([meta(13)], "load")).toBe(2);
-    expect(pageCount([meta(120)], "load")).toBe(10);
-  });
-
-  it("存档模式在最末满页后多放一页空页", () => {
-    expect(pageCount([meta(5)], "save")).toBe(1);
-    expect(pageCount([meta(12)], "save")).toBe(2); // 第 1 页满 → 第 2 页可存
-    expect(pageCount([meta(13)], "save")).toBe(2);
-    expect(pageCount([meta(120)], "save")).toBe(MAX_PAGES); // 上限 10 页
-    expect(pageCount([meta(121)], "save")).toBe(MAX_PAGES); // 越界不再增页
-    expect(pageCount([meta(null, true)], "save")).toBe(1); // AUTO 槽不占手动页
+  it("槽位固定 120 个 → 恒 10 页，空页也完整渲染", () => {
+    expect(pageCount()).toBe(MAX_PAGES);
+    expect(MAX_PAGES * PER_PAGE).toBe(MAX_SLOT);
   });
 });
 
