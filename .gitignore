@@ -11,3 +11,6 @@ backend/data/
 frontend/test-results/
 frontend/playwright-report/
 frontend/.playwright/
+
+# 本地 agent 工作区数据（记忆 / 会话），不进仓库
+.workbuddy/
