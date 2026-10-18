@@ -1,18 +1,24 @@
 /* ===== 设置页三段式（对照柚子社 config）=====
    顶部 tab 条 | 中部滚动内容 | 底部操作条——三层各自是独立全宽容器，
-   tab 不与内容面板粘连。桌面横屏限定。 */
+   tab 不与内容面板粘连。桌面横屏限定。
+   背景：与标题页同标尺的旋转网格（GridBackdrop），坐标系随 tab 旋转；
+   tab 高亮滑块与内容滑轨用同一个时间常数（0.35s, easeInOutCubic）滑动。 */
 
 .settings-page {
   position: relative;
   z-index: 1;
-  height: 100dvh;
+  height: 100%;
   display: flex;
   flex-direction: column;
 }
 
+/* 网格背景样式在 base.css（.grid-backdrop，与存档页共用）。 */
+
 /* --- 顶部 tab 条（独立容器，铺满顶部） --- */
 
 .tabstrip {
+  position: relative;
+  z-index: 1;
   flex: none;
   border-bottom: 1px solid var(--line);
   background: var(--chrome);
@@ -20,12 +26,29 @@
 }
 
 .tabstrip-inner {
+  position: relative;
   display: flex;
   width: min(1200px, calc(100% - 64px));
   margin: 0 auto;
 }
 
+/* 金色高亮滑块：宽度=1/4，随激活 tab 平移——不直接切换。 */
+.stab-thumb {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 25%;
+  height: 100%;
+  background: var(--accent-soft);
+  border-bottom: 2px solid var(--accent);
+  transition: transform 0.35s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: transform;
+  pointer-events: none;
+}
+
 .stab {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -49,6 +72,13 @@
   box-shadow: none;
 }
 
+/* base.css 的 button:hover（0,1,1）会盖掉 .stab 的透明底（0,1,0），
+   把 tab 整块涂成实心金——高亮只由滑块承担，这里显式压回透明。 */
+.stab:hover,
+.stab:active {
+  background: transparent;
+}
+
 .stab-label {
   font-size: 15px;
   font-weight: 600;
@@ -58,16 +88,33 @@
 
 .stab.active {
   color: var(--accent-strong);
-  border-bottom-color: var(--accent);
-  background: var(--accent-soft);
 }
 
-/* --- 中部滚动内容 --- */
+/* --- 中部滚动内容：滑轨式（手机多桌面横滑） --- */
 
 .settings-scroll {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+}
+
+/* 四面板常驻横排，translateX 切换；时长/缓动与 stab-thumb 严格一致。 */
+.settings-track {
+  display: flex;
+  height: 100%;
+  transition: transform 0.35s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: transform;
+}
+
+.settings-pane {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .settings-content {
@@ -296,7 +343,7 @@
 }
 
 .avatar-res-scroll {
-  max-height: 46vh;
+  max-height: 46cqh;
   overflow-y: auto;
 }
 
@@ -397,6 +444,8 @@
 /* --- 底部操作条（独立全宽容器） --- */
 
 .footbar {
+  position: relative;
+  z-index: 1;
   flex: none;
   border-top: 1px solid var(--line);
   background: var(--chrome);
@@ -517,7 +566,7 @@
 
 .ext-modal {
   width: min(620px, calc(100% - 64px));
-  max-height: calc(100dvh - 96px);
+  max-height: calc(100cqh - 96px);
   overflow-y: auto;
 }
 
@@ -587,4 +636,12 @@
   min-width: 0;
   font-family: monospace;
   font-size: 12px;
+}
+
+/* 动效弱化：滑块与滑轨瞬移落位（网格旋转在 GridBackdrop 内自行处理）。 */
+@media (prefers-reduced-motion: reduce) {
+  .stab-thumb,
+  .settings-track {
+    transition: none;
+  }
 }
