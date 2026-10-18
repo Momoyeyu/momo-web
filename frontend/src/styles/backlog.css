@@ -9,18 +9,21 @@
   justify-content: center;
   background: var(--backdrop);
   backdrop-filter: blur(10px);
-  padding: 6vh 16px;
+  padding: 6cqh 16px;
   animation: page-in 0.28s ease both;
 }
 
+/* Backlog 是阅读流，不跟存档页的宽幅面板走：保持瘦长阅读栏，
+   只比原先（680px）略宽一点。 */
 .backlog-panel {
   display: flex;
   flex-direction: column;
-  width: min(680px, 92vw);
+  width: min(760px, 92cqw);
   min-height: 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
+  backdrop-filter: blur(14px);
   overflow: hidden;
 }
 

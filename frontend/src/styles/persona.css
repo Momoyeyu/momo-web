@@ -49,7 +49,7 @@ button.danger:hover {
 
 /* 记忆 tab：单栏面板铺满内容区高度。 */
 .mem-panel {
-  min-height: min(560px, 72vh);
+  min-height: min(560px, 72cqh);
 }
 
 /* 卡片右上角图钉钮：pinned=实心金 / unpinned=金色描边；hover 出说明浮窗。 */

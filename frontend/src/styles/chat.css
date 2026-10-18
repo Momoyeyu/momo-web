@@ -77,7 +77,7 @@
   position: absolute;
   top: 58px;
   left: 20px;
-  max-width: min(560px, 90vw);
+  max-width: min(560px, 90cqw);
   padding: 8px 16px;
   border-radius: var(--r-md);
   background: var(--danger-bg);
@@ -118,7 +118,7 @@
 
 .dialog-box {
   position: relative;
-  width: min(880px, 94vw);
+  width: min(880px, 94cqw);
   min-height: 148px;
   display: flex;
   flex-direction: column;

@@ -62,12 +62,33 @@ body,
 #root {
   margin: 0;
   height: 100%;
-  background: var(--bg);
-  color: var(--text);
   font-family:
     "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system,
     "Segoe UI", sans-serif;
   overflow: hidden;
+}
+
+/* 画面比例锁 16:9：舞台永远等比居中，窗口多余部分留黑边（letterbox）。
+   - 舞台即“视口”：内部一律用 cqh/cqw（容器查询单位）代替 vh/vw；
+   - transform 让内部的 position:fixed（页面层、立绘画布、模态）以舞台为包含块；
+   - overflow:hidden 保证任何内容都不越出舞台。 */
+html,
+body {
+  background: #000;
+  color: var(--text);
+}
+
+.app-stage {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+  container-type: size;
+  transform: translateZ(0);
 }
 
 /* 路由切换：淡入 + 轻微上浮（VN 换场感）。 */
@@ -162,6 +183,15 @@ textarea::placeholder {
   border-radius: var(--r-lg);
   backdrop-filter: blur(14px);
   padding: 20px;
+}
+
+/* RoPE 旋转网格背景（GridBackdrop）：设置页与存档页共用，纯装饰。 */
+.grid-backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 .muted {
