@@ -404,6 +404,11 @@
   padding-right: 0.4em;
   text-align: center;
   white-space: nowrap;
+  /* 定宽就必须硬截断：失败文案长短不可控（如 "backend unreachable"），
+     没有 overflow 处理时会直接画到框外、压到相邻控件上。完整文本走 title。 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 /* .probe-btn 只作标记（状态色见 .probe-ok / .probe-err，宽度走 .row-btn），
@@ -533,9 +538,13 @@
 .ext-dot {
   flex: none;
   min-width: 84px;
+  max-width: 140px;
   font-size: 12px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  /* 连接状态文案同样是变长错误信息：给上限 + 截断，绝不撑开行或溢出 */
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .ext-dot.ok {

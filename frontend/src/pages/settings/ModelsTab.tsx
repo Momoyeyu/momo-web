@@ -174,7 +174,11 @@ export default function ModelsTab() {
           className={`key-toggle row-btn probe-btn ${
             warn ? "probe-warn" : probeLabel(sec).cls
           }`}
-          title={warn ? t(badUrl ? "settings.invalidUrl" : "settings.required") : undefined}
+          title={
+            warn
+              ? t(badUrl ? "settings.invalidUrl" : "settings.required")
+              : probeLabel(sec).text
+          }
           onClick={() => runProbe(sec)}
           disabled={disabled || warn || probes[sec] !== undefined}
         >

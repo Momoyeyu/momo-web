@@ -306,3 +306,16 @@ test("通用 tab：语言下拉展开后不被下面的「语音设置」面板�
   await page.locator(".sel-opt").filter({ hasText: "日本語" }).click();
   await expect(page.locator(".stab-label").first()).toHaveText("通用"); // 界面语言未变
 });
+
+test("四个 tab 都不产生横向溢出（定宽控件里的长文案一律截断）", async ({ page }) => {
+  await openApp(page, "settings");
+  for (const tab of ["通用", "模型", "记忆", "拓展"]) {
+    await page.locator(".stab", { hasText: tab }).click();
+    const { scroll, client } = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollWidth,
+      client: document.documentElement.clientWidth,
+    }));
+    // 「禁止溢出」是硬约束：任何 tab 出现横向滚动都算回归
+    expect(scroll, `${tab} tab 出现横向溢出`).toBeLessThanOrEqual(client + 1);
+  }
+});
