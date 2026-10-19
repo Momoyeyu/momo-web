@@ -94,33 +94,24 @@ export default function ModelsTab() {
    *   延迟 ≥1s 记成 1.2s（否则 1234ms 会把按钮撑破）
    *   HTTP 状态码只留数字（✗ 404 比 ✗ HTTP 404 短，且与 ✓ 122ms 对称）
    */
+  /** 探测按钮的文案：**封闭短词汇表**，永不透传后端的原始错误串。
+      定宽按钮里只能放这类短词（测试/…/0.8s/失败/未填/缺参考音/缺模型）；
+      具体原因（HTTP 400、backend unreachable 之类）属于内部实现，留在日志里即可。 */
   const probeLabel = (sec: EndpointSection): { text: string; cls: string } => {
     const r = probes[sec];
     if (!r) return { text: t("settings.test"), cls: "" };
     if (r === "running") return { text: "…", cls: "probe-info" };
     const ms = /^(\d+)ms$/.exec(r.detail);
-    const detail = ms
-      ? Number(ms[1]) >= 1000
-        ? `${(Number(ms[1]) / 1000).toFixed(1)}s`
-        : r.detail
-      : r.detail === "unconfigured"
-        ? t("settings.testNeedUrl")
-        : /^(unreachable|timeout|connect failed|bad url|closed)/.test(r.detail)
-          ? t("settings.testFail")
-          // 定宽按钮容不下长描述：已知原因收短，其余按后端给的短串
-          : r.detail.startsWith("连接失败")
-            ? t("settings.testFail")
-            : r.detail === "未上传参考音频"
-            ? t("settings.ttsNeedRef")
-            : r.detail.startsWith("缺少模型")
-              ? t("settings.asrNeedModel")
-              : r.detail.startsWith("未配置服务地址")
-                ? t("settings.testNeedUrl")
-                : r.detail.replace(/^HTTP /, "");
-    return {
-      text: `${r.ok ? "✓" : "✗"} ${detail}`,
-      cls: r.ok ? "probe-ok" : "probe-err",
-    };
+    if (ms) {
+      const n = Number(ms[1]);
+      return { text: n >= 1000 ? `${(n / 1000).toFixed(1)}s` : r.detail, cls: "probe-ok" };
+    }
+    if (r.detail === "unconfigured" || r.detail.startsWith("未配置服务地址")) {
+      return { text: t("settings.testNeedUrl"), cls: "probe-err" };
+    }
+    if (r.detail === "未上传参考音频") return { text: t("settings.ttsNeedRef"), cls: "probe-err" };
+    if (r.detail.startsWith("缺少模型")) return { text: t("settings.asrNeedModel"), cls: "probe-err" };
+    return { text: t("settings.testFail"), cls: "probe-err" };
   };
 
   const fileRef = useRef<HTMLInputElement>(null);
@@ -174,11 +165,7 @@ export default function ModelsTab() {
           className={`key-toggle row-btn probe-btn ${
             warn ? "probe-warn" : probeLabel(sec).cls
           }`}
-          title={
-            warn
-              ? t(badUrl ? "settings.invalidUrl" : "settings.required")
-              : probeLabel(sec).text
-          }
+          title={warn ? t(badUrl ? "settings.invalidUrl" : "settings.required") : undefined}
           onClick={() => runProbe(sec)}
           disabled={disabled || warn || probes[sec] !== undefined}
         >

@@ -307,7 +307,7 @@ test("通用 tab：语言下拉展开后不被下面的「语音设置」面板�
   await expect(page.locator(".stab-label").first()).toHaveText("通用"); // 界面语言未变
 });
 
-test("四个 tab 都不产生横向溢出（定宽控件里的长文案一律截断）", async ({ page }) => {
+test("四个 tab 都不产生横向溢出（定宽控件里只放短词汇，不放长文案）", async ({ page }) => {
   await openApp(page, "settings");
   for (const tab of ["通用", "模型", "记忆", "拓展"]) {
     await page.locator(".stab", { hasText: tab }).click();
