@@ -97,21 +97,28 @@ export default function ModelsTab() {
   /** 探测按钮的文案：**封闭短词汇表**，永不透传后端的原始错误串。
       定宽按钮里只能放这类短词（测试/…/0.8s/失败/未填/缺参考音/缺模型）；
       具体原因（HTTP 400、backend unreachable 之类）属于内部实现，留在日志里即可。 */
+  /** 探测按钮的文案：**封闭短词汇表**（✓ / ✓ 122ms / ✗ 失败 / ✗ 未填 …），
+      既不透传后端的原始错误串，也不显示 provider 名（"gpt-sovits" 之类属于内部实现）。 */
   const probeLabel = (sec: EndpointSection): { text: string; cls: string } => {
     const r = probes[sec];
     if (!r) return { text: t("settings.test"), cls: "" };
     if (r === "running") return { text: "…", cls: "probe-info" };
-    const ms = /^(\d+)ms$/.exec(r.detail);
-    if (ms) {
+    if (r.ok) {
+      const ms = /^(\d+)ms$/.exec(r.detail);
+      if (!ms) return { text: "✓", cls: "probe-ok" };
       const n = Number(ms[1]);
-      return { text: n >= 1000 ? `${(n / 1000).toFixed(1)}s` : r.detail, cls: "probe-ok" };
+      return { text: n >= 1000 ? `✓ ${(n / 1000).toFixed(1)}s` : `✓ ${r.detail}`, cls: "probe-ok" };
     }
+    const fail = (key: string): { text: string; cls: string } => ({
+      text: `✗ ${t(key)}`,
+      cls: "probe-err",
+    });
     if (r.detail === "unconfigured" || r.detail.startsWith("未配置服务地址")) {
-      return { text: t("settings.testNeedUrl"), cls: "probe-err" };
+      return fail("settings.testNeedUrl");
     }
-    if (r.detail === "未上传参考音频") return { text: t("settings.ttsNeedRef"), cls: "probe-err" };
-    if (r.detail.startsWith("缺少模型")) return { text: t("settings.asrNeedModel"), cls: "probe-err" };
-    return { text: t("settings.testFail"), cls: "probe-err" };
+    if (r.detail === "未上传参考音频") return fail("settings.ttsNeedRef");
+    if (r.detail.startsWith("缺少模型")) return fail("settings.asrNeedModel");
+    return fail("settings.testFail");
   };
 
   const fileRef = useRef<HTMLInputElement>(null);
