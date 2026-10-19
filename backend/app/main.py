@@ -7,7 +7,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import chat, checkpoints, extensions, memories, state
+from .api import asr, chat, checkpoints, extensions, memories, state, tts
 
 app = FastAPI(title="momo-web backend")
 
@@ -24,3 +24,5 @@ app.include_router(memories.router)
 app.include_router(checkpoints.router)
 app.include_router(extensions.router)
 app.include_router(chat.router)
+app.include_router(asr.router)
+app.include_router(tts.router)

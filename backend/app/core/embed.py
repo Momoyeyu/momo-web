@@ -30,6 +30,7 @@ def embed(text: str, cfg: dict[str, Any] | None = None) -> list[float] | None:
     try:
         resp = httpx.post(
             f"{url}/v1/embeddings",
+            trust_env=False,
             json={"model": model, "input": text},
             headers=headers,
             timeout=TIMEOUT,

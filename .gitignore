@@ -14,3 +14,8 @@ frontend/.playwright/
 
 # 本地 agent 工作区数据（记忆 / 会话），不进仓库
 .workbuddy/
+
+# 内置 ASR 模型（scripts/download_asr_models.py 下载）
+backend/models/
+
+.DS_Store

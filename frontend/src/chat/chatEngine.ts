@@ -3,7 +3,9 @@
 // 打断（SpeechStarted / stop）= 停播放 + abort SSE/TTS。
 // 设置每次回合开始从 store 现读——setting 页改动无需重启即生效。
 
-import { AsrStream } from "../services/asrClient";
+import { createAsr, setAsrChatLang } from "../services/asrClient";
+import { ttsConfigured } from "../lib/asr";
+import type { AsrEngine } from "../services/asrClient";
 import { MicStreamer } from "../audio/capture";
 import { TtsPlayer } from "../audio/player";
 import { getStage } from "../live2d/stage";
@@ -125,7 +127,7 @@ export class ChatEngine {
   private turn: Turn | null = null;
 
   private mic: MicStreamer | null = null;
-  private asr: AsrStream | null = null;
+  private asr: AsrEngine | null = null;
   private micOn = false;
   private micStarting = false;
   /** 离开 chat 页的挂起标记；micIntended 记录挂起前用户开着麦（回来恢复）。 */
@@ -201,11 +203,12 @@ export class ChatEngine {
       return Promise.resolve();
     }
     const cfg = getSettings();
-    if (!cfg.tts.url) return Promise.resolve();
+    if (!ttsConfigured(cfg.tts)) return Promise.resolve();
     this.safe(() => this.player.stop());
-    return streamSpeech(cfg.tts, m.text, {
+    return streamSpeech(m.text, {
       // 回放与实时合成同一口径：语言 = 对话语言
       lang: resolveChatLang(cfg.general),
+      onSampleRate: (hz) => this.safe(() => this.player.setSampleRate(hz)),
       onChunk: (pcm) => {
         if (this.disposed) return;
         this.safe(() => this.player.push(pcm));
@@ -314,34 +317,37 @@ export class ChatEngine {
       this.micIntended = false;
       return;
     }
-    if (!cfg.asr.url) {
+    // 内置引擎总能连（模型缺失由 backend 回 error 事件）；自定义引擎要求 url
+    if (cfg.asr.mode === "openai" && !cfg.asr.url.trim()) {
       this.events.onError(new ServiceError("asr", "unconfigured"));
       return;
     }
     this.micStarting = true;
     const mic = new MicStreamer();
-    const asr = new AsrStream();
+    // 语言跟随对话语言：内置引擎按它选识别语言，openai 引擎按它传 language
+    setAsrChatLang(cfg.general.lang, cfg.general.chatLang);
+    const asr = createAsr(cfg.asr, {
+      onSpeechStarted: () => {
+        if (this.phase !== "idle") this.interrupt();
+      },
+      onTranscript: (t: string) => {
+        if (t.trim()) this.sendText(t);
+      },
+      onError: (e) => this.events.onError(toError(e)),
+      onClose: (_code: number) => {
+        // 服务端断连：若我们认为还在听，收尾回到非监听态。
+        if (this.asr === asr) {
+          this.asr = null;
+          this.micOn = false;
+          this.safe(() => this.mic?.cancel());
+          this.mic = null;
+          this.emitStatus();
+        }
+      },
+    });
     try {
-      await asr.connect(cfg.asr, {
-        onSpeechStarted: () => {
-          if (this.phase !== "idle") this.interrupt();
-        },
-        onResult: (t) => {
-          if (t.trim()) this.sendText(t);
-        },
-        onError: (e) => this.events.onError(toError(e)),
-        onClose: (_code) => {
-          // 服务端断连：若我们认为还在听，收尾回到非监听态。
-          if (this.asr === asr) {
-            this.asr = null;
-            this.micOn = false;
-            this.safe(() => this.mic?.cancel());
-            this.mic = null;
-            this.emitStatus();
-          }
-        },
-      });
-      // WS 就绪后再开采集，避免开头几帧静默丢弃。
+      // 连接就绪后再开采集，避免开头几帧静默丢弃。
+      await asr.connect();
       await mic.start((pcm) => asr.send(pcm), {
         onError: (e) => this.events.onError(toError(e)),
       });
@@ -526,7 +532,7 @@ export class ChatEngine {
     this.history.push(msg);
     this.events.onSentence(msg);
     if (this.voiceMuted || turn.audioAbort.signal.aborted) return;
-    if (!cfg.tts.url) {
+    if (!ttsConfigured(cfg.tts)) {
       this.reportTtsOnce(turn, new ServiceError("tts", "unconfigured"));
       return;
     }
@@ -547,9 +553,10 @@ export class ChatEngine {
 
     let req: Promise<void>;
     try {
-      req = streamSpeech(cfg.tts, sentence, {
+      req = streamSpeech(sentence, {
         lang: resolveChatLang(cfg.general),
         signal,
+        onSampleRate: (hz) => this.safe(() => this.player.setSampleRate(hz)),
         onChunk: (pcm) => {
           tts.chunks.push(pcm);
           this.flushTts(turn);

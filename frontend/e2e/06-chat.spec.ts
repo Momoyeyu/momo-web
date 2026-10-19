@@ -5,7 +5,7 @@
 // afterEach 用 /api/chat/interrupt 撤掉 assistant 行；user 行没有 API 可删，
 // 故每跑一次会留在 live 里多一条 user（已知且可接受）。
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { gotoRoute } from "./helpers";
+import { gotoRoute, settle } from "./helpers";
 
 /** 固定文案：afterEach 要靠它定位并撤回。 */
 const PROMPT = "只回复四个字：测试通过";
@@ -104,6 +104,7 @@ test("离开对话页后回来，字幕保持（引擎跨页存活）", async ({
   const text = await page.locator(".subtitle").textContent();
   await gotoRoute(page, "settings");
   await gotoRoute(page, "chat");
+  await settle(page); // 旧页（含设置页的对话预览）退场后再断言
   await expect(page.locator(".subtitle")).toHaveText(text ?? "");
 });
 

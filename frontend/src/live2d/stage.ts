@@ -113,11 +113,7 @@ export class Live2DStage {
       autoDensity: true,
     });
     this.app.renderer.on("resize", () => this.fitModel());
-    // 路由切换会改变 --dialog-zone-h（chat 页才有对话区）→ 重新落位。
-    window.addEventListener("hashchange", this.refit);
   }
-
-  private readonly refit = (): void => this.fitModel();
 
   /** 加载模型（默认 /live2d/hiyori/Hiyori.model3.json）。幂等去重；失败 reject 由调用方降级。 */
   async loadModel(url: string): Promise<void> {
@@ -281,7 +277,6 @@ export class Live2DStage {
   }
 
   dispose(): void {
-    window.removeEventListener("hashchange", this.refit);
     this.loading = null;
     this.model = null;
     this.bounds = null;

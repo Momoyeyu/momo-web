@@ -30,6 +30,18 @@ export class TtsPlayer {
   private mouth = 0;
   private _playing = false;
   private volume = 1;
+  /** 当前音频采样率（GPT-SoVITS 随模型版本变化，由 TTS 响应头决定）。 */
+  private rate = 24000;
+
+  /** 设置采样率；与当前 AudioContext 不一致时重建成新上下文。 */
+  setSampleRate(hz: number): void {
+    if (!hz || hz === this.rate) return;
+    this.rate = hz;
+    if (this.ctx) {
+      // 队列里的旧采样与旧 ctx 同源，直接丢弃重建
+      this.dispose();
+    }
+  }
 
   /** 语音音量 0..1，即时生效（含播放中）。 */
   setVolume(v: number): void {
@@ -38,7 +50,7 @@ export class TtsPlayer {
   }
 
   /**
-   * 推入一段 s16le 24kHz mono PCM（内部转 Float32 入 worklet）。
+   * 推入一段 s16le mono PCM（内部转 Float32 入 worklet；速率见 setSampleRate）。
    * AudioContext 需要用户手势后才能 resume —— init 在首次 push 时 lazy 进行。
    */
   push(pcm: Uint8Array): void {
@@ -96,7 +108,7 @@ export class TtsPlayer {
   }
 
   private async init(): Promise<void> {
-    const ctx = this.ctx ?? new AudioContext({ sampleRate: 24000 });
+    const ctx = this.ctx ?? new AudioContext({ sampleRate: this.rate });
     this.ctx = ctx;
     await ctx.audioWorklet.addModule("/worklets/pcm-player.js");
     // init 期间被 dispose → ctx 已换主，放弃建图。

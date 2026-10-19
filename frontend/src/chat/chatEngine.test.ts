@@ -12,16 +12,12 @@ vi.mock("../services/ttsClient", () => ({
   streamSpeech: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("../services/asrClient", () => ({
-  AsrStream: class {
-    connect(): Promise<void> {
-      return Promise.resolve();
-    }
-    send(): void {}
-    close(): void {}
-    get open(): boolean {
-      return false;
-    }
-  },
+  setAsrChatLang: vi.fn(),
+  createAsr: () => ({
+    connect: (): Promise<void> => Promise.resolve(),
+    send: (): void => {},
+    close: (): void => {},
+  }),
 }));
 vi.mock("../audio/capture", () => ({
   MicStreamer: class {
@@ -108,8 +104,8 @@ beforeEach(() => {
     settings: {
       ...getSettings(),
       llm: { url: "http://llm.test", key: "", model: "test-model" },
-      asr: { url: "ws://asr.test/v1/listen", key: "" },
-      tts: { url: "http://tts.test", key: "", voice: "" },
+      asr: { mode: "openai", url: "http://asr.test/v1", key: "", model: "" },
+      tts: { url: "http://tts.test", key: "", voice: "", prompt: "" },
     },
   });
 });

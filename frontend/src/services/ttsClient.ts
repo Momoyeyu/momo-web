@@ -1,31 +1,26 @@
-// TTS 客户端：OpenAI 对齐 POST /v1/audio/speech。
-// response_format=pcm → chunked 流式 s16le 24kHz mono，逐块回调给播放器。
-// AbortSignal 即取消（断连取消在途合成，无单独取消端点）。
-
-import type { TtsConfig } from "../lib/types";
+// TTS 客户端：统一走后端代理 `POST /api/tts/speech`（OpenAI 形状），
+// 后端再翻译成 GPT-SoVITS api_v2。这样前端不关心引擎差异，也不会有 CORS /
+// 混合内容问题；将来换引擎只改后端。
+//
+// 响应是裸 PCM（s16le mono），采样率放在 `X-Sample-Rate` 头里——
+// GPT-SoVITS 的采样率随模型版本变化（32k/48k），前端据此配置 AudioContext，
+// 写死 24k 会变调。
 import { ServiceError } from "../lib/errors";
 
 interface SpeakOptions {
   /** 合成语言 = 对话语言（调用方用 resolveChatLang(cfg.general) 解析）。 */
   lang: string;
   signal?: AbortSignal;
+  /** 收到采样率（每个响应一次，早于任何 onChunk）。 */
+  onSampleRate?: (sampleRate: number) => void;
   /** 每个到达的 PCM 块。 */
   onChunk: (pcm: Uint8Array) => void;
 }
 
-/** 规范化 TTS url：按 base-URL 语义补 /v1/audio/speech。纯函数可测。 */
-export function speechUrl(cfg: TtsConfig): string {
-  const u = new URL(cfg.url);
-  const p = u.pathname.replace(/\/+$/, "");
-  if (p.endsWith("/v1/audio/speech")) {
-    u.pathname = p;
-  } else if (p.endsWith("/v1")) {
-    u.pathname = `${p}/audio/speech`;
-  } else {
-    u.pathname = `${p}/v1/audio/speech`;
-  }
-  return u.toString();
-}
+const SPEECH_PATH = "/api/tts/speech";
+
+/** 缺省采样率：后端没给头时兜底（老版本后端 / 直连 OpenAI 兼容端点）。 */
+const DEFAULT_SR = 24000;
 
 function isAbort(err: unknown, signal?: AbortSignal): boolean {
   if (signal?.aborted) return true;
@@ -38,30 +33,22 @@ function isAbort(err: unknown, signal?: AbortSignal): boolean {
 
 /**
  * 合成一段文本并把流式 PCM 块回调出去。
- * 请求体：{input, voice?, lang, response_format:"pcm"}，
- * voice 为空走服务端缺省；TTS 不做感情控制（表情/动作由指令单独驱动）。
- * HTTP 错误 → throw Error（带 status 与 OpenAI 信封 message）。
+ * 请求体：{input, lang}（OpenAI /v1/audio/speech 形状的子集；参考音频由后端管理）。
+ * HTTP 错误 → throw ServiceError（带 status 与 detail）。
  * signal abort → 静默结束（不 throw）。
  */
 export async function streamSpeech(
-  cfg: TtsConfig,
   text: string,
   opts: SpeakOptions,
 ): Promise<void> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (cfg.key) headers.Authorization = `Bearer ${cfg.key}`;
-
   let res: Response;
   try {
-    res = await fetch(speechUrl(cfg), {
+    res = await fetch(SPEECH_PATH, {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         input: text,
-        response_format: "pcm",
         lang: opts.lang,
-        voice: cfg.voice || undefined,
-        model: "momo-tts",
       }),
       signal: opts.signal ?? null,
     });
@@ -71,16 +58,18 @@ export async function streamSpeech(
   }
 
   if (!res.ok) {
-    // OpenAI 错误信封 {error:{message}}；解析失败退回 statusText。
-    let message = "";
+    let detail = "";
     try {
-      const body = (await res.json()) as { error?: { message?: string } } | null;
-      if (body?.error?.message) message = body.error.message;
+      const body = (await res.json()) as { detail?: string } | null;
+      if (body?.detail) detail = body.detail;
     } catch {
       // 非 JSON 错误体：用 statusText
     }
-    throw new ServiceError("tts", "http", res.status, message || res.statusText || undefined);
+    throw new ServiceError("tts", "http", res.status, detail || res.statusText || undefined);
   }
+
+  const sr = Number(res.headers.get("x-sample-rate"));
+  opts.onSampleRate?.(Number.isFinite(sr) && sr > 0 ? sr : DEFAULT_SR);
   if (!res.body) return;
 
   const reader = res.body.getReader();
@@ -108,4 +97,29 @@ export async function streamSpeech(
     throw err;
   }
   // 流尾单字节残余按协议丢弃。
+}
+
+/** 上传参考音频（重复上传覆盖旧文件）。返回落盘后的文件名与大小。 */
+export async function uploadRefAudio(
+  file: File,
+): Promise<{ name: string; size: number }> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  let res: Response;
+  try {
+    res = await fetch("/api/tts/ref", { method: "POST", body: form });
+  } catch {
+    throw new ServiceError("tts", "unreachable");
+  }
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const body = (await res.json()) as { detail?: string } | null;
+      if (body?.detail) detail = body.detail;
+    } catch {
+      // 非 JSON 错误体
+    }
+    throw new ServiceError("tts", "http", res.status, detail || undefined);
+  }
+  return (await res.json()) as { name: string; size: number };
 }

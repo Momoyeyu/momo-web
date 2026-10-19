@@ -26,6 +26,8 @@ export default defineConfig({
       "/api": {
         target: UPSTREAM.api,
         changeOrigin: true,
+        // 内置 ASR 走 /api/asr/stream（WS）
+        ws: true,
       },
       "/proxy/llm": {
         target: UPSTREAM.llm,

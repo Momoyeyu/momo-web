@@ -13,7 +13,6 @@ import { useEffect, useRef } from "react";
 import { drawGrid } from "../lib/grid";
 
 const BG = "#16121a"; // var(--bg)
-const SWEEP_MS = 350; // 与 .stab-thumb/.settings-track 的 CSS 过渡时长一致
 
 const easeInOutCubic = (p: number): number =>
   p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
@@ -27,22 +26,30 @@ export interface GridBackdropApi {
 export default function GridBackdrop({
   angle,
   contrast = 1,
+  from,
+  sweepMs,
   api,
 }: {
   angle: number;
   /** 网格对比度倍数（面板遮住大半画面时，边缘网格可以更实一点） */
   contrast?: number;
+  /** 被离开页面的坐标系角：挂载时从这里转到 angle——跨页的 RoPE 才成立 */
+  from?: number;
+  /** 旋转时长（默认 350ms，与设置页滑块同步；页面入场漫开时传更长值） */
+  sweepMs?: number;
   /** 供拖拽跟手/手动吸附用的命令通道（可选） */
   api?: React.MutableRefObject<GridBackdropApi | null>;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const apiRef = useRef<GridBackdropApi | null>(null);
+  // 旋转时长用 ref 存：rAF 闭包在挂载时创建，prop 变化要走 ref 才能读到
+  const sweepRef = useRef(sweepMs ?? 350);
 
   // 挂载一次：canvas、绘制与 rAF 动画机；对外的控制面存进 apiRef
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d", { alpha: false });
+    const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
     const reduced = matchMedia("(prefers-reduced-motion: reduce)");
@@ -78,7 +85,7 @@ export default function GridBackdrop({
     const loop = (ts: number): void => {
       raf = 0;
       if (disposed || document.hidden) return;
-      const p = Math.min(1, (ts - t0) / SWEEP_MS);
+      const p = Math.min(1, (ts - t0) / sweepRef.current);
       cur = from + (to - from) * easeInOutCubic(p);
       draw(cur);
       if (p < 1) raf = requestAnimationFrame(loop);
@@ -150,16 +157,24 @@ export default function GridBackdrop({
     };
   }, []);
 
-  // angle 变化 → 首次直接落位，之后缓动转到新坐标系
-  const firstRef = useRef(true);
+  // 挂载：若有 from 角，先落到 from 再旋转到本页角（跨页 RoPE）；否则直接落位。
+  // angle 变化（tab/翻页）：从当前插值角缓动续接。
+  const mountedRef = useRef(false);
   useEffect(() => {
-    if (firstRef.current) {
-      firstRef.current = false;
-      apiRef.current?.seek(angle);
-    } else {
-      apiRef.current?.rotate(angle);
+    sweepRef.current = sweepMs ?? 350;
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      if (from != null && from !== angle) {
+        apiRef.current?.setAngle(from);
+        apiRef.current?.rotate(angle);
+      } else {
+        apiRef.current?.seek(angle);
+      }
+      return;
     }
-  }, [angle]);
+    apiRef.current?.rotate(angle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [angle, sweepMs]);
 
   return <canvas ref={ref} className="grid-backdrop" aria-hidden="true" />;
 }

@@ -441,10 +441,10 @@ def _write_auto(c: sqlite3.Connection, summary: str) -> None:
 
 
 def load_checkpoint(sid: str) -> CheckpointDetail:
-    """加载存档覆盖当前会话；当前会话非空先存入 auto 槽。返回存档全文。
+    """加载存档覆盖当前会话。返回存档全文。
 
-    代际 +1：load 之后在途回合的 append_sentence 全部作废（其 user
-    行已随原 live 进 auto 槽）。
+    不做任何自动备份：当前会话是否保留由前端在加载前确认，用户想保留
+    应手动存档。代际 +1：load 之后在途回合的 append_sentence 全部作废。
     """
     _guard_snapshot_id(sid)
     with db.tx() as c:
@@ -453,21 +453,6 @@ def load_checkpoint(sid: str) -> CheckpointDetail:
         ).fetchone()
         if target is None:
             raise CheckpointError("存档不存在", kind="not_found")
-        cur_summary = ""
-        cur_count = 0
-        live = c.execute(
-            "SELECT summary FROM sessions WHERE id=?", (LIVE_ID,)
-        ).fetchone()
-        if live is not None:
-            cur_summary = str(live["summary"] or "")
-            cur_count = int(
-                c.execute(
-                    "SELECT COUNT(*) AS n FROM messages WHERE session_id=?",
-                    (LIVE_ID,),
-                ).fetchone()["n"]
-            )
-        if cur_count:
-            _write_auto(c, cur_summary)
         _copy_messages(c, sid, LIVE_ID)
         now = now_iso()
         c.execute(
@@ -476,6 +461,25 @@ def load_checkpoint(sid: str) -> CheckpointDetail:
             (str(target["summary"] or ""), now, LIVE_ID),
         )
         return _entry(c, target)
+
+
+def save_auto() -> None:
+    """当前会话非空时写入 auto 槽（不清空 live）。
+
+    auto 槽的唯一写入时机：从对话页退回标题页时由前端调用。
+    """
+    with db.tx() as c:
+        live = c.execute(
+            "SELECT summary FROM sessions WHERE id=?", (LIVE_ID,)
+        ).fetchone()
+        if live is None:
+            return
+        n = c.execute(
+            "SELECT COUNT(*) AS n FROM messages WHERE session_id=?",
+            (LIVE_ID,),
+        ).fetchone()["n"]
+        if n:
+            _write_auto(c, str(live["summary"] or ""))
 
 
 def new_session() -> None:

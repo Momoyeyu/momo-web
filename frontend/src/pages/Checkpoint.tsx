@@ -48,6 +48,7 @@ import Pager from "../ui/Pager";
 import PageHeader from "../ui/PageHeader";
 import Confirm from "../ui/Confirm";
 import GridBackdrop, { type GridBackdropApi } from "../components/GridBackdrop";
+import { ropeFrom } from "../lib/ropeAngle";
 import "../styles/checkpoint.css";
 import "../styles/persona.css";
 
@@ -67,10 +68,9 @@ function formatTime(iso: string): string {
 const slotNo = (n: number): string => `No.${String(n).padStart(3, "0")}`;
 
 // RoPE 角度：Save/Load 沿 0° 镜像对称，每页 ±36°（10 页满圈）
+const CK_BASE = 75; // checkpoint 比标题/设置更深（层级角度见 App.ROUTE_ANGLE）
 const PAGE_STEP = 36;
-const MODE_HALF = 18;
-const pageAngle = (mode: CheckpointMode, page: number): number =>
-  (mode === "save" ? 1 : -1) * MODE_HALF + page * PAGE_STEP;
+const pageAngle = (page: number): number => CK_BASE + page * PAGE_STEP;
 const DRAG_FLIP = 0.22; // 拖过 22% 宽即翻页
 
 /** 待确认的破坏性操作（覆盖 / 读取 / 删除），统一走 ui/Confirm。 */
@@ -143,9 +143,8 @@ export default function Checkpoint() {
   const auto = slots.find((s) => s.auto) ?? null;
   const manual = slots.filter((s) => !s.auto);
   const pages = MAX_PAGES; // 槽位固定 120 个 → 恒 10 页
-  const angle = pageAngle(mode, page);
+  const angle = pageAngle(page);
   // 每页方向：save 向右翻 = 顺时针；load 镜像 = 逆时针
-  const dir = mode === "save" ? 1 : -1;
 
   /** 存档模式点空槽：快照写入该槽。 */
   const saveTo = async (slot: number): Promise<void> => {
@@ -213,11 +212,16 @@ export default function Checkpoint() {
   const openCell = (c: SlotCell): void => {
     if (busy || saveBlocked) return;
     if (mode === "save") {
+      // 覆盖别人的档永远要确认
       if (c.save) setPending({ kind: "overwrite", save: c.save });
       else void saveTo(c.slot);
-    } else if (c.save) {
-      setPending({ kind: "load", save: c.save });
+      return;
     }
+    // 读档：只在 session 中（从 chat 进入）需要确认——当前进度会丢；
+    // 从标题进入时没有进行中的进度（退出时已自动进 auto），直接读。
+    if (!c.save) return;
+    if (fromRoute() === "chat") setPending({ kind: "load", save: c.save });
+    else void doLoad(c.save);
   };
 
   /** 已占槽卡片体：槽位号 + 时间 + 末句预览（网格卡与 auto 卡共用）。 */
@@ -234,13 +238,21 @@ export default function Checkpoint() {
   // —— 滑轨拖拽：跟手横移 + 网格角度等比实时偏转；松手吸附/翻页 ——
   const onDragStart = (e: React.PointerEvent<HTMLDivElement>): void => {
     if (e.button !== 0 || busy) return;
+    // 注意：这里**不能** setPointerCapture——捕获会把随后的 click 一并
+    // 重定向到滑轨容器，卡片上的点击就永远收不到了（存档点击失灵的根因）。
+    // 捕获推迟到指针真正移动超过阈值时。
     dragRef.current = { x0: e.clientX, moved: false };
-    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const onDragMove = (e: React.PointerEvent<HTMLDivElement>): void => {
     const d = dragRef.current;
     if (!d) return;
+    if (!d.moved) {
+      // 未超过阈值不当作拖拽：让 click 正常落到卡片上
+      if (Math.abs(e.clientX - d.x0) < 6) return;
+      d.moved = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
     const w = e.currentTarget.clientWidth || 1;
     let progress = -(e.clientX - d.x0) / w; // 向左拖（下一页）为正
     if (!d.moved && Math.abs(e.clientX - d.x0) > 6) d.moved = true;
@@ -250,10 +262,8 @@ export default function Checkpoint() {
     }
     setDragDx(-progress * w);
     // 网格角度跟手：页进度 → RoPE 角度（clamp 在 10 页范围内）
-    const fp = Math.max(0, Math.min(pages - 1, page + dir * progress));
-    backdropRef.current?.setAngle(
-      (mode === "save" ? 1 : -1) * MODE_HALF + fp * PAGE_STEP,
-    );
+    const fp = Math.max(0, Math.min(pages - 1, page + progress));
+    backdropRef.current?.setAngle(pageAngle(fp));
   };
 
   const onDragEnd = (e: React.PointerEvent<HTMLDivElement>): void => {
@@ -287,7 +297,7 @@ export default function Checkpoint() {
 
   return (
     <div className="checkpoint-page">
-      <GridBackdrop angle={angle} contrast={1.7} api={backdropRef} />
+      <GridBackdrop angle={angle} contrast={1.7} from={ropeFrom()} sweepMs={620} api={backdropRef} />
       <div className={`checkpoint-panel checkpoint-${mode}`}>
         <PageHeader
           className="checkpoint-head"
@@ -316,7 +326,9 @@ export default function Checkpoint() {
                 mode === "load" && !busy ? " slot-clickable" : ""
               }`}
               onClick={() => {
-                if (mode === "load" && !busy) setPending({ kind: "load", save: auto });
+                if (mode !== "load" || busy) return;
+                if (fromRoute() === "chat") setPending({ kind: "load", save: auto });
+                else void doLoad(auto);
               }}
             >
               <span className="slot-badge">{t("checkpoint.autoBadge")}</span>
@@ -404,9 +416,7 @@ export default function Checkpoint() {
       {pending && (
         <Confirm
           title={t(CONFIRM_COPY[pending.kind].title)}
-          message={t(CONFIRM_COPY[pending.kind].message, {
-            title: pending.save.title,
-          })}
+          message={t(CONFIRM_COPY[pending.kind].message)}
           confirmLabel={t(CONFIRM_COPY[pending.kind].action)}
           danger={CONFIRM_COPY[pending.kind].danger}
           busy={busy}

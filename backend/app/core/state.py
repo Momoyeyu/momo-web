@@ -72,8 +72,9 @@ DEFAULT_STATE: dict[str, Any] = {
             "voiceInput": True,
         },
         "llm": {"url": "", "key": "", "model": ""},
-        "asr": {"url": "", "key": ""},
-        "tts": {"url": "", "key": "", "voice": ""},
+        # mode: builtin（内置 SenseVoice）| openai（OpenAI 兼容 HTTP 端点）
+        "asr": {"mode": "builtin", "url": "", "key": ""},
+        "tts": {"url": "", "key": "", "voice": "", "prompt": ""},
         # 语义检索端点（设置页「模型」tab 可改）。
         # url 留空 = 未配置语义检索，只用词面召回；env（MOMO_EMBEDDING_*）可覆盖。
         # model 不预填：DEFAULT_EMBEDDING_MODEL 只作「填了 url 却没填 model」时的

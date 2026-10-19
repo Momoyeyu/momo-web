@@ -88,8 +88,11 @@ _T: dict[str, Any] = {
 }
 
 
-def _lang_of(state: State) -> str:
-    """momo 对话语言：general.chatLang（auto/缺失 → 回落界面语言 lang）。"""
+def conversation_lang(state: State) -> str:
+    """momo 对话语言：general.chatLang（auto/缺失 → 回落界面语言 lang）。
+
+    对外接口——ASR 的语言参数、TTS 的合成语言都应走这里，保证三处口径一致。
+    """
     g = state["settings"]["general"]
     raw = str(g["chatLang"] or "").lower()
     if not raw or raw == "auto":
@@ -138,7 +141,7 @@ def build_system_prompt(
     pins：初始记忆文本列表（momo.db memories.pinned=1；由调用方注入，
     state 里已不含 pin 数据）。
     """
-    lang = _lang_of(state)
+    lang = conversation_lang(state)
     t = _T  # 模版只有一份（英文），不再按语言取
     # 人设来自 soul 文件（backend/resources/soul.md），原样注入。
     soul = load_soul()

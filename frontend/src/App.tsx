@@ -1,15 +1,80 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import StageCanvas from "./live2d/StageCanvas";
 import Title from "./pages/Title";
 import Chat from "./pages/Chat";
 import Settings from "./pages/Settings";
 import Backlog from "./pages/Backlog";
 import Checkpoint from "./pages/Checkpoint";
-import { useRoute } from "./router";
+import GridBackdrop from "./components/GridBackdrop";
+import { blobForward } from "./lib/blobMask";
+import { setRopeFrom } from "./lib/ropeAngle";
+import { useRoute, type Route } from "./router";
 import { getSettings, subscribe } from "./lib/store";
+
+// —— 转场：一滴水落进画面 ——
+//   1) 中心落一滴（亮点一闪）；
+//   2) 涟漪荡开的同时，旧页在上层"化开"（透明度渐变），新页在下层已经就位
+//      ——换页不是硬切，是上层慢慢变透明露出下层。
+//   3) 进入 chat 是特例（「入戏」）：chat 背景是房间+Live2D 而非 RoPE，
+//      作为核心页面不参与"洞"的隐喻——改为旧页化开、整个场景从下面浮现。
+// 关键取舍：页面层只做**透明度**，不缩放、不滤镜。整页 transform 会让带
+// backdrop-filter 的层每帧重采样（实测掉到 7~10fps）；透明度是可合成的，
+// 化开期间临时关掉该层的 backdrop-filter（画面在消失，看不出来）。
+const BLOOM_MS = 560; // RoPE 页之间的边缘漫开
+const LEAVE_MS = 640; // 进 chat：旧页化开
+const RIPPLE_MS = 1000; // 涟漪散尽（特效层生命周期）
+// 每个页面一个坐标系角度（RoPE）。**按层级单调递增**：
+//   title(根, 0) < chat(15) < settings(40) < checkpoint(75) < backlog(110)
+// 角度增大 = 层级变深；顺时针（角度+）是往深走，逆时针是往浅走。
+// settings 内部 tab 再叠加 +70/tab（越往右越深），checkpoint 翻页 +36/页。
+const ROUTE_ANGLE: Record<Route, number> = {
+  title: 0,
+  chat: 15,
+  settings: 40,
+  checkpoint: 75,
+  backlog: 110,
+};
+
+interface PageEntry {
+  id: number;
+  route: Route;
+  leaving?: boolean;
+}
+
+function renderPage(route: Route) {
+  switch (route) {
+    case "title":
+      return <Title />;
+    case "chat":
+      return <Chat />;
+    case "settings":
+      return <Settings />;
+    case "backlog":
+      return <Backlog />;
+    case "checkpoint":
+      return <Checkpoint />;
+  }
+}
 
 export default function App() {
   const route = useRoute();
+  // 页面栈：换页时旧页不立即卸载，而是留在栈里淡出后再移除——
+  // 这样"化开"的是真正的旧页实例（状态也还在），不是重挂一份复制品。
+  const [stack, setStack] = useState<PageEntry[]>([{ id: 0, route }]);
+  // front = 新页正在从落点向外"漫开"（临时盖上不规则遮罩）。
+  const [front, setFront] = useState(false);
+  // rev = 往回走（层级向上）：洞口收拢、涟漪向内
+  const [rev, setRev] = useState(false);
+  // booting = 进入 chat 的化开还在进行（压住 chat 内部的入场动画）
+  const [booting, setBooting] = useState(false);
+  const [fx, setFx] = useState(false);
+  const curRef = useRef<Route>(route);
+  const seq = useRef(1);
+  // 访问历史：判断"这一次是往里走还是往回走"。返回目标若正好是上一页，
+  // 就当作回退（洞口收拢）；否则当作深入（洞口长开）。
+  // 层级本身：title 是根，chat / settings / checkpoint 挂在 title 下，
+  // backlog 挂在 chat 下——回退按钮都指向各自父级，所以历史栈足够判定。
+  const histRef = useRef<Route[]>([route]);
 
   // 对话框不透明度 → CSS 变量，保存后即时生效。
   useEffect(() => {
@@ -22,19 +87,115 @@ export default function App() {
     return subscribe(apply);
   }, []);
 
-  // key=route 触发整页入场动画（淡入+上浮，VN 换场感）；
-  // StageCanvas 在动画层之外，人物不随页面切换跳动。
-  // 全部内容锁在 16:9 舞台内（.app-stage）：窗口比例任意，画面比例恒定，
-  // 特效/布局无需为不同画面比例做响应式适配。
+  useEffect(() => {
+    if (route === curRef.current) return;
+    const prevRoute = curRef.current;
+    curRef.current = route;
+    // 把被离开页的角度交给 ropeAngle 通道：新页挂载时从这里旋转过来
+    setRopeFrom(ROUTE_ANGLE[prevRoute]);
+
+    const hist = histRef.current;
+    const back = hist.length > 1 && hist[hist.length - 2] === route;
+    if (back) hist.pop();
+    else hist.push(route);
+    if (hist.length > 24) hist.splice(0, hist.length - 24);
+
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setStack([{ id: seq.current++, route }]);
+      setFront(false);
+      setRev(false);
+      setBooting(false);
+      setFx(false);
+      return;
+    }
+    setRev(back);
+    setFx(true);
+
+    let t1: number;
+    const t2 = window.setTimeout(() => setFx(false), RIPPLE_MS);
+
+    // 同一路由只保留最新实例：来回切换时旧的那份直接丢弃，
+    // 否则会出现两个同页 DOM 并存（定位器会匹配到多份）
+    const withoutSame = (prev: PageEntry[]): PageEntry[] =>
+      prev.filter((p) => p.route !== route);
+
+    if (route === "chat") {
+      // 「入戏」：旧页化开（带一小拍延迟，让水滴先落下），chat 在下面就位
+      setStack((prev) => [
+        ...withoutSame(prev).map((p) => ({ ...p, leaving: true })),
+        { id: seq.current++, route },
+      ]);
+      setBooting(true);
+      t1 = window.setTimeout(() => {
+        setStack((prev) => prev.filter((p) => !p.leaving));
+        setBooting(false);
+      }, LEAVE_MS);
+    } else {
+      // RoPE 页之间：新页压栈顶，盖上不规则遮罩漫开；旧页在下面等着被盖住
+      setStack((prev) => [
+        ...withoutSame(prev),
+        { id: seq.current++, route },
+      ]);
+      setFront(true);
+      t1 = window.setTimeout(() => {
+        setFront(false);
+        setStack((prev) => prev.slice(-1));
+      }, BLOOM_MS);
+    }
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [route]);
+
+  const stageStyle = {
+    "--tx-bloom-ms": `${BLOOM_MS}ms`,
+    "--tx-leave-ms": `${LEAVE_MS}ms`,
+    "--tx-ms": `${RIPPLE_MS}ms`,
+    "--blob-forward": blobForward,
+  } as CSSProperties;
+
+  // 全部内容锁在 16:9 舞台内（.app-stage）：窗口比例任意，画面比例恒定。
   return (
-    <div className="app-stage">
-      <StageCanvas visible={route === "chat"} />
-      <div className="page-wrap" key={route}>
-        {route === "title" && <Title />}
-        {route === "chat" && <Chat />}
-        {route === "settings" && <Settings />}
-        {route === "backlog" && <Backlog />}
-        {route === "checkpoint" && <Checkpoint />}
+    <div className={`app-stage${fx ? " tx-active" : ""}`} style={stageStyle}>
+      {/* 舞台级网格：常驻、不参与页面变换、随页面坐标系旋转（RoPE） */}
+      {/* sweep 放长到 900ms：遮幕/漫开盖住的时段之外仍能看到旋转 */}
+      <GridBackdrop angle={ROUTE_ANGLE[route]} sweepMs={900} />
+
+      {/* 对话场景的房间底图 + Live2D：不随路由重挂载 */}
+      <div className="chat-layer">
+        <StageCanvas visible={route === "chat"} />
+      </div>
+
+      {stack.map((p, i) => {
+        const top = i === stack.length - 1;
+        let cls: string;
+        if (p.leaving) {
+          cls = " is-leaving";
+        } else if (!top) {
+          cls = " is-back";
+        } else if (front) {
+          cls = ` is-front${rev ? " is-rev" : ""}`;
+        } else {
+          cls = "";
+        }
+        // 进入 chat 的化开还没结束时，压住 chat 内部的入场动画（对话框抢跑）
+        if (top && booting) cls += " is-booting";
+        return (
+          <div
+            key={p.id}
+            className={`page-wrap${cls}`}
+            aria-hidden={top ? undefined : true}
+          >
+            {renderPage(p.route)}
+          </div>
+        );
+      })}
+
+      {/* 换场特效：落点 + 水面光晕（涟漪环已删——正圆光环盖过不规则边缘） */}
+      <div className="tx-fx" aria-hidden="true">
+        <i className="tx-sheen" />
+        <i className="tx-drop" />
       </div>
     </div>
   );

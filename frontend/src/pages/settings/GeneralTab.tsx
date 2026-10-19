@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 
 import { getChatEngine } from "../../chat/engineInstance";
 import { useT, tFor, LANGS } from "../../i18n";
+import { asrConfigured, ttsConfigured as ttsReadyOf } from "../../lib/asr";
 import { getState, speakerName, subscribe, update } from "../../lib/store";
 import type { Settings as SettingsData } from "../../lib/types";
 import FieldRow from "../../ui/FieldRow";
@@ -17,8 +18,8 @@ export default function GeneralTab() {
   const settings = useSyncExternalStore(subscribe, getState).settings;
 
   const [voiceMuted, setVoiceMuted] = useState(getChatEngine().muted);
-  const ttsConfigured = settings.tts.url.trim() !== "";
-  const asrConfigured = settings.asr.url.trim() !== "";
+  const ttsReady = ttsReadyOf(settings.tts);
+  const asrReady = asrConfigured(settings.asr);
 
   const toggleVoice = (on: boolean): void => {
     const eng = getChatEngine();
@@ -89,33 +90,33 @@ export default function GeneralTab() {
   <div className="opt-list">
   <FieldRow
     label={t("settings.voiceInput")}
-    extra={!asrConfigured ? t("settings.voiceNeedAsr") : undefined}
+    hint={!asrReady ? t("settings.voiceNeedAsr") : undefined}
   >
     <Switch
-      on={asrConfigured && settings.general.voiceInput}
-      disabled={!asrConfigured}
+      on={asrReady && settings.general.voiceInput}
+      disabled={!asrReady}
       title={
-        !asrConfigured ? t("settings.voiceNeedAsr") : undefined
+        !asrReady ? t("settings.voiceNeedAsr") : undefined
       }
       onChange={toggleVoiceInput}
     />
   </FieldRow>
   <FieldRow
     label={t("settings.voiceOut")}
-    extra={!ttsConfigured ? t("settings.voiceNeedTts") : undefined}
+    hint={!ttsReady ? t("settings.voiceNeedTts") : undefined}
   >
     <Switch
-      on={ttsConfigured && !voiceMuted}
-      disabled={!ttsConfigured}
+      on={ttsReady && !voiceMuted}
+      disabled={!ttsReady}
       title={
-        !ttsConfigured ? t("settings.voiceNeedTts") : undefined
+        !ttsReady ? t("settings.voiceNeedTts") : undefined
       }
       onChange={toggleVoice}
     />
   </FieldRow>
   <FieldRow label={t("settings.voiceVolume")}>
     <Slider
-      disabled={voiceMuted || !ttsConfigured}
+      disabled={voiceMuted || !ttsReady}
       value={settings.general.voiceVolume}
       onChange={(v) => patchGeneral({ voiceVolume: v })}
     />

@@ -90,6 +90,13 @@ def new_session() -> Response:
     return Response(status_code=204)
 
 
+@router.post("/api/checkpoints/auto", status_code=204)
+def save_auto() -> Response:
+    """当前会话写入 auto 槽（不清空 live）。从对话页退回标题页时调用。"""
+    checkpoint.save_auto()
+    return Response(status_code=204)
+
+
 @router.post("/api/checkpoints/{sid}/load")
 def load_checkpoint(sid: str) -> CheckpointDetail:
     """加载存档覆盖当前会话（当前内容先进 auto 槽）。返回存档全文。"""

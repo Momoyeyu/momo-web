@@ -91,21 +91,177 @@ body {
   transform: translateZ(0);
 }
 
-/* 路由切换：淡入 + 轻微上浮（VN 换场感）。 */
+/* 页面层：换场时只做透明度（化开），不缩放、不滤镜——
+   整页 transform 会让带 backdrop-filter 的层每帧重采样（实测掉到 7~10fps）。 */
 .page-wrap {
   position: fixed;
   inset: 0;
-  animation: page-in 0.34s cubic-bezier(0.22, 0.8, 0.36, 1) both;
+  z-index: 1;
 }
 
-@keyframes page-in {
+/* 新画面沿不规则"洞"的边缘漫开（形状见 lib/blobMask）。
+   向下钻一层（title → chat/settings/checkpoint/backlog）：洞由小到大长开；
+   往回走（返回）：洞由大收到无，新画面从四周合拢、旧画面被挤回中心。 */
+.page-wrap.is-front {
+  z-index: 2;
+  pointer-events: none;
+  -webkit-mask-image: var(--blob-forward);
+  mask-image: var(--blob-forward);
+  -webkit-mask-size: 2% 2%;
+  mask-size: 2% 2%;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  animation: page-bloom var(--tx-fade-ms, 560ms)
+    cubic-bezier(0.33, 0.06, 0.36, 1) forwards;
+}
+
+@keyframes page-bloom {
   from {
-    opacity: 0;
-    transform: translateY(10px);
+    -webkit-mask-size: 2% 2%;
+    mask-size: 2% 2%;
   }
   to {
+    -webkit-mask-size: 300% 300%;
+    mask-size: 300% 300%;
+  }
+}
+
+/* 返回：满幅遮罩减去一个"洞"，洞由大收到无——新页从四周合拢 */
+.page-wrap.is-front.is-rev {
+  mask-image: linear-gradient(#000, #000), var(--blob-forward);
+  mask-composite: subtract;
+  mask-size: 100% 100%, 320% 320%;
+  animation-name: page-bloom-rev;
+}
+
+@keyframes page-bloom-rev {
+  from {
+    mask-size: 100% 100%, 320% 320%;
+  }
+  to {
+    mask-size: 100% 100%, 0% 0%;
+  }
+}
+
+/* 正在化开的旧页（进入 chat 的「入戏」）：先等水滴落下（120ms 延迟），
+   再整体淡出——房间从下面透出来。淡出期间关掉本层 backdrop-filter，
+   否则每帧重采样会掉帧；画面正在消失，看不出来。 */
+.page-wrap.is-leaving {
+  z-index: 2;
+  pointer-events: none;
+  animation: page-leave 520ms ease-in-out 120ms forwards;
+  will-change: opacity;
+}
+
+.page-wrap.is-leaving,
+.page-wrap.is-leaving * {
+  backdrop-filter: none !important;
+}
+
+@keyframes page-leave {
+  from {
     opacity: 1;
-    transform: none;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* 旧页在下面：不参与动画，只等着被漫开的新画面盖住 */
+.page-wrap.is-back {
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* 对话房间底图 + Live2D：不随路由重挂载 */
+.chat-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* —— 换场特效层：一滴水落进画面 ——
+   落点一闪 → 三圈涟漪荡开 → 涟漪带着画面化开。全程只有 transform/opacity。 */
+.tx-fx {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.tx-fx > i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  opacity: 0; /* 静止态：整层不画；动画只在 .tx-active 下挂上 */
+}
+
+/* 水面的那点隆起：一圈极淡的暖白，随涟漪一起铺开，给"水面"一点体积 */
+.tx-sheen {
+  width: 74cqw;
+  height: 74cqw;
+  margin: -37cqw 0 0 -37cqw;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(253, 243, 216, 0.14),
+    rgba(234, 182, 84, 0.06) 38%,
+    transparent 62%
+  );
+}
+
+.app-stage.tx-active .tx-sheen {
+  animation: tx-sheen 620ms cubic-bezier(0.2, 0.6, 0.25, 1) both;
+}
+
+@keyframes tx-sheen {
+  0% {
+    transform: scale(0.04);
+    opacity: 0;
+  }
+  22% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+/* 落点：一滴水砸下时那一下微亮 */
+.tx-drop {
+  width: 22px;
+  height: 22px;
+  margin: -11px 0 0 -11px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(253, 243, 216, 0.95),
+    rgba(234, 182, 84, 0.35) 42%,
+    transparent 68%
+  );
+}
+
+.app-stage.tx-active .tx-drop {
+  animation: tx-drop 420ms ease-out both;
+}
+
+@keyframes tx-drop {
+  0% {
+    transform: scale(0.15);
+    opacity: 0;
+  }
+  16% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
   }
 }
 
@@ -132,6 +288,14 @@ button:hover {
 
 button:active {
   transform: translateY(1px);
+}
+
+/* 禁用态：内置 ASR 模式下 url/key 变暗示意"不需要填" */
+input:disabled,
+textarea:disabled,
+select:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 button:disabled {
@@ -189,6 +353,7 @@ textarea::placeholder {
 .grid-backdrop {
   position: absolute;
   inset: 0;
+  z-index: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;

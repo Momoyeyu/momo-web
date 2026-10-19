@@ -6,16 +6,20 @@ import { useT } from "../../i18n";
 import { getState, subscribe, update } from "../../lib/store";
 import type { Settings as SettingsData } from "../../lib/types";
 import { probeAsr, probeEmbedding, probeLlm, probeTts } from "../../services/probe";
+import { uploadRefAudio } from "../../services/ttsClient";
 import type { ProbeResult } from "../../services/probe";
 import Button from "../../ui/Button";
 import FieldRow from "../../ui/FieldRow";
+import Hint from "../../ui/Hint";
+import Select from "../../ui/Select";
 
 type EndpointSection = "llm" | "asr" | "tts" | "embedding";
 
 const URL_SCHEMES: Record<EndpointSection, string[]> = {
   llm: ["http:", "https:"],
   tts: ["http:", "https:"],
-  asr: ["ws:", "wss:"],
+  // asr 自定义模式走 OpenAI HTTP 转写协议（内置模式不走 url）
+  asr: ["http:", "https:"],
   embedding: ["http:", "https:"],
 };
 
@@ -103,46 +107,82 @@ export default function ModelsTab() {
         ? t("settings.testNeedUrl")
         : /^(unreachable|timeout|connect failed|bad url|closed)/.test(r.detail)
           ? t("settings.testFail")
-          : r.detail.replace(/^HTTP /, "");
+          // 定宽按钮容不下长描述：已知原因收短，其余按后端给的短串
+          : r.detail.startsWith("连接失败")
+            ? t("settings.testFail")
+            : r.detail === "未上传参考音频"
+            ? t("settings.ttsNeedRef")
+            : r.detail.startsWith("缺少模型")
+              ? t("settings.asrNeedModel")
+              : r.detail.startsWith("未配置服务地址")
+                ? t("settings.testNeedUrl")
+                : r.detail.replace(/^HTTP /, "");
     return {
       text: `${r.ok ? "✓" : "✗"} ${detail}`,
       cls: r.ok ? "probe-ok" : "probe-err",
     };
   };
 
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr] = useState("");
+
+  /** 上传参考音频：重复上传覆盖旧文件，成功后把文件名写回 state。 */
+  const onPickRef = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // 允许再次选同一个文件
+    if (!file) return;
+    setUploading(true);
+    setUploadErr("");
+    try {
+      const res = await uploadRefAudio(file);
+      update({
+        settings: { ...settings, tts: { ...settings.tts, voice: res.name } },
+      });
+    } catch (err) {
+      setUploadErr((err as Error).message || String(err));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const urlRow = (
     sec: EndpointSection,
     phKey: string,
     required = false,
-  ): React.ReactNode => (
-    <FieldRow
-      label={sec === "llm" ? t("settings.apiUrl") : t("settings.svcUrl")}
-      required={required}
-    >
-      <input
-        className={urlError(sec, settings[sec].url) ? "invalid" : undefined}
-        value={settings[sec].url}
-        placeholder={t(phKey)}
-        onChange={(e) => patchEndpoint(sec, "url", e.target.value)}
-      />
-      <Button
-        variant="ghost"
-        className={`key-toggle row-btn probe-btn ${probeLabel(sec).cls}`}
-        onClick={() => runProbe(sec)}
-        disabled={probes[sec] !== undefined}
+    disabled = false,
+  ): React.ReactNode => {
+    // 地址有问题（格式错 / 必填为空）不在行内堆文字：输入框标红，
+    // 测试按钮直接变成警示图标（悬停有原因），信息密度交给图标。
+    const badUrl = !disabled && urlError(sec, settings[sec].url);
+    const missing = !disabled && required && !settings[sec].url.trim();
+    const warn = badUrl || missing;
+    return (
+      <FieldRow
+        label={sec === "llm" ? t("settings.apiUrl") : t("settings.svcUrl")}
+        required={required}
       >
-        {probeLabel(sec).text}
-      </Button>
-      {urlError(sec, settings[sec].url) ? (
-        <span className="probe-err">{t("settings.invalidUrl")}</span>
-      ) : (
-        required &&
-        !settings[sec].url.trim() && (
-          <span className="probe-err">{t("settings.required")}</span>
-        )
-      )}
-    </FieldRow>
-  );
+        <input
+          className={warn ? "invalid" : undefined}
+          value={settings[sec].url}
+          placeholder={disabled ? "—" : t(phKey)}
+          disabled={disabled}
+          onChange={(e) => patchEndpoint(sec, "url", e.target.value)}
+        />
+        <Button
+          variant="ghost"
+          className={`key-toggle row-btn probe-btn ${
+            warn ? "probe-warn" : probeLabel(sec).cls
+          }`}
+          title={warn ? t(badUrl ? "settings.invalidUrl" : "settings.required") : undefined}
+          onClick={() => runProbe(sec)}
+          disabled={disabled || warn || probes[sec] !== undefined}
+        >
+          {warn ? "⚠" : probeLabel(sec).text}
+        </Button>
+      </FieldRow>
+    );
+  };
 
   // 返回目标与来源页一致：chat 进来回 chat，其余回 title。
   const patchEndpoint = (sec: EndpointSection, key: string, v: string): void => {
@@ -151,16 +191,18 @@ export default function ModelsTab() {
     });
   };
 
-  const keyRow = (sec: EndpointSection) => (
+  const keyRow = (sec: EndpointSection, disabled = false) => (
     <FieldRow label={t("settings.apiKey")}>
       <input
         type={showKey[sec] ? "text" : "password"}
         value={settings[sec].key}
+        disabled={disabled}
         onChange={(e) => patchEndpoint(sec, "key", e.target.value)}
       />
       <Button
         variant="ghost"
         className="key-toggle row-btn"
+        disabled={disabled}
         onClick={() => setShowKey((s) => ({ ...s, [sec]: !s[sec] }))}
       >
         {showKey[sec] ? t("settings.hideKey") : t("settings.showKey")}
@@ -170,10 +212,13 @@ export default function ModelsTab() {
   return (
 <div className="settings-cols">
 {/* 每个小标题各自成格，与「通用」页一致（2 列网格里一格一组）。
-    网格按行填充，故顺序为：第 1 行 LLM｜ASR，第 2 行 Embedding｜TTS，
-    与原「左栏 LLM+Embedding / 右栏 ASR+TTS」的位置一致。 */}
+    网格按行填充：第 1 行 LLM｜Embedding（各 3 行），第 2 行 ASR｜TTS（各 4 行）
+    —— 同一行的卡片行数一致，两行内部各自等高。 */}
 <section className="panel settings-col opt-list">
-  <h3 className="opt-group">{t("settings.groups.llm")}</h3>
+  <h3 className="opt-group">
+    {t("settings.groups.llm")}
+    <Hint text={t("settings.llmHint")} side="down" />
+  </h3>
   {urlRow("llm", "settings.llmUrlPh", true)}
   {keyRow("llm")}
   <FieldRow label={t("settings.model")} required>
@@ -185,15 +230,7 @@ export default function ModelsTab() {
       placeholder={t("settings.llmModelPh")}
       onChange={(e) => patchEndpoint("llm", "model", e.target.value)}
     />
-    {!settings.llm.model.trim() && (
-      <span className="probe-err">{t("settings.required")}</span>
-    )}
   </FieldRow>
-</section>
-<section className="panel settings-col opt-list">
-  <h3 className="opt-group">{t("settings.groups.asr")}</h3>
-  {urlRow("asr", "settings.asrUrlPh")}
-  {keyRow("asr")}
 </section>
 <section className="panel settings-col opt-list">
   <h3 className="opt-group">
@@ -212,14 +249,78 @@ export default function ModelsTab() {
   </FieldRow>
 </section>
 <section className="panel settings-col opt-list">
-  <h3 className="opt-group">{t("settings.groups.tts")}</h3>
+  <h3 className="opt-group">
+    {t("settings.groups.asr")}
+    <Hint
+      text={
+        settings.asr.mode === "builtin"
+          ? t("settings.asrBuiltinHint")
+          : t("settings.asrHint")
+      }
+      side="down"
+    />
+  </h3>
+  <FieldRow label={t("settings.asrMode")}>
+    <Select
+      value={settings.asr.mode}
+      options={[
+        { value: "builtin", label: t("settings.asrBuiltin") },
+        { value: "openai", label: t("settings.asrOpenai") },
+      ]}
+      onChange={(v) => patchEndpoint("asr", "mode", v)}
+    />
+  </FieldRow>
+  {urlRow("asr", "settings.asrUrlPh", false, settings.asr.mode === "builtin")}
+  {keyRow("asr", settings.asr.mode === "builtin")}
+  <FieldRow label={t("settings.model")}>
+    <input
+      value={settings.asr.model}
+      disabled={settings.asr.mode === "builtin"}
+      placeholder={
+        settings.asr.mode === "builtin" ? "—" : t("settings.asrModelPh")
+      }
+      onChange={(e) => patchEndpoint("asr", "model", e.target.value)}
+    />
+  </FieldRow>
+</section>
+<section className="panel settings-col opt-list">
+  <h3 className="opt-group">
+    {t("settings.groups.tts")}
+    <Hint text={t("settings.ttsHint")} side="down" />
+  </h3>
   {urlRow("tts", "settings.ttsUrlPh")}
   {keyRow("tts")}
-  <FieldRow label={t("settings.voice")}>
+  <FieldRow label={t("settings.ttsRefAudio")} hint={t("settings.ttsRefAudioHint")}>
+    <span className={`ref-name${settings.tts.voice ? "" : " muted"}`}>
+      {settings.tts.voice || t("settings.ttsNotUploaded")}
+    </span>
     <input
-      value={settings.tts.voice}
-      placeholder={t("settings.voicePh")}
-      onChange={(e) => patchEndpoint("tts", "voice", e.target.value)}
+      ref={fileRef}
+      type="file"
+      accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg,.aac"
+      hidden
+      onChange={onPickRef}
+    />
+    {/* 与「显示/测试」同一套紧凑尺寸（key-toggle 提供字号与内边距） */}
+    <Button
+      variant="ghost"
+      className="key-toggle row-btn"
+      disabled={uploading}
+      onClick={() => fileRef.current?.click()}
+    >
+      {uploading
+        ? t("settings.ttsUploading")
+        : settings.tts.voice
+          ? t("settings.ttsReupload")
+          : t("settings.ttsUpload")}
+    </Button>
+    {uploadErr && <span className="probe-err">{uploadErr}</span>}
+  </FieldRow>
+  <FieldRow label={t("settings.ttsRefText")}>
+    <input
+      value={settings.tts.prompt}
+      placeholder={t("settings.ttsRefTextPh")}
+      onChange={(e) => patchEndpoint("tts", "prompt", e.target.value)}
     />
   </FieldRow>
   {/* 合成语言不单独配置：跟随「通用」页的对话语言

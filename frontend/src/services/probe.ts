@@ -8,8 +8,7 @@ import type {
   LlmConfig,
   TtsConfig,
 } from "../lib/types";
-import { asrUrl } from "./asrClient";
-import { speechUrl } from "./ttsClient";
+import { apiJson } from "./http";
 
 export interface ProbeResult {
   ok: boolean;
@@ -36,21 +35,6 @@ function modelsUrl(cfg: { url: string }): string {
 }
 
 const TIMEOUT_MS = 5000;
-
-/** 由端点 url 推导 healthz：剥掉已知的 API 路径段后在原 base 上拼 /healthz。 */
-function healthzUrl(raw: string, apiSuffixes: string[]): string {
-  const u = new URL(raw.replace(/^ws(s?):/, "http$1:"));
-  let p = u.pathname.replace(/\/+$/, "");
-  for (const s of apiSuffixes) {
-    if (p.endsWith(s)) {
-      p = p.slice(0, -s.length);
-      break;
-    }
-  }
-  u.pathname = `${p}/healthz`;
-  u.search = "";
-  return u.toString();
-}
 
 async function get(url: string, headers?: Record<string, string>): Promise<ProbeResult> {
   const ctl = new AbortController();
@@ -87,39 +71,37 @@ export async function probeEmbedding(
 
 export async function probeTts(cfg: TtsConfig): Promise<ProbeResult> {
   if (!cfg.url) return { ok: false, detail: "unconfigured" };
-  const first = await get(healthzUrl(cfg.url, ["/v1/audio/speech", "/v1"]));
-  if (first.ok || first.detail !== "HTTP 404") return first;
-  // 无 /healthz 的服务：GET speech 端点本身——405 也算可达。
-  return get(speechUrl(cfg));
+  try {
+    const s = await apiJson<{
+      configured: boolean;
+      reachable: boolean;
+      detail: string;
+    }>("/api/tts/status");
+    if (s.configured && s.reachable) return { ok: true, detail: "gpt-sovits" };
+    return { ok: false, detail: s.detail || "未就绪" };
+  } catch {
+    return { ok: false, detail: "backend unreachable" };
+  }
 }
 
-export function probeAsr(cfg: AsrConfig): Promise<ProbeResult> {
-  if (!cfg.url) return Promise.resolve({ ok: false, detail: "unconfigured" });
-  return new Promise((resolve) => {
-    let settled = false;
-    const done = (r: ProbeResult): void => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      try {
-        ws.close();
-      } catch {
-        // 关闭失败忽略
-      }
-      resolve(r);
-    };
-    const started = performance.now();
-    const timer = setTimeout(() => done({ ok: false, detail: "timeout" }), TIMEOUT_MS);
-    let ws: WebSocket;
+export async function probeAsr(cfg: AsrConfig): Promise<ProbeResult> {
+  if (cfg.mode === "builtin") {
     try {
-      ws = new WebSocket(asrUrl(cfg));
+      const s = await apiJson<{ ready: boolean; missing: string[] }>(
+        "/api/asr/status",
+      );
+      if (s.ready) return { ok: true, detail: "sensevoice" };
+      return {
+        ok: false,
+        detail: s.missing.length ? `缺少模型：${s.missing.join(", ")}` : "未就绪",
+      };
     } catch {
-      clearTimeout(timer);
-      resolve({ ok: false, detail: "bad url" });
-      return;
+      return { ok: false, detail: "backend unreachable" };
     }
-    ws.onopen = () => done({ ok: true, detail: `${Math.round(performance.now() - started)}ms` });
-    ws.onerror = () => done({ ok: false, detail: "connect failed" });
-    ws.onclose = (ev) => done({ ok: false, detail: `closed ${ev.code}` });
-  });
+  }
+  if (!cfg.url) return { ok: false, detail: "unconfigured" };
+  const headers: Record<string, string> = {};
+  if (cfg.key) headers.Authorization = `Bearer ${cfg.key}`;
+  // OpenAI 兼容服务的惯例是 GET {base}/models；404 也说明主机可达
+  return get(modelsUrl(cfg), headers);
 }

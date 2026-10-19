@@ -1,6 +1,20 @@
 {
   "components": {
     "schemas": {
+      "Body_upload_ref_api_tts_ref_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_ref_api_tts_ref_post",
+        "type": "object"
+      },
       "ChatIn": {
         "properties": {
           "text": {
@@ -346,6 +360,30 @@
         "title": "ProbeResult",
         "type": "object"
       },
+      "SpeechIn": {
+        "properties": {
+          "input": {
+            "title": "Input",
+            "type": "string"
+          },
+          "lang": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lang"
+          }
+        },
+        "required": [
+          "input"
+        ],
+        "title": "SpeechIn",
+        "type": "object"
+      },
       "StoredMessage": {
         "description": "momo.db 里的一条会话消息（落库形态，不含指令）。\n\nrole 只会有两个值——begin_turn 写 user、append_sentence 写 assistant。",
         "properties": {
@@ -422,6 +460,27 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/asr/status": {
+      "get": {
+        "description": "内置引擎状态：ready=false 时 missing 列出缺失文件。",
+        "operationId": "asr_status_api_asr_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Asr Status Api Asr Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Asr Status"
+      }
+    },
     "/api/chat": {
       "post": {
         "operationId": "chat_api_chat_post",
@@ -555,6 +614,18 @@
           }
         },
         "summary": "Create Checkpoint"
+      }
+    },
+    "/api/checkpoints/auto": {
+      "post": {
+        "description": "当前会话写入 auto 槽（不清空 live）。从对话页退回标题页时调用。",
+        "operationId": "save_auto_api_checkpoints_auto_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Save Auto"
       }
     },
     "/api/checkpoints/live": {
@@ -983,6 +1054,103 @@
           }
         },
         "summary": "Put State"
+      }
+    },
+    "/api/tts/ref": {
+      "post": {
+        "description": "上传参考音频。重复上传覆盖旧文件（state 里只记文件名）。",
+        "operationId": "upload_ref_api_tts_ref_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_ref_api_tts_ref_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Upload Ref Api Tts Ref Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Ref"
+      }
+    },
+    "/api/tts/speech": {
+      "post": {
+        "operationId": "speech_api_tts_speech_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SpeechIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Speech"
+      }
+    },
+    "/api/tts/status": {
+      "get": {
+        "operationId": "status_api_tts_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Status Api Tts Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status"
       }
     }
   }

@@ -10,7 +10,6 @@
   background: var(--backdrop);
   backdrop-filter: blur(10px);
   padding: 6cqh 16px;
-  animation: page-in 0.28s ease both;
 }
 
 /* Backlog 是阅读流，不跟存档页的宽幅面板走：保持瘦长阅读栏，

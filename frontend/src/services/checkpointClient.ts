@@ -45,6 +45,11 @@ export async function deleteCheckpoint(id: string): Promise<void> {
   await apiFetch(`${API}/${id}`, { method: "DELETE" });
 }
 
+/** 当前会话写入 auto 槽（不清空 live）。从对话页退回标题页时调用。 */
+export async function saveAutoCheckpoint(): Promise<void> {
+  await apiFetch(`${API}/auto`, { method: "POST" });
+}
+
 /** 开启新会话：live 非空先快照进 auto 槽，然后清空 live。 */
 export async function newSession(): Promise<void> {
   await apiFetch(`${API}/live/new`, { method: "POST" });

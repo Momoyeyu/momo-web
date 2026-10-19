@@ -4,6 +4,7 @@
 // 拓展记录只做「建 → 断言 → 删」。
 import { expect, test } from "@playwright/test";
 import {
+  activePane,
   fieldRow,
   openApp,
   openTab,
@@ -11,6 +12,7 @@ import {
   readState,
   useStateRestore,
   waitSaved,
+  writeState,
 } from "./helpers";
 
 const restore = useStateRestore();
@@ -48,6 +50,13 @@ test("界面语言即时生效，且写回后端", async ({ page, request }) => 
 });
 
 test("滑块拖动即时反映数值并写盘", async ({ page, request }) => {
+  // 音量滑杆受 TTS 可用性门控：先配好 url 与参考音频，否则它是禁用的
+  const st = await readState(request);
+  const tts = (st.settings as { tts: { url: string; voice: string } }).tts;
+  tts.url = "http://tts.test";
+  tts.voice = "ref.wav";
+  await writeState(request, st);
+  await page.reload();
   await openTab(page, "通用");
   const field = fieldRow(page, "语音音量");
   await field.locator("input.ux-range").fill("42");
@@ -64,9 +73,11 @@ test("开关点击切换并写盘", async ({ page, request }) => {
   await openTab(page, "通用");
   const read = async () =>
     (await readState(request)).settings as { general: { showStatus: boolean } };
-  const before = (await read()).general.showStatus;
-
   const sw = fieldRow(page, "显示对话状态").locator(".switch");
+  // 起点取界面实际状态：本开关另有用例也在动它，硬编码 true/false 会跨次跑互相污染
+  await expect(sw).toHaveAttribute("aria-checked", /true|false/);
+  const before = (await sw.getAttribute("aria-checked")) === "true";
+
   await sw.click();
   await waitSaved(page);
   expect((await read()).general.showStatus).toBe(!before);
@@ -115,19 +126,19 @@ test("通用 tab：语言/语音是与对话框设置同级的两个面板，语
   await openTab(page, "通用");
 
   // 左栏是两个**独立面板**（不再是套在一个面板里的子框）：第一列 2 项
-  const stack = page.locator(".settings-cols > .settings-stack > .panel");
+  const stack = page.locator(":is(.settings-pane:not([aria-hidden])) .settings-cols > .settings-stack > .panel");
   await expect(stack).toHaveCount(2);
   expect(await stack.locator(".opt-group").allTextContents()).toEqual([
     "语言设置",
     "语音设置",
   ]);
   // 第二列 1 项，与左栏的两个面板同级（都是 .settings-cols 的子级）
-  await expect(page.locator(".settings-cols > .panel")).toHaveCount(1);
+  await expect(page.locator(":is(.settings-pane:not([aria-hidden])) .settings-cols > .panel")).toHaveCount(1);
 
   // 两栏总高对齐
   const [left, right] = await Promise.all([
-    page.locator(".settings-stack").boundingBox(),
-    page.locator(".settings-cols > .panel").boundingBox(),
+    page.locator(":is(.settings-pane:not([aria-hidden])) .settings-stack").boundingBox(),
+    page.locator(":is(.settings-pane:not([aria-hidden])) .settings-cols > .panel").boundingBox(),
   ]);
   expect(Math.abs((left?.height ?? 0) - (right?.height ?? 0))).toBeLessThan(2);
 
@@ -142,9 +153,15 @@ test("通用 tab：语言/语音是与对话框设置同级的两个面板，语
 
   // 预览与对话页一致：状态条属于对话框本体，跟着「显示对话状态」开关
   const preview = page.locator(".dialog-preview .chat-status");
+  const sw = dialogPanel.locator(".opt-row", { hasText: "显示对话状态" }).locator(".switch");
+  // 本开关的起点由前序用例决定，先归位到「开」再断言关掉后的效果
+  if ((await sw.getAttribute("aria-checked")) !== "true") {
+    await sw.click();
+    await waitSaved(page);
+  }
   await expect(preview).toHaveCount(1);
   await expect(preview).toContainText("空闲");
-  await dialogPanel.locator(".opt-row", { hasText: "显示对话状态" }).locator(".switch").click();
+  await sw.click();
   await waitSaved(page);
   await expect(page.locator(".dialog-preview .chat-status")).toHaveCount(0);
 });
@@ -152,7 +169,7 @@ test("通用 tab：语言/语音是与对话框设置同级的两个面板，语
 test("拓展 tab：Live2D 与 MCP 左右并排且等宽", async ({ page }) => {
   await openTab(page, "拓展");
 
-  const cols = page.locator(".settings-cols > .panel");
+  const cols = page.locator(":is(.settings-pane:not([aria-hidden])) .settings-cols > .panel");
   await expect(cols).toHaveCount(2);
   await expect(cols.nth(0)).toContainText("Live2D 模型");
   await expect(cols.nth(1)).toContainText("MCP");
@@ -213,7 +230,7 @@ test("拓展 tab：Live2D 与「记忆」同构（检索 + 加号 + 翻页），
   page,
 }) => {
   await openTab(page, "拓展");
-  const panel = page.locator(".panel-stack").nth(0);
+  const panel = activePane(page).locator(".panel-stack").nth(0);
 
   await expect(panel.locator(".list-search")).toBeVisible();
   // 只取工具条的加号：卡片上还有编辑/删除两个 .icon-btn，多个匹配会触发严格模式报错
@@ -242,7 +259,7 @@ test("拓展 tab：Live2D 与「记忆」同构（检索 + 加号 + 翻页），
 
 test("拓展 tab：点模型卡片弹出「表情与动作」，并可按名检索", async ({ page }) => {
   await openTab(page, "拓展");
-  const panel = page.locator(".panel-stack").nth(0);
+  const panel = activePane(page).locator(".panel-stack").nth(0);
 
   // 检索过滤（内置 Hiyori 命中，乱词落空态）
   await panel.locator(".list-search").fill("Hiyori");

@@ -10,6 +10,9 @@ dependencies = [
     "mcp>=2.2,<3",
     "sqlite-vec>=0.1",
     "pyyaml>=6.0.3",
+    "sherpa-onnx>=1.13.8",
+    "onnxruntime>=1.31.0",
+    "websockets>=17.2",
 ]
 
 [dependency-groups]

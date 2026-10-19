@@ -91,6 +91,22 @@ export async function waitSaved(page: Page, ms = 600): Promise<void> {
  * 注意：`filter({ has })` 的内层定位器会被**重新挂到每个候选元素下**，
  * 所以内层只能写相对路径（`.opt-label`），scope 只加在外层。
  */
+/**
+ * 等页面转场结束：转场期间旧页仍挂在栈里（.page-wrap.is-leaving），
+ * 会让严格定位器同时匹配到新旧两份 DOM。断言前先等它收场。
+ */
+export async function settle(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => !document.querySelector(".app-stage.tx-active, .page-wrap.is-leaving"),
+    undefined,
+    { timeout: 5_000 },
+  );
+}
+
+/** 当前激活的设置面板（四个 tab 常驻横排，其余 pane 带 aria-hidden）。 */
+export const activePane = (page: Page) =>
+  page.locator(".settings-pane:not([aria-hidden])");
+
 export const fieldRow = (page: Page, label: string, scope = "") =>
   page
     .locator(`${scope} .opt-row`.trim())

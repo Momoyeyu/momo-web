@@ -79,7 +79,7 @@ beforeEach(() => {
     settings: {
       ...getSettings(),
       llm: { url: "http://llm.test", key: "", model: "test-model" },
-      tts: { url: "", key: "", voice: "" },
+      tts: { url: "", key: "", voice: "", prompt: "" },
     },
   });
 });

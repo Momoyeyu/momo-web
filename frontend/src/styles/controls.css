@@ -141,6 +141,8 @@
 .opt-label {
   flex: none;
   width: 180px;
+  display: flex;
+  align-items: center;
   font-size: 14px;
   color: var(--text-dim);
   letter-spacing: 0.06em;
@@ -390,11 +392,14 @@
    尺寸按 em，比相邻文字略小一丢丢，且跟随所在位置的字号。 */
 .hint {
   flex: none;
-  width: 1em;
-  height: 1em;
+  width: 0.95em;
+  height: 0.95em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* 内联场景：下移 0.12em 让图标圆心落在文字的中轴上（纯 baseline 对齐会偏高） */
+  vertical-align: -0.12em;
+  margin-left: 0.35em;
   color: var(--text-dim);
   cursor: help;
 }

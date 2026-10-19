@@ -13,9 +13,11 @@ import {
 import type { EngineHandlers } from "../chat/engineInstance";
 import type { ChatStatus } from "../lib/types";
 import { navigate } from "../router";
+import { saveAutoCheckpoint } from "../services/checkpointClient";
 import { useT } from "../i18n";
 import { ServiceError } from "../lib/errors";
 import { getState, speakerName, subscribe } from "../lib/store";
+import { asrConfigured, ttsConfigured } from "../lib/asr";
 import Button from "../ui/Button";
 import Icon from "../ui/Icon";
 import DialogBox from "../components/DialogBox";
@@ -37,8 +39,8 @@ export default function Chat() {
   // 语音输入开关 + ASR 配置双重门控（与设置页「通用」同一个开关）。
   const micAllowed =
     getState().settings.general.voiceInput &&
-    getState().settings.asr.url.trim() !== "";
-  const ttsConfigured = getState().settings.tts.url.trim() !== "";
+    asrConfigured(getState().settings.asr);
+  const ttsReady = ttsConfigured(getState().settings.tts);
   const [status, setStatus] = useState<ChatStatus>(getChatEngine().status);
   const [micOn, setMicOn] = useState(getChatEngine().listening);
   const [muted, setMuted] = useState(getChatEngine().muted);
@@ -225,12 +227,12 @@ export default function Chat() {
             <Icon name="load" />
           </Button>
           <Button
-            className={`tb${muted || !ttsConfigured ? " tb-off" : ""}`}
+            className={`tb${muted || !ttsReady ? " tb-off" : ""}`}
             onClick={toggleVoice}
-            disabled={!ttsConfigured}
+            disabled={!ttsReady}
             aria-label={muted ? t("chat.voiceOff") : t("chat.voiceOn")}
             title={
-              !ttsConfigured
+              !ttsReady
                 ? t("chat.voiceNeedCfg")
                 : muted
                   ? t("chat.voiceTitleOff")
@@ -251,7 +253,11 @@ export default function Chat() {
             className="tb"
             aria-label={t("common.backTitle")}
             title={t("common.backTitle")}
-            onClick={() => navigate("title")}
+            onClick={() => {
+              // 退出对话 = 本段进度落 auto 槽（auto 唯一的写入时机）
+              void saveAutoCheckpoint().catch(() => {});
+              navigate("title");
+            }}
           >
             <Icon name="home" />
           </Button>

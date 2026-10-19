@@ -141,36 +141,46 @@ def test_live_transcript_endpoint():
     assert client.get("/api/checkpoints").json() == []
 
 
-def test_load_roundtrip_and_auto_slot():
+def test_load_roundtrip_no_auto_on_load():
+    """load 只覆盖 live，**不做任何自动备份**——是否保留当前进度
+    由前端在加载前确认，用户想保留应手动存档。"""
     client = TestClient(app)
     _seed(2, "甲")
     sid_a = client.post("/api/checkpoints", json={"title": "A"}).json()["id"]
     _seed(1, "乙")  # 当前 = A + 一回合
-    sid_b = client.post("/api/checkpoints", json={"title": "B"}).json()["id"]
 
     r = client.post(f"/api/checkpoints/{sid_a}/load")
     assert r.status_code == 200
     assert _live_texts() == ["甲问0", "甲答0", "甲问1", "甲答1"]  # 回到 A 时点
+    assert all(not s["auto"] for s in client.get("/api/checkpoints").json())
 
-    # load 前现场进 auto 槽
+
+def test_save_auto_endpoint():
+    """save_auto：live 非空写入 auto 槽，原地覆盖、不清空 live。
+    这是 auto 槽唯一的写入时机（从对话页退回标题页时由前端调用）。"""
+    client = TestClient(app)
+    _seed(2, "甲")
+    assert client.post("/api/checkpoints/auto").status_code == 204
     autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
-    assert len(autos) == 1
+    assert len(autos) == 1 and autos[0]["slot"] is None
     auto_full = client.get(f"/api/checkpoints/{autos[0]['id']}").json()
     assert [m["text"] for m in auto_full["messages"]] == [
-        "甲问0", "甲答0", "甲问1", "甲答1", "乙问0", "乙答0",
+        "甲问0", "甲答0", "甲问1", "甲答1",
     ]
 
-    # 再 load B：auto 槽原地覆盖，不新增
-    assert client.post(f"/api/checkpoints/{sid_b}/load").status_code == 200
+    # 再存：原地覆盖不新增，且 live 不被清空
+    _seed(1, "乙")
+    assert client.post("/api/checkpoints/auto").status_code == 204
     autos2 = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos2) == 1 and autos2[0]["id"] == autos[0]["id"]
     assert _live_texts() == ["甲问0", "甲答0", "甲问1", "甲答1", "乙问0", "乙答0"]
+    auto_full2 = client.get(f"/api/checkpoints/{autos[0]['id']}").json()
+    assert auto_full2["messages"][-1]["text"] == "乙答0"
 
-    # load auto 槽自己 → 还原被 B 顶掉的现场
+    # load auto 槽自己 → 还原 auto 时点的现场
     auto_id = autos[0]["id"]
     assert client.post(f"/api/checkpoints/{auto_id}/load").status_code == 200
-    autos3 = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
-    assert len(autos3) == 1 and autos3[0]["id"] == auto_id
+    assert _live_texts() == ["甲问0", "甲答0", "甲问1", "甲答1", "乙问0", "乙答0"]
 
 
 def test_load_with_summary_roundtrip():
@@ -239,9 +249,7 @@ def test_slot_out_of_range_and_occupied():
 def test_auto_slot_not_deletable():
     client = TestClient(app)
     _seed(1)
-    sid = client.post("/api/checkpoints", json={}).json()["id"]
-    _seed(1, "乙")
-    client.post(f"/api/checkpoints/{sid}/load")
+    client.post("/api/checkpoints/auto")
     autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos) == 1
     assert client.delete(f"/api/checkpoints/{autos[0]['id']}").status_code == 400
@@ -251,9 +259,7 @@ def test_auto_slot_not_overwritable():
     """PUT 覆盖 auto 槽与删除同规则：400 invalid，内容不被改动。"""
     client = TestClient(app)
     _seed(1, "甲")
-    sid = client.post("/api/checkpoints", json={}).json()["id"]
-    _seed(1, "乙")
-    client.post(f"/api/checkpoints/{sid}/load")  # 现场进 auto 槽
+    client.post("/api/checkpoints/auto")  # 现场进 auto 槽
     autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos) == 1
     auto_id = autos[0]["id"]
@@ -270,9 +276,7 @@ def test_auto_slot_not_overwritable():
 def test_overwrite_auto_direct_raises_invalid():
     """存储层直连：覆盖 auto 槽抛 CheckpointError(kind='invalid')，同 delete。"""
     _seed(1)
-    sid = checkpoint.create_checkpoint()["id"]
-    _seed(1, "乙")
-    checkpoint.load_checkpoint(sid)  # 现场进 auto 槽
+    checkpoint.save_auto()  # 现场进 auto 槽
     auto_id = db.query(
         "SELECT id FROM sessions WHERE auto=1 AND id != ?", (db.LIVE_ID,)
     )[0]["id"]
@@ -292,9 +296,7 @@ def test_preview_uses_last_message():
 def test_auto_slot_has_no_slot_number():
     client = TestClient(app)
     _seed(1, "甲")
-    sid = client.post("/api/checkpoints", json={}).json()["id"]
-    _seed(1, "乙")
-    client.post(f"/api/checkpoints/{sid}/load")  # 当前现场进 auto 槽
+    client.post("/api/checkpoints/auto")  # 当前现场进 auto 槽
     autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
     assert len(autos) == 1 and autos[0]["slot"] is None
 
@@ -400,10 +402,8 @@ def test_load_invalidates_inflight_turn(monkeypatch):
     client.post(f"/api/checkpoints/{sid}/load")  # 代际 +1
     assert checkpoint.append_sentence("迟到回复", gen, "t9") is False
     assert _live_texts() == ["甲问0", "甲答0"]  # 迟到回复没落进新会话
-    # auto 槽里留有被顶掉的现场（含途中 user 消息）
-    autos = [s for s in client.get("/api/checkpoints").json() if s["auto"]]
-    auto = client.get(f"/api/checkpoints/{autos[0]['id']}").json()
-    assert auto["messages"][-1]["text"] == "途中的问题"
+    # load 不做自动备份：被顶掉的现场直接丢弃（是否保留由用户在 load 前决定）
+    assert all(not s["auto"] for s in client.get("/api/checkpoints").json())
 
 
 def test_run_turn_skips_stream_when_gen_stale(monkeypatch):

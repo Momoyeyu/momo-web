@@ -27,14 +27,25 @@ class LlmConfig(TypedDict):
 
 
 class AsrConfig(TypedDict):
+    """ASR 端点。mode: "builtin" 用内置 SenseVoice；"openai" 用任何兼容
+    OpenAI /v1/audio/transcriptions 的服务（url 为 base，如 http://host:8080/v1）。"""
+
+    mode: str
     url: str
     key: str
 
 
 class TtsConfig(TypedDict):
+    """TTS 端点（GPT-SoVITS api_v2 的地址）。
+
+    voice = 参考音频的**服务端路径**（音色来源）；prompt = 那段音频的文本，
+    留空则以 ref_free 模式合成（音色相似度会降一点）。
+    """
+
     url: str
     key: str
     voice: str
+    prompt: str
 
 
 class EmbeddingConfig(TypedDict):

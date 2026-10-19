@@ -14,6 +14,7 @@ import { useT } from "../i18n";
 import { fromRoute, navigate } from "../router";
 import Button from "../ui/Button";
 import GridBackdrop from "../components/GridBackdrop";
+import { ropeFrom } from "../lib/ropeAngle";
 import MemoryPanel from "./panels/Memory";
 import ExtensionsTab from "./settings/ExtensionsTab";
 import GeneralTab from "./settings/GeneralTab";
@@ -41,7 +42,7 @@ export default function Settings() {
 
   return (
     <div className="settings-page">
-      <GridBackdrop angle={ROT_BASE + idx * ROT_STEP} />
+      <GridBackdrop angle={ROT_BASE + idx * ROT_STEP} from={ropeFrom()} sweepMs={620} />
       <nav className="tabstrip">
         <div className="tabstrip-inner">
           {/* 金色高亮滑块：宽度=1/4，translateX 按下标平移，随内容同节奏滑动 */}
@@ -66,26 +67,42 @@ export default function Settings() {
           className="settings-track"
           style={{ transform: `translateX(${-idx * 100}%)` }}
         >
-          <section className="settings-pane">
+          <section
+            className="settings-pane"
+            aria-hidden={tab !== "general" ? true : undefined}
+            inert={tab !== "general"}
+          >
             <div className="settings-content">
               <div className="settings-body">
                 <GeneralTab />
               </div>
             </div>
           </section>
-          <section className="settings-pane">
+          <section
+            className="settings-pane"
+            aria-hidden={tab !== "models" ? true : undefined}
+            inert={tab !== "models"}
+          >
             <div className="settings-content">
               <div className="settings-body">
                 <ModelsTab />
               </div>
             </div>
           </section>
-          <section className="settings-pane">
+          <section
+            className="settings-pane"
+            aria-hidden={tab !== "memory" ? true : undefined}
+            inert={tab !== "memory"}
+          >
             <div className="settings-content">
               <MemoryPanel />
             </div>
           </section>
-          <section className="settings-pane">
+          <section
+            className="settings-pane"
+            aria-hidden={tab !== "extend" ? true : undefined}
+            inert={tab !== "extend"}
+          >
             <div className="settings-content">
               <div className="settings-body">
                 <ExtensionsTab />

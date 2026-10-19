@@ -3,7 +3,7 @@
 //
 // 走 backlog 的「回放」路径验证：它和实时回合共用同一处语言解析，
 // 是对这个需求最干净的观测点。
-// 拦下 /v1/audio/speech 读请求体，不依赖 mac-studio 上真实的 TTS。
+// 拦下 /api/tts/speech（后端代理）读请求体，不依赖真实的 GPT-SoVITS。
 import { expect, test } from "@playwright/test";
 import { gotoRoute, readState, useStateRestore, writeState } from "./helpers";
 
@@ -22,9 +22,13 @@ type Body = { input?: string; lang?: string; voice?: string };
 
 test("TTS 请求的 lang = 对话语言（日语/英语/auto 三种）", async ({ page, request }) => {
   const bodies: Body[] = [];
-  await page.route("**/v1/audio/speech", async (route) => {
+  await page.route("**/api/tts/speech", async (route) => {
     bodies.push(JSON.parse(route.request().postData() ?? "{}") as Body);
-    await route.fulfill({ status: 200, headers: { "Content-Type": "audio/pcm" }, body: "" });
+    await route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "audio/pcm", "X-Sample-Rate": "32000" },
+      body: "",
+    });
   });
 
   // 先自己造一个回合：不能依赖别的 spec 留下的数据 —— 06-chat 的收尾会把它自己的
@@ -49,9 +53,15 @@ test("TTS 请求的 lang = 对话语言（日语/英语/auto 三种）", async (
   for (const [chatLang, want] of cases) {
     const state = await readState(request);
     (state.settings as { general: { chatLang: string } }).general.chatLang = chatLang;
+    // 参考音频随便给个文件名：请求被 page.route 拦下，不会真的到 backend
+    const tts = (state.settings as { tts: { url: string; voice: string } }).tts;
+    tts.url = tts.url || "http://tts.test";
+    tts.voice = "ref.wav";
     await writeState(request, state);
 
     await page.reload(); // 重新 boot 才能让 store 读到新配置
+    await page.waitForTimeout(900); // bootPersist 是异步的，等它把远端配置合并进来
+    await page.waitForTimeout(900); // bootPersist 是异步的，等它把远端配置合并进来
     await expect(page.locator(".bl-replay:not([disabled])").first()).toBeVisible();
 
     bodies.length = 0;

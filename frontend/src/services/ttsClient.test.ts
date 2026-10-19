@@ -1,48 +1,64 @@
+// TTS 客户端单测：后端代理协议（X-Sample-Rate 头 + s16le 偶数对齐 + 错误映射）。
+// 端点固定为 /api/tts/speech，不再有 URL 拼接逻辑（引擎细节归 backend）。
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ServiceError } from "../lib/errors";
-import { speechUrl, streamSpeech } from "./ttsClient";
+import { streamSpeech } from "./ttsClient";
 
-const CFG = { key: "", voice: "" };
-
-/** TTS 合成语言是请求参数（= 对话语言），不是端点配置。 */
 const LANG = "zh";
 
-function streamResponse(chunks: Uint8Array[]): Response {
+function streamResponse(chunks: Uint8Array[], sr = 32000): Response {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       for (const c of chunks) controller.enqueue(c);
       controller.close();
     },
   });
-  return new Response(stream, { status: 200 });
+  return new Response(stream, {
+    status: 200,
+    headers: { "x-sample-rate": String(sr) },
+  });
 }
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("speechUrl", () => {
-  it("appends /v1/audio/speech when url has no path", () => {
-    expect(speechUrl({ url: "http://127.0.0.1:7811", ...CFG })).toBe(
-      "http://127.0.0.1:7811/v1/audio/speech",
-    );
-  });
-
-  it("treats a bare '/' path as missing", () => {
-    const u = new URL(speechUrl({ url: "http://127.0.0.1:7811/", ...CFG }));
-    expect(u.pathname).toBe("/v1/audio/speech");
-  });
-
-  it("keeps an existing path untouched", () => {
-    const u = new URL(speechUrl({ url: "https://tts.example.com/v1/audio/speech", ...CFG }));
-    expect(u.pathname).toBe("/v1/audio/speech");
-    const u2 = new URL(speechUrl({ url: "https://tts.example.com/other", ...CFG }));
-    expect(u2.pathname).toBe("/other/v1/audio/speech");
-  });
-});
-
 describe("streamSpeech", () => {
-  it("realigns chunks to even s16le byte boundaries", async () => {
+  it("把采样率头交给调用方（早于第一个 chunk）", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => streamResponse([new Uint8Array([1, 2])], 48000)));
+    const order: string[] = [];
+    let sr = 0;
+    await streamSpeech("hi", {
+      lang: LANG,
+      onSampleRate: (hz) => {
+        sr = hz;
+        order.push(`sr:${hz}`);
+      },
+      onChunk: () => order.push("chunk"),
+    });
+    expect(sr).toBe(48000);
+    expect(order[0]).toBe("sr:48000");
+    expect(order).toContain("chunk");
+  });
+
+  it("缺头时回落 24000", async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(new Uint8Array([1, 2]));
+        c.close();
+      },
+    });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(stream, { status: 200 })));
+    let sr = 0;
+    await streamSpeech("hi", {
+      lang: LANG,
+      onSampleRate: (hz) => (sr = hz),
+      onChunk: () => {},
+    });
+    expect(sr).toBe(24000);
+  });
+
+  it("chunk 对齐到偶数 s16 字节边界", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -50,140 +66,72 @@ describe("streamSpeech", () => {
       ),
     );
     const got: number[][] = [];
-    await streamSpeech({ url: "http://h", ...CFG }, "hi", {
+    await streamSpeech("hi", {
       lang: LANG,
       onChunk: (pcm) => got.push([...pcm]),
     });
-    // [1] 滞留 → [1,2] 对齐下送；[3] 滞留 → [3,4] 下送；尾 [5] 单字节丢弃。
     expect(got).toEqual([
       [1, 2],
       [3, 4],
     ]);
   });
 
-  it("passes through even chunks without buffering", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => streamResponse([new Uint8Array([1, 2, 3, 4]), new Uint8Array([5, 6])])),
-    );
-    const got: number[][] = [];
-    await streamSpeech({ url: "http://h", ...CFG }, "hi", {
-      lang: LANG,
-      onChunk: (pcm) => got.push([...pcm]),
-    });
-    expect(got).toEqual([
-      [1, 2, 3, 4],
-      [5, 6],
-    ]);
-  });
-
-  it("throws ServiceError(http) carrying status on OpenAI error envelope", async () => {
+  it("后端 503 的 detail 映射成 ServiceError(http)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(
         async () =>
-          new Response(JSON.stringify({ error: { message: "voice not found" } }), {
-            status: 400,
+          new Response(JSON.stringify({ detail: "未配置参考音频（音色）" }), {
+            status: 503,
           }),
       ),
     );
-    const err = await streamSpeech(
-      { url: "http://h", ...CFG },
-      "hi",
-      { lang: LANG, onChunk: () => {} },
-    ).catch((e: unknown) => e);
+    const err = await streamSpeech("hi", { lang: LANG, onChunk: () => {} }).catch(
+      (e: unknown) => e,
+    );
     expect(err).toBeInstanceOf(ServiceError);
-    expect(err).toMatchObject({
-      service: "tts",
-      failure: "http",
-      status: 400,
-    });
-    expect((err as Error).message).toContain("voice not found");
+    expect(err).toMatchObject({ service: "tts", failure: "http", status: 503 });
+    expect((err as Error).message).toContain("未配置参考音频");
   });
 
-  it("throws ServiceError(unreachable) on network failure", async () => {
+  it("网络失败 → ServiceError(unreachable)", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
         throw new TypeError("fetch failed");
       }),
     );
-    const err = await streamSpeech(
-      { url: "http://h", ...CFG },
-      "hi",
-      { lang: LANG, onChunk: () => {} },
-    ).catch((e: unknown) => e);
+    const err = await streamSpeech("hi", { lang: LANG, onChunk: () => {} }).catch(
+      (e: unknown) => e,
+    );
     expect(err).toBeInstanceOf(ServiceError);
     expect(err).toMatchObject({ service: "tts", failure: "unreachable" });
   });
 
-  it("sends Authorization only when key is set", async () => {
-    const spy = vi.fn(async (_url: string, _init: RequestInit) => streamResponse([]));
-    vi.stubGlobal("fetch", spy);
-    await streamSpeech({ url: "http://h", key: "k1", voice: "" }, "hi", {
-      lang: LANG,
-      onChunk: () => {},
-    });
-    const init = spy.mock.calls[0][1] as RequestInit;
-    const headers = init.headers as Record<string, string>;
-    expect(headers.Authorization).toBe("Bearer k1");
-    expect(headers["Content-Type"]).toBe("application/json");
-    const body = JSON.parse(init.body as string) as Record<string, unknown>;
-    expect(body).toMatchObject({
-      input: "hi",
-      response_format: "pcm",
-      lang: "zh",
-      model: "momo-tts",
-    });
-  });
-
-  it("returns quietly when the signal aborts mid-stream", async () => {
-    const controller = new AbortController();
+  it("abort 时静默结束（不抛错）", async () => {
+    const ctl = new AbortController();
+    ctl.abort();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_url: string, init: RequestInit) => {
-        const stream = new ReadableStream<Uint8Array>({
-          start(c) {
-            init.signal?.addEventListener("abort", () =>
-              c.error(new DOMException("aborted", "AbortError")),
-            );
-            c.enqueue(new Uint8Array([1, 2]));
-          },
-        });
-        controller.abort();
-        return new Response(stream, { status: 200 });
+      vi.fn(async () => {
+        throw Object.assign(new Error("aborted"), { name: "AbortError" });
       }),
     );
     await expect(
-      streamSpeech({ url: "http://h", ...CFG }, "hi", {
-        lang: LANG,
-        signal: controller.signal,
-        onChunk: () => {},
-      }),
+      streamSpeech("hi", { lang: LANG, signal: ctl.signal, onChunk: () => {} }),
     ).resolves.toBeUndefined();
   });
 
-  it("voice 为空则不带该字段，非空则原样透传", async () => {
-    const spy = vi.fn(async (_url: string, _init: RequestInit) => streamResponse([]));
-    vi.stubGlobal("fetch", spy);
-
-    await streamSpeech({ url: "http://h", key: "", voice: "v1" }, "hi", {
-      lang: LANG,
-      onChunk: () => {},
-    });
-    const withVoice = JSON.parse(
-      (spy.mock.calls[0][1] as RequestInit).body as string,
-    ) as Record<string, unknown>;
-    expect(withVoice.voice).toBe("v1");
-
-    spy.mockClear();
-    await streamSpeech({ url: "http://h", key: "", voice: "" }, "hi", {
-      lang: LANG,
-      onChunk: () => {},
-    });
-    const without = JSON.parse(
-      (spy.mock.calls[0][1] as RequestInit).body as string,
-    ) as Record<string, unknown>;
-    expect("voice" in without).toBe(false);
+  it("请求体只带 input/lang（参考音频由后端管理）", async () => {
+    const calls: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        calls.push(JSON.parse(String(init?.body)));
+        return streamResponse([new Uint8Array([1, 2])]);
+      }),
+    );
+    await streamSpeech("你好", { lang: "ja", onChunk: () => {} });
+    expect(calls[0]).toEqual({ input: "你好", lang: "ja" });
   });
 });

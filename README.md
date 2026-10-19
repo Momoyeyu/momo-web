@@ -36,6 +36,44 @@ API 契约详见 `docs/backend-api.md`。
 - **checkpoint**：存档 / 读档，固定 120 个槽位（10 页滑轨），auto 槽为读档前的自动备份
 - **settings**：通用 / 模型（LLM·ASR·TTS·Embedding·形象）/ 记忆 / 拓展（MCP）
 
+## 语音
+
+- **ASR 默认内置**：SenseVoice-Small（int8）+ silero VAD，跑在 backend 进程内（中日英），无需外部服务。首次使用先下载模型：
+
+  ```bash
+  cd backend && uv run python scripts/download_asr_models.py   # ~240MB，落盘 backend/models/asr/
+  ```
+
+  模型缺失时设置页会提示「缺少模型」；也可在「模型」tab 把 ASR 切成**自定义（OpenAI 兼容）**，填 `whisper.cpp` / `Speaches` / `LocalAI` / `Groq` / `OpenAI` 的 base URL（`…/v1`）与模型名。
+- **TTS 由 backend 代理到 GPT-SoVITS api_v2**（`POST /api/tts/speech` → 上游 `POST /tts`，流式裸 PCM，采样率随模型 32k/48k 由响应头带回）：
+
+  ```bash
+  # 在跑 GPT-SoVITS 的机器上（如带 GPU 的笔记本）
+  python api_v2.py -a 0.0.0.0 -p 9880 -c GPT_SoVITS/configs/tts_infer.yaml
+  ```
+
+  设置页「模型 → TTS」填服务地址（`http://<host>:9880`）、参考音频的服务端路径、以及参考音频对应的文本（留空则免参考文本合成）。
+- LLM 仅支持 OpenAI 兼容接口（`POST /v1/chat/completions`）。
+
+## 语音
+
+- **ASR 默认内置**：SenseVoice-Small（int8）+ silero VAD，跑在 backend 进程内（中日英），无需外部服务。首次使用先下载模型：
+
+  ```bash
+  cd backend && uv run python scripts/download_asr_models.py   # ~240MB，落盘 backend/models/asr/
+  ```
+
+  模型缺失时设置页会提示「缺少模型」；也可在「模型」tab 把 ASR 切成**自定义（OpenAI 兼容）**，填 `whisper.cpp` / `Speaches` / `LocalAI` / `Groq` / `OpenAI` 的 base URL（`…/v1`）与模型名。
+- **TTS 由 backend 代理到 GPT-SoVITS api_v2**（`POST /api/tts/speech` → 上游 `POST /tts`，流式裸 PCM，采样率随模型 32k/48k 由响应头带回）：
+
+  ```bash
+  # 在跑 GPT-SoVITS 的机器上（如带 GPU 的笔记本）
+  python api_v2.py -a 0.0.0.0 -p 9880 -c GPT_SoVITS/configs/tts_infer.yaml
+  ```
+
+  设置页「模型 → TTS」填服务地址（`http://<host>:9880`）、参考音频的服务端路径、以及参考音频对应的文本（留空则免参考文本合成）。
+- LLM 仅支持 OpenAI 兼容接口（`POST /v1/chat/completions`）。
+
 ## 验证
 
 ```bash

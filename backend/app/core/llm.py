@@ -57,6 +57,7 @@ def chat_completion(
     try:
         resp = httpx.post(
             f"{url}/v1/chat/completions",
+            trust_env=False,
             json=payload,
             headers=headers,
             timeout=TIMEOUT,
@@ -121,6 +122,7 @@ def chat_stream(
         with httpx.stream(
             "POST",
             f"{url}/v1/chat/completions",
+            trust_env=False,
             json=payload,
             headers=headers,
             timeout=TIMEOUT,

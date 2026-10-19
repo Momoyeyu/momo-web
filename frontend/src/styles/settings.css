@@ -204,6 +204,8 @@
 /* 模型配置页内分块标题（LLM/ASR/TTS）。 */
 .opt-group {
   margin: 22px 4px 4px;
+  display: flex;
+  align-items: center;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.18em;
@@ -644,4 +646,24 @@
   .settings-track {
     transition: none;
   }
+}
+
+/* URL 有问题时，测试按钮变成警示图标：禁用态默认会降到 45% 透明，
+   那样图标几乎看不见——这里保持不透明并用警示色。 */
+.probe-btn.probe-warn,
+.probe-btn.probe-warn:disabled {
+  opacity: 1;
+  color: var(--danger-text, #e8756a);
+  border-color: var(--danger-line, rgba(232, 117, 106, 0.45));
+  cursor: default;
+}
+
+/* 参考音频：文件名占一行（超长省略），右侧上传按钮 */
+.ref-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
 }

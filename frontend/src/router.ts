@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-type Route = "title" | "chat" | "settings" | "backlog" | "checkpoint";
+export type Route = "title" | "chat" | "settings" | "backlog" | "checkpoint";
 
 /** 存档页模式：入口决定（对话工具条「存档/读档」、标题菜单「读档」）。 */
 export type CheckpointMode = "save" | "load";

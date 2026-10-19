@@ -49,10 +49,10 @@ export default function ExtensionsTab() {
 
   // 检索 + 分页（与 Live2D 面板同构：过滤命中集分页，索引映射回原清单）
   const extHits = settings.extensions
-  .map((ext, i) => ({ ext, i }))
-  .filter(({ ext }) =>
-  (ext.name || "").toLowerCase().includes(extQuery.trim().toLowerCase()),
-  );
+    .map((ext, i) => ({ ext, i }))
+    .filter(({ ext }) =>
+      (ext.name || "").toLowerCase().includes(extQuery.trim().toLowerCase()),
+    );
   const extPg = clampPage(extPage, extHits.length, CARD_PAGE_SIZE);
   const extSlice = extHits.slice(
   extPg.page * CARD_PAGE_SIZE,
@@ -122,89 +122,87 @@ export default function ExtensionsTab() {
 
   return (
     <>
-              /* 双栏：左 Live2D（原「形象」tab 唯一剩下的配置）、右 MCP 拓展 */
-              <div className="settings-cols">
-              <section className="panel panel-stack">
-              <h3 className="opt-group">
-              {t("settings.groups.avatar")}
-              <span className="req">*</span>
-              </h3>
-              <AvatarPanel />
-              </section>
-              <section className="panel panel-stack settings-col ext-panel">
-                  <div className="panel-title-row">
-                    <h3 className="opt-group">
-                      {t("settings.groups.extensions")}
-                    </h3>
-                    <Hint text={t("settings.extHint")} side="down" />
-                  </div>
-                  <div className="list-toolbar">
-                  <input
-                  className="list-search"
-                  placeholder={t("settings.extSearchPh")}
-                  value={extQuery}
-                  onChange={(e) => {
-                  setExtQuery(e.target.value);
-                  setExtPage(0);
-                  }}
-                  />
-                  <IconButton
-                  icon="plus"
-                  label={t("settings.extAdd")}
-                  tip={t("settings.extAdd")}
-                  onClick={() => setExtEditing(-1)}
-                  />
-                  </div>
-                  <div className="list-body">
-                  {extSlice.length === 0 && (
-                  <p className="muted">{t("settings.extEmpty")}</p>
-                  )}
-                  {extSlice.map(({ ext, i }) => (
-                  <div className="list-item ext-row" key={i}>
-                        <span className="ext-name">
-                          {ext.name || t("settings.extUnnamed")}
-                        </span>
-                        <span className="ext-badge">{ext.transport}</span>
-                        <Switch
-                          on={ext.enabled}
-                          onChange={(v) =>
-                            patchExtensions(
-                              settings.extensions.map((x, j) =>
-                                j === i ? { ...x, enabled: v } : x,
-                              ),
-                            )
-                          }
-                        />
-                        {extDot(i, ext)}
-<IconButton
-                            icon="edit"
-                            size="sm"
-                            label={t("common.edit")}
-                            tip={t("common.edit")}
-                            onClick={() => setExtEditing(i)}
-                          />
-                          <IconButton
-                            icon="trash"
-                            size="sm"
-                            danger
-                            label={t("common.del")}
-                            tip={t("common.del")}
-                            onClick={() =>
-                              patchExtensions(
-                                settings.extensions.filter((_, j) => j !== i),
-                              )
-                            }
-                          />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="col-foot">
-                    <div className="list-foot">
-                      <Pager page={extPg.page} pages={extPg.pages} onChange={setExtPage} />
-                    </div>
-                  </div>
-                </section>
-                </div>
+      {/* 双栏：左 Live2D（原「形象」tab 唯一剩下的配置）、右 MCP 拓展 */}
+      <div className="settings-cols">
+        <section className="panel panel-stack">
+          <h3 className="opt-group">
+            {t("settings.groups.avatar")}
+            <span className="req">*</span>
+          </h3>
+          <AvatarPanel />
+        </section>
+        <section className="panel panel-stack settings-col ext-panel">
+          <div className="panel-title-row">
+            <h3 className="opt-group">{t("settings.groups.extensions")}</h3>
+            <Hint text={t("settings.extHint")} side="down" />
+          </div>
+          <div className="list-toolbar">
+            <input
+              className="list-search"
+              placeholder={t("settings.extSearchPh")}
+              value={extQuery}
+              onChange={(e) => {
+                setExtQuery(e.target.value);
+                setExtPage(0);
+              }}
+            />
+            <IconButton
+              icon="plus"
+              label={t("settings.extAdd")}
+              tip={t("settings.extAdd")}
+              onClick={() => setExtEditing(-1)}
+            />
+          </div>
+          <div className="list-body">
+            {extSlice.length === 0 && (
+              <p className="muted">{t("settings.extEmpty")}</p>
+            )}
+            {extSlice.map(({ ext, i }) => (
+              <div className="list-item ext-row" key={i}>
+                <span className="ext-name">
+                  {ext.name || t("settings.extUnnamed")}
+                </span>
+                <span className="ext-badge">{ext.transport}</span>
+                <Switch
+                  on={ext.enabled}
+                  onChange={(v) =>
+                    patchExtensions(
+                      settings.extensions.map((x, j) =>
+                        j === i ? { ...x, enabled: v } : x,
+                      ),
+                    )
+                  }
+                />
+                {extDot(i, ext)}
+                <IconButton
+                  icon="edit"
+                  size="sm"
+                  label={t("common.edit")}
+                  tip={t("common.edit")}
+                  onClick={() => setExtEditing(i)}
+                />
+                <IconButton
+                  icon="trash"
+                  size="sm"
+                  danger
+                  label={t("common.del")}
+                  tip={t("common.del")}
+                  onClick={() =>
+                    patchExtensions(
+                      settings.extensions.filter((_, j) => j !== i),
+                    )
+                  }
+                />
+              </div>
+            ))}
+          </div>
+          <div className="col-foot">
+            <div className="list-foot">
+              <Pager page={extPg.page} pages={extPg.pages} onChange={setExtPage} />
+            </div>
+          </div>
+        </section>
+      </div>
       {/* 拓展配置弹窗：背景变暗，点背景/取消丢弃未保存内容 */}
       {extEditing !== null && (
         <ExtConfigModal

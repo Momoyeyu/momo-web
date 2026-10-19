@@ -9,15 +9,24 @@ export interface LlmConfig {
 
 /** ASR 端点（ws(s)://…[/v1/listen]，Deepgram 对齐流式）。 */
 export interface AsrConfig {
+  /** builtin = backend 内置 SenseVoice；openai = 任何 OpenAI 兼容 HTTP 端点。 */
+  mode: "builtin" | "openai";
+  /** openai 模式：base URL（http(s)://host/v1 或完整 /audio/transcriptions）。 */
   url: string;
   key: string;
+  /** openai 模式：模型名（OpenAI 官方要 whisper-1；自托管多为任意值）。 */
+  model: string;
 }
 
-/** TTS 端点（http(s)://…，POST /v1/audio/speech，OpenAI 对齐）。 */
+/** TTS 端点：GPT-SoVITS api_v2 服务地址（前端统一走 backend 的 /api/tts/speech）。 */
 export interface TtsConfig {
+  /** GPT-SoVITS api_v2 的服务地址（如 http://127.0.0.1:9880）。 */
   url: string;
   key: string;
+  /** 参考音频的**服务端路径**（音色来源），如 GPT-SoVITS 里的 reference/xx.wav。 */
   voice: string;
+  /** 参考音频对应的文本；留空则 ref_free 合成（相似度略降）。 */
+  prompt: string;
   // 语言不在这里：TTS 合成语言跟随**对话语言**（settings.general.chatLang），
   // 由调用方按请求传入（见 services/ttsClient.ts 的 SpeakOptions.lang）。
 }

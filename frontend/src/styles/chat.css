@@ -1,9 +1,11 @@
 /* 对话页：底部视觉小说式对话框（铭牌 + 字幕 + 快捷栏 + 输入行），
    不遮挡 Live2D 人物主体。历史在 backlog 子页，不在本页展开。 */
 
-/* 对话区高度只在对话页生效（StageCanvas 用它定位人物底边）。
+/* 对话区高度：StageCanvas 用它定位人物底边。
+   无条件定义在 :root（不随 .chat-page 挂载出现/消失）——
+   否则切页瞬间可用高度变化，Live2D 会重算尺寸产生跳变。
    = 对话框高度 208 + 底部工具条 46。 */
-:root:has(.chat-page) {
+:root {
   --dialog-zone-h: 254px;
   --toolbar-h: 46px;
 }
@@ -103,6 +105,13 @@
   padding: 0 16px 18px;
   pointer-events: none;
   animation: dialog-rise 0.4s ease 0.05s both;
+}
+
+/* 入场转场期间压住对话框的浮动动画——「入戏」渐变（App 的 is-booting）
+   结束后再浮上来，否则路由切到 chat 的瞬间对话框就抢跑了。 */
+.page-wrap.is-booting .dialog-zone {
+  animation: none;
+  opacity: 0;
 }
 
 @keyframes dialog-rise {

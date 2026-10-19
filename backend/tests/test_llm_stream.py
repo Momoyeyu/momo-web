@@ -28,7 +28,7 @@ class _Resp:
 def _patch(monkeypatch, lines: list[str], status: int = 200) -> list[dict]:
     seen: list[dict] = []
 
-    def fake_stream(method, url, json=None, headers=None, timeout=None):
+    def fake_stream(method, url, json=None, headers=None, timeout=None, **kw):
         seen.append({"url": url, "payload": json, "headers": headers or {}})
         return _Resp(lines, status)
 
