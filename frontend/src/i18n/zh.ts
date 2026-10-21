@@ -1,6 +1,33 @@
 // 中文（基准字典——key 结构的单一来源，其他语言需与之同形）。
 
 export const zh = {
+  performance: {
+    label: "名称",
+    desc: "实际表现",
+    context: "适用语境",
+    raw: "原始",
+    composed: "组合",
+
+    progress: "预览进度",
+    previewItem: "预览 {name}",
+    resourceHint: "点击列表中的播放键预览。取消 AI 勾选后，仍可手动预览。",
+    unavailable: "形象预览暂不可用，请检查模型资源后重新打开。",
+    closeUp: "近景",
+    fullBody: "全身",
+    preview: "表演预览",
+    face: "当前表情",
+    neutral: "中性",
+    loading: "正在准备形象…",
+    demo: "播放演出示例",
+    reset: "恢复自然",
+    hint: "预览时暂停 AI 表演。恢复自然后继续跟随对话。",
+    trace: "演出追踪",
+    noCue: "还没有收到演出指令",
+    demoText: "你真的来了！不过，你刚才去哪儿了？我才没有一直等你呢。",
+    enabled: "允许 AI 使用",
+  },
+
+
   common: {
     backTitle: "返回标题",
     backChat: "返回对话",
@@ -201,7 +228,7 @@ export const zh = {
     errMissing: "模型描述文件引用的文件在 zip 中缺失",
     errStore: "模型保存失败（浏览器存储不可用）",
     resources: "表情与动作",
-    resHint: "给每项写一句含义描述，momo 会在对话中按描述自行选用。",
+    resHint: "名称便于辨认，实际表现写看到的动作，适用语境告诉 momo 何时选用。",
     expList: "表情",
     motionList: "动作",
     descPh: "含义（可选）",

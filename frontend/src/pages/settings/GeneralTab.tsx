@@ -159,6 +159,7 @@ export default function GeneralTab() {
   {/* 对话框实时预览：多句循环，逐字上屏 + 按切句速度换句 */}
   <div className="col-foot">
     <DialogPreview
+      lang={settings.general.chatLang === "auto" ? settings.general.lang : settings.general.chatLang}
       name={speakerName()}
       // 预览语言跟随「对话语言」：auto 回落到界面语言
       sample={tFor(

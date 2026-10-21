@@ -1,5 +1,13 @@
 /* ===== 自绘控件（统一设计语言：深底 + 香槟描边 + 暖白字）===== */
 
+.check-control { position: relative; display: inline-flex; flex: none; width: 20px; height: 20px; cursor: pointer; }
+.check-control input { position: absolute; inset: 0; margin: 0; width: 100%; height: 100%; opacity: 0; cursor: inherit; }
+.check-control > span { display: grid; place-items: center; width: 100%; height: 100%; border: 1px solid var(--line-strong); border-radius: var(--r-xs); background: var(--input-bg); color: transparent; pointer-events: none; }
+.check-control input:checked + span { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.check-control input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 3px; }
+.check-control input:disabled + span { opacity: 0.45; }
+
+
 /* --- 下拉选择 --- */
 
 .sel {
@@ -332,21 +340,12 @@
   cursor: default;
 }
 
-/* ===== Tip：通用 hover 浮窗——任意元素加 class="tip" + data-tip 即可 =====
-   默认在元素上方居中；tip-r 右缘对齐（向右下不挡左侧）、tip-l 左缘对齐。 */
-
-.tip {
-  position: relative;
-}
-
-.tip::after {
-  content: attr(data-tip);
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(100% + 8px);
+/* Tooltips are portaled to body, measured against the stage, and flipped at edges. */
+.tip { position: relative; }
+.tooltip-bubble {
+  position: fixed;
+  z-index: 100;
   width: max-content;
-  max-width: 240px;
   padding: 8px 10px;
   font-size: 12px;
   font-weight: 400;
@@ -358,33 +357,9 @@
   border-radius: var(--r-md);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
   white-space: normal;
+  overflow-wrap: anywhere;
   text-align: left;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 30;
-}
-
-.tip.tip-r::after {
-  left: auto;
-  right: 0;
-  transform: none;
-}
-
-.tip.tip-l::after {
-  left: 0;
-  transform: none;
-}
-
-.tip:hover::after,
-.tip:focus-visible::after {
-  opacity: 1;
-}
-
-/* 朝下弹的浮窗：元素贴在面板顶部时用（朝上会被滚动容器裁掉）。 */
-.tip.tip-b::after {
-  top: calc(100% + 8px);
-  bottom: auto;
 }
 
 /* 圈内问号（ui/Hint）：悬停/聚焦时给出解释。

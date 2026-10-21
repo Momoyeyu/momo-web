@@ -1,9 +1,15 @@
+import { SpeechMouth } from "./speechMouth";
+import { motionPlayback, type MotionPlaybackEntry, type PreviewPlayback } from "./previewPlayback";
 // pixi 舞台 + pixi-live2d-display（Cubism 4）模型加载。
 // pixi 锁 v7 = pixi-live2d-display@0.5.0-beta peer 范围；约定从全局读 PIXI。
 // Cubism Core 从官方 CDN 注入 <script>（可 VITE_MOMO_CUBISM_CORE_URL 覆盖）。
 // 参考 momo/app/web/src/live2d/stage.ts 但简化：安全区即全窗口，底边贴
 // 底部对话框区（CSS 变量 --dialog-zone-h）。
 
+import { ensureIdleGroup, parseExpression, reconcileResources, type ResourceCatalog, type RuntimeResource } from "./controlCatalog";
+import { ParameterMixer } from "./parameterMixer";
+import { PerformanceController } from "./performanceController";
+import type { PerformanceCue, PresentationSnapshot } from "./performanceTypes";
 import * as PIXI from "pixi.js";
 import { getAvatarId, getAvatars } from "../lib/store";
 import { getBlob } from "../lib/idb";
@@ -15,14 +21,14 @@ if (typeof window !== "undefined") {
 }
 
 const DEFAULT_CORE_URL =
-  "https://cubism.live2d.com/sdk-web/core/05/live2dcubismcore.min.js";
+  "/api/live2d/core";
 const DEFAULT_AVATAR_URL = "/live2d/hiyori/Hiyori.model3.json";
-const CORE_TIMEOUT_MS = 15000;
+const CORE_TIMEOUT_MS = 30000;
 const FALLBACK_DIALOG_ZONE_H = 140;
 /** 模型高度占可用高度（窗口高 - 对话框区）的比例。 */
 const MODEL_HEIGHT_FRAC = 0.85;
 /** 右侧留给面板/菜单：模型水平中心落在窗口宽度的偏左位置。 */
-const MODEL_CENTER_X_FRAC = 0.44;
+const MODEL_CENTER_X_FRAC = 0.5;
 
 let corePromise: Promise<void> | null = null;
 
@@ -87,12 +93,32 @@ interface ModelBounds {
 
 export class Live2DStage {
   private app: PIXI.Application | null = null;
+  private epoch = 0;
+  private actualAvatarId = "builtin";
+  private controller: PerformanceController | null = null;
+  private catalog: ResourceCatalog | null = null;
+  private neutralPose: Map<string, number> | null = null;
+  private speechMouth = new SpeechMouth();
+  private previewMode: "raw" | "composed" = "raw";
+  private closeUp = true;
+  private blinkAt = 0;
+  private tapTimer: ReturnType<typeof setTimeout> | undefined;
+  private requestedAvatar = "";
+  private chatHost: HTMLElement | null = null;
+  private chatVisible = false;
+  private previewHost: HTMLElement | null = null;
+  private previewAvatarId: string | null = null;
+  private previewLease = 0;
+  private chatCloseUp = true;
+  private viewportObserver: ResizeObserver | null = null;
+  private previewPlayback: { status: PreviewPlayback; entry?: MotionPlaybackEntry; expressionStarted?: number } | null = null;
+  private previewChannel: "expressions" | "motions" | null = null;
+
   // pixi-live2d-display 类型与其打包的 pixi 版本耦合，按 any 处理。
   private model: any = null;
   private bounds: ModelBounds | null = null;
   /** 加载中的 promise（去重并发/StrictMode 重复调用）。 */
   private loading: Promise<void> | null = null;
-  private modelUrl: string | null = null;
 
   /** 模型是否已加载（口型/情绪写参前置检查）。 */
   /** 初始化舞台（透明背景叠页面；canvas 全窗口）。幂等：同一 canvas 重复调用跳过。 */
@@ -115,67 +141,114 @@ export class Live2DStage {
     this.app.renderer.on("resize", () => this.fitModel());
   }
 
-  /** 加载模型（默认 /live2d/hiyori/Hiyori.model3.json）。幂等去重；失败 reject 由调用方降级。 */
-  async loadModel(url: string): Promise<void> {
-    if (!this.app) throw new Error("stage not initialized");
-    if (this.model && this.modelUrl === url) return;
-    if (this.loading) return this.loading;
-    this.loading = this.doLoad(() => url, url).finally(() => {
-      this.loading = null;
-    });
-    return this.loading;
+  /** One canvas/context/ticker; only its host and viewport change. */
+  setChatHost(host: HTMLElement): void {
+    this.chatHost = host;
+    if (!this.previewHost) this.attachViewport(host);
+  }
+  setChatVisible(visible: boolean): void {
+    this.chatVisible = visible;
+    if (!this.app) return;
+    const canvas = this.app.view as HTMLCanvasElement;
+    canvas.style.opacity = visible || this.previewHost ? "1" : "0";
+    canvas.style.pointerEvents = visible && !this.previewHost ? "auto" : "none";
+  }
+  private attachViewport(host: HTMLElement): void {
+    if (!this.app) return;
+    const canvas = this.app.view as HTMLCanvasElement;
+    host.appendChild(canvas);
+    this.viewportObserver?.disconnect();
+    this.app.resizeTo = host;
+    const resize = () => { this.app?.resize(); this.fitModel(); };
+    this.viewportObserver = new ResizeObserver(resize);
+    this.viewportObserver.observe(host);
+    resize();
+    this.setChatVisible(this.chatVisible);
+  }
+  openResourcePreview(host: HTMLElement, avatarId: string): { ready: Promise<void>; release: () => void } {
+    const lease = ++this.previewLease;
+    if (!this.previewHost) this.chatCloseUp = this.closeUp;
+    this.previewHost = host;
+    this.previewAvatarId = avatarId;
+    this.previewMode = "raw";
+    this.previewChannel = null;
+    this.previewPlayback = null;
+    this.closeUp = true;
+    clearTimeout(this.tapTimer);
+    this.controller?.previewExpression(null);
+    this.model?.internalModel?.motionManager.stopAllMotions();
+    this.restoreNeutralPose();
+    this.attachViewport(host);
+    const ready = this.app ? this.loadAvatar(avatarId).then(() => {
+      if (lease !== this.previewLease) return;
+      if (this.actualAvatarId !== avatarId) throw new Error("Preview model unavailable");
+      this.controller?.beginPreview();
+      this.fitModel();
+    }) : Promise.reject(new Error("Renderer unavailable"));
+    return { ready, release: () => {
+      if (lease !== this.previewLease) return;
+      this.previewLease++;
+      this.endPreview();
+      this.previewHost = null;
+      this.previewAvatarId = null;
+      this.previewChannel = null;
+      this.closeUp = this.chatCloseUp;
+      if (this.chatHost) this.attachViewport(this.chatHost);
+      void this.loadAvatar().catch(error => console.warn("Restore avatar:", error));
+    } };
   }
 
-  /**
-   * 按当前设置加载形象：内置（meta 缺失或 builtin 标记）→ URL；
-   * 导入模型 → IndexedDB zip → Live2DModel.from([File])
-   * （库内 ZipLoader+FileLoader 解包映射）。
-   * 导入模型加载失败 → 静默回退内置 Hiyori，不阻断聊天。
-   */
-  async loadAvatar(): Promise<void> {
+  /** 加载模型（默认 /live2d/hiyori/Hiyori.model3.json）。幂等去重；失败 reject 由调用方降级。 */
+  async loadModel(url: string): Promise<void> {
+    const epoch = ++this.epoch;
+    this.cancelPerformance(); this.catalog = null;
+    await this.doLoad(() => url, url, epoch, "builtin");
+  }
+
+  async loadAvatar(id = this.previewAvatarId ?? getAvatarId()): Promise<void> {
     if (!this.app) return;
-    const id = getAvatarId();
+    if (this.loading && this.requestedAvatar === id) return this.loading;
+    if (this.catalog && this.requestedAvatar === id) return;
+    this.requestedAvatar = id;
+    const epoch = ++this.epoch;
+    this.cancelPerformance(); this.catalog = null;
     const meta = getAvatars().find((a) => a.id === id);
-    if (!meta || meta.builtin) {
-      await this.loadModel(avatarModelUrl());
-      return;
-    }
-    const blob = await getBlob(id);
-    if (!blob) {
-      await this.loadModel(avatarModelUrl());
-      return;
-    }
-    const key = `avatar:${id}`;
-    if (this.model && this.modelUrl === key) return;
-    if (this.loading) return this.loading;
-    this.loading = this.doLoad(
-      async (mod) => makeAvatarSource(mod, blob, meta),
-      key,
-    )
-      .catch(() => this.doLoad(() => avatarModelUrl(), avatarModelUrl()))
-      .finally(() => {
-        this.loading = null;
-      });
+    this.loading = (async () => {
+      if (!meta || meta.builtin) return this.doLoad(() => avatarModelUrl(), avatarModelUrl(), epoch, "builtin");
+      try {
+        const blob = await getBlob(id);
+        if (!blob) throw new Error("Avatar archive missing");
+        await this.doLoad((mod) => makeAvatarSource(mod, blob, meta), `avatar:${id}`, epoch, id);
+      } catch (error) {
+        if (epoch !== this.epoch) return;
+        console.warn("Avatar fallback:", error);
+        await this.doLoad(() => avatarModelUrl(), avatarModelUrl(), epoch, "builtin");
+      }
+    })().finally(() => { if (epoch === this.epoch) this.loading = null; });
     return this.loading;
   }
 
   private async doLoad(
     makeSource: (mod: any) => unknown | Promise<unknown>,
-    key: string,
+    _key: string,
+    epoch: number,
+    avatarId: string,
   ): Promise<void> {
     await ensureCubismCore();
     const mod: any = await import("pixi-live2d-display/cubism4");
     mod.config.sound = false;
     wireZipLoader(mod);
     const source = await makeSource(mod);
-    const model = await mod.Live2DModel.from(source);
+    const model = await mod.Live2DModel.from(source, { idleMotionGroup: "MomoIdle" });
+    if (epoch !== this.epoch || !this.app) { model.destroy(); return; }
+    await this.configurePerformance(model, epoch, avatarId);
+    if (epoch !== this.epoch || !this.app) { model.destroy(); return; }
     if (this.model) {
       this.app?.stage.removeChild(this.model);
       this.model.destroy?.();
       this.model = null;
     }
     this.model = model;
-    this.modelUrl = key;
     const b = model.getLocalBounds();
     this.bounds = { x: b.x, y: b.y, width: b.width, height: b.height };
     this.app?.stage.addChild(model);
@@ -187,100 +260,201 @@ export class Live2DStage {
   private fitModel(): void {
     if (!this.app || !this.model || !this.bounds) return;
     const { screen } = this.app.renderer;
-    const dialogH = readCssNum("--dialog-zone-h", FALLBACK_DIALOG_ZONE_H);
+    const dialogH = this.previewHost ? 0 : readCssNum("--dialog-zone-h", FALLBACK_DIALOG_ZONE_H);
     const availH = Math.max(0, screen.height - dialogH);
     const b = this.bounds;
     if (b.width <= 0 || b.height <= 0 || availH <= 0) return;
-    const scale = (availH * MODEL_HEIGHT_FRAC) / b.height;
+    const scale = (availH * MODEL_HEIGHT_FRAC * (this.closeUp ? 1.8 : 1)) / b.height;
     this.model.scale.set(scale);
-    this.model.y = availH - (b.y + b.height) * scale;
+    this.model.y = availH - (b.y + b.height * (this.closeUp ? 0.6 : 1)) * scale;
     const cx = screen.width * MODEL_CENTER_X_FRAC;
     this.model.x = cx - (b.x + b.width / 2) * scale;
   }
 
-  /** 口型 0..1 → ParamMouthOpenY。 */
-  setMouthOpen(v: number): void {
-    const core = this.model?.internalModel?.coreModel;
-    if (!core || typeof core.setParameterValueById !== "function") return;
-    const clamped = Math.min(1, Math.max(0, v));
-    core.setParameterValueById("ParamMouthOpenY", clamped);
-  }
+  setCloseUp(value: boolean): void { this.closeUp = value; this.fitModel(); }
+  getCloseUp(): boolean { return this.closeUp; }
 
-  /** 表情资源名清单（AvatarMeta.resources；无表情文件 → 空集）。 */
-  private expressionNames(): Set<string> {
-    const names = new Set<string>();
-    const list = this.model?.internalModel?.settings?.expressions;
-    for (const e of Array.isArray(list) ? list : []) {
-      const n =
-        typeof e === "object" && e !== null
-          ? ((e as { Name?: unknown }).Name ?? (e as { name?: unknown }).name)
-          : e;
-      if (typeof n === "string" && n) names.add(n);
+  /** All mouth writes occur in the same frame hook as expressions and blinking. */
+  setMouthOpen(v: number, active = v > 0): void { this.speechMouth.set(v, active, performance.now()); }
+
+  private async configurePerformance(model: any, epoch: number, avatarId: string): Promise<void> {
+    const internal = model.internalModel;
+    const core = internal.coreModel;
+    const params = core.getModel().parameters;
+    const ids = new Set<string>(Array.from(params.ids));
+    const definitions = (await Promise.all((internal.settings.expressions ?? []).map(async (entry: { Name: string; File: string }) => {
+      try {
+        const response = await fetch(internal.settings.resolveURL(entry.File));
+        if (!response.ok) throw new Error("Expression resource unavailable");
+        return parseExpression(entry.Name, await response.json(), ids);
+      } catch (error) { console.warn("Expression disabled:", entry.Name, error); return null; }
+    }))).filter((x): x is NonNullable<typeof x> => x !== null);
+    const motions: RuntimeResource[] = [];
+    const groups = internal.settings.motions ?? {};
+    // Imported models get a neutral, single-resource idle group; no full random emotion group.
+    ensureIdleGroup(groups, internal.motionManager.motionGroups, avatarId === "builtin" ? "motions/Hiyori_m01.motion3.json" : undefined);
+    await Promise.all(Object.entries(groups).filter(([g]) => g !== "MomoIdle").flatMap(([group, entries]) =>
+      (entries as unknown[]).map(async (_, index) => {
+        try {
+          const motion = await internal.motionManager.loadMotion(group, index);
+          if (!motion) return;
+          const fileName = (entries as { File: string }[])[index].File;
+          const alias = `${group}/${index}`;
+          const existing = motions.find(m => m.name === fileName);
+          if (existing) existing.aliases.push(alias);
+          else motions.push({ name: fileName, fileName, group, index, aliases: [alias],
+            duration: (() => { const d = motion.getDuration() > 0 ? motion.getDuration() : motion.getLoopDuration(); return Number.isFinite(d) && d > 0 && d <= 3600 ? d : undefined; })(),
+            parameterIds: (motion._motionData?.curves ?? []).filter((c: any) => c.type === 1).map((c: any) => c.id) });
+        }
+        catch (error) { console.warn("Motion disabled:", group, index, error); }
+      })));
+    if (epoch !== this.epoch) return;
+    // Hiyori's authored neutral arms differ from moc default values. Reset to
+    // its verified idle's first frame; imported models keep their own defaults.
+    this.neutralPose = null;
+    if (avatarId === "builtin") {
+      const neutral = motions.find(m => m.name === "motions/Hiyori_m01.motion3.json");
+      const data = neutral ? internal.motionManager.motionGroups[neutral.group!][neutral.index!]?._motionData : null;
+      if (data) this.neutralPose = new Map(data.curves.filter((c: any) => c.type === 1 && ids.has(c.id)).map((c: any) =>
+        [c.id, data.points[data.segments[c.baseSegmentIndex].basePointIndex].value]));
     }
-    return names;
-  }
-
-  /** 动作组清单（settings.motions：group → 数组长度）。 */
-  private motionGroups(): Record<string, number> {
-    const out: Record<string, number> = {};
-    const motions = this.model?.internalModel?.settings?.motions;
-    if (motions && typeof motions === "object") {
-      for (const [g, items] of Object.entries(motions)) {
-        out[g] = Array.isArray(items) ? items.length : 0;
+    const mixer = new ParameterMixer();
+    const controller = new PerformanceController(definitions, mixer, async (id) => {
+      if (epoch !== this.epoch || this.model !== model) return false;
+      const resource = motions.find(m => m.name === id || m.aliases.includes(id));
+      if (!resource) return false;
+      const playback = this.previewHost && this.previewChannel === "motions" ? this.previewPlayback : null;
+      try {
+        const played = await model.motion(resource.group, resource.index, 3);
+        if (playback && playback === this.previewPlayback && epoch === this.epoch) {
+          // Keep the entry after the SDK removes it from its queue on completion.
+          playback.entry = played ? internal.motionManager.queueManager._motions.at(-1) : undefined;
+          playback.status = { phase: played && playback.entry ? "playing" : "failed", progress: 0 };
+        }
+        return played;
+      } catch (error) {
+        if (playback === this.previewPlayback && playback) playback.status = { phase: "failed", progress: 0 };
+        throw error;
       }
-    }
-    return out;
+    });
+    internal.motionManager.expressionManager = undefined;
+    internal.eyeBlink = undefined;
+    this.controller = controller;
+    if (this.previewHost) controller.beginPreview();
+    this.actualAvatarId = avatarId;
+    this.catalog = {
+      expressions: definitions.map(d => ({ name: d.name,
+        fileName: internal.settings.expressions.find((e: any) => e.Name === d.name).File,
+        aliases: [], parameterIds: d.parameters.map((p: { id: string }) => p.id) })),
+      motions: motions.sort((a,b) => a.name.localeCompare(b.name)),
+    };
+    const state = internal.motionManager.state;
+    const requestIdle = state.shouldRequestIdleMotion;
+    state.shouldRequestIdleMotion = () => !this.previewHost && requestIdle.call(state);
+    const eyes = (internal.settings.getEyeBlinkParameters?.() ?? []).filter((id: string) => ids.has(id));
+    const eyeIds = eyes.length ? eyes : ["ParamEyeLOpen", "ParamEyeROpen"].filter((id) => ids.has(id));
+    this.blinkAt = performance.now() + 3000;
+    internal.on("beforeModelUpdate", () => {
+      if (epoch !== this.epoch) return;
+      const now = performance.now();
+      const elapsed = now - this.blinkAt;
+      let blink = 1;
+      if (elapsed >= 0 && elapsed <= 180) blink = Math.abs(elapsed - 90) / 90;
+      else if (elapsed > 180) this.blinkAt = now + 2800 + Math.random() * 2500;
+      const raw = this.previewHost && this.previewMode === "raw";
+      const motion = this.catalog?.motions.find(m => m.aliases.includes(`${state.currentGroup}/${state.currentIndex}`));
+      // Authored eye animation owns its parameters; procedural blinks only fill gaps.
+      const blinkEyes = raw ? [] : eyeIds.filter((id: string) => !motion?.parameterIds.includes(id));
+      const mouth = this.previewHost ? { value: 0, weight: 0 } : this.speechMouth.sample(now);
+      if (!(raw && this.previewChannel === "motions")) {
+        mixer.apply(core, now, { eyes: blinkEyes, blink, mouthId: ids.has("ParamMouthOpenY") ? "ParamMouthOpenY" : undefined,
+          mouth: mouth.value, mouthWeight: mouth.weight });
+      }
+      for (let i = 0; i < params.count; i++) {
+        const value = core.getParameterValueById(params.ids[i]);
+        core.setParameterValueById(params.ids[i], Math.max(params.minimumValues[i], Math.min(params.maximumValues[i], value)));
+      }
+    });
   }
 
-  /** <exp>名称</exp>：切换表情。清单外丢弃；持续到 resetExpression。 */
-  setExpression(name: string): void {
-    if (!this.model || !this.expressionNames().has(name)) return;
-    try {
-      void this.model.expression(name)?.catch?.(() => {});
-    } catch {
-      // 表情资源缺失等：静默
-    }
+  getPresentation(includeDisabled = false): PresentationSnapshot | null {
+    if (!this.catalog || !this.controller) return null;
+    const resources = getAvatars().find((a) => a.id === this.actualAvatarId)?.resources;
+    const merged = reconcileResources(this.catalog, resources);
+    const entries = (kind: "expressions" | "motions") => merged[kind]
+      .filter(r => includeDisabled || r.enabled !== false)
+      .map(r => ({ name: r.name, desc: r.desc, label: r.label, context: r.context,
+        ...(kind === "motions" ? { duration: this.catalog!.motions.find(m => m.name === r.name)?.duration } : {}) }));
+    const expressions = entries("expressions");
+    const state = this.controller.state;
+    return { avatarId: this.actualAvatarId, revision: String(this.epoch), expressions, motions: entries("motions"),
+      expressionState: expressions.some((e) => e.name === state.name) ? { ...state } : { name: null, intensity: 0 } };
   }
-
-  /** <motion>组名/序号</motion>：播放一次后交回 Idle。清单外丢弃。 */
-  playMotion(id: string): void {
-    if (!this.model) return;
-    const m = /^(.*)\/(\d+)$/.exec(id.trim());
-    if (!m) return;
-    const groups = this.motionGroups();
-    const index = Number(m[2]);
-    if (!(m[1] in groups) || index >= groups[m[1]]) return;
-    try {
-      void this.model.motion(m[1], index)?.catch?.(() => {});
-    } catch {
-      // 动作资源缺失等：静默
-    }
+  getResourceCatalog(): ResourceCatalog | null { return this.catalog; }
+  setPreviewMode(mode: "raw" | "composed"): void { this.previewMode = mode; }
+  beginPerformance(turnId: string): void { this.controller?.beginTurn(turnId); }
+  endPerformance(turnId: string): void { this.controller?.endTurn(turnId); }
+  applyCue(cue: PerformanceCue, turnId: string, revision: string): void {
+    const snapshot = this.getPresentation();
+    if (!snapshot || snapshot.revision !== revision) { this.controller?.record(cue.id, "stale-model"); return; }
+    const next = { ...cue };
+    if (next.expression && !snapshot.expressions.some((e) => e.name === next.expression!.name)) { this.controller?.record(cue.id, "expression-unavailable"); delete next.expression; }
+    if (next.motion && !snapshot.motions.some((m) => m.name === next.motion)) { this.controller?.record(cue.id, "motion-unavailable"); delete next.motion; }
+    if (!("expression" in next) && !next.motion) return;
+    this.controller?.apply(next, turnId);
   }
-
-  /** 回合结束复位表情（回默认 expression）。 */
-  resetExpression(): void {
-    try {
-      this.model?.internalModel?.motionManager?.expressionManager?.resetExpression?.();
-    } catch {
-      // 模型无表情通道：静默
-    }
+  private restoreNeutralPose(): void {
+    const core = this.model?.internalModel?.coreModel;
+    if (!core) return;
+    const parameters = core.getModel().parameters;
+    for (let i = 0; i < parameters.count; i++) core.setParameterValueById(parameters.ids[i], this.neutralPose?.get(parameters.ids[i]) ?? parameters.defaultValues[i]);
+    core.saveParameters();
   }
-
-  /** 轻拍：按约定组名播放（TapBody），缺失静默。 */
+  previewExpression(name: string | null): void {
+    clearTimeout(this.tapTimer);
+    if (this.previewHost) { this.previewPlayback = name ? { status: { phase: "playing", progress: 0 }, expressionStarted: performance.now() } : null; this.previewChannel = "expressions"; this.model?.internalModel?.motionManager.stopAllMotions(); this.restoreNeutralPose(); }
+    this.controller?.previewExpression(name);
+  }
+  previewMotion(id: string): void {
+    clearTimeout(this.tapTimer);
+    if (this.previewHost) { this.previewPlayback = { status: { phase: "loading", progress: 0 } }; this.previewChannel = "motions"; if (this.previewMode === "raw") { this.controller?.previewExpression(null); this.restoreNeutralPose(); } }
+    this.controller?.previewMotion(id);
+  }
+  resetResourcePreview(): void { this.endPreview(); this.restoreNeutralPose(); this.previewChannel = null; if (this.previewHost) this.controller?.beginPreview(); }
+  endPreview(): void { this.previewPlayback = null; if (!this.controller?.previewActive) return; this.controller.endPreview(); this.model?.internalModel?.motionManager.stopAllMotions(); }
+  getPreviewPlayback(): PreviewPlayback | null {
+    const playback = this.previewPlayback;
+    if (!playback) return null;
+    if (playback.entry) return motionPlayback(playback.entry);
+    if (playback.expressionStarted !== undefined) {
+      const progress = Math.min(1, Math.max(0, (performance.now() - playback.expressionStarted) / 250));
+      return { phase: progress === 1 ? "finished" : "playing", progress };
+    }
+    return playback.status;
+  }
+  getPerformanceTrace() { return this.controller?.trace ?? []; }
+  cancelPerformance(): void { this.previewPlayback = null; clearTimeout(this.tapTimer); this.controller?.cancel(); this.speechMouth.clear(); this.model?.internalModel?.motionManager.stopAllMotions(); }
   tap(): void {
-    if (!this.model || !("TapBody" in this.motionGroups())) return;
-    try {
-      void this.model.motion("TapBody")?.catch?.(() => {});
-    } catch {
-      // 静默
-    }
+    if (this.previewHost) return;
+    clearTimeout(this.tapTimer);
+    const epoch = this.epoch;
+    const motion = this.catalog?.motions.find(m => m.aliases.includes("TapBody/0"));
+    if (motion) this.previewMotion(motion.name);
+    this.tapTimer = setTimeout(() => { if (epoch === this.epoch) this.endPreview(); }, 1200);
   }
 
   dispose(): void {
+    this.viewportObserver?.disconnect(); this.viewportObserver = null;
+    this.previewLease++;
+    this.previewHost = null; this.previewAvatarId = null; this.chatHost = null;
+    this.epoch++;
+    this.cancelPerformance();
+    this.catalog = null;
+    this.controller = null;
+    this.requestedAvatar = "";
     this.loading = null;
     this.model = null;
     this.bounds = null;
-    this.modelUrl = null;
     if (this.app) {
       // removeView=false：canvas 归 React 管，不从 DOM 移除。
       this.app.destroy(false, { children: true });

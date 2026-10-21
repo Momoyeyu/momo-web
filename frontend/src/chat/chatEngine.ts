@@ -11,7 +11,7 @@ import { TtsPlayer } from "../audio/player";
 import { getStage } from "../live2d/stage";
 import type { Live2DStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
-import { getAvatarId, getAvatars, getSettings, newId, subscribe } from "../lib/store";
+import { getSettings, newId, subscribe } from "../lib/store";
 import type {
   ChatMessage,
   ChatStatus,
@@ -20,13 +20,9 @@ import type {
 } from "../lib/types";
 import { resolveChatLang } from "../i18n";
 import { streamSpeech } from "../services/ttsClient";
-import {
-  chat,
-  interrupt as sendInterrupt,
-  type SentenceDir,
-} from "../services/chatClient";
-import { dueDirs, dirAllowed } from "./directives";
-import type { PendingDir } from "./directives";
+import { chat, interrupt as sendInterrupt } from "../services/chatClient";
+import type { PerformanceCue, PresentationSnapshot } from "../live2d/performanceTypes";
+import { dueCues } from "./cueScheduler";
 import { charsPerSec, dwellMs, sentencePauseMs } from "./pacing";
 
 interface ChatEngineEvents {
@@ -59,9 +55,9 @@ interface SentItem {
   text: string;
   tts: TtsItem | null;
   /** 本句附着的表情/动作指令，按到达顺序。 */
-  dirs: PendingDir[];
-  /** 已触发游标：dirs[0..dirIdx) 已派发。 */
-  dirIdx: number;
+  cues: PerformanceCue[];
+  /** 已触发游标：cues[0..cueIdx) 已派发。 */
+  cueIdx: number;
 }
 
 /** 逐字播放状态机：句为最小播放单元。 */
@@ -79,11 +75,13 @@ interface DisplayState {
 }
 
 interface Turn {
+  presentation: PresentationSnapshot | null;
   id: string;
   abort: AbortController;
   /** 只杀 TTS 合成不杀 LLM：静音时 abort 在途 speech 请求并跳过新句子。 */
   audioAbort: AbortController;
   userText: string;
+  userMessageId: string;
   /** assistant 已产出全文（打断按此落账）。 */
   text: string;
   llmDone: boolean;
@@ -105,14 +103,6 @@ interface Turn {
 
 const INTERRUPT_DEBOUNCE_MS = 300;
 const DISPLAY_TICK_MS = 40;
-
-/** 句事件里的指令 → 展示层用的 PendingDir；清单外的静默丢弃。 */
-function filterDirs(
-  dirs: SentenceDir[],
-  res: Parameters<typeof dirAllowed>[2],
-): PendingDir[] {
-  return dirs.filter((d) => dirAllowed(d.kind, d.name, res));
-}
 
 function toError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e));
@@ -149,7 +139,7 @@ export class ChatEngine {
     this.applyVolume();
     this.unsubVolume = subscribe(() => this.applyVolume());
     this.player.onMouthOpen = (v) =>
-      this.tryStage((s) => s.setMouthOpen(v));
+      this.tryStage((s) => s.setMouthOpen(v, this.player.playing));
     this.player.onDrain = () => {
       const t = this.turn;
       if (t) this.maybeFinish(t);
@@ -225,6 +215,7 @@ export class ChatEngine {
    * assistant 的末句，无则空。调用方负责 bumpTranscript 通知订阅者。
    */
   loadHistory(messages: CheckpointMessage[]): void {
+    this.tryStage((st) => st.cancelPerformance());
     if (this.turn) this.interruptNow(false);
     this.safe(() => this.player.stop());
     this.history.length = 0;
@@ -283,10 +274,12 @@ export class ChatEngine {
     this.events.onUserMessage(userMsg);
 
     const turn: Turn = {
+      presentation: null,
       id: newId("m"),
       abort: new AbortController(),
       audioAbort: new AbortController(),
       userText: trimmed,
+      userMessageId: userMsg.id,
       text: "",
       llmDone: false,
       finished: false,
@@ -300,6 +293,7 @@ export class ChatEngine {
       timer: 0,
     };
     this.turn = turn;
+    this.tryStage((st) => { st.beginPerformance(turn.id); turn.presentation = st.getPresentation(); });
     this.lastDisplay = "";
     turn.timer = setInterval(() => this.displayTick(turn), DISPLAY_TICK_MS);
     this.events.onAssistantStart(turn.id);
@@ -407,6 +401,7 @@ export class ChatEngine {
   interrupt(): void {
     if (!this.turn) {
       this.safe(() => this.player.stop());
+      this.tryStage((st) => st.cancelPerformance());
       return;
     }
     const now = Date.now();
@@ -434,8 +429,9 @@ export class ChatEngine {
       .map((s) => s.text);
     const active = turn.sentences[turn.disp.idx];
     const cur = active ? active.text : "";
-    const n = Math.min(cur.length, Math.floor(turn.disp.reveal));
-    if (n > 0) parts.push(cur.slice(0, n));
+    const units = Array.from(cur);
+    const n = Math.min(units.length, Math.floor(turn.disp.reveal));
+    if (n > 0) parts.push(units.slice(0, n).join(""));
     return parts.join("");
   }
 
@@ -477,27 +473,18 @@ export class ChatEngine {
       this.events.onAssistantDone(msg);
     }
     // 表情是回合内状态：回合中止/结束统一复位。
-    this.tryStage((st) => st.resetExpression());
+    this.tryStage((st) => st.cancelPerformance());
     this.setPhase("idle");
     return done;
   }
 
   private async runTurn(turn: Turn, cfg: Settings, userText: string): Promise<void> {
-    // 清单校验：指令值不在当前形象资源清单中 → 静默丢弃。
-    // 回合开始取一次快照，与注入提示词的清单同源；清单缺失时不拦（stage 兜底）。
-    const resources = getAvatars().find(
-      (a) => a.id === getAvatarId(),
-    )?.resources;
-
-    // LLM 调用与切句都在 backend（system prompt/历史/记忆工具/句边界由它负责），
-    // 前端只发本回合文本、收逐句事件。句事件自带 dirs（含句内偏移），
-    // 因此这里不再需要指令流式解析，也不再持有「未断句尾部」。
     try {
-      for await (const ev of chat(userText, turn.abort.signal)) {
+      for await (const ev of chat(userText, turn.abort.signal, turn.presentation)) {
         if (this.turn !== turn) return; // 已被打断
         if (ev.t === "sentence") {
           turn.text += ev.text;
-          this.pushSentence(turn, cfg, ev.text, filterDirs(ev.dirs, resources));
+          this.pushSentence(turn, cfg, ev.text, ev.cues);
         } else if (ev.t === "error") {
           throw new ServiceError("llm", "http", 0, ev.message);
         }
@@ -506,6 +493,12 @@ export class ChatEngine {
       if (this.turn === turn) this.events.onError(toError(err));
     }
     if (this.turn !== turn) return; // 已被打断，已落句子由 interruptNow 对齐
+    if (!turn.text.trim()) {
+      // A send is provisional until a real reply arrives. Remove by identity,
+      // not text: retries may contain exactly the same words as earlier turns.
+      const index = this.history.findIndex((m) => m.id === turn.userMessageId);
+      if (index >= 0) this.history.splice(index, 1);
+    }
     turn.llmDone = true;
     this.maybeFinish(turn);
   }
@@ -515,11 +508,12 @@ export class ChatEngine {
     turn: Turn,
     cfg: Settings,
     sentence: string,
-    dirs: PendingDir[],
+    cues: PerformanceCue[],
   ): void {
     if (turn.finished) return;
-    const item: SentItem = { text: sentence, tts: null, dirs, dirIdx: 0 };
+    const item: SentItem = { text: sentence, tts: null, cues, cueIdx: 0 };
     turn.sentences.push(item);
+    if (!sentence) return; // Ordered control-only units never enter history or speech.
     // 句落账即进转写：**流式期间 backlog 就能看到这一句**，不必等回合结束。
     // id 用「回合 id + 句序」，与重载后按行重建的转写形态一致。
     const msg: ChatMessage = {
@@ -619,7 +613,8 @@ export class ChatEngine {
     const fullText = active.text;
 
     // 逐字上屏：受文字速度封顶，不超过已产出长度。
-    const target = fullText.length;
+    const units = Array.from(fullText);
+    const target = units.length;
     if (turn.disp.reveal < target) {
       const rate = charsPerSec(g.textSpeed);
       turn.disp.reveal =
@@ -628,7 +623,7 @@ export class ChatEngine {
           : Math.min(target, turn.disp.reveal + rate * (DISPLAY_TICK_MS / 1000));
       if (turn.disp.reveal >= target) turn.disp.doneAt = now;
     }
-    const shown = fullText.slice(0, Math.floor(turn.disp.reveal));
+    const shown = units.slice(0, Math.floor(turn.disp.reveal)).join("");
     if (shown !== turn.disp.emitted) {
       turn.disp.emitted = shown;
       this.lastDisplay = shown;
@@ -636,12 +631,9 @@ export class ChatEngine {
       if (shown && this.phase === "thinking") this.setPhase("speaking");
     }
 
-    // 展示游标越过指令位置才派发（offset 越界收敛到句尾；句中途可切换）。
-    const due = dueDirs(active.dirs, active.dirIdx, turn.disp.reveal, target);
-    while (active.dirIdx < due) {
-      this.fireDir(active.dirs[active.dirIdx]);
-      active.dirIdx += 1;
-    }
+    const due = dueCues(active.cues, active.cueIdx, turn.disp.reveal, target);
+    active.cueIdx = due.next;
+    for (const cue of due.cues) this.fireCue(cue, turn);
 
     // 完整句的播完判定：TTS 开 = 音频播完；TTS 关/本句无音频 = 上屏完 + 按句长驻留。
     const tts = active.tts;
@@ -650,29 +642,15 @@ export class ChatEngine {
     if (hasAudio && tts) {
       const audioDone =
         tts.done && turn.pushIndex > turn.disp.idx && !this.playerPlaying();
-      if (audioDone) {
-        // 音频播完即本句播完：未上完的字一次补齐再切句。
-        if (turn.disp.reveal < target) {
-          turn.disp.reveal = target;
-          turn.disp.emitted = fullText;
-          this.lastDisplay = fullText;
-          this.events.onDisplay(fullText);
-        }
-        ended = true;
-      }
+      ended = audioDone && turn.disp.reveal >= target;
     } else if (
-      turn.disp.doneAt > 0 &&
+      target === 0 || turn.disp.doneAt > 0 &&
       now - turn.disp.doneAt >= dwellMs(g.sentenceSpeed, target)
     ) {
       ended = true;
     }
     if (ended) {
-      // 兜底：句结束时仍未触发的指令全部派发。
-      while (active.dirIdx < active.dirs.length) {
-        this.fireDir(active.dirs[active.dirIdx]);
-        active.dirIdx += 1;
-      }
-      turn.disp.pausedUntil = now + sentencePauseMs(g.sentenceSpeed);
+      turn.disp.pausedUntil = target ? now + sentencePauseMs(g.sentenceSpeed) : now;
       turn.disp.idx += 1;
       turn.disp.reveal = 0;
       turn.disp.doneAt = 0;
@@ -700,7 +678,7 @@ export class ChatEngine {
       if (last) this.events.onAssistantDone(last);
     }
     // 表情持续到本次回复结束：回合完成复位。
-    this.tryStage((st) => st.resetExpression());
+    this.tryStage((st) => st.endPerformance(turn.id));
     this.setPhase("idle");
   }
 
@@ -731,10 +709,8 @@ export class ChatEngine {
     }
   }
 
-  /** 派发一条表情/动作指令到舞台（未就绪由 tryStage 静默降级）。 */
-  private fireDir(d: PendingDir): void {
-    if (d.kind === "exp") this.tryStage((st) => st.setExpression(d.name));
-    else this.tryStage((st) => st.playMotion(d.name));
+  private fireCue(cue: PerformanceCue, turn: Turn): void {
+    if (turn.presentation) this.tryStage((st) => st.applyCue(cue, turn.id, turn.presentation!.revision));
   }
 
   private tryStage(fn: (s: Live2DStage) => void): void {

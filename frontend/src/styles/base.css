@@ -1,7 +1,8 @@
-/* 全局基线：深色舞台 + 暖白文字 + 柠檬金点缀（LLLJ 系配色）。
+@import url("/fonts/fonts.css");
+
+/* 全局基线：深紫灰舞台 + 暖白正文 + 柔金重点。
    设计语言两条硬约束：
-   1. 圆角只用圆角矩形——禁止 999px/50% 的胶囊与半圆端头，
-      曲度只许引用下面的 --r-* token；
+   1. 面板使用下方圆角 token；圆形仅用于即时动作等明确的语义例外；
    2. 颜色只许引用 --* token——分散的 rgba 字面量已全部收敛，
       新增颜色请先在 :root 登记。 */
 
@@ -13,26 +14,26 @@
   --r-lg: 14px; /* 大面板：对话框、modal、panel */
 
   /* —— 底色与描边 —— */
-  --bg: #16121a;
-  --panel-rgb: 28, 23, 34;
-  --panel: rgba(var(--panel-rgb), 0.68);
-  --panel-solid: #231d2c;
+  --bg: #18151f;
+  --panel-rgb: 40, 35, 46;
+  --panel: rgba(var(--panel-rgb), 0.9);
+  --panel-solid: #28232e;
   --panel-hover: rgba(40, 33, 50, 0.78);
   --chrome: rgba(16, 12, 20, 0.62); /* 顶/底横条 */
   --input-bg: rgba(0, 0, 0, 0.28);
   --backdrop: rgba(12, 9, 16, 0.62);
-  --line: rgba(234, 190, 100, 0.22);
-  --line-strong: rgba(234, 190, 100, 0.45);
-  --line-soft: rgba(234, 190, 100, 0.12);
-  --line-faint: rgba(234, 190, 100, 0.07);
+  --line: #49414d;
+  --line-strong: #716676;
+  --line-soft: rgba(183, 174, 189, 0.16);
+  --line-faint: rgba(183, 174, 189, 0.07);
 
   /* —— 文字 —— */
   --text: #f3ecdf;
-  --text-dim: #b0a48f;
-  --text-faint: rgba(176, 164, 143, 0.55);
+  --text-dim: #b7aebd;
+  --text-faint: #918695;
 
   /* —— 唯一强调色：柠檬金 —— */
-  --accent: #eab654;
+  --accent: #e7be77;
   --accent-strong: #f6d488;
   --accent-hover: #f6d488;
   --accent-soft: rgba(234, 182, 84, 0.14);
@@ -50,6 +51,10 @@
   --danger-text: #ffd9de;
   --info: #8fd0ff;
 
+  --font-ui: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-brand: "Nunito", sans-serif;
+  --content-width: min(1040px, calc(100cqw - 64px));
+
   font-size: 15px;
 }
 
@@ -62,10 +67,12 @@ body,
 #root {
   margin: 0;
   height: 100%;
-  font-family:
-    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system,
-    "Segoe UI", sans-serif;
+  font-family: var(--font-ui);
   overflow: hidden;
+}
+
+:lang(ja) {
+  --font-ui: "Noto Sans JP", "Hiragino Kaku Gothic ProN", sans-serif;
 }
 
 /* 画面比例锁 16:9：舞台永远等比居中，窗口多余部分留黑边（letterbox）。
@@ -273,8 +280,8 @@ button {
   padding: 0.55em 1.5em;
   background: var(--accent);
   color: var(--on-accent);
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 500;
+  letter-spacing: 0;
   transition:
     background 0.15s ease,
     box-shadow 0.15s ease,
@@ -283,7 +290,13 @@ button {
 
 button:hover {
   background: var(--accent-hover);
-  box-shadow: 0 0 14px var(--accent-glow);
+  box-shadow: none;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 button:active {

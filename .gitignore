@@ -19,3 +19,18 @@ frontend/.playwright/
 backend/models/
 
 .DS_Store
+
+# 本地凭据与用户数据库（含 SQLite WAL / SHM），即使移出默认 data 目录也忽略
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm

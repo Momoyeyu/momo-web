@@ -46,15 +46,14 @@ vi.mock("../audio/player", () => ({
 vi.mock("../live2d/stage", () => ({
   getStage: () => ({
     setMouthOpen() {},
-    setExpression() {},
-    playMotion() {},
-    resetExpression() {},
+    cancelPerformance() {}, beginPerformance() {}, endPerformance() {}, applyCue() {},
+    getPresentation() { return { avatarId: "runtime-model", revision: "r1", expressions: [{name: "happy", desc: "开心"}], motions: [], expressionState: {name: null, intensity: 0} }; },
   }),
 }));
 
 import { chat, interrupt } from "../services/chatClient";
 import { ChatEngine } from "./chatEngine";
-import { getAvatars, getSettings, update } from "../lib/store";
+import { getSettings, update } from "../lib/store";
 import type { ChatMessage } from "../lib/types";
 
 const chatMock = vi.mocked(chat);
@@ -74,7 +73,7 @@ const setVoiceInput = (v: boolean): void => {
 
 interface EngineInternals {
   turn: {
-    sentences: { text: string; dirs: { kind: string; name: string; offset: number }[] }[];
+    sentences: { text: string; cues: import("../live2d/performanceTypes").PerformanceCue[] }[];
     disp: { idx: number; reveal: number };
     timer: ReturnType<typeof setInterval>;
   } | null;
@@ -118,7 +117,7 @@ describe("打断落账一致性（seenText）", () => {
   it("打断时本地落账与回传都是用户实际看到的文本", async () => {
     chatMock.mockImplementation(async function* () {
       for (const [no, text] of ["第一句。", "第二句。", "第三句。"].entries()) {
-        yield { t: "sentence" as const, no, text, dirs: [], at: "" };
+        yield { t: "sentence" as const, no, text, cues: [], at: "" };
       }
       yield { t: "done" as const };
     });
@@ -143,7 +142,7 @@ describe("打断落账一致性（seenText）", () => {
 
   it("一个字都没看到就不落账（assistant 可空）", async () => {
     chatMock.mockImplementation(async function* () {
-      yield { t: "sentence" as const, no: 0, text: "还没来得及看。", dirs: [], at: "" };
+      yield { t: "sentence" as const, no: 0, text: "还没来得及看。", cues: [], at: "" };
       await new Promise(() => {}); // 回合悬挂，无人看屏
     });
     const { eng, done } = makeEngine();
@@ -165,7 +164,7 @@ describe("interrupt → send 顺序", () => {
     const order: string[] = [];
     chatMock.mockImplementation(async function* (text: string) {
       order.push(`chat:${text}`);
-      yield { t: "sentence" as const, no: 0, text: "在写。", dirs: [], at: "" };
+      yield { t: "sentence" as const, no: 0, text: "在写。", cues: [], at: "" };
       await new Promise(() => {}); // 悬挂保持回合存活
     });
     const { eng } = makeEngine();
@@ -249,45 +248,13 @@ describe("麦克风开关语义", () => {
 });
 
 describe("解析层资源清单过滤", () => {
-  it("清单外指令静默丢弃、清单内随句携带（当前形象的资源清单）", async () => {
-    // 从 store 取一个真实存在的动作名 —— 不把内置清单抄进测试，否则改内置资源时
-    // 要在两处同步维护。
-    const known = getAvatars()[0].resources?.motions?.[0]?.name;
-    expect(known, "内置形象应当带动作清单").toBeTruthy();
+  it("sends the actual runtime model catalog with each request", async () => {
     chatMock.mockImplementation(async function* () {
-      yield {
-        t: "sentence" as const,
-        no: 0,
-        text: "好。",
-        dirs: [{ kind: "exp" as const, name: "bad_exp", offset: 0 }],
-        at: "",
-      };
-      yield {
-        t: "sentence" as const,
-        no: 1,
-        text: "呐！",
-        dirs: [
-          { kind: "motion" as const, name: known!, offset: 0 },
-          { kind: "motion" as const, name: "Nope/9", offset: 0 },
-        ],
-        at: "",
-      };
+      yield { t: "sentence" as const, no: 0, text: "好。", cues: [], at: "" };
       yield { t: "done" as const };
     });
-    const { eng } = makeEngine();
-    eng.sendText("hi");
-    await tick();
-    const turn = internals(eng).turn;
-    expect(turn).toBeTruthy();
-    clearInterval(turn!.timer);
-
-    expect(turn!.sentences.map((s) => s.text)).toEqual(["好。", "呐！"]);
-    // exp 不在清单（内置形象没有表情资源）→ 丢；Nope/9 不在 motions → 丢；
-    // 而在清单的那个动作 → 挂在「呐！」上（offset=0，指令在句首）。
-    expect(turn!.sentences[0].dirs).toEqual([]);
-    expect(turn!.sentences[1].dirs).toEqual([
-      { kind: "motion", name: known, offset: 0 },
-    ]);
+    const { eng } = makeEngine(); eng.sendText("hi"); await tick();
+    expect(chatMock.mock.calls.at(-1)?.[2]).toMatchObject({ avatarId: "runtime-model", revision: "r1" });
     eng.dispose();
   });
 
@@ -297,9 +264,9 @@ describe("解析层资源清单过滤", () => {
       release = r;
     });
     chatMock.mockImplementation(async function* () {
-      yield { t: "sentence" as const, no: 0, text: "第一句。", dirs: [], at: "" };
+      yield { t: "sentence" as const, no: 0, text: "第一句。", cues: [], at: "" };
       await gate; // 回合悬停：后面的句子还没到
-      yield { t: "sentence" as const, no: 1, text: "第二句。", dirs: [], at: "" };
+      yield { t: "sentence" as const, no: 1, text: "第二句。", cues: [], at: "" };
       yield { t: "done" as const };
     });
     const { eng } = makeEngine();
@@ -312,6 +279,33 @@ describe("解析层资源清单过滤", () => {
     release();
     await tick();
     expect(eng.history.map((m) => m.text)).toEqual(["hi", "第一句。", "第二句。"]);
+    eng.dispose();
+  });
+});
+describe('unanswered request failures', () => {
+  it.each(['network', 'error event', 'empty stream'])('removes only the pending user message after %s', async (kind) => {
+    chatMock.mockImplementation(async function* () {
+      if (kind === 'network') throw new Error('network down');
+      if (kind === 'error event') yield { t: 'error' as const, message: 'upstream refused' };
+    });
+    const { eng } = makeEngine();
+    eng.loadHistory([{ role: 'user', text: 'previous question', at: 't' }, { role: 'assistant', text: 'previous answer', at: 't' }]);
+    eng.sendText('failed message');
+    await tick();
+    expect(eng.history.map(m => m.text)).toEqual(['previous question', 'previous answer']);
+    expect(eng.status).toBe('idle');
+    eng.dispose();
+  });
+
+  it('retains the exchange if a real sentence arrived before failure', async () => {
+    chatMock.mockImplementation(async function* () {
+      yield { t: 'sentence' as const, no: 0, text: 'A real reply.', cues: [], at: '' };
+      throw new Error('stream disconnected');
+    });
+    const { eng } = makeEngine();
+    eng.sendText('question');
+    await tick();
+    expect(eng.history.map(m => m.text)).toEqual(['question', 'A real reply.']);
     eng.dispose();
   });
 });

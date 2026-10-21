@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
-import { checkManifest, listManifests } from "./avatarZip";
+import { checkManifest, listManifests, wireZipLoader } from "./avatarZip";
 
 const MANIFEST = JSON.stringify({
   Version: 3,
@@ -58,7 +58,7 @@ describe("checkManifest", () => {
       missing: [],
       name: "TestModel",
       texture: "m/M.2048/texture_00.png",
-      resources: { expressions: [], motions: ["Idle/0"] },
+      resources: { expressions: [], motions: ["motions/idle.motion3.json"] },
     });
   });
 
@@ -90,7 +90,7 @@ describe("checkManifest", () => {
       missing: [],
       resources: {
         expressions: ["star_eyes", "fukidashi"],
-        motions: ["Idle/0", "Idle/1", "Tap/0"],
+        motions: ["a.motion3.json", "b.motion3.json", "c.motion3.json"],
       },
     });
   });
@@ -130,4 +130,37 @@ describe("checkManifest", () => {
       resources: { expressions: [], motions: [] },
     });
   });
+});
+
+
+it("overlapping ZIP loads keep distinct file-map namespaces", async () => {
+  const ZipLoader = {
+    ZIP_PROTOCOL: "zip://",
+    unzip: async (_reader: unknown, settings: { _objectURL: string }) => settings,
+  };
+  wireZipLoader({ ZipLoader });
+  const first = { url: "model.json", _objectURL: "zip://same/model.json" };
+  const second = { ...first };
+  await Promise.all([ZipLoader.unzip(null, first), ZipLoader.unzip(null, second)]);
+  expect(first._objectURL).not.toBe(second._objectURL);
+});
+
+it('discovers orphan controls and deduplicates motion files across groups', async () => {
+  const zip = await zipOf({
+    'm/M.model3.json': JSON.stringify({ FileReferences: { Moc: 'M.moc3', Textures: ['t.png'], Motions: { Idle: [{File:'a.motion3.json'}], Tap: [{File:'a.motion3.json'}] } } }),
+    'm/M.moc3': 'bin', 'm/t.png': 'png', 'm/a.motion3.json': '{}',
+    'm/orphan.motion3.json': '{}', 'm/blush.exp3.json': '{}',
+  });
+  const result = await checkManifest(zip, 'm/M.model3.json');
+  expect(result).toMatchObject({ resources: { expressions: ['blush'], motions: ['a.motion3.json', 'orphan.motion3.json'] } });
+});
+
+it('does not import controls from another model in a multi-manifest archive', async () => {
+  const zip = await zipOf({
+    'A/model.model3.json': JSON.stringify({FileReferences:{Moc:'M.moc3',Textures:['t.png']}}),
+    'A/M.moc3':'bin', 'A/t.png':'png', 'A/wave.motion3.json':'{}',
+    'B/model.model3.json': JSON.stringify({FileReferences:{Moc:'M.moc3',Textures:['t.png']}}),
+    'B/M.moc3':'bin', 'B/t.png':'png', 'B/angry.motion3.json':'{}', 'B/blush.exp3.json':'{}',
+  });
+  expect(await checkManifest(zip,'A/model.model3.json')).toMatchObject({resources:{expressions:[],motions:['wave.motion3.json']}});
 });

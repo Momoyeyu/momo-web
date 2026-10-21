@@ -41,6 +41,7 @@
 }
 
 .title-logo {
+  font-family: var(--font-brand);
   margin: 0;
   font-size: clamp(52px, 8cqw, 96px);
   font-weight: 800;

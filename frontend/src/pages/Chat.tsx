@@ -14,7 +14,8 @@ import type { EngineHandlers } from "../chat/engineInstance";
 import type { ChatStatus } from "../lib/types";
 import { navigate } from "../router";
 import { saveAutoCheckpoint } from "../services/checkpointClient";
-import { useT } from "../i18n";
+import { useT, resolveChatLang } from "../i18n";
+import { getStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
 import { getState, speakerName, subscribe } from "../lib/store";
 import { asrConfigured, ttsConfigured } from "../lib/asr";
@@ -48,6 +49,7 @@ export default function Chat() {
   const [streamText, setStreamText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState("");
+  const [closeUp, setCloseUp] = useState(() => getStage().getCloseUp());
   const errTimer = useRef<number | null>(null);
   // 引擎侧消息变化（含跨页产生的新消息）时刷新本页引用。
   useSyncExternalStore(subscribeTranscript, transcriptVersion);
@@ -139,6 +141,7 @@ export default function Chat() {
 
       <div className="dialog-zone">
         <DialogBox
+          lang={resolveChatLang(getState().settings.general)}
           name={name}
           text={subtitle || <span className="muted">……</span>}
           // 状态并进对话框（铭牌右侧），不再是页面左上角的浮标
@@ -178,22 +181,14 @@ export default function Chat() {
             </Button>
             <Button
               variant="solid"
-              className="send-btn"
-              onClick={send}
-              disabled={!input.trim()}
-              aria-label={t("chat.send")}
-              title={t("chat.send")}
+              className={`send-btn${busy ? " is-stopping" : ""}`}
+              onClick={busy ? () => getChatEngine().interrupt() : send}
+              disabled={!busy && !input.trim()}
+              aria-label={t(busy ? "chat.stop" : "chat.send")}
+              title={t(busy ? "chat.stop" : "chat.send")}
             >
-              <Icon name="send" />
+              <Icon name={busy ? "stop" : "send"} />
             </Button>
-            {busy && (
-              <Button
-                variant="ghost"
-                onClick={() => getChatEngine().interrupt()}
-              >
-                {t("chat.stop")}
-              </Button>
-            )}
           </div>
         </DialogBox>
       </div>
@@ -201,6 +196,13 @@ export default function Chat() {
       {/* 底部工具条：对照 VN 底部 icon 栏，操作聚拢右侧，返回标题收尾 */}
       <div className="chat-toolbar">
         <div className="tb-side">
+          <Button
+            className="tb tb-framing"
+            title={t(closeUp ? "performance.fullBody" : "performance.closeUp")}
+            onClick={() => { const next = !getStage().getCloseUp(); getStage().setCloseUp(next); setCloseUp(next); }}
+          >
+            {t(closeUp ? "performance.fullBody" : "performance.closeUp")}
+          </Button>
           <Button
             className="tb"
             aria-label={t("chat.backlog")}

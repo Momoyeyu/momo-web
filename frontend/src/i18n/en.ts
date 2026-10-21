@@ -1,6 +1,32 @@
 import type { Dict } from "./zh";
 
 export const en: Dict = {
+  performance: {
+    label: "Name",
+    desc: "Appearance",
+    context: "Use when",
+    raw: "Raw",
+    composed: "Composed",
+
+    progress: "Preview progress",
+    previewItem: "Preview {name}",
+    resourceHint: "Use a row's play button to preview. Resources disabled for AI can still be previewed.",
+    unavailable: "Preview unavailable. Check the model resources and reopen this editor.",
+    closeUp: "Close-up",
+    fullBody: "Full body",
+    preview: "Performance preview",
+    face: "Current expression",
+    neutral: "Neutral",
+    loading: "Preparing avatar…",
+    demo: "Play example",
+    reset: "Resume naturally",
+    hint: "Preview pauses AI performance. Resume to follow the conversation.",
+    trace: "Performance trace",
+    noCue: "No performance cues yet",
+    demoText: "You are here! Wait, where were you? I was not waiting for you at all.",
+    enabled: "Allow AI control",
+  },
+
   common: {
     backTitle: "Back to Title",
     backChat: "Back to Chat",
@@ -201,8 +227,7 @@ export const en: Dict = {
     errMissing: "Files referenced by the model descriptor are missing in the zip",
     errStore: "Failed to save model (browser storage unavailable)",
     resources: "Expressions & motions",
-    resHint:
-      "Give each item a short description — momo picks them in conversation by meaning.",
+    resHint: "Name the resource, describe what it visibly does, then specify when momo should use it.",
     expList: "Expressions",
     motionList: "Motions",
     descPh: "Meaning (optional)",

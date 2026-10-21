@@ -3,21 +3,25 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
+  margin: auto;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
+  container-type: size;
   z-index: 40;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(16, 12, 20, 0.38);
-  backdrop-filter: blur(10px) saturate(0.85) brightness(0.92);
+  background: rgba(24, 21, 31, 0.6);
+  backdrop-filter: blur(6px);
 }
 
 .modal-box {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   width: min(520px, 92cqw);
   max-height: 70cqh;
-  padding: 18px 20px;
+  padding: 24px;
   background: var(--panel-solid);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);

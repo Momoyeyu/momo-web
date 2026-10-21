@@ -4,11 +4,11 @@
 
 import type {
   AvatarMeta,
-  AvatarResources,
   McpExtension,
   PersistedState,
   Settings,
 } from "./types";
+import { mergeBuiltinResources } from "../live2d/controlCatalog";
 import { fetchState, putState } from "../services/stateClient";
 
 export type { PersistedState };
@@ -17,28 +17,6 @@ const STORAGE_KEY = "momo-web.v1";
 
 /** 内置模型（Hiyori）的 avatarId 取值。 */
 export const AVATAR_BUILTIN = "builtin";
-
-/**
- * 内置 Hiyori 的资源清单（vendored manifest 的固定值；desc 可在设置页改）。
- * 描述语义沿用内置情绪映射表的选型：m03=害羞 m04=开心 m06=思考
- * m07=惊讶 m08=难过 m09=生气 m10=困倦；m01/m02/m05 为通用待机动作。
- * 模型没有 .exp3.json，expressions 为空（表情段不注入 prompt）。
- */
-const BUILTIN_RESOURCES: AvatarResources = {
-  expressions: [],
-  motions: [
-    { name: "Idle/0", desc: "待机轻晃" },
-    { name: "Idle/1", desc: "待机动作" },
-    { name: "Idle/2", desc: "害羞地低头" },
-    { name: "Idle/3", desc: "待机动作" },
-    { name: "Idle/4", desc: "思考的样子" },
-    { name: "Idle/5", desc: "惊讶" },
-    { name: "Idle/6", desc: "难过" },
-    { name: "Idle/7", desc: "生气" },
-    { name: "Idle/8", desc: "困倦" },
-    { name: "TapBody/0", desc: "开心地蹦一下" },
-  ],
-};
 
 /** 内置形象条目：始终位于 avatars[0]，不可删除。 */
 function builtinAvatar(): AvatarMeta {
@@ -50,7 +28,7 @@ function builtinAvatar(): AvatarMeta {
     manifest: "Hiyori.model3.json",
     size: 0,
     addedAt: "",
-    resources: structuredClone(BUILTIN_RESOURCES),
+    resources: mergeBuiltinResources(),
   };
 }
 
@@ -132,7 +110,7 @@ function normalizeAvatars(raw: unknown): AvatarMeta[] {
       ? {
           ...a,
           builtin: true as const,
-          resources: a.resources ?? structuredClone(BUILTIN_RESOURCES),
+          resources: mergeBuiltinResources(a.resources),
         }
       : a,
   );

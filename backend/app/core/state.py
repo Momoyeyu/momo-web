@@ -29,9 +29,7 @@ DATA_DIR = Path(
 )
 STATE_PATH = DATA_DIR / "momo.yaml"
 
-# 内置 Hiyori 的资源清单（与前端 BUILTIN_RESOURCES 保持一致；
-# 前端 manifest 解析才是权威源，这里是后端兜底默认）。
-# desc 语义沿用旧情绪映射表的选型，可在设置页修改。
+# 内置形象仅占位；实际资源与语义由前端加载、校准并随请求提供。
 _BUILTIN_AVATAR: dict[str, Any] = {
     "id": "builtin",
     "builtin": True,
@@ -40,21 +38,7 @@ _BUILTIN_AVATAR: dict[str, Any] = {
     "manifest": "Hiyori.model3.json",
     "size": 0,
     "addedAt": "",
-    "resources": {
-        "expressions": [],
-        "motions": [
-            {"name": "Idle/0", "desc": "待机轻晃"},
-            {"name": "Idle/1", "desc": "待机动作"},
-            {"name": "Idle/2", "desc": "害羞地低头"},
-            {"name": "Idle/3", "desc": "待机动作"},
-            {"name": "Idle/4", "desc": "思考的样子"},
-            {"name": "Idle/5", "desc": "惊讶"},
-            {"name": "Idle/6", "desc": "难过"},
-            {"name": "Idle/7", "desc": "生气"},
-            {"name": "Idle/8", "desc": "困倦"},
-            {"name": "TapBody/0", "desc": "开心地蹦一下"},
-        ],
-    },
+    "resources": {"expressions": [], "motions": []},
 }
 
 # 缺省 state：仅覆盖后端消费的字段（settings/persona/avatars），

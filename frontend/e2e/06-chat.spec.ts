@@ -65,16 +65,16 @@ test("真实回合：发送 → 逐句上屏 → 落账 → backlog 可见，且
     )
     .toBe(true);
 
-  // 字幕已上屏；<motion>/<exp> 指令由前端剥离，不应出现在字幕里
+  // 字幕已上屏；ACT 指令由前端剥离，不应出现在字幕里
   await expect(page.locator(".subtitle")).not.toHaveText("……");
-  await expect(page.locator(".subtitle")).not.toContainText("<motion>");
+  await expect(page.locator(".subtitle")).not.toContainText("<|ACT ");
   await expect(page.locator(".chat-error")).toHaveCount(0);
 
   // 落账的 assistant 正文同样不含指令（backend 落库前剥离）
   const rows = await liveRows(request);
   const reply = rows[rows.length - 1];
   expect(reply.role).toBe("assistant");
-  expect(reply.text).not.toContain("<motion>");
+  expect(reply.text).not.toContain("<|ACT ");
   expect(reply.text.length).toBeGreaterThan(0);
 
   // backlog 里能看到本轮 user 文案。

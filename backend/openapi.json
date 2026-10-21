@@ -17,6 +17,16 @@
       },
       "ChatIn": {
         "properties": {
+          "presentation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PresentationIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "text": {
             "title": "Text",
             "type": "string"
@@ -192,6 +202,90 @@
         "title": "CheckpointMeta",
         "type": "object"
       },
+      "ControlIn": {
+        "additionalProperties": false,
+        "properties": {
+          "context": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "desc": {
+            "default": "",
+            "maxLength": 500,
+            "title": "Desc",
+            "type": "string"
+          },
+          "duration": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "maximum": 3600.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "maxLength": 80,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "ControlIn",
+        "type": "object"
+      },
+      "FaceIn": {
+        "properties": {
+          "intensity": {
+            "default": 0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Intensity",
+            "type": "number"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          }
+        },
+        "title": "FaceIn",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -335,6 +429,48 @@
           }
         },
         "title": "MemoryPatch",
+        "type": "object"
+      },
+      "PresentationIn": {
+        "additionalProperties": false,
+        "properties": {
+          "avatarId": {
+            "maxLength": 128,
+            "title": "Avatarid",
+            "type": "string"
+          },
+          "expressionState": {
+            "$ref": "#/components/schemas/FaceIn"
+          },
+          "expressions": {
+            "items": {
+              "$ref": "#/components/schemas/ControlIn"
+            },
+            "maxItems": 128,
+            "title": "Expressions",
+            "type": "array"
+          },
+          "motions": {
+            "items": {
+              "$ref": "#/components/schemas/ControlIn"
+            },
+            "maxItems": 256,
+            "title": "Motions",
+            "type": "array"
+          },
+          "revision": {
+            "maxLength": 128,
+            "title": "Revision",
+            "type": "string"
+          }
+        },
+        "required": [
+          "avatarId",
+          "revision",
+          "expressions",
+          "motions"
+        ],
+        "title": "PresentationIn",
         "type": "object"
       },
       "ProbeResult": {
@@ -863,6 +999,22 @@
           }
         },
         "summary": "Probe Extension"
+      }
+    },
+    "/api/live2d/core": {
+      "get": {
+        "operationId": "cubism_core_api_live2d_core_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Cubism Core"
       }
     },
     "/api/memories": {

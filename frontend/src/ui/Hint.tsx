@@ -8,10 +8,7 @@
 // 尺寸按 em 走：比相邻文字略小一丢丢，并自动跟随所在位置的字号。
 //
 // 用途：把「说明书式」的长句从页面上收进浮窗，说明只在用户主动询问时出现。
-// 复用 controls.css 的 .tip 机制（与图钉同一套浮窗）：
-//   .tip      提供 data-tip → ::after 浮窗，默认朝**上**弹
-//   side="down"  朝下弹：元素贴在面板顶部时用，朝上会被滚动容器裁掉
-//   .tip-l    左对齐：贴左缘时不至于向左出界
+// .tip / data-tip 由 TooltipLayer 显示，自动避开舞台边缘和滚动裁切。
 import "../styles/controls.css";
 
 export default function Hint({

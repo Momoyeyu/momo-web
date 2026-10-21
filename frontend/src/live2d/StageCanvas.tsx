@@ -8,14 +8,19 @@ import { getStage } from "./stage";
 
 export default function StageCanvas({ visible }: { visible: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const homeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const home = homeRef.current;
+    if (!home) return;
+    const canvas = canvasRef.current ??= document.createElement("canvas");
+    canvas.className = "live2d-canvas";
+    Object.assign(canvas.style, { position: "absolute", inset: "0", width: "100%", height: "100%" });
     const stage = getStage();
     try {
       // 幂等：StrictMode 双挂载对同一 canvas 重复 init 会被跳过。
       stage.init(canvas);
+      stage.setChatHost(home);
     } catch {
       return; // WebGL 不可用等：背景图兜底，页面照常可用
     }
@@ -29,9 +34,14 @@ export default function StageCanvas({ visible }: { visible: boolean }) {
       void stage.loadAvatar().catch(() => {});
     };
     load();
-    return subscribe(load);
+    const tap = () => stage.tap();
+    canvas.addEventListener("click", tap);
+    const unsubscribe = subscribe(load);
+    return () => { unsubscribe(); canvas.removeEventListener("click", tap); };
     // 不随组件卸载 dispose：舞台是应用级常驻单例。
   }, []);
+
+  useEffect(() => { getStage().setChatVisible(visible); }, [visible]);
 
   return (
     <div
@@ -39,28 +49,14 @@ export default function StageCanvas({ visible }: { visible: boolean }) {
         position: "fixed",
         inset: 0,
         zIndex: 0,
-        backgroundImage:
-          "linear-gradient(rgba(20, 16, 26, 0.45), rgba(20, 16, 26, 0.72)), url(/stage/stage-room.jpg)",
+        backgroundImage: "url(/stage/stage-room.jpg)",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
     >
-      <canvas
-        ref={canvasRef}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          opacity: visible ? 1 : 0,
-          transition: "opacity 0.45s ease",
-          pointerEvents: visible ? "auto" : "none",
-        }}
-        onClick={() => {
-          // 轻拍回应：播模型约定的 TapBody 组，未就绪/无该组静默 no-op。
-          getStage().tap();
-        }}
-      />
+      <div className="scene-ambient" aria-hidden="true" />
+      <div ref={homeRef} className="live2d-home" style={{ position: "absolute", inset: 0 }} />
+      <div className="scene-reading-shade" aria-hidden="true" />
     </div>
   );
 }

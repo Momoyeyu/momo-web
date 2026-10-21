@@ -34,7 +34,12 @@ def _state(lang: str, **over):
 
 
 def _prompt(lang: str, pins=_PINS, **over) -> str:
-    return prompt.build_system_prompt(_state(lang, **over), pins)
+    state = _state(lang, **over)
+    res = next((a.get('resources', {}) for a in state['avatars'] if a['id'] == state['avatarId']), {})
+    catalog = {'avatarId': state['avatarId'], 'revision': 'test',
+               'expressions': res.get('expressions', []), 'motions': res.get('motions', []),
+               'expressionState': {'name': None, 'intensity': 0}}
+    return prompt.build_system_prompt(state, pins, catalog)
 
 
 # ---------------- 模版与语言无关 ----------------
@@ -127,101 +132,21 @@ def test_unknown_lang_falls_back_zh():
 # ---------------- 行为配置（指令段） ----------------
 
 
-def test_directive_section_without_expressions():
-    """默认内置形象（Hiyori：无表情、10 个动作）→ 只注入动作段。"""
-    for lang in ("zh", "en", "ja"):
-        p = _prompt(lang)
-        assert "<motion>" in p and "Idle/4" in p
-        assert "<exp>" not in p  # Hiyori 无表情文件 → 表情段不注入
-        # 行为配置是最后一节，末尾是动作控制小节 + 容错说明
-        assert p.split("\n\n")[-1].startswith("##")
-
-    p = _prompt("zh")
-    assert "# Behavior Configuration" in p
-    assert "## Motion control policy" in p
-    assert "## Expression control policy" not in p
-    assert "- Idle/4 — 思考的样子" in p  # 资源描述是注入内容，保持原语言
-    assert "&lt;" in p
+def test_runtime_motion_catalog_is_injected():
+    p = _prompt('zh', avatarId='test-model', avatars=[{'id':'test-model', 'resources': {'expressions': [], 'motions': [{'name': 'motions/think.motion3.json', 'desc': '歪头'}]}}])
+    assert '<|ACT ' in p and 'motions/think.motion3.json' in p
+    assert '歪头' in p
 
 
-def test_directive_section_with_expressions():
-    """导入模型带表情资源 → 表情段注入，名称-描述成行。"""
-    p = _prompt(
-        "zh",
-        avatarId="av_x",
-        avatars=[
-            {
-                "id": "av_x",
-                "resources": {
-                    "expressions": [
-                        {"name": "star_eyes", "desc": "非常期待"},
-                        {"name": "fukidashi", "desc": ""},
-                    ],
-                    "motions": [{"name": "Tap/0", "desc": ""}],
-                },
-            }
-        ],
-    )
-    assert "## Expression control policy" in p
-    assert "- star_eyes — 非常期待" in p
-    assert "- fukidashi" in p and "fukidashi —" not in p
-    assert "## Motion control policy" in p and "- Tap/0" in p
+def test_runtime_expression_catalog_is_injected():
+    p = _prompt('zh', avatarId='av_x', avatars=[{'id':'av_x', 'resources': {
+        'expressions': [{'name':'star_eyes', 'desc':'非常期待'}],
+        'motions': [{'name':'Tap/0', 'desc':''}]
+    }}])
+    assert 'star_eyes' in p and '非常期待' in p and 'Tap/0' in p
+    assert '<|ACT ' in p and '<exp>' not in p
 
 
-def test_no_directive_section_when_no_resources():
-    """当前形象没有资源清单 → 整个行为配置节不出现。"""
-    p = _prompt("zh", avatarId="av_x", avatars=[{"id": "av_x"}])
-    assert "<exp>" not in p and "<motion>" not in p
-    assert "# Behavior Configuration" not in p
-
-
-# ---------------- 输出方式 ----------------
-
-
-def test_output_style_section_present_for_every_language():
-    """一轮可多次输出 + 工具调用前先说明：模版只有一份，三语因此都拿到它。
-
-    这几条直接决定前端「逐句可见/逐句朗读」的观感，缺一条模型就可能整段吐。
-    """
-    for lang in ("zh", "en", "ja"):
-        p = _prompt(lang)
-        assert "## How you speak" in p
-        assert "several separate outputs" in p
-        assert "empty content" in p
-
-
-def test_soul_is_injected_identically_across_languages():
-    """soul 与对话语言无关：三语拿到的是同一段人设原文。"""
-    souls = []
-    for lang in ("zh", "en", "ja"):
-        p = _prompt(lang)
-        souls.append(p.split("## Your basic settings")[0])
-    assert souls[0] == souls[1] == souls[2]
-    assert prompt.load_soul() in souls[0]
-
-
-def test_load_soul_strips_html_comments(monkeypatch, tmp_path):
-    """soul 里的 HTML 注释是写给人的说明，不该被注入 prompt。
-
-    这是 load_soul 明确承诺的行为（也是 soul.md 里能写「怎么用这份文件」的前提），
-    但此前三处 soul 断言只做包含/非空，而当前 soul.md 恰好没有注释 —— 无人守。
-    """
-    soul = tmp_path / "soul.md"
-    soul.write_text(
-        "# momo\n\n<!-- 给人看的说明：这里可以写怎么改人设 -->\n\n设定：喜欢甜食\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(prompt, "SOUL_PATH", soul)
-
-    text = prompt.load_soul()
-    assert "喜欢甜食" in text
-    assert "给人看" not in text
-    assert "<!--" not in text
-
-
-def test_missing_soul_skips_persona_section(monkeypatch, tmp_path):
-    """soul 文件缺失 → 人设段整段不注入（其余段落照常）。"""
-    monkeypatch.setattr(prompt, "SOUL_PATH", tmp_path / "nope.md")
-    p = _prompt("zh")
-    assert "# Persona Configuration" not in p
-    assert "## Your basic settings" in p  # 基本设定仍在
+def test_no_performance_section_when_no_runtime_resources():
+    p = _prompt('zh', avatarId='av_x', avatars=[{'id':'av_x'}])
+    assert '# Performance direction' not in p

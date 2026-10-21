@@ -2,7 +2,7 @@
 // 结构 = 值框（描边圆角 + 右端箭头）+ 浮层选项列（选中左侧金条、悬停浅金底）。
 // 交互：点击开合；外点/Esc 关；↑↓ 移动高亮，Enter 选定。
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import "../styles/controls.css";
 
 export interface SelectOption {
@@ -49,6 +49,37 @@ export default function Select({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Fit within every scrolling ancestor, not just the browser viewport.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const root = rootRef.current, list = listRef.current;
+    if (!root || !list) return;
+    const fit = () => {
+      const rect = root.getBoundingClientRect();
+      let top = 0, bottom = innerHeight;
+      for (let parent = root.parentElement; parent; parent = parent.parentElement) {
+        if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(parent).overflowY)) {
+          const bounds = parent.getBoundingClientRect();
+          top = Math.max(top, bounds.top + parent.clientTop);
+          bottom = Math.min(bottom, bounds.top + parent.clientTop + parent.clientHeight);
+        }
+      }
+      const below = bottom - rect.bottom - 8, above = rect.top - top - 8;
+      const up = below < Math.min(list.scrollHeight + 2, 220) && above > below;
+      list.style.top = up ? "auto" : "calc(100% + 6px)";
+      list.style.bottom = up ? "calc(100% + 6px)" : "auto";
+      list.style.maxHeight = `${Math.max(0, Math.min(220, up ? above : below))}px`;
+    };
+    const scroll = (event: Event) => { if (!list.contains(event.target as Node)) fit(); };
+    fit();
+    window.addEventListener("resize", fit);
+    document.addEventListener("scroll", scroll, true);
+    return () => {
+      window.removeEventListener("resize", fit);
+      document.removeEventListener("scroll", scroll, true);
+    };
+  }, [open, options.length]);
+
   const pick = (v: string): void => {
     onChange(v);
     setOpen(false);
@@ -63,6 +94,8 @@ export default function Select({
       return;
     }
     if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
       setOpen(false);
     } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();

@@ -216,6 +216,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/live2d/core": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Cubism Core */
+        get: operations["cubism_core_api_live2d_core_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/memories": {
         parameters: {
             query?: never;
@@ -344,6 +361,7 @@ export interface components {
         };
         /** ChatIn */
         ChatIn: {
+            presentation?: components["schemas"]["PresentationIn"] | null;
             /** Text */
             text: string;
         };
@@ -409,6 +427,32 @@ export interface components {
             title: string;
             /** Updatedat */
             updatedAt: string;
+        };
+        /** ControlIn */
+        ControlIn: {
+            /** Context */
+            context?: string | null;
+            /**
+             * Desc
+             * @default
+             */
+            desc: string;
+            /** Duration */
+            duration?: number | null;
+            /** Label */
+            label?: string | null;
+            /** Name */
+            name: string;
+        };
+        /** FaceIn */
+        FaceIn: {
+            /**
+             * Intensity
+             * @default 0
+             */
+            intensity: number;
+            /** Name */
+            name?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -478,6 +522,18 @@ export interface components {
             content?: string | null;
             /** Pinned */
             pinned?: boolean | null;
+        };
+        /** PresentationIn */
+        PresentationIn: {
+            /** Avatarid */
+            avatarId: string;
+            expressionState?: components["schemas"]["FaceIn"];
+            /** Expressions */
+            expressions: components["schemas"]["ControlIn"][];
+            /** Motions */
+            motions: components["schemas"]["ControlIn"][];
+            /** Revision */
+            revision: string;
         };
         /**
          * ProbeResult
@@ -889,6 +945,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cubism_core_api_live2d_core_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

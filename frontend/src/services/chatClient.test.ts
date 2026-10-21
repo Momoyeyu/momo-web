@@ -29,7 +29,7 @@ const sentence = (no: number, text: string) => ({
   t: "sentence",
   no,
   text,
-  dirs: [],
+  cues: [],
   at: "2026-01-01T00:00:00+00:00",
 });
 

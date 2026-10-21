@@ -18,6 +18,7 @@ export default function DialogPreview({
   textSpeed,
   sentenceSpeed,
   showStatus,
+  lang,
 }: {
   name: string;
   sample: string;
@@ -26,6 +27,7 @@ export default function DialogPreview({
   sentenceSpeed: number;
   /** 预览也要跟着「显示对话状态」开关（状态条已是对话框本体的一部分）。 */
   showStatus: boolean;
+  lang?: string;
 }) {
   const t = useT();
   const [text, setText] = useState("");
@@ -68,6 +70,7 @@ export default function DialogPreview({
       style={{ "--dialog-alpha": opacity / 100 } as React.CSSProperties}
     >
       <DialogBox
+        lang={lang}
         name={name}
         text={text}
         status={

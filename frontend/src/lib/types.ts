@@ -106,12 +106,17 @@ export interface Settings {
 }
 
 /** 记忆条目（backend /api/memories 返回；pinned=true 即初始记忆 pin）。 */
-/** Live2D 资源语义层条目：资源名 + 可编辑的含义描述（写给 LLM 看）。 */
+/** Live2D 资源语义层：稳定 ID、展示名称、实际表现与使用语境。 */
 export interface AvatarResource {
-  /** 表情 = FileReferences.Expressions[].Name；动作 = "组名/序号"。 */
+  enabled?: boolean;
+  /** 表情 = FileReferences.Expressions[].Name；动作 = 相对 manifest 的文件路径。 */
   name: string;
-  /** 语义描述（可为空；注入 prompt 时写作 "- 名称 — 描述"）。 */
+  /** 可观察的实际表现；不要把使用场景混入这里。 */
   desc: string;
+  /** 展示名称，与稳定资源 ID 分离。 */
+  label?: string;
+  /** 适用语境与避免的场景，不代替实际动作描述。 */
+  context?: string;
 }
 
 /** 模型的表情/动作资源清单：导入时从 manifest 解析，desc 在设置页编辑。 */

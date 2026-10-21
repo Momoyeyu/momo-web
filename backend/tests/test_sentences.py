@@ -100,35 +100,30 @@ def test_hard_max_len_force_splits():
 # ---------------- 指令原子性 ----------------
 
 
-def test_directive_after_sentence_belongs_to_next():
-    sents = split_sentences("你好。<exp>happy</exp>再见。")
+def test_control_after_sentence_belongs_to_next():
+    sents = split_sentences('你好。<|ACT {"expression":{"name":"happy"}}|>再见。')
     assert texts(sents) == ["你好。", "再见。"]
-    assert sents[0].dirs == []
-    assert [(d.kind, d.name, d.offset) for d in sents[1].dirs] == [("exp", "happy", 0)]
+    assert sents[0].cues == []
+    assert sents[1].cues[0].offset == 0
+    assert sents[1].cues[0].payload['expression']['name'] == 'happy'
 
 
-def test_directive_inside_sentence_keeps_offset():
-    sents = split_sentences("前半<exp>happy</exp>后半。")
+def test_control_inside_sentence_keeps_offset():
+    sents = split_sentences('前半<|ACT {"expression":{"name":"happy"}}|>后半。')
     assert texts(sents) == ["前半后半。"]
-    assert [(d.kind, d.name, d.offset) for d in sents[0].dirs] == [("exp", "happy", 2)]
+    assert sents[0].cues[0].offset == 2
 
 
-def test_motion_directive_parsed():
-    sents = split_sentences("<motion>wave/1</motion>挥手。")
-    assert [(d.kind, d.name, d.offset) for d in sents[0].dirs] == [("motion", "wave/1", 0)]
+def test_motion_control_is_atomic():
+    sents = split_sentences('<|ACT {"motion":"a,b/1"}|>完成。')
+    assert texts(sents) == ['完成。']
+    assert sents[0].cues[0].payload == {'motion': 'a,b/1'}
 
 
-def test_directive_value_does_not_break_sentence():
-    """指令值里的逗号不该被当弱边界。"""
-    sents = split_sentences("<motion>a,b,c</motion>完成。")
-    assert texts(sents) == ["完成。"]
-
-
-def test_malformed_directive_degrades_to_text():
-    sents = split_sentences("前面<exp>没闭合的标记")
-    joined = "".join(texts(sents))
-    assert "<exp>没闭合的标记" in joined
-    assert sents[0].dirs == []
+def test_malformed_control_is_not_spoken():
+    sents = split_sentences('前面<|ACT 未闭合')
+    assert texts(sents) == ['前面']
+    assert sents[0].cues == []
 
 
 def test_stray_angle_bracket_is_literal():
@@ -144,7 +139,7 @@ CASES = [
     "Hello there. How are you? Fine, thanks!",
     "我……不知道。也许吧，你说呢？",
     "「引号里的话，很长很长很长很长很长很长很长很长很长很长很长」然后结束。",
-    "前半<exp>happy</exp>后半。<motion>wave</motion>挥手。",
+    '前半<|ACT {"expression":{"name":"happy"}}|>后半。<|ACT {"motion":"wave/0"}|>挥手。',
     "没有标点的尾巴",
     "真的吗？！我不信。",
     "圆周率约 3.14 左右，够用。",

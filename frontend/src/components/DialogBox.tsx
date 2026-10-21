@@ -13,6 +13,7 @@ export default function DialogBox({
   text,
   status,
   children,
+  lang,
 }: {
   /** 铭牌文案（说话人显示名，见 backend/resources/soul.md）。 */
   name: string;
@@ -22,9 +23,10 @@ export default function DialogBox({
   status?: ReactNode;
   /** 字幕之后的附加内容（对话页的输入行）。 */
   children?: ReactNode;
+  lang?: string;
 }) {
   return (
-    <div className="dialog-box">
+    <div className="dialog-box" lang={lang}>
       <div className="nameplate-row">
         <div className="nameplate">{name}</div>
         {status}

@@ -88,10 +88,13 @@ class Settings(TypedDict):
 
 
 class Resource(TypedDict):
-    """形象的一个表情或动作；desc 是给模型看的语义描述。"""
+    """形象控件：稳定标识、实际表现、展示名称与使用语境。"""
 
     name: str
     desc: str
+    label: NotRequired[str]
+    context: NotRequired[str]
+    enabled: NotRequired[bool]
 
 
 class AvatarResources(TypedDict):
@@ -258,16 +261,21 @@ class ProbeResult(TypedDict):
 ErrorService = Literal["llm", "backend"]
 
 
-class SentenceDir(TypedDict):
-    """句子携带的指令（kind=exp 切表情 / motion 播动作，offset 为句内位置）。"""
-
-    kind: Literal["exp", "motion"]
+class ExpressionCue(TypedDict):
     name: str
+    intensity: float
+    duration: NotRequired[float]
+
+
+class PerformanceCue(TypedDict):
+    id: str
     offset: int
+    expression: NotRequired[ExpressionCue | None]
+    motion: NotRequired[str]
 
 
 class SentenceEvent(TypedDict):
-    """一句话落账后的推送：正文已剥离指令，指令随 dirs 一起下发。
+    """一句话落账后的推送：正文已剥离指令，控制随 cues 一起下发。
 
     切句由后端唯一口径完成（core/sentences.py），前端不再切句。
     """
@@ -275,7 +283,7 @@ class SentenceEvent(TypedDict):
     t: Literal["sentence"]
     no: int
     text: str
-    dirs: list[SentenceDir]
+    cues: list[PerformanceCue]
     at: str
 
 

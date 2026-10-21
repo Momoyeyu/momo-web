@@ -1,3 +1,4 @@
+import { reconcileResources } from "../../live2d/controlCatalog";
 // 形象面板（「拓展」tab 左栏）：Live2D 模型导入/切换/删除。
 //
 // 形态与 MCP 面板同一套：检索框 + 右侧加号 → 卡片列表 → 底部翻页器；
@@ -8,7 +9,7 @@
 // zip 本体与纹理缩略图存 IndexedDB，元信息进 PersistedState；
 // 加载失败回退内置模型，不阻断聊天。
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import JSZip from "jszip";
 import {
   AVATAR_BUILTIN,
@@ -29,6 +30,9 @@ import IconButton from "../../ui/IconButton";
 import Modal from "../../ui/Modal";
 import Pager from "../../ui/Pager";
 import Select from "../../ui/Select";
+import Checkbox from "../../ui/Checkbox";
+import ResourcePreview, { type ResourceSelection } from "../../components/ResourcePreview";
+import type { PresentationSnapshot } from "../../live2d/performanceTypes";
 import "../../styles/persona.css";
 import "../../styles/controls.css";
 
@@ -106,6 +110,21 @@ export default function AvatarPanel() {
   // 两个弹窗：导入 / 表情与动作（后者记录目标模型 id）
   const [importOpen, setImportOpen] = useState(false);
   const [resId, setResId] = useState<string | null>(null);
+  const [resKind, setResKind] = useState<keyof AvatarResources>("expressions");
+  const [previewCatalog, setPreviewCatalog] = useState<PresentationSnapshot | null>(null);
+  const onPreviewReady = useCallback((snapshot: PresentationSnapshot | null) => {
+    setPreviewCatalog(snapshot);
+    const catalog = getStage().getResourceCatalog();
+    if (!snapshot || !catalog) return;
+    const avatar = getAvatars().find(a => a.id === snapshot.avatarId);
+    if (!avatar) return;
+    const resources = reconcileResources(catalog, avatar.resources);
+    if (JSON.stringify(resources) !== JSON.stringify(avatar.resources)) {
+      update({ avatars: getAvatars().map(a => a.id === avatar.id ? { ...a, resources } : a) });
+    }
+  }, []);
+  const [selection, setSelection] = useState<ResourceSelection | null>(null);
+  useEffect(() => { setSelection(null); setPreviewCatalog(null); }, [resId]);
   /** 拖放区高亮（拖入中）。 */
   const [dragging, setDragging] = useState(false);
 
@@ -268,11 +287,12 @@ export default function AvatarPanel() {
     if (resId === id) setResId(null);
   };
 
-  const setDesc = (
+  const setResourceField = (
     avatarId: string,
     kind: keyof AvatarResources,
     name: string,
-    desc: string,
+    field: "label" | "desc" | "context",
+    value: string,
   ): void => {
     update({
       avatars: getAvatars().map((a) =>
@@ -282,7 +302,7 @@ export default function AvatarPanel() {
               resources: {
                 ...a.resources,
                 [kind]: a.resources[kind].map((r) =>
-                  r.name === name ? { ...r, desc } : r,
+                  r.name === name ? { ...r, [field]: value } : r,
                 ),
               },
             }
@@ -302,13 +322,30 @@ export default function AvatarPanel() {
       <div className="avatar-res-group">
         <div className="avatar-res-group-title muted">{label}</div>
         {items.map((r) => (
-          <div key={r.name} className="avatar-res-row">
-            <span className="avatar-res-name">{r.name}</span>
-            <input
-              className="avatar-res-desc"
-              value={r.desc}
-              placeholder={t("avatar.descPh")}
-              onChange={(e) => setDesc(avatar.id, kind, r.name, e.target.value)}
+          <div key={r.name} data-resource-id={r.name} className={`avatar-res-row${selection?.kind === kind && selection.name === r.name ? " is-selected" : ""}`}>
+            <Checkbox checked={r.enabled !== false} aria-label={`${r.label || r.name} · ${t("performance.enabled")}`}
+              onChange={(e) => update({ avatars: getAvatars().map((a) => a.id === avatar.id && a.resources ? {
+                ...a, resources: { ...a.resources, [kind]: a.resources[kind].map((item) => item.name === r.name ? { ...item, enabled: e.target.checked } : item) }
+              } : a) })} />
+            <span className="avatar-res-name">{r.label || r.name.split('/').pop()}
+              <small>{r.name.split('/').pop()}{previewCatalog?.[kind].find(item => item.name === r.name)?.duration ? ` · ${previewCatalog[kind].find(item => item.name === r.name)!.duration!.toFixed(2)}s` : ''}</small>
+            </span>
+            <div className="resource-fields">
+              {(["label", "desc", "context"] as const).map(field => <label key={field}>
+                <span>{t(`performance.${field}`)}</span>
+                <input aria-label={`${r.name} · ${t(`performance.${field}`)}`} maxLength={field === "label" ? 80 : 500}
+                  value={r[field] ?? ""} placeholder={t(`performance.${field}`)}
+                  onChange={e => setResourceField(avatar.id, kind, r.name, field, e.target.value)} />
+              </label>)}
+            </div>
+            <IconButton
+              icon="play"
+              className="resource-play"
+              size="sm"
+              label={t("performance.previewItem", { name: r.label || r.name })}
+              disabled={previewCatalog?.avatarId !== avatar.id || !previewCatalog[kind].some(item => item.name === r.name)}
+              active={selection?.kind === kind && selection.name === r.name}
+              onClick={() => setSelection(previous => ({ kind, name: r.name, request: (previous?.request ?? 0) + 1 }))}
             />
           </div>
         ))}
@@ -500,20 +537,33 @@ export default function AvatarPanel() {
       {resAvatar && (
         <Modal
           className="avatar-res-modal"
+          label={`${t("avatar.resources")} · ${resAvatar.name || BUILTIN_NAME}`}
           onClose={() => setResId(null)}
         >
-          <div className="modal-meta muted">
+          <h2 className="modal-meta">
             {t("avatar.resources")} · {resAvatar.name || BUILTIN_NAME}
-          </div>
+          </h2>
           <p className="muted avatar-hint">{t("avatar.resHint")}</p>
+          <div className="resource-layout">
+          <section className="resource-editor">
           {hasRes(resAvatar) ? (
-            <div className="avatar-res-scroll">
-              {resGroup(resAvatar, "expressions", t("avatar.expList"))}
-              {resGroup(resAvatar, "motions", t("avatar.motionList"))}
-            </div>
+            <>
+              <div className="resource-sections" role="group" aria-label={t("avatar.resources")}>
+                {(["expressions", "motions"] as const).map((kind) => <Button variant="ghost" key={kind} aria-pressed={resKind === kind} onClick={() => setResKind(kind)}>
+                  {t(kind === "expressions" ? "avatar.expList" : "avatar.motionList")}
+                  <span>{resAvatar.resources?.[kind].length ?? 0}</span>
+                </Button>)}
+              </div>
+              <div className="avatar-res-scroll">
+                {resGroup(resAvatar, resKind, t(resKind === "expressions" ? "avatar.expList" : "avatar.motionList"))}
+              </div>
+            </>
           ) : (
             <p className="muted">{t("avatar.resEmpty")}</p>
           )}
+          </section>
+          <ResourcePreview key={resAvatar.id} avatarId={resAvatar.id} selection={selection} onReady={onPreviewReady} />
+          </div>
           <div className="modal-foot">
             <Button onClick={() => setResId(null)}>{t("common.close")}</Button>
           </div>

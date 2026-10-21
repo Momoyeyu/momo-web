@@ -69,10 +69,8 @@ export class TtsPlayer {
     this.pending = [];
     this.node?.port.postMessage({ type: "clear" });
     this._playing = false;
-    if (this.mouth !== 0) {
-      this.mouth = 0;
-      this.onMouthOpen?.(0);
-    }
+    this.mouth = 0;
+    this.onMouthOpen?.(0);
   }
 
   /** 是否仍有待播音频（近似：push 置位，drain/stop 复位）。 */

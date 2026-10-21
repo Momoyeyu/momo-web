@@ -71,6 +71,40 @@ async function readManifest(
   }
 }
 
+/** Shared discovery for the import inspector and runtime loader. */
+async function discoverControls(zip: JSZip, manifestPath: string, json: any): Promise<void> {
+  const directory = (path: string) => path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
+  const dir = directory(manifestPath);
+  const others = await Promise.all(listManifests(zip).filter(p => p !== manifestPath).map(async path => {
+    const manifest = await readManifest(zip, path);
+    return { dir: directory(path), paths: 'error' in manifest ? [] : referencedFiles(manifest.dir, manifest.json) };
+  }));
+  const ambiguous = others.some(other => other.dir === dir);
+  const claimed = new Set(others.flatMap(other => other.paths));
+  const refs = json.FileReferences ??= {};
+  const files = Object.keys(zip.files).filter(p => !ambiguous && p.startsWith(dir) && !claimed.has(p)
+    && !others.some(other => other.dir.length > dir.length && other.dir.startsWith(dir) && p.startsWith(other.dir))
+    && !zip.files[p].dir && !p.split('/').some(s => s === '__MACOSX' || s.startsWith('._'))).sort();
+  const relative = (path: string) => {
+    const base = dir.split('/').filter(Boolean), parts = path.split('/');
+    let n = 0; while (n < base.length && base[n] === parts[n]) n++;
+    return [...base.slice(n).map(() => '..'), ...parts.slice(n)].join('/');
+  };
+  const expressions = refs.Expressions ??= [];
+  const names = new Set(expressions.map((x: any) => x.Name));
+  const expPaths = new Set(expressions.map((x: any) => resolvePath(dir, x.File)));
+  for (const path of files.filter(p => p.endsWith('.exp3.json') && !expPaths.has(p))) {
+    const file = relative(path), base = path.split('/').pop()!.replace(/\.exp3\.json$/, '');
+    const name = names.has(base) ? file.replace(/\.exp3\.json$/, '') : base;
+    names.add(name); expressions.push({ Name: name, File: file });
+  }
+  const groups = refs.Motions ??= {};
+  const paths = new Set(Object.values(groups).flatMap((entries: any) => entries.map((x: any) => resolvePath(dir, x.File))));
+  for (const path of files.filter(p => p.endsWith('.motion3.json') && !paths.has(p))) {
+    (groups.MomoImported ??= []).push({ File: relative(path) });
+  }
+}
+
 /** 从 manifest FileReferences 提取指令资源清单：
  *  表情 = Expressions[].Name；动作 = "组名/序号"（组内按下标枚举）。 */
 function extractResources(json: unknown): {
@@ -88,9 +122,10 @@ function extractResources(json: unknown): {
   const groups = refs?.Motions as
     | Record<string, unknown[]>
     | undefined;
-  for (const [group, items] of Object.entries(groups ?? {})) {
+  for (const items of Object.values(groups ?? {})) {
     for (let i = 0; i < (Array.isArray(items) ? items.length : 0); i++) {
-      motions.push(`${group}/${i}`);
+      const file = (items[i] as { File?: string })?.File;
+      if (file && !motions.includes(file)) motions.push(file);
     }
   }
   return { expressions, motions };
@@ -114,6 +149,7 @@ export async function checkManifest(
 ): Promise<ManifestCheck | { error: string }> {
   const m = await readManifest(zip, manifestPath);
   if ("error" in m) return m;
+  await discoverControls(zip, manifestPath, m.json);
   const namelist = new Set(
     Object.keys(zip.files).filter((p) => !zip.files[p].dir),
   );
@@ -161,6 +197,14 @@ export function wireZipLoader(mod: Record<string, any>): void {
     if (!entry) return Promise.reject(new Error(`zip entry missing: ${path}`));
     return entry.async("text");
   };
+  // The SDK reads a shared uid after awaiting ZIP IO. Concurrent loads can
+  // therefore collide, and destroying the stale model removes the new model's
+  // file map. Assign a namespace to each settings object at extraction time.
+  const unzip = zl.unzip;
+  zl.unzip = (reader: JSZip, settings: { url: string; _objectURL: string }) => {
+    settings._objectURL = `${zl.ZIP_PROTOCOL}momo-${crypto.randomUUID()}/${settings.url}`;
+    return unzip.call(zl, reader, settings);
+  };
   zl.__momoWired = true;
 }
 
@@ -178,6 +222,7 @@ export async function makeAvatarSource(
   const text = await zip.file(meta.manifest)?.async("text");
   if (!text) throw new Error(`manifest missing in zip: ${meta.manifest}`);
   const json = JSON.parse(text);
+  await discoverControls(zip, meta.manifest, json);
   json.url = meta.manifest;
   const runtime = mod.Live2DFactory.findRuntime(json);
   if (!runtime) throw new Error("unsupported model (not Cubism 3/4)");
@@ -185,7 +230,5 @@ export async function makeAvatarSource(
   const file = new File([blob], meta.fileName, { type: "application/zip" });
   const source = [file] as File[] & { settings?: unknown };
   source.settings = settings;
-  // uid 静态不自增：手动推进避免新旧模型 filesMap 键碰撞。
-  mod.ZipLoader.uid = (mod.ZipLoader.uid ?? 0) + 1;
   return source;
 }

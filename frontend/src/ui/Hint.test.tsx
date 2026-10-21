@@ -1,8 +1,8 @@
 // Hint：圈内问号 + 悬停解释。结构单测（renderToStaticMarkup，不需要浏览器）。
 //
 // 关注点：说明必须同时挂在两处 ——
-//   data-tip（CSS 浮窗，给鼠标用户）
-//   aria-label（读屏用户拿不到 ::after 的内容）
+//   data-tip（公共提示浮层，给鼠标用户）
+//   aria-label（读屏直接获取说明）
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";

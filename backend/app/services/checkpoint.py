@@ -96,6 +96,31 @@ def begin_turn(text: str, gen: int, at: str) -> bool:
         return True
 
 
+def discard_unanswered_turn(gen: int, at: str) -> None:
+    """Remove this turn's provisional user row only when it has no reply.
+
+    Generation guards protect loaded/interrupted history. Match this turn by its
+    timestamp, and stop at the next user boundary so newer turns stay intact.
+    """
+    with db.tx() as c:
+        cur = c.execute("SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)).fetchone()
+        if cur is None or int(cur["generation"]) != gen:
+            return
+        user = c.execute(
+            "SELECT seq FROM messages WHERE session_id=? AND role='user' AND at=?"
+            " ORDER BY seq DESC LIMIT 1", (LIVE_ID, at),
+        ).fetchone()
+        if user is None:
+            return
+        following = c.execute(
+            "SELECT role FROM messages WHERE session_id=? AND seq>? ORDER BY seq LIMIT 1",
+            (LIVE_ID, user["seq"]),
+        ).fetchone()
+        if following is not None and following["role"] == "assistant":
+            return
+        c.execute("DELETE FROM messages WHERE session_id=? AND seq=?", (LIVE_ID, user["seq"]))
+
+
 def append_sentence(text: str, gen: int, at: str) -> bool:
     """assistant 单句落账：代际一致才写入；读档/打断后 gen 漂移 → 丢弃。
 

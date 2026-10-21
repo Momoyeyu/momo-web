@@ -3,8 +3,8 @@
 // 前端只消费**句事件**（sentence）并逐句上屏/朗读。
 //
 // SSE 协议（每行 `data: <json>`）：
-//   {"t":"sentence","no","text","dirs","at"}  一句话已落账（正文已剥离指令，
-//                                         dirs 是该句要触发的表情/动作及句内偏移）
+//   {"t":"sentence","no","text","cues","at"}  一句话已落账（正文已剥离指令，
+//                                         cues 是该句要触发的表情/动作及句内偏移）
 //   {"t":"done"}                       回合结束
 //   {"t":"error","message":"…"}        回合失败（yield 给调用方映射成 Error）
 
@@ -33,15 +33,10 @@ export function interrupt(user: string, assistant: string): Promise<void> {
   }
 }
 
-/** 句子携带的指令：kind=exp 切表情 / motion 播动作，offset 为句内字符位置。 */
-export interface SentenceDir {
-  kind: "exp" | "motion";
-  name: string;
-  offset: number;
-}
+import type { PerformanceCue, PresentationSnapshot } from "../live2d/performanceTypes";
 
 export type ChatEvent =
-  | { t: "sentence"; no: number; text: string; dirs: SentenceDir[]; at: string }
+  | { t: "sentence"; no: number; text: string; cues: PerformanceCue[]; at: string }
   | { t: "done" }
   | { t: "error"; message: string };
 
@@ -61,7 +56,7 @@ function parseEvent(data: string): ChatEvent | null {
       text?: unknown;
       message?: unknown;
       no?: unknown;
-      dirs?: unknown;
+      cues?: unknown;
       at?: unknown;
     };
     if (j.t === "sentence" && typeof j.text === "string") {
@@ -69,7 +64,7 @@ function parseEvent(data: string): ChatEvent | null {
         t: "sentence",
         no: typeof j.no === "number" ? j.no : 0,
         text: j.text,
-        dirs: Array.isArray(j.dirs) ? (j.dirs as SentenceDir[]) : [],
+        cues: Array.isArray(j.cues) ? (j.cues as PerformanceCue[]) : [],
         at: typeof j.at === "string" ? j.at : "",
       };
     }
@@ -94,13 +89,14 @@ function parseEvent(data: string): ChatEvent | null {
 export async function* chat(
   text: string,
   signal?: AbortSignal,
+  presentation: PresentationSnapshot | null = null,
 ): AsyncGenerator<ChatEvent> {
   let res: Response;
   try {
     res = await fetch("/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, presentation }),
       signal: signal ?? null,
     });
   } catch (e) {

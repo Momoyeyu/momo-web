@@ -1,6 +1,32 @@
 import type { Dict } from "./zh";
 
 export const ja: Dict = {
+  performance: {
+    label: "名前",
+    desc: "実際の動き",
+    context: "使用場面",
+    raw: "元の動作",
+    composed: "合成",
+
+    progress: "プレビューの進行状況",
+    previewItem: "{name} をプレビュー",
+    resourceHint: "一覧の再生ボタンで確認できます。AI 用に無効にした項目もプレビューできます。",
+    unavailable: "プレビューを表示できません。モデルのファイルを確認して開き直してください。",
+    closeUp: "クローズアップ",
+    fullBody: "全身",
+    preview: "演出プレビュー",
+    face: "現在の表情",
+    neutral: "通常",
+    loading: "モデルを準備中…",
+    demo: "演出サンプル",
+    reset: "通常に戻す",
+    hint: "プレビュー中は AI の演出を一時停止します。通常に戻すと会話に追従します。",
+    trace: "演出ログ",
+    noCue: "演出指示はまだありません",
+    demoText: "来てくれた！でも、さっきまでどこにいたの？ずっと待ってたわけじゃないよ。",
+    enabled: "AI の操作を許可",
+  },
+
   common: {
     backTitle: "タイトルへ戻る",
     backChat: "会話へ戻る",
@@ -201,7 +227,7 @@ export const ja: Dict = {
     errMissing: "モデル記述ファイルが参照するファイルが zip 内にありません",
     errStore: "モデルの保存に失敗しました（ブラウザのストレージが使えません）",
     resources: "表情とモーション",
-    resHint: "各項目に意味を一言書くと、momo が会話の中で意味を見て使い分けます。",
+    resHint: "名前、実際に見える動き、使用する場面を分けて設定します。",
     expList: "表情",
     motionList: "モーション",
     descPh: "意味（任意）",

@@ -273,7 +273,7 @@ test("拓展 tab：点模型卡片弹出「表情与动作」，并可按名检�
   await expect(page.locator(".modal-meta")).toContainText("表情与动作");
   const row = page.locator(".avatar-res-row").first();
   await expect(row).toBeVisible();
-  const desc = row.locator("input");
+  const desc = row.locator(".avatar-res-desc");
   const before = await desc.inputValue();
   await desc.fill("e2e-描述");
   await expect(desc).toHaveValue("e2e-描述");

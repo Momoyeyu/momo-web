@@ -1,3 +1,4 @@
+import TooltipLayer from "./ui/TooltipLayer";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import StageCanvas from "./live2d/StageCanvas";
 import Title from "./pages/Title";
@@ -78,11 +79,13 @@ export default function App() {
 
   // 对话框不透明度 → CSS 变量，保存后即时生效。
   useEffect(() => {
-    const apply = (): void =>
+    const apply = (): void => {
+      document.documentElement.lang = getSettings().general.lang === "zh" ? "zh-CN" : getSettings().general.lang;
       document.documentElement.style.setProperty(
         "--dialog-alpha",
         String(getSettings().general.dialogOpacity / 100),
       );
+    };
     apply();
     return subscribe(apply);
   }, []);
@@ -184,13 +187,15 @@ export default function App() {
         return (
           <div
             key={p.id}
-            className={`page-wrap${cls}`}
+            className={`page-wrap${p.route === "chat" ? " is-chat" : ""}${cls}`}
             aria-hidden={top ? undefined : true}
           >
             {renderPage(p.route)}
           </div>
         );
       })}
+
+      <TooltipLayer />
 
       {/* 换场特效：落点 + 水面光晕（涟漪环已删——正圆光环盖过不规则边缘） */}
       <div className="tx-fx" aria-hidden="true">

@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any, Iterator
 
 from ..core import llm, mcp
+from ..core.performance import allowed_act
 from ..core.sentences import Sentence, SentenceStream
 from ..core import db
 from ..core.state import load as load_state
@@ -29,32 +30,52 @@ SUMMARY_PREFIX = "以下是本次对话此前部分的摘要，其后的最新�
 # ==================== 主流程 ====================
 
 
-def run_turn(text: str) -> Iterator[TurnEvent]:
+def run_turn(text: str, presentation: dict | None = None) -> Iterator[TurnEvent]:
     """一回合：yield 增量/错误事件（结束即返回）。流程见 services/turn.py。"""
     state = load_state()
-    messages = build_messages(state, text)  # 节点 B
+    messages = build_messages(state, text, presentation)  # 节点 B
 
     at, gen = db.now_iso(), checkpoint.generation()  # 代际快照
     if not checkpoint.begin_turn(text, gen, at):
         return  # 会话已被读档/重置 → 本回合静默作废
 
-    with mcp.open_tools(state["settings"]["extensions"], builtin_names()) as ext_tools:
-        yield from react(messages, ext_tools, state, gen, at)  # 节点 R→D→E→CNT→H
+    try:
+        with mcp.open_tools(state["settings"]["extensions"], builtin_names()) as ext_tools:
+            for event in react(messages, ext_tools, state, gen, at, presentation):
+                if event["t"] == "error":
+                    # Roll back before publishing the error so a retry's prompt
+                    # cannot pick up an unanswered, failed input.
+                    checkpoint.discard_unanswered_turn(gen, at)
+                yield event
+    finally:
+        # Also handles setup exceptions, empty/control-only responses and close.
+        checkpoint.discard_unanswered_turn(gen, at)
 
 
 # ==================== 节点实现 ====================
 
 
-def build_messages(state: State, text: str) -> list[ChatMessage]:
+def build_messages(state: State, text: str, presentation: dict | None = None) -> list[ChatMessage]:
     """节点 B：system prompt + 压缩摘要（若有）+ 最近窗口 history + 本回合输入。"""
     messages: list[ChatMessage] = [
-        {"role": "system", "content": build_system_prompt(state, memory.pins())}
+        {"role": "system", "content": build_system_prompt(state, memory.pins(), presentation)}
     ]
     summary = checkpoint.live_summary().strip()
     if summary:
         messages.append({"role": "system", "content": SUMMARY_PREFIX + summary})
     for past in _merge_assistant(checkpoint.live_messages())[-HISTORY_WINDOW:]:
         messages.append(past)
+    if presentation and presentation['expressions']:
+        # History intentionally stores pure dialogue. Re-state the live output mode
+        # after it so plain historical messages do not suppress this turn's acting.
+        messages.append({'role': 'system', 'content': (
+            'Live performance mode remains active for THIS reply, even though past dialogue contains no controls. '
+            'Act out your response using fitting controls; use expression:null when none of the available faces fits serious comfort or displeasure. Place a cue before the relevant words, '
+            'and switch within a sentence at a meaningful turn rather than only between sentences. '
+            'For serious listening or sincere displeasure, begin with <|ACT {"expression":null}|>; do not use the first resource as a default opening. '
+            'Use the catalog descriptions to choose the fitting face, speak in the configured language, '
+            'and do not copy the example text or explain your controls.'
+        )})
     messages.append({"role": "user", "content": text})
     return messages
 
@@ -87,6 +108,7 @@ def react(
     state: State,
     gen: int,
     at: str,
+    presentation: dict | None = None,
 ) -> Iterator[TurnEvent]:
     """节点 R→D→E→CNT→H：流式调 LLM，正文**边到边切句落账并推句事件**。
 
@@ -107,15 +129,16 @@ def react(
     def take(sent: Sentence) -> TurnEvent | None:
         """成句 → 落账 → 句事件；None = 代际漂移（读档/打断），调用方应停止。"""
         nonlocal seq
-        if not checkpoint.append_sentence(sent.text, gen, at):
+        if checkpoint.generation() != gen or (sent.text and not checkpoint.append_sentence(sent.text, gen, at)):
             return None
         ev: TurnEvent = {
             "t": "sentence",
             "no": seq,
             "text": sent.text,
-            "dirs": [
-                {"kind": d.kind, "name": d.name, "offset": d.offset}
-                for d in sent.dirs
+            "cues": [
+                {"id": f"{seq}:{i}", "offset": c.offset, **payload}
+                for i, c in enumerate(sent.cues)
+                if (payload := allowed_act(c.payload, presentation))
             ],
             "at": at,
         }

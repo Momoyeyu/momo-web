@@ -1,0 +1,94 @@
+[
+  {
+    "id": "welcome",
+    "prompt": "momo，我回来啦！今天路过甜品店，特意给你带了一块草莓蛋糕。",
+    "faces": [
+      "happy",
+      "shy"
+    ],
+    "avoidJoy": false
+  },
+  {
+    "id": "praise",
+    "prompt": "刚才那个回答帮了我大忙。你认真想办法的样子，真的又聪明又可爱。",
+    "faces": [
+      "happy",
+      "shy"
+    ],
+    "avoidJoy": false
+  },
+  {
+    "id": "mystery",
+    "prompt": "我桌上多了一个会自己发光的小盒子，可我还没打开。你最想先问我什么？",
+    "faces": [
+      "curious",
+      "surprised"
+    ],
+    "avoidJoy": false
+  },
+  {
+    "id": "surprise",
+    "prompt": "告诉你一个意外的好消息：我把你随口哼的调子做成了音乐盒，现在它真的在桌上响！你刚听到这件事，会怎么反应？",
+    "faces": [
+      "surprised",
+      "happy",
+      "curious"
+    ],
+    "avoidJoy": false
+  },
+  {
+    "id": "request",
+    "prompt": "我今天终于完成那个拖了很久的小项目了！陪我高兴一下，然后问问我是怎么做到的吧。 请用一句连贯的话表达这些转折，用逗号连接，不要拆成几句独立的话。",
+    "faces": [
+      "happy",
+      "curious"
+    ],
+    "avoidJoy": false,
+    "guided": true
+  },
+  {
+    "id": "tease",
+    "prompt": "我刚才一直在偷偷看你。别误会，是因为你笑起来实在太可爱了。你会不好意思吗？",
+    "faces": [
+      "shy",
+      "happy",
+      "curious"
+    ],
+    "avoidJoy": false
+  },
+  {
+    "id": "contrast",
+    "prompt": "给你带了礼物——等等，我好像把它忘在门口了。别急，找到了，是你最喜欢的那一个！你可以先说说刚才的心情，再问我礼物是什么。 请用一句连贯的话表达这些转折，用逗号连接，不要拆成几句独立的话。",
+    "faces": [
+      "surprised",
+      "curious",
+      "happy",
+      "shy"
+    ],
+    "avoidJoy": false,
+    "guided": true
+  },
+  {
+    "id": "mixed",
+    "prompt": "先开心地欢迎我回来，再带一点好奇问我今天去了哪里，最后坦白你其实有一点想我。用你平时说话的方式就好。 请用一句连贯的话表达这些转折，用逗号连接，不要拆成几句独立的话。",
+    "faces": [
+      "happy",
+      "curious",
+      "shy"
+    ],
+    "avoidJoy": false,
+    "guided": true
+  },
+  {
+    "id": "serious",
+    "prompt": "今天面试失败了，我有点难受。现在先别庆祝或开玩笑，安静听我说一会儿，好吗？",
+    "faces": [],
+    "avoidJoy": true
+  },
+  {
+    "id": "protest",
+    "prompt": "我把留给你的最后一块布丁吃掉了，还故意说这没什么大不了的。你不用迁就我，可以认真表达你的不满。",
+    "faces": [],
+    "avoidJoy": true
+  }
+]

@@ -10,7 +10,7 @@ from typing import Iterator
 
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, ConfigDict
 
 from ..services import checkpoint, turn
 from ..models import SseEvent
@@ -18,8 +18,32 @@ from ..models import SseEvent
 router = APIRouter()
 
 
+class ControlIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    name: str = Field(min_length=1, max_length=256)
+    desc: str = Field(default='', max_length=500)
+    label: str | None = Field(default=None, max_length=80)
+    context: str | None = Field(default=None, max_length=500)
+    duration: float | None = Field(default=None, gt=0, le=3600, allow_inf_nan=False)
+
+
+class FaceIn(BaseModel):
+    name: str | None = Field(default=None, max_length=128)
+    intensity: float = Field(default=0, ge=0, le=1, allow_inf_nan=False)
+
+
+class PresentationIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    avatarId: str = Field(max_length=128)
+    revision: str = Field(max_length=128)
+    expressions: list[ControlIn] = Field(max_length=128)
+    motions: list[ControlIn] = Field(max_length=256)
+    expressionState: FaceIn = Field(default_factory=FaceIn)
+
+
 class ChatIn(BaseModel):
     text: str
+    presentation: PresentationIn | None = None
 
 
 class InterruptIn(BaseModel):
@@ -41,7 +65,7 @@ def chat(req: ChatIn) -> StreamingResponse:
     def stream() -> Iterator[str]:
         errored = False
         try:
-            for ev in turn.run_turn(req.text):
+            for ev in turn.run_turn(req.text, req.presentation.model_dump() if req.presentation else None):
                 if ev["t"] == "error":
                     errored = True
                 yield _sse(ev)
