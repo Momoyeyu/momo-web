@@ -1,0 +1,52 @@
+{
+  "meta": {
+    "title": "当前基线：多个快照与单浏览器队列"
+  },
+  "nodes": [
+    {
+      "id": "web",
+      "label": "Web / Tauri React",
+      "row": 0,
+      "col": 0
+    },
+    {
+      "id": "brain",
+      "label": "Python ReAct / soul / memory",
+      "row": 0,
+      "col": 1
+    },
+    {
+      "id": "history",
+      "label": "live 最多100条 + 摘要删原文",
+      "kind": "store",
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": "tools",
+      "label": "Python MCP per-turn hub",
+      "row": 1,
+      "col": 1
+    },
+    {
+      "id": "promotion",
+      "label": "手动迁移共享源码",
+      "row": 1,
+      "col": 0
+    }
+  ],
+  "edges": [
+    {
+      "from": "web",
+      "to": "brain"
+    },
+    {
+      "from": "brain",
+      "to": "history"
+    },
+    {
+      "from": "brain",
+      "to": "tools"
+    }
+  ]
+}
