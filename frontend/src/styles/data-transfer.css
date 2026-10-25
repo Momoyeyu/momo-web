@@ -1,0 +1,27 @@
+.general-settings { display: flex; flex-direction: column; gap: 16px; }
+.data-transfer-panel { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 16px 24px; }
+.data-transfer-copy { min-width: 0; }
+.data-transfer-copy .opt-group { margin: 0 0 8px; }
+.data-transfer-copy p { margin: 0; color: var(--text-dim); font-size: 12px; line-height: 1.7; }
+.data-transfer-actions { display: grid; grid-template-columns: repeat(2,max-content); gap: 10px; }
+.data-transfer-actions button { min-width: 100px; padding: 8px 16px; white-space: nowrap; }
+.data-transfer-error { grid-column: 1 / -1; margin: 0; }
+@container (max-width: 1050px) {
+  .data-transfer-panel { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .data-transfer-actions { justify-content: start; }
+}
+
+.data-transfer-busy {
+  color: var(--text);
+  width: min(360px, 92vw);
+}
+.data-transfer-busy:not([open]) {
+  display: none;
+}
+.data-transfer-busy::backdrop {
+  background: rgba(24, 21, 31, 0.6);
+  backdrop-filter: blur(6px);
+}
+.data-transfer-busy p {
+  margin: 0;
+}

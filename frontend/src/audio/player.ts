@@ -20,6 +20,8 @@ export class TtsPlayer {
   onMouthOpen: ((value: number) => void) | null = null;
   /** 播放队列播空（一句话/一轮播完）。 */
   onDrain: (() => void) | null = null;
+  /** Autoplay blocked or worklet unavailable: caller falls back to subtitles. */
+  onUnavailable: (() => void) | null = null;
 
   private ctx: AudioContext | null = null;
   private node: AudioWorkletNode | null = null;
@@ -30,6 +32,7 @@ export class TtsPlayer {
   private mouth = 0;
   private _playing = false;
   private volume = 1;
+  private paused = false;
   /** 当前音频采样率（GPT-SoVITS 随模型版本变化，由 TTS 响应头决定）。 */
   private rate = 24000;
 
@@ -62,6 +65,13 @@ export class TtsPlayer {
       this.pending.push(samples);
     }
     this._playing = true;
+  }
+
+  /** Keep queued PCM and its sample cursor when the meeting scene is hidden. */
+  setPaused(paused: boolean): void {
+    this.paused=paused;
+    this.node?.port.postMessage({type:"pause",paused});
+    if(paused){this.mouth=0;this.onMouthOpen?.(0);}
   }
 
   /** barge-in / stop：清空播放缓冲并立即静音，口型复位。 */
@@ -98,6 +108,8 @@ export class TtsPlayer {
       this.initPromise = this.init().catch(() => {
         // 加载失败（如 worklet 404）：重置允许下次 push 重试，ctx 复用。
         this.initPromise = null;
+        this.stop();
+        this.onUnavailable?.();
       });
     }
     if (this.ctx && this.ctx.state !== "closed") {
@@ -111,8 +123,15 @@ export class TtsPlayer {
     await ctx.audioWorklet.addModule("/worklets/pcm-player.js");
     // init 期间被 dispose → ctx 已换主，放弃建图。
     if (this.ctx !== ctx) return;
+    if (ctx.state !== "running") {
+      this.initPromise = null;
+      this.stop();
+      this.onUnavailable?.();
+      return;
+    }
     const node = new AudioWorkletNode(ctx, "pcm-player");
     node.port.onmessage = (ev: MessageEvent<WorkletOutMsg>) => this.onWorkletMsg(ev.data);
+    node.port.postMessage({type:"pause",paused:this.paused});
     const gain = ctx.createGain();
     gain.gain.value = this.volume;
     node.connect(gain);
@@ -129,7 +148,7 @@ export class TtsPlayer {
 
   private onWorkletMsg(msg: WorkletOutMsg): void {
     if (!msg) return;
-    if (msg.type === "rms") {
+    if (msg.type === "rms" && !this.paused) {
       const target = Math.min(1, (msg.rms ?? 0) * MOUTH_GAIN);
       const k = target > this.mouth ? MOUTH_ATTACK : MOUTH_RELEASE;
       this.mouth += (target - this.mouth) * k;

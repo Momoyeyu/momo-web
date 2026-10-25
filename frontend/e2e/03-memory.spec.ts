@@ -20,7 +20,7 @@ async function purgeMemories(request: APIRequestContext): Promise<void> {
 
 /** 造一条记忆（走 UI，顺便验证添加弹窗）。 */
 async function addViaUi(page: import("@playwright/test").Page, text: string): Promise<void> {
-  await page.locator(".list-toolbar .icon-btn").click();
+  await page.getByRole("button", {name: "添加记忆", exact: true}).click();
   await expect(page.locator(".modal-overlay")).toBeVisible();
   await page.locator(".add-field").fill(text);
   await page.locator(".modal-foot").getByText("保存").click();
@@ -48,6 +48,7 @@ test("空态 → 添加 → 出现在列表 → 删除", async ({ page }) => {
   // 且要在点击之前注册。
   page.on("dialog", (d) => void d.accept());
   await card(page, `${PREFIX}喜欢吃草莓蛋糕`).getByLabel("删除").click();
+  await page.locator(".confirm-box").getByRole("button", {name: "删除", exact: true}).click();
   await expect(card(page, `${PREFIX}喜欢吃草莓蛋糕`)).toHaveCount(0);
 });
 
@@ -81,11 +82,11 @@ test("检索过滤命中集，空结果显示空态", async ({ page }) => {
   await addViaUi(page, alpha);
   await addViaUi(page, beta);
 
-  await page.locator(".list-search").fill("ALPHA");
+  await page.locator(".mem-panel .list-search").fill("ALPHA");
   await expect(card(page, alpha)).toBeVisible();
   await expect(card(page, beta)).toHaveCount(0);
 
-  await page.locator(".list-search").fill("不存在的关键词xyz");
+  await page.locator(".mem-panel .list-search").fill("不存在的关键词xyz");
   await expect(page.locator(".mem-panel .muted", { hasText: "没有匹配的记忆" })).toBeVisible();
 });
 

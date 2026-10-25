@@ -38,9 +38,9 @@ test("控件态：输入为空时发送禁用，工具条与状态条齐备", as
 
   // 工具条已全部图标化：可见文案转为 aria-label（鼠标看 tooltip、读屏看这个）
   const labels = await page
-    .locator(".chat-toolbar .tb")
+    .locator(".chat-toolbar button.tb[aria-label]")
     .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
-  expect(labels).toEqual(["记录", "存档", "读档", "语音·开", "设置", "返回标题"]);
+  expect(labels).toEqual(["记录", "语音·开", "设置", "返回标题"]);
 });
 
 test("真实回合：发送 → 逐句上屏 → 落账 → backlog 可见，且指令被剥离", async ({

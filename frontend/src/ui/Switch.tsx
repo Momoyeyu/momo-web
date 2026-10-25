@@ -17,6 +17,7 @@ export default function Switch({
       type="button"
       role="switch"
       aria-checked={on}
+      aria-label={title}
       className={`switch${on ? " on" : ""}`}
       disabled={disabled}
       title={title}

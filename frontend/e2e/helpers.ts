@@ -1,11 +1,10 @@
 // E2E 公共工具：路由跳转、配置快照/还原、定位器辅助。
 //
-// 测试打的是你正在跑的开发实例（:5173 → :7821），所以写状态的用例
-// 一律用 stateSnapshot/stateRestore 包住，跑完把 momo.yaml 原样还原。
+// 测试必须打显式 MOMO_E2E_BASE_URL 隔离实例；配置快照仅用于测试间还原。
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
-/** 应用外壳（五条路由各自的根容器）。 */
-const SHELL = ".title-screen, .chat-page, .settings-page, .backlog-page, .checkpoint-page";
+/** 应用外壳（四条路由各自的根容器）。 */
+const SHELL = ".title-screen, .chat-page, .settings-page, .backlog-page";
 
 /**
  * 打开某条路由。
@@ -17,10 +16,18 @@ const SHELL = ".title-screen, .chat-page, .settings-page, .backlog-page, .checkp
 export async function gotoRoute(page: Page, route = "title"): Promise<void> {
   await page.goto(`/#/${route}`);
   await expect(page.locator(SHELL).first()).toBeVisible();
+  // A mounted shell can still be behind startup or a scene/dialogue entrance.
+  // Functional tests type only once real players can interact with that shell.
+  await expect.poll(() => page.locator(SHELL).first().evaluate(element => !element.closest('[inert]'))).toBe(true);
 }
 
 /** 兼容旧名。 */
 export const openApp = gotoRoute;
+
+/** Chat mounts before its scene/dialogue entry releases keyboard input. */
+export async function waitForChatReady(page: Page): Promise<void> {
+  await expect.poll(() => page.locator('.chat-page').evaluate(element => !element.closest('[inert]'))).toBe(true);
+}
 
 /** 进设置页的某个 tab（tab 名按当前界面语言取，调用方给 zh 字面量即可）。 */
 export async function openTab(page: Page, label: string): Promise<void> {
@@ -122,3 +129,13 @@ export async function pickSelect(
   await fieldRow(page, label, scope).locator(".sel-face").click();
   await page.locator(".sel-opt").filter({ hasText: option }).first().click();
 }
+
+// Every spec targets isolated data. Release its real meeting before the next
+// browser document, without taking over another window or waiting for TTL.
+test.afterEach(async ({page}) => {
+  if (page.isClosed()) return;
+  await page.evaluate(async () => {
+    const resource=performance.getEntriesByType('resource').find(entry=>new URL(entry.name).pathname==='/src/services/meetingClient.ts');
+    if (resource) await (await import(resource.name)).leaveMeeting();
+  }).catch(()=>{});
+});

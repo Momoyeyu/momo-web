@@ -11,14 +11,16 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "mock": "node scripts/mock-services.mjs",
-    "gen:api": "node scripts/gen-api.mjs"
+    "gen:api": "node scripts/gen-api.mjs",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "jszip": "^3.10.2",
     "pixi-live2d-display": "0.5.0-beta",
     "pixi.js": "^7.4.3",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "@pixi/unsafe-eval": "7.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

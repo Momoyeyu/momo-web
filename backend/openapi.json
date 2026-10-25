@@ -1,6 +1,55 @@
 {
   "components": {
     "schemas": {
+      "AckIn": {
+        "properties": {
+          "clientId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clientid"
+          },
+          "generation": {
+            "minimum": 0.0,
+            "title": "Generation",
+            "type": "integer"
+          },
+          "leaseId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaseid"
+          },
+          "runId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Runid",
+            "type": "string"
+          },
+          "text": {
+            "maxLength": 128000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "runId",
+          "generation",
+          "text"
+        ],
+        "title": "AckIn",
+        "type": "object"
+      },
       "Body_upload_ref_api_tts_ref_post": {
         "properties": {
           "file": {
@@ -17,6 +66,47 @@
       },
       "ChatIn": {
         "properties": {
+          "clientId": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clientid"
+          },
+          "firstMeeting": {
+            "default": false,
+            "title": "Firstmeeting",
+            "type": "boolean"
+          },
+          "leaseId": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaseid"
+          },
+          "messageId": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messageid"
+          },
           "presentation": {
             "anyOf": [
               {
@@ -307,6 +397,51 @@
             "title": "Assistant",
             "type": "string"
           },
+          "clientId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clientid"
+          },
+          "generation": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation"
+          },
+          "leaseId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaseid"
+          },
+          "runId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runid"
+          },
           "user": {
             "default": "",
             "title": "User",
@@ -314,6 +449,33 @@
           }
         },
         "title": "InterruptIn",
+        "type": "object"
+      },
+      "LeaseIn": {
+        "properties": {
+          "clientId": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Clientid",
+            "type": "string"
+          },
+          "leaseId": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaseid"
+          }
+        },
+        "required": [
+          "clientId"
+        ],
+        "title": "LeaseIn",
         "type": "object"
       },
       "LiveTranscript": {
@@ -431,6 +593,44 @@
         "title": "MemoryPatch",
         "type": "object"
       },
+      "OpeningIn": {
+        "properties": {
+          "clientId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clientid"
+          },
+          "leaseId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaseid"
+          },
+          "presentation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PresentationIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "OpeningIn",
+        "type": "object"
+      },
       "PresentationIn": {
         "additionalProperties": false,
         "properties": {
@@ -471,6 +671,34 @@
           "motions"
         ],
         "title": "PresentationIn",
+        "type": "object"
+      },
+      "Probe": {
+        "properties": {
+          "key": {
+            "default": "",
+            "title": "Key",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "thinking": {
+            "default": false,
+            "title": "Thinking",
+            "type": "boolean"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "Probe",
         "type": "object"
       },
       "ProbeResult": {
@@ -527,12 +755,39 @@
             "title": "At",
             "type": "string"
           },
+          "eventId": {
+            "title": "Eventid",
+            "type": "string"
+          },
+          "externalMessageId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Externalmessageid"
+          },
           "role": {
             "enum": [
               "user",
               "assistant"
             ],
             "title": "Role",
+            "type": "string"
+          },
+          "runId": {
+            "title": "Runid",
+            "type": "string"
+          },
+          "seq": {
+            "title": "Seq",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
             "type": "string"
           },
           "text": {
@@ -960,6 +1215,54 @@
         "summary": "Load Checkpoint"
       }
     },
+    "/api/data/export": {
+      "get": {
+        "operationId": "export_data_api_data_export_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Export Data"
+      }
+    },
+    "/api/data/import": {
+      "post": {
+        "operationId": "import_data_api_data_import_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Import Data"
+      }
+    },
+    "/api/data/validate": {
+      "post": {
+        "operationId": "validate_data_api_data_validate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Validate Data"
+      }
+    },
     "/api/extensions/probe": {
       "post": {
         "description": "对一条拓展记录做 connect + list_tools + close 探测。\n\nbody = 单条拓展配置 JSON（来自设置页，未校验故按 dict 收）；返回形状见 models.ProbeResult。\n失败不抛错——不可达的 server 只是不可见，探测本身永不阻塞 UI。",
@@ -1001,6 +1304,128 @@
         "summary": "Probe Extension"
       }
     },
+    "/api/health": {
+      "get": {
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/api/life/ack": {
+      "post": {
+        "operationId": "acknowledge_api_life_ack_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Acknowledge"
+      }
+    },
+    "/api/life/history": {
+      "get": {
+        "operationId": "continuous_history_api_life_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Continuous History"
+      }
+    },
+    "/api/life/live": {
+      "get": {
+        "operationId": "continuous_transcript_api_life_live_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Continuous Transcript"
+      }
+    },
     "/api/live2d/core": {
       "get": {
         "operationId": "cubism_core_api_live2d_core_get",
@@ -1015,6 +1440,130 @@
           }
         },
         "summary": "Cubism Core"
+      }
+    },
+    "/api/meeting": {
+      "get": {
+        "operationId": "status_api_meeting_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status"
+      }
+    },
+    "/api/meeting/enter": {
+      "post": {
+        "operationId": "enter_api_meeting_enter_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeaseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enter"
+      }
+    },
+    "/api/meeting/heartbeat": {
+      "post": {
+        "operationId": "heartbeat_api_meeting_heartbeat_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeaseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Heartbeat"
+      }
+    },
+    "/api/meeting/leave": {
+      "post": {
+        "operationId": "leave_api_meeting_leave_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LeaseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Leave"
       }
     },
     "/api/memories": {
@@ -1153,6 +1702,114 @@
           }
         },
         "summary": "Update Memory"
+      }
+    },
+    "/api/onboarding": {
+      "get": {
+        "operationId": "status_api_onboarding_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status"
+      }
+    },
+    "/api/onboarding/opening": {
+      "post": {
+        "operationId": "opening_api_onboarding_opening_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpeningIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Opening"
+      }
+    },
+    "/api/probe/llm": {
+      "post": {
+        "operationId": "llm_probe_api_probe_llm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Probe"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Llm Probe"
+      }
+    },
+    "/api/resources/status": {
+      "get": {
+        "operationId": "resources_status_api_resources_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resources Status Api Resources Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Resources Status"
       }
     },
     "/api/state": {

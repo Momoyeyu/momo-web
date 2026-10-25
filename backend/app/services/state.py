@@ -23,3 +23,13 @@ def read() -> dict[str, Any]:
 def replace(payload: dict[str, Any]) -> None:
     """整体替换配置。"""
     config.write_state(payload)
+    from .coordinator import runtime
+
+    if runtime.started:
+        from .extend import configure
+
+        configure(config.load()["settings"]["extensions"])
+
+
+def migrate_legacy_services() -> bool:
+    return config.retire_legacy_services()

@@ -1,0 +1,2028 @@
+{
+  "source": "Momoyeyu/momo-web",
+  "head": "dd7f580b90e2f91cabcf5d353bfb343b129a67d9",
+  "snapshotIncludesUncommittedAcceptedChanges": true,
+  "capturedAt": "2026-10-22",
+  "files": [
+    {
+      "path": "backend/README.md",
+      "sha256": "3ca7227ae4140cb19a0a665d3e3772609443445e407ff09f27c02f1bf9488430"
+    },
+    {
+      "path": "backend/app/__init__.py",
+      "sha256": "b070e2ed0c4e2a1f0168718f36ea69c418c4b2f508485436c38118a249b7d088"
+    },
+    {
+      "path": "backend/app/api/__init__.py",
+      "sha256": "e9becf3798512bd7b555473d2af077955a56308d002e6e849e27a94aeee2e62d"
+    },
+    {
+      "path": "backend/app/api/asr.py",
+      "sha256": "61c224d44ef0e52f85c7dde32a6094323179ff5769deb2f6c9d3f784d3192e6e"
+    },
+    {
+      "path": "backend/app/api/chat.py",
+      "sha256": "f277b2f936344cc7d43f20965835d89b658ba74d0943e274cc25c77a69ba9645"
+    },
+    {
+      "path": "backend/app/api/checkpoints.py",
+      "sha256": "8a226b28f2c12ddc571778ceea73569a860827d44b89580aa9f62e23a41ba39e"
+    },
+    {
+      "path": "backend/app/api/extensions.py",
+      "sha256": "d40d3e4c0334ef293ac8be96fbe8447990d786e94f0d02d4d7c7492e9dad5099"
+    },
+    {
+      "path": "backend/app/api/live2d.py",
+      "sha256": "92f14543470ff25d3fcd42340f8083e9021a6b720b19b860c197e849153948a1"
+    },
+    {
+      "path": "backend/app/api/memories.py",
+      "sha256": "2a128acdf8a898d7f9c20eaf3a14036ff868bbd7c1f1248d7e1216cde3470594"
+    },
+    {
+      "path": "backend/app/api/onboarding.py",
+      "sha256": "acf89cd88cb88cd11d0daf93081eaa24efaf8d5ef6eb31fc925a6edee2f8e101"
+    },
+    {
+      "path": "backend/app/api/resources.py",
+      "sha256": "7102584959e82b41fb18d5ff33a0256a8a3e2a6ee431569d64c1b63da00c51a1"
+    },
+    {
+      "path": "backend/app/api/state.py",
+      "sha256": "9e25ccf4df485055113b49e300742752d7cedbdca9456dda1e1317d43a3b03d0"
+    },
+    {
+      "path": "backend/app/api/tts.py",
+      "sha256": "9f8dcd705d1de727db91d6819cbbffa0ee64f2c8ccd9cb42fed19601a8dff063"
+    },
+    {
+      "path": "backend/app/core/db.py",
+      "sha256": "60b11ee47237c1f3f461ded3fb6c1842c0ea094214a4567dc7c3d6fae1a68515"
+    },
+    {
+      "path": "backend/app/core/embed.py",
+      "sha256": "9d05c3d84eb6645de17af40f39ec5389e4f827afda58b0c319a0057a0680c40a"
+    },
+    {
+      "path": "backend/app/core/llm.py",
+      "sha256": "df3dab232d5222be97077ad67c730fb639c9ad3dbe584d4cd50631915fc7a78c"
+    },
+    {
+      "path": "backend/app/core/mcp.py",
+      "sha256": "2716117e30958bd8b0e19eb8bbf88f91b111e85977c3d02ea37257866ed58417"
+    },
+    {
+      "path": "backend/app/core/performance.py",
+      "sha256": "d399e0638ae8694065cef54f137412ecc665c187f04401c09bd382da8d62eab8"
+    },
+    {
+      "path": "backend/app/core/sentences.py",
+      "sha256": "b674a5fd4810ca8d72c8b5ffd0b5a8174a85fbfa1689e28dfe19fc12a38e7c68"
+    },
+    {
+      "path": "backend/app/core/state.py",
+      "sha256": "b6b0bc9bec969f7f278e5c2b088a99bee2426379b2cfc290bbc6fa4ded5bc57f"
+    },
+    {
+      "path": "backend/app/core/text.py",
+      "sha256": "77ecca8d0237e6c6598e545b5e7b991ce0afee730023bbaaf304064308a7e61c"
+    },
+    {
+      "path": "backend/app/core/time.py",
+      "sha256": "8a4043630ef14c19535d0d92f446dcc307ca311f4a5aea9fdf3357c9efffd26e"
+    },
+    {
+      "path": "backend/app/main.py",
+      "sha256": "99d2edc39a72110cb1585dab0536d1a2d9fd74680c2fdd57512629af51417146"
+    },
+    {
+      "path": "backend/app/models/__init__.py",
+      "sha256": "c3907bcd9cf2d6793d12e94442ffb2a09d3b4e560c31fc00c1036c5c4991ab98"
+    },
+    {
+      "path": "backend/app/models/memories.py",
+      "sha256": "99acf0fc5a2037767142f454756e461094c3ec771839fdd3424ae7ca0d346941"
+    },
+    {
+      "path": "backend/app/models/vectors.py",
+      "sha256": "1f924f6730cd25086c1bd9c780acc47b1a07a818cc0a4629c797918f86f57fb6"
+    },
+    {
+      "path": "backend/app/services/asr.py",
+      "sha256": "352d6431f2bc3f52b35bebbc08e3b829a9d4bec240ed7143341c200af090a27c"
+    },
+    {
+      "path": "backend/app/services/capability.py",
+      "sha256": "bca3ed3206077815b32d4423232738aa1b740b888f0b8a8f4b200807c034aaa5"
+    },
+    {
+      "path": "backend/app/services/checkpoint.py",
+      "sha256": "328eaa198dff9c03f70d3a10fd23db443b04d9f65f98a9ad6a754e5bbb63b0d5"
+    },
+    {
+      "path": "backend/app/services/compress.py",
+      "sha256": "ce61bfd245a4fb1fd0213cf4cc56cc4d7ec4ad1df41f150c047a7c47fbc6e1c6"
+    },
+    {
+      "path": "backend/app/services/extend.py",
+      "sha256": "a950851f1392e1c7c0d41a6ec0e5479bcab0376d4534c907e4df8c0d5c2b22b7"
+    },
+    {
+      "path": "backend/app/services/live2d.py",
+      "sha256": "a51be17b99f3c9db34c5e78461f2058d99c481a9496a1843a6c7c3066bb328c4"
+    },
+    {
+      "path": "backend/app/services/memory.py",
+      "sha256": "bab68e4818e68ca07dfd8882a298ef864e7bb2747eaa51c3d0904c7b20541f7c"
+    },
+    {
+      "path": "backend/app/services/onboarding.py",
+      "sha256": "56a87153ca08cf3a992c9ea75dca148759fd8a194a17e86ee7799caac88d0496"
+    },
+    {
+      "path": "backend/app/services/prompt.py",
+      "sha256": "ac49b605cc81d5b4ac01dc7a5ffb765cd1b576c9c0c791ee8c85d63f64246c74"
+    },
+    {
+      "path": "backend/app/services/resources.py",
+      "sha256": "ba499878469d029060a7215db296c63734d57c609ac148cd1df254271cd6f96b"
+    },
+    {
+      "path": "backend/app/services/state.py",
+      "sha256": "6bb3ad3911ed4341d3b87d13591e8f1e263df1d52d68c3cc0853a96b3217cdd6"
+    },
+    {
+      "path": "backend/app/services/tts.py",
+      "sha256": "2551f0e2cfc7f029a4141d1c10610b076d0866c1248134b56b3e7c0c71af6f3b"
+    },
+    {
+      "path": "backend/app/services/turn.py",
+      "sha256": "0a0513ba6c417a23fe8acc5e8f7cc6c9a70600404ad1c7bf983fa5ad550f9fbf"
+    },
+    {
+      "path": "backend/openapi.json",
+      "sha256": "444c5341a18178c0ce4c2a6cf368f31fc85ad10777cdffbe07463db98fc72701"
+    },
+    {
+      "path": "backend/pyproject.toml",
+      "sha256": "ca46b9ec31a5e76c3273f58dfbca5c3dfaf899d01a476c930218be7f834e3773"
+    },
+    {
+      "path": "backend/resources/README.md",
+      "sha256": "2a8f62cc7b440fa36556a00e97e9dc227d8295150eb532db301439c292eb7243"
+    },
+    {
+      "path": "backend/resources/asr/PROVENANCE.md",
+      "sha256": "41bbf6fb36f6fa3dc911e321707395b1a46a3d5b6c8fb1731f623a65047c1ff8"
+    },
+    {
+      "path": "backend/resources/asr/licenses/FunASR-MODEL-LICENSE",
+      "sha256": "7dba975a2069691db4992b0592d70828b330d2f8a30a71450f4e152a554e84f8"
+    },
+    {
+      "path": "backend/resources/asr/licenses/ONNX-LICENSE-REFERENCE",
+      "sha256": "f1a4057b359881cbfd625166abcd5830c92f2f54c89aaa139fd75138cd694e8e"
+    },
+    {
+      "path": "backend/resources/asr/licenses/SenseVoice-LICENSE",
+      "sha256": "4bc3bffe14ebe38cc67309991e04f92866835eac1c5e2e1abd37163f67c6de5f"
+    },
+    {
+      "path": "backend/resources/asr/licenses/Silero-VAD-LICENSE",
+      "sha256": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b"
+    },
+    {
+      "path": "backend/resources/asr/manifest.json",
+      "sha256": "4c438082fec429296854cf811f7a3b11d014b6f49d16c88a16758dbb1967aa53"
+    },
+    {
+      "path": "backend/resources/embedding/multilingual-e5-small/LICENSE",
+      "sha256": "904dc4d8749877f1dba1cda48200d2462dccbeb7c134d5e4ef6fa75e0198c8fe"
+    },
+    {
+      "path": "backend/resources/embedding/multilingual-e5-small/UPSTREAM_README.md",
+      "sha256": "0038de97aee16258cecbad7ffda4b4febd6953e747a00e0ddbc8e6ed241e9c1c"
+    },
+    {
+      "path": "backend/resources/embedding/multilingual-e5-small/manifest.json",
+      "sha256": "331730b131b022c7e2fb9da38fcdd54b3f6ce78749942d8bf223380e3820934c"
+    },
+    {
+      "path": "backend/resources/soul.md",
+      "sha256": "960071b1dba98fb454bd74ac5d58c1aa053f386bfb7e34de739a7b501b25b313"
+    },
+    {
+      "path": "backend/scripts/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "backend/scripts/benchmark_embedding.py",
+      "sha256": "27020108bdc42e4690426c281c214269d6ea8bc7cb3d94e1807aaf8bf3519909"
+    },
+    {
+      "path": "backend/scripts/benchmark_thinking.py",
+      "sha256": "b75cbabcfb153ea9f13c33d51052d6e5c78486ac4b1acc4ba365f1ebf67cd60d"
+    },
+    {
+      "path": "backend/scripts/download_asr_models.py",
+      "sha256": "357b22f2aa65a6ac38fdc76a3dbc3c52cacdd7215e80782127ad69755a2befa5"
+    },
+    {
+      "path": "backend/scripts/export_openapi.py",
+      "sha256": "190a857a9ffaea2513d4badf9eeddc4f9182c183414fdd2a42e16c5d1acbb2bb"
+    },
+    {
+      "path": "backend/scripts/package_resources.py",
+      "sha256": "869ba840a26e274f09f2b08a8acd0c2846f3a88ed64bc1f2cab43ddb977c806a"
+    },
+    {
+      "path": "backend/scripts/prepare_embedding.py",
+      "sha256": "d1b0e2a98743b0138ee9ee247334570be6d573a6cd6e89b358da38019a5ea5b4"
+    },
+    {
+      "path": "backend/tests/conftest.py",
+      "sha256": "0f907acb44d9a02aa395fa471b451b3506321f2c7f5277a529262c888e7e0fbb"
+    },
+    {
+      "path": "backend/tests/fixtures/embedding_recall.json",
+      "sha256": "a2eb68ad1cb9ffc43f5f50a64f5fa90bc42a80d59227e049513dbd20f7cc821c"
+    },
+    {
+      "path": "backend/tests/helpers/onboarding_request.py",
+      "sha256": "0e4d0a3546785582aec9224f256c5ec8d0b8ee174976954ada81057773cc0e4a"
+    },
+    {
+      "path": "backend/tests/helpers/real_performance_turn.py",
+      "sha256": "e47dd4ebd7f6834a9b67f7d00206ce5a31b722ba7f13ee1e37727f82b8a1d6a8"
+    },
+    {
+      "path": "backend/tests/test_asr.py",
+      "sha256": "3b7d7d1e6c5d586a708cf60742b907b1529399af110d4d6a460d37322b230d8c"
+    },
+    {
+      "path": "backend/tests/test_checkpoint.py",
+      "sha256": "fa5b82f41de4e287696a1ec75fff23efd55eaf8a8d7a9e667a70bc421e987ddc"
+    },
+    {
+      "path": "backend/tests/test_embedding_model.py",
+      "sha256": "eaac7da54d5ec48110f41578f23c3e69a275fa823ed00dbe0a66cf867ef4aeb1"
+    },
+    {
+      "path": "backend/tests/test_extend.py",
+      "sha256": "37fe7a364f74159039f2af66e9676cfb6cda84053c1eb7da1b5115a72468cc66"
+    },
+    {
+      "path": "backend/tests/test_layering.py",
+      "sha256": "de362291ee3c65c53e8b123ed5a05cbaa751e7890e1244c8a04b0b829211b441"
+    },
+    {
+      "path": "backend/tests/test_live2d.py",
+      "sha256": "5316d1b943a3cfbf0a512e4a87f1657329c5de1cdf14def2c1ec9678588a87e9"
+    },
+    {
+      "path": "backend/tests/test_llm_stream.py",
+      "sha256": "f37d277d7c4704e231a4983d900f85a8a6a91b26a9543c11120d77f2db42296c"
+    },
+    {
+      "path": "backend/tests/test_local_embedding.py",
+      "sha256": "54def584d348417dbd44618c6f4bebaf661ba37ae61d1d81ef5c5ac16fd2fd33"
+    },
+    {
+      "path": "backend/tests/test_loop.py",
+      "sha256": "01d38deb5ad060c077905c98010f9e35981d415fdf9b7c1139edae9902a20586"
+    },
+    {
+      "path": "backend/tests/test_memory.py",
+      "sha256": "17b2b152be971053a10527644b921d1b99c070f8dac73946cf59460631652aad"
+    },
+    {
+      "path": "backend/tests/test_native_thinking.py",
+      "sha256": "ffa44c1cb84003b68b2b5cce3e8f1597c52107b6acb70ba0c04b11f064785bdf"
+    },
+    {
+      "path": "backend/tests/test_onboarding.py",
+      "sha256": "1268f8d29ef92dd02989213dacdad5b1457a094e6d6e978dc94a5c0576d479fb"
+    },
+    {
+      "path": "backend/tests/test_openapi.py",
+      "sha256": "8a6db889ae7d47606a382ad59a5b3523d41c2498f7897c14882f324c9d732957"
+    },
+    {
+      "path": "backend/tests/test_performance.py",
+      "sha256": "9070427d4bb27cd9f8827b6257137442028b011c7c0731280c7c8ca425f88271"
+    },
+    {
+      "path": "backend/tests/test_prompt.py",
+      "sha256": "e38c0097efec52569168171dd7dae61c97d77b28d22098ca6bda48fe38034f1f"
+    },
+    {
+      "path": "backend/tests/test_resource_pack.py",
+      "sha256": "6505fc067cebc1820f162826bf1832dcb47cc6f343d9917762ec4835ab0ef6b7"
+    },
+    {
+      "path": "backend/tests/test_sentences.py",
+      "sha256": "fd2aadcfc4e40eaaddb459623860b62fb2d715ecdbd30569ff90d97f6352c000"
+    },
+    {
+      "path": "backend/tests/test_store.py",
+      "sha256": "598390442484e5a93674c26b6f01b137db036be7744b57b064e21c57e9508981"
+    },
+    {
+      "path": "backend/tests/test_tts.py",
+      "sha256": "37c33e99ba1ab27547d7c46587ac9f230e4ba807ccf8c099ecd4f7cb7e6a014f"
+    },
+    {
+      "path": "backend/uv.lock",
+      "sha256": "330b6db110073a5b890ac7a49900bdb309c5cc176e556c4df9d10ebfe449d606"
+    },
+    {
+      "path": "evaluations/2026-10-22-thinking/blind-responses.md",
+      "sha256": "a6e63f1e5c8583681efd972be81c4fcf400362057ca612b36ee941b44063dbca"
+    },
+    {
+      "path": "evaluations/2026-10-22-thinking/fixtures.json",
+      "sha256": "7c12560799a04882ebb1c1e8900a0fb7d1a756176abd8402c94d1a0bc839dcd5"
+    },
+    {
+      "path": "evaluations/2026-10-22-thinking/report.md",
+      "sha256": "d51f8de924b3d3b83575f9efa28da90b6ea842a2b45a098e66827e135fb1349a"
+    },
+    {
+      "path": "evaluations/2026-10-22-thinking/results.json",
+      "sha256": "44ed38720c47467ea691a8a5783cb2677dc891020aee3b581abe3274b9af7b9c"
+    },
+    {
+      "path": "evaluations/2026-10-22-thinking/rubric.md",
+      "sha256": "6a2823168433c952aff84fad13e1d0a75787de5fab7c5b7efc93aaed839155b0"
+    },
+    {
+      "path": "evaluations/2026-10-22-thinking/scores.json",
+      "sha256": "1ef05e21b3d0adc4fa8dddbecd4db83d07e4a6e7d587b8a95277fcc4b54187ca"
+    },
+    {
+      "path": "frontend/e2e/01-smoke.spec.ts",
+      "sha256": "16e35380137da3017e704f2a11be8da2e1fed11c4d31ed5dc965d3d4f49ac1da"
+    },
+    {
+      "path": "frontend/e2e/02-settings.spec.ts",
+      "sha256": "9d0392e37f8cc17e5d4e51a9060701c690b0520dc02a1fbe107cb6d6402da782"
+    },
+    {
+      "path": "frontend/e2e/03-memory.spec.ts",
+      "sha256": "3c5be8b2da869326544e8cf739633dcefb1c1a8c1a11de5942adbf1677f8123a"
+    },
+    {
+      "path": "frontend/e2e/05-checkpoint.spec.ts",
+      "sha256": "55c72e9aeaf654868e035ebec89e0eee5377f2a7bbf409b339eb290b3524b978"
+    },
+    {
+      "path": "frontend/e2e/06-chat.spec.ts",
+      "sha256": "451088c20d9b9ebc87abb9ebf9ec238f13a0f80bed01150971221846c4177b96"
+    },
+    {
+      "path": "frontend/e2e/07-tts.spec.ts",
+      "sha256": "6adfc5216bf1236589bfe4bb62a9ee0f654d010dac2d29681204ad300d3c1da9"
+    },
+    {
+      "path": "frontend/e2e/08-performance.spec.ts",
+      "sha256": "aaa71ae888b62d24d9947cb96aeec3d982d31c1b2830e706a3298471ef26709f"
+    },
+    {
+      "path": "frontend/e2e/09-failed-chat.spec.ts",
+      "sha256": "389ffe4af72df76c4d701a638b6258ceb0751b8b7e583dfd1e68956b35256fb4"
+    },
+    {
+      "path": "frontend/e2e/10-visual-preview.spec.ts",
+      "sha256": "aa78f69056559f845feeae6fc70aab42df9f1856fc4b2dc08fcb531c487faa60"
+    },
+    {
+      "path": "frontend/e2e/11-resource-preview.spec.ts",
+      "sha256": "6d0b2a13d3c5b0a2ff274ff6f1ba6b8de57d94d3bed20d8a9da70c7455a6b818"
+    },
+    {
+      "path": "frontend/e2e/12-overlay-layout.spec.ts",
+      "sha256": "6f1935818a7648194862392bb1a535879c148938a1146c932cddd59f57e505de"
+    },
+    {
+      "path": "frontend/e2e/13-real-performance.spec.ts",
+      "sha256": "b23196fd52499a8c0da4af3a22f829610c755bd7192bb9bdda78972aaaf18df6"
+    },
+    {
+      "path": "frontend/e2e/14-control-semantics.spec.ts",
+      "sha256": "00d157948a8e619a46adcddded2fe4838d7860088cb556f21d3b4689c488c50b"
+    },
+    {
+      "path": "frontend/e2e/15-onboarding.spec.ts",
+      "sha256": "31fab603c26b11e19f08eb595d9b64b0a7f312a89072d86670a2750baa4372ca"
+    },
+    {
+      "path": "frontend/e2e/16-builtin-models.spec.ts",
+      "sha256": "cb34cbbc31f41de5ea4dbb750f2b0c026bf323daa33f62597e2341b3012184c0"
+    },
+    {
+      "path": "frontend/e2e/README.md",
+      "sha256": "bae4a217c2d64ccbe45616e3cae6e8158307f8ecd51f33ae60332e9524685b3b"
+    },
+    {
+      "path": "frontend/e2e/fixtures/performance-prompts.json",
+      "sha256": "499d25d07fc798d2444e15f9df9d65877df1bf2a31442d2f3119883e9e6cff61"
+    },
+    {
+      "path": "frontend/e2e/helpers.ts",
+      "sha256": "4d9412fa145f6d55cbfaa83ce49e19bef111cb67691b90ac1e05b84fcf28c918"
+    },
+    {
+      "path": "frontend/e2e/helpers/runtime.ts",
+      "sha256": "e1c03836efbca437197820eb7336ea708dec07c463c2a813355a9253ecf0cc07"
+    },
+    {
+      "path": "frontend/index.html",
+      "sha256": "397f6a4cb2e89dcfb8091f5bc01e68611ad2d784a316cefd3329d05fde391ec6"
+    },
+    {
+      "path": "frontend/package.json",
+      "sha256": "489dc8332a98abb03091f1fbf9b7f89dd5c0a974663ba860b8c6fec6c25d65bd"
+    },
+    {
+      "path": "frontend/playwright.config.ts",
+      "sha256": "04c16cefc67167639db76ee56efbc2a979c48ab1d32dc3daa6b0f14166e7d9cd"
+    },
+    {
+      "path": "frontend/pnpm-lock.yaml",
+      "sha256": "e43d88fe9120716ec2be46a7d3a2cb465072faa46cf6b36087d5becd7cf24479"
+    },
+    {
+      "path": "frontend/public/favicon.svg",
+      "sha256": "0bf49f195870e8c48c725662c0ffe6d3374fde17f5be928f8ec4b3d908af2383"
+    },
+    {
+      "path": "frontend/public/fonts/README.md",
+      "sha256": "37ebf639d34ce914625114d4a3ef85c161445f2b915fb8eeb69ab070055e7ed6"
+    },
+    {
+      "path": "frontend/public/fonts/fonts.css",
+      "sha256": "d53f46495fed7e835a6b98924196a7d385479714d4933db83662defa76bf9c48"
+    },
+    {
+      "path": "frontend/public/fonts/manifest.json",
+      "sha256": "48b83d6c5a448476f0cc864fc434673c103c02d714b8f8541e0b4c3e86e6dd53"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-0017e0225f6c.woff2",
+      "sha256": "64ec79c6ea108eaaa352044d749c6eabac901bc662a823ffda7ed6ad21fa5681"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-00ccf1c5d258.woff2",
+      "sha256": "dd5d3138ee48eecf370f9e8bee418c45e5ce10ec9fe0ffdb6cc951fe4ca7976e"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-0438fc429aa1.woff2",
+      "sha256": "450ae5f071847470de2a44b2baf60f7f4fb859bdac401e5d4e60c97d42b9af64"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-095c8b1152e5.woff2",
+      "sha256": "4c2ccdbe298de0510aaaecc8a61ecf59d9001d13f3a0bcd1a9a8f26f6d73e753"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-0a0b3cd18d11.woff2",
+      "sha256": "c8422b75cf1738d4effc3516b68ed22beb1c97b6affd79fa25bb2e6c36cca9fe"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-0a4f78b5ab73.woff2",
+      "sha256": "647237e08588941b2627d4059e9e58a0209a0f791f06c86fc55344bba7af26b2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-0b7370c6937a.woff2",
+      "sha256": "8c2a1fba16aff8f8de002ef381bb24eaa0218d7daa42b4aee4b8616addae1787"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-0c0b50f6dd88.woff2",
+      "sha256": "114ad7d9c81d79a23c27bea5563d6bb80d0c0d5bb5e221734b62f85a49b8acc2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-190d6ade1b83.woff2",
+      "sha256": "25eb6189580347de1172d4a29f712b232d47eafacb78d32188039ba6f8032953"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-1aac60be9ca7.woff2",
+      "sha256": "a66e40d9ad8411665de31b37e50b3fc8bd909bf32b36271fc8bbf7e96c0b7486"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-1c9f2496d17e.woff2",
+      "sha256": "12c2a8e788f9c62e6d5cda9cea49e0e21f9f08de26a64e8c656f9bedc2c5b91e"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-1cc8b5cfebce.woff2",
+      "sha256": "d0e0403331a41f2871f3bf19a78f75d24d75c31fed91b774c404056fbe28cc7b"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-21576257bf4e.woff2",
+      "sha256": "a78b9604fb4656237c83d96288f920da6cddd3272228b4dd2830dd58df885415"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-258b86c2d343.woff2",
+      "sha256": "731c5b20b9c657706bfd360bfac26464e1f1d1856477e8eda777554d81fadac3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-28c6e7f3cae6.woff2",
+      "sha256": "431d1253162e578155d9537327de7f08e7a48f4567078d2735c8d0e1674c1931"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-2be24a8e59a4.woff2",
+      "sha256": "2b1630ea7da7295add99bb54ec43cbadff59a33b231849c7b76da39098d96ed2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-2be7f7ffc7ef.woff2",
+      "sha256": "6bbe1bcee045a41fc19aa1c4488a077120695c324ea0efd249e5b657a699dded"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-325f4bf78d84.woff2",
+      "sha256": "e0eb852273009f95561cb4267b53cd9f0e113ed600518fd19d903a5920913e98"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-328bd80c6093.woff2",
+      "sha256": "f436b95f8740da8cb4d8992b632ed62c30fcec333ade158a20ff08010498ba90"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-36b72168cbff.woff2",
+      "sha256": "3c78df1121834a7f63888d45f48b561dd300419868677b26acc6565c5324f816"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-397b6e985577.woff2",
+      "sha256": "393dc29681708f3915ff709f00db59f77497a0b78ca277190174b74e0d60bc28"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-3d59adea3acb.woff2",
+      "sha256": "6e1b17bdd0dd4f357698ea71d37571f691fdcd44ddf2aae7d9ed2943acc7ff6f"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-3ef348d0ed9a.woff2",
+      "sha256": "6cd87c47da369c49c7ae230a899d6f127213b8316195231481332fd51e2214e0"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-3fa9e2575805.woff2",
+      "sha256": "50cc52317a9992578a90104b2fad0660d0f69206cca2b6e3685cd3253d622ddf"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-41f298189af9.woff2",
+      "sha256": "f349e5c5f705a845a4f93d70b63f6e5a4bd139dc3bb5c75e6cf74da6d84940dc"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-4552fed42779.woff2",
+      "sha256": "8ba4241cca98b04822b61ba9bb3e2f91f81709e3294317e50dd340302edd82f9"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-45afb068f844.woff2",
+      "sha256": "cff5a5affcdbfcf91dd13d2a24ca21f79ec198e9fc2ff1f4e7f5c6a869ebafc1"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-4837ef7a6579.woff2",
+      "sha256": "d9a84b8300079136145698976b1c8b9e60895c0cc88673c4ea0dbcb28f99511f"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-48713b23f96c.woff2",
+      "sha256": "4dfc0f77371ec52138e80a724d74ac6ea895e2b41be6b6e3cb3192755c0bf8cd"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-49f7626c4ac1.woff2",
+      "sha256": "88dccea1534382601d4a4d8cf2e2311e30cd705da66d526783125233efa11ad6"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-4dba0ffef04d.woff2",
+      "sha256": "68ce66639d66a6070a74727c8299eb8d12bc09a07ec002ebeb22ede5417263e1"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-50705a8e8007.woff2",
+      "sha256": "dc81542a76a71fa752e2ef92c0f90e96bebaaa980b0ed71ccf0e9a12df421803"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-5198f592b8af.woff2",
+      "sha256": "0f17b2748b52c59bc97ae562aabb38e7232409659641e64c2be4277ccd608b41"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-526eed7f56aa.woff2",
+      "sha256": "c4557a49dcd65c5168dec4dc8e3b4d5059c7ecac38733acc9bc96576cdc152e0"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-55edddd03d5f.woff2",
+      "sha256": "701aa37e03b10aeb64ed937c94d2e9365a06b253a6bb439a26fa7045de121298"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-574d2a3ee0a1.woff2",
+      "sha256": "fe568d50a29522314189c7e2189f2cbbca3acfa35b3173452d91b13053337ae7"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-5b2ab6cb53da.woff2",
+      "sha256": "e8b5680f69489d24a0857537a764fdf539cb7eb3d411aa50290b2f1eb215a589"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-5b471629531c.woff2",
+      "sha256": "719a95a81aa2f4fc5f75931beef933f7f892c30bbebf7b715d0941577d0bd381"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-5d02f7915432.woff2",
+      "sha256": "4d7ca14c9eea5afdbc4ed10c30d875c706a65ddaaceaca702600712da9288b1f"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-5f2331d41f98.woff2",
+      "sha256": "aed02e236b633aa90e081f94bb3a1e998f6f9b73910a7efce5a9a3068449fb0f"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-5f7f5ab04d28.woff2",
+      "sha256": "662df765fb4c06e2b62a7eb0ee6d77f323fe6f87e50af822575dab0109f59d8c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-5fe4a68754fa.woff2",
+      "sha256": "69b2985f9b4520f4a8f11852bd5054a9dcfe1af4b53c570e6b5cb81f3f171d2d"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-604842ac4df6.woff2",
+      "sha256": "bde28debfa6489e5da1808d36d5c50dbf79403b99448c3470678306f95967e51"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-635a63dcfb35.woff2",
+      "sha256": "6b500513a4cb4328b6a3fdb4482d368114e07ffca45852b83506eaed6733adfd"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-6464c72f9232.woff2",
+      "sha256": "8c1d0e099601ac7956ccab3667b688b8dafabad4b6fa9d151f31320f3518d6d5"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-657f9495cef6.woff2",
+      "sha256": "33c3bf956ac1fd652e2b6ed2d8cc095607cf89f7e512b989e40092956cfd5e76"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-687bf006fdca.woff2",
+      "sha256": "91eea7a9e124efec4d6b435ec8096cf0e7b8118bb6fa49bf38cb4dc2746e30e1"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-6a39bb5b86fb.woff2",
+      "sha256": "41e1d3735115ef697306f55286cd0ac806bfac48428c26c86fbe1c464c902c96"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-6afdaa7661f1.woff2",
+      "sha256": "6403394a9980dafe0ceee3b7edad1975fd52b6630e242ffc3dc369d66cedb551"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-6b651f582a8f.woff2",
+      "sha256": "eb9918d846673765da7a60652fad8033ac69f129d3e32f453a28a23b63368358"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-6bb2cec942be.woff2",
+      "sha256": "40eff58d340abdaa835896198211ae9f9ccfddfb400a1e57e89fdfc2c394b273"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-6c45b004dca3.woff2",
+      "sha256": "ed6c64119956713fc69b2e2d665c9777d3d998e3c2d95c24b64241cd3b76e71c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-72f12362e36f.woff2",
+      "sha256": "bcf3f4c1d2503f1f4c36e664ea446ba4bd0bd0c14948b8bc039a7adc74d29735"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-77a5b7d08646.woff2",
+      "sha256": "7cab9def0f200207177eb4dfdb3d6dd08cdbf06ee45e85d15f58064190a5e69f"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-7ee206fa2bc5.woff2",
+      "sha256": "9599b975b5bd4bd9e79e8b19710f2fe4250d57380ee2f08e97e1491f86a4326c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-7fb6f127621a.woff2",
+      "sha256": "fd237e1c09106cb15a4961de0363a91f34c16a3624156f717576e8b4fa4d3038"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-8053c022b9ba.woff2",
+      "sha256": "b81fc546c809f5e1e6c3c724f049f8a3f940f02d7eff2713285d4546242c44e2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-8340f89bcc9c.woff2",
+      "sha256": "a56512d1276cc0afeb80b07c2efceb951da10bf8521d934b8fe4c931b8e5e886"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-843f7038161d.woff2",
+      "sha256": "076683c53a9ede79109d392319962e48c79ae0539f6ef2d25e5c06faf8f67d16"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-84fb65f5d097.woff2",
+      "sha256": "b2d87199260e5b1954de4f16e442672d30751aab3610ec56114320d446156910"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-87d767000b10.woff2",
+      "sha256": "984530d640f12381c6e2104ea2f70ae31503ae273312c3315b19b5d6664dcb8f"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-887c9dfe1d8f.woff2",
+      "sha256": "bd162830a338710ab63a86cb0001d41cd977905ef16fef654e86f3c46bac29bb"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-891100317f75.woff2",
+      "sha256": "d47806eaad5ccb1226d8bd716153b40b6d0dffdba948143c64855ed040627ce2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-899275a1e6f1.woff2",
+      "sha256": "367ebd6d6ae02b7ad96466b8916c19aa0a50cbdaff175b77bf3075d0d5ac3d62"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-8ba48118e1d1.woff2",
+      "sha256": "8030382eda8bda7f0fae2764cf712b7ef19baca1ccc2742ebe264148aa38d77c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-922a934dea1e.woff2",
+      "sha256": "336db5373f820565120565d80326380b662f98bde8c15e665887a8ca99843557"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-928be0fb7d3a.woff2",
+      "sha256": "6e4e9355deb91d40e98d014b296ce6a2cfd5be73e27bfd1618939f036b41a758"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-946a6900208c.woff2",
+      "sha256": "a260ae7006ec8428ab8b0794bd999b25176319c0533e57a6289152b31739e0fd"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-95e89d2a4ff1.woff2",
+      "sha256": "4ba5ffc310182ba6dd4a2b762967c4600774665ef54f621004acdbb905ba753d"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-96f5de142254.woff2",
+      "sha256": "9b05d8e046064342ffa50d8c37916702ee8d6d775e75a3193d93a022feecb3a3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-97d60dea6b94.woff2",
+      "sha256": "39451ca3e05244f1ddfd1aa5a46608304e90cd04bbe03ba906cf2e08196cd9f3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-9a3a827883b5.woff2",
+      "sha256": "aada309d17d13c73db9dc261b3da02b29a634c46e60c1dbd107e24a1ac37a8cd"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-9b4d78fc830d.woff2",
+      "sha256": "dd4b968769ee0c8b4f0a092483442a1d663292f3506c95638741f90b68a73159"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-9ea5fcfd9c22.woff2",
+      "sha256": "ab05c4a9bee318021843f46f1139c56d5488fc433ddd16a752a2b828a7f34358"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-a2ab975ea462.woff2",
+      "sha256": "69f7d0cbdc1ffcc820efcfa4630e5e0dd912ede7e0bdbecff30edbb94dc3b14c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-a30f5020c7b7.woff2",
+      "sha256": "4bc049769a14c1c25d8eca994cf17a56070aaa72c59c4566bc48ef43cc7d29e3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-a3b28d292ac1.woff2",
+      "sha256": "b7504537e9acd70d9d193390b7c868a2e109a272885023355a1ac4d8681c9831"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-a71135b6595f.woff2",
+      "sha256": "b9b8a74a3df837e907f44a09d966c1e78fbf9e6223a10d1c7d34428930741037"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-a72ae9f1dd67.woff2",
+      "sha256": "f3ef5b9fe4650a1e8474b0e44f5dda68f26d8f5fb3b21a4d165bbc7b8a7a3d49"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-a7e63a9e180e.woff2",
+      "sha256": "c9384ed3f76dfa2268f61110cdf665b290578e36cfab9c65378bdd4e6cc3bd27"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-a8ab8e8bebd1.woff2",
+      "sha256": "cbd84d25a557f241262a65f5a8ed1ee4718f392c85c364e75893d436ffe68bd9"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-a8eb766bf271.woff2",
+      "sha256": "9746bd72270dc0efc4556a06d9ec5511153e0df3753fe332197510485d5344ff"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-a9d782c525d4.woff2",
+      "sha256": "7418dc3bd59729ecdefa7a36f31953d4866d977c516df37f8e0c8047e3344a81"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-aaca1014eac7.woff2",
+      "sha256": "04835dd1a5e7977ba584d72c078d572ef131c074fde28b1f8d6b87c779725bb5"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-ab1af02f2639.woff2",
+      "sha256": "d8e0ba34314deff2b1a393223c6d1286efcab6024a2985e9e91b382f3cb64734"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-ab9d2bd9e6a9.woff2",
+      "sha256": "297a4ab27a112c71e2a9867b74579428ef50211aeb32722f41d129f5bffe860a"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-af42dd642eac.woff2",
+      "sha256": "d9b1b57892c0484008fccd4af07dcd8303569b1022af59cbd6dd1dbb2c552dbc"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-b47355a02b45.woff2",
+      "sha256": "c1ec3c62a5b83b69a645e7f58bf75a110335439668643959ac58abd31c03a43b"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-bca42f23b3d9.woff2",
+      "sha256": "c3896e9de2bc808476e911be028991aee6f4d2ba789ef0f3066a1eb636d3abb3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-c4ed4063952e.woff2",
+      "sha256": "9a11a2f335bd9e84964dd1d62d3e014d06a1eec60dd3cf20ecff986e0d895cd2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-c6062458921e.woff2",
+      "sha256": "f6fde21fb8ceb875a09f1b2d07b4e86a828e40916ba759a33778caaa809acaa4"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-ca55c8d65673.woff2",
+      "sha256": "61fb2788fb317a6781247e9abbba9b805d81624cce847bbe632e607ff1fc1daf"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-cb699d1dc8de.woff2",
+      "sha256": "bc332e58a1ae8e7234864aaf637bac3338ca53c63cc20b980c9cc9b3892592d6"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-cb7fb6574178.woff2",
+      "sha256": "23108257758c8c5ce00b30dc5512c3d68589659e673a5707341e646eeec64b1e"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-d1ef42980114.woff2",
+      "sha256": "95ca9779c49febd61eef42fbdc6d4fcbb6b7ecf02ba4a545ec4686ce95fbc3c9"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-d424595baa18.woff2",
+      "sha256": "99ec0b3ea83e49bd00734150d1eab781ac0b319ea9bb878e89050c4dd281321a"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-d442bda40191.woff2",
+      "sha256": "20217ea3b246ebadd90737aaedf3874cc934a781d7d17903c0a65a32698eb329"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-d8019f8eed9d.woff2",
+      "sha256": "c420d7998301c721215710028d8c73b583e62d9b9550f7b1b45131bbe41463df"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-d8240af38662.woff2",
+      "sha256": "13c0328a4f41c5ee144a338b7b78099c4cef4afb34fe14d658841ee5c77f1a93"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-da61967b4a7b.woff2",
+      "sha256": "009709def6f2bbb9827c60a1265abfc5fc6afa90b387a1f8bd3b16bfa95ce1bd"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-dd08593d78ac.woff2",
+      "sha256": "f86243752d4be3de3c50d0bb6bd0d4e2ab33259bb5cc0224f81ec4fc3ccd6fc3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-e1fc59c01232.woff2",
+      "sha256": "9ad3e79017992898280dcb3c3599c9c72440c553548fcb16560f53b4c5e8ae8b"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-e26405b6953a.woff2",
+      "sha256": "4ee74e5446fbd58e4f0f9bd65167d050503284efb7914ad014f4fc0d2d63aa9c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-e28dc56e70e2.woff2",
+      "sha256": "f66cbc6e4a38a65df1891c1d0bf4f135da459330bdd56c04ff0c30ad1bcc3ff5"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-e40d9cdd78e8.woff2",
+      "sha256": "a0140d7af30c40505bcaa747c4d13727a48fbd65c07545c1fc43513d5fcd5b82"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-e57a89911984.woff2",
+      "sha256": "8f59314f95afddadd65354f91a3228ac394e87b1453e9fb3f9e67e1b3afba159"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-e6fc2d17dd6a.woff2",
+      "sha256": "6f4b59448b6674e844aedf12ca731983d55ce306745f6b223e854e23d47f92c7"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-e76629d4eb02.woff2",
+      "sha256": "a20b7431a801b17936af0b15fd2082da8fa3cb12c8d55035390ade372ab1d8a2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-e8ac1c063199.woff2",
+      "sha256": "3fb3ba3e0daa93d966f0c3467ebf6920a660411c31b1ff02a64aad04e0ebb338"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-e951e21a4e31.woff2",
+      "sha256": "9b14d2fde6f85c3d6d32810bd51229d02059df48e7cff4b39388407db21469b5"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-ea50dd81d941.woff2",
+      "sha256": "4a2034990656d1840f375380defcd5f0c8d67058e547ef910d79aea000f1c075"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-ecf704732438.woff2",
+      "sha256": "50dc38b7842c5710adc318aff3675505235574e713ba7024efab7210a8b5aea2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-ef1d43a50480.woff2",
+      "sha256": "18c4caeda214240fede839a9a1677df15852097e6ddfdc2b10a8abb43071bd9c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-f2d2342cda0c.woff2",
+      "sha256": "25b33a5a35a5b4011c47f35ecaba0d66e70ea1d8757fb057a035a5664e870b9e"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-f36197afa035.woff2",
+      "sha256": "63a5792ca5f4942bfe44289bdc0bc8dd57e3f8b0210f5a0e34d7ebe588915d61"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-f3d2034c4394.woff2",
+      "sha256": "08ece4af5dab7b4f1cddb30ce6cacd173f2bbb2e51b67bf381dcde13bd644a18"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-f761a83ebe61.woff2",
+      "sha256": "b9df7810a66e8d2b31833e4c968fc326117fba46d1486f65a6ac880f68f52a94"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-f7f4a911e0cc.woff2",
+      "sha256": "52940bb494d62e09f9bec8691069474a601c709b68648226ad367a5616b0f16d"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-f9a93d14387f.woff2",
+      "sha256": "c219dd62843b3a713957cbaef1d93e1b671adeda8e103828caf593a15420da69"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-f9f13fdad0a5.woff2",
+      "sha256": "b8aabbdc88f526ac9f3dd7e1bdaf03c8c61a84856597bee0fa8f5be0a8053c6a"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-fa2e09a6ad0b.woff2",
+      "sha256": "95dc6f7a3cffa3050327c7b8e62964832fb57df035c67f9cee3654243d9a58d5"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-fd31a1aed82f.woff2",
+      "sha256": "c0a2a76c75ace0ab18b989f6c33df4e6c0e688c6236a3147a6138d2f5f30bec5"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-fe61ce421378.woff2",
+      "sha256": "e09e18b76580419508c0ea22f1213ed92ae09ce65fd059f0fbf0fa447a620b51"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-jp-febab62f08ba.woff2",
+      "sha256": "09ea73a305cdb72a5bae642ad40332a2c3b2cb8345673ecaf5de684e2fe1b0f3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-06f132490dd9.woff2",
+      "sha256": "add8a0bfe4ac000894bc5bc115f7bc6aa26d4a8b52c1835c15c880c503ae2ec2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-087aa3b1c45e.woff2",
+      "sha256": "4f9a99a8d9e893c18580b6a48fe1ba08d33eaa610e62b0075cebcde4d8b6d7eb"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-0b323d299be3.woff2",
+      "sha256": "fbd62ca155ea7a785493b418c7076493d3ed73acc581f0e4dfbb7cf675f98043"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-1234c639df6b.woff2",
+      "sha256": "75978a089957153f0714dcff4594f6469893395a343a360c0bf86a96e17d7c8a"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-133780a7eebb.woff2",
+      "sha256": "113ed2e5fe033476c8da28cf8608dd374d29e144871749489d9a6b4731f85a62"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-182bb234a8e8.woff2",
+      "sha256": "4b74cab2d8e2b3c07b050fcbde8adc41a6193bbdb78c32001491d2950b5e6956"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-1bfcb32d0e0d.woff2",
+      "sha256": "2760361e7fd0e0ca8a5c671f684a1e908afbf8be519da247fc5e0926711e960b"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-1e4aedb86973.woff2",
+      "sha256": "1b09d45bc4fa14fd7164723c52b997fb0db464630adad7baeef05fabd02a1155"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-2505a8c33587.woff2",
+      "sha256": "ee2c85ff2b5207630bf4cb863ec5ef3992d28f2bbbea0a905a861cbd63dde4b5"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-250690b82622.woff2",
+      "sha256": "2db38a16cd11d3d80c8186afd70f57aa833f341721aa487fc23c0accda01ef7d"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-277a3c504512.woff2",
+      "sha256": "3045d947c7d78678a5ae0c4b356ec0bda8c8d8513599b9702ecdc1190e90136f"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-27805df98919.woff2",
+      "sha256": "1e0821cd2e0bbd587e4e7417109ec3656f2480d0e961a7ddfa60e0dcdb3b4520"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-295785b51ad4.woff2",
+      "sha256": "de53fb4fed079a6270971a5a4f20e8501191ffd8846a3cbfbc19c3f1d3fd6925"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-32457f63fd67.woff2",
+      "sha256": "f8f2f31e0d4c161b826c4f3622a44913934b0dd050151b51bc4580879e23216e"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-362b24ed1867.woff2",
+      "sha256": "a7f1e42cbf1209626de1ebea6241482aae14f50bf60020a3b969104c226bbadb"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-3a121bf93704.woff2",
+      "sha256": "4136c39ad0909016b4eb11c6705ba6ff75e0af6eeddf9cc0908120b2897f95ab"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-3dfce9b6d915.woff2",
+      "sha256": "f2099ad4a19de114d46b3c4d32353240f885ec76c09b95e65d15e36090d56add"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-3e45fce238c8.woff2",
+      "sha256": "2d43f90aef16dde8420af269b952483ec67474f7b729a8d689f6b2bf77bca558"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-3e63a10f03c0.woff2",
+      "sha256": "8fd5870c4b22c2015c5a54a02ea9fec7c0102abff26599cf4b03cd2aaf3f58c5"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-3f239edb929a.woff2",
+      "sha256": "b7d51765c99c0ecb44ba17ac44d35f231e6662afcb5f773064cac2ae67bbe8bb"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-41c9ba4a0456.woff2",
+      "sha256": "8c2c0472d514eabb192f3c2c47fcb8c7e33895a3a96a0e1b021239cca115e453"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-42dd36d225f1.woff2",
+      "sha256": "d5683769e4748479ff987ec25234b997e75d67795279c8740625801ec3f84dc3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-45fda5d5f479.woff2",
+      "sha256": "3d483f5a29464e66102be7eccbecc5789cc413aefcdbd2b411fff907c54012f6"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-4eca279fff69.woff2",
+      "sha256": "dbe0b5a015af24b6708bf24fdb477f68b7085ece81f2e333c00b24815a90b68c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-4ef8c2b6f4f8.woff2",
+      "sha256": "a4b3be19a7a70889fd7a334d1b1573bdef8b20189f99b1c05a5f1aa044cd7cf3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-53d1478ca7e3.woff2",
+      "sha256": "b287c69afa5039a593ac30765c362fb3cf4b8e397de66d5e11b931df8a4ca4e8"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-5427d67a1c21.woff2",
+      "sha256": "9bab402ba033334906b2478832ca6622fb382e97bbbe51a12df9065625e9497e"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-5597b37a3ca4.woff2",
+      "sha256": "f62b9ab15b8bef2bcb3529008cefd25c12ef804e0cf88d01d33be1441bb43d0c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-582313360ca3.woff2",
+      "sha256": "356fe3740509fe66b6265db7b0f60e7a4485e1b7719c004f8abf3d642d52d747"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-592cfde6f513.woff2",
+      "sha256": "7bb430b6f7a4cb6a6f3d946c2bc0571150b4601dd12a8792a140f2845d88bd70"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-59a1d2c2d092.woff2",
+      "sha256": "35dddbc7b5c78f1dfaee0c9eb8852432a46fee2e9b05ede476b9c47890fa1ed4"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-5c9d67c14eaa.woff2",
+      "sha256": "a0cf1ee49edfa5e58bac8b599e0005f2a98945eee65205166c8849fa3a41e699"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-60c42b92d05d.woff2",
+      "sha256": "6689c10783e90ce2e3ad11bce8b33a05deecde83ad6561a63f50dcc120c92dc4"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-61be096922ac.woff2",
+      "sha256": "c044d116dc8f655dd794a7d87eaa7dfe9a9371ddf1eef99af0e37b72f47475ee"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-64e94e61f41c.woff2",
+      "sha256": "43196b8058bd55a6ac484704118b5e6196d0ed6ec3265b2bdbda7bf888f120fc"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-661e8dd1879e.woff2",
+      "sha256": "f81693a776e30ff9a45567eaa15d9a0bed038649007a61e75ecd0e780ab257c7"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-692e00d338f2.woff2",
+      "sha256": "f5bc6961ea42aee6c8c7669c52485c7e4682c3e189eb478dc9295f9c2965ea94"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-6a637665971b.woff2",
+      "sha256": "4b594f04215780f690da15990ef2a1e5ac82f2f3a4d9cb91713d83d379c983f6"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-6b3ed176a8f4.woff2",
+      "sha256": "03aa9df5058c995bb5805907cc35bd159b00f77e4aea30e7df68f7b39acbd69d"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-6db955826ed1.woff2",
+      "sha256": "5b91a58010929377e94cd5c64c26c57b10a417687371138ef77627b907370bb8"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-70d25b91cae6.woff2",
+      "sha256": "9e1f1f766eb3b9e4f5b6f0bfa525789a43bb83f636a93a034ed66c93dac2f0ea"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-775e0bbc135e.woff2",
+      "sha256": "531d6a5dc22f7b69084100c07a9caa07724910703f7234e8e36603b47adb25b8"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-7b11bd7a5ebc.woff2",
+      "sha256": "adbe40605d1781449c8eb55df80bb53f52f331e97ea0d35fe1c2d53a6034d881"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-7bd9b5005e38.woff2",
+      "sha256": "2a169d8dc2ebf18d4ba3a646b7926e2ea8f03371daa8a33aa5aa4e222a30fcb4"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-830206359ee5.woff2",
+      "sha256": "6d088e37bdc27339bb4c82d4bfe0966849df0cef5872fc99b81025f2488f42d8"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-83cf62a26a8e.woff2",
+      "sha256": "c3d4250403511b3fae48d031c22ecfe15696209abc9576f86a810e844d32bdc3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-87349d1ef0c1.woff2",
+      "sha256": "b21735210b7eee7a48d74426275c0c6ba8f81cc9049b147a8222e25529feef00"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-894e9565a2c2.woff2",
+      "sha256": "dbbdc3ebf4296eacf3e96da6872d4eb1985a7e2040211a8112e76e98968bce04"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-899588dac533.woff2",
+      "sha256": "58f780a2d2b3f293d50b1a3b7026a812273d1923af861a5046ff0f94d5335032"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-8a184be5766d.woff2",
+      "sha256": "cb019c3783d8da86144e2cc42b718dbe592ececafe2640ca77ebb6c9082c60e2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-8bfb4ed5f280.woff2",
+      "sha256": "c973e4713ca031d7f2d154bfdeb111add88df7ae88dcdab98e8ba70228636362"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-937d2a92c438.woff2",
+      "sha256": "d32e7ca8037160ed0dabff758b75da2a39722fbc49567bb1dc11436da39d61f7"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-93e8611f845c.woff2",
+      "sha256": "c1fc78539235f6468a2be89b59fba2a2316afad88dc2e1f602aeab5afebda98f"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-943e38c3e8f6.woff2",
+      "sha256": "98f590f9f68914d4e439e6151a85a4f1cba30a66e904305a74f81a3f470dd044"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-966de64f29cd.woff2",
+      "sha256": "3d0d06b73960ab03119d5502142dae3a408ad815d8efbc7d9a016735fd654d80"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-97168be8b07b.woff2",
+      "sha256": "c19eb125aee260696faefab99bea783f62279d9d763d45a316a62770644bfe31"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-97fe25304d91.woff2",
+      "sha256": "2938d56727e9fe32bd83c6410aef59ed9af9528f23fa224a3413538d8231a842"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-9d97d7d92159.woff2",
+      "sha256": "81643939573a897901647110fcd7dbc0315beb87979a2c0ba56fb50da012755c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-a0a979815728.woff2",
+      "sha256": "5a35370c68dbb4ce5b263b4a8326513f4ab94337f66197dca1b2810f3de9a7a9"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-a248fc31fc46.woff2",
+      "sha256": "0af4fd643eb6e631776dd62b433c259ba73c36f93c7e3f358b8106a8761f1e7f"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-a2df4394d40c.woff2",
+      "sha256": "72d3f5812086c592a09fca4584779f59ad6349c43208922efe84347c915c0957"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-a6a2ee423c29.woff2",
+      "sha256": "220acde2a122a7608737ce22da353b6788aa79af2bed9ded842cbbe446694540"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-aaa3e977b91d.woff2",
+      "sha256": "96d17ca1177682c2073ac7f905d1cc529ba43495275f93391e45f663039cb43d"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-ab362ffae887.woff2",
+      "sha256": "9b749147b8cb1aafb56c2515cfd804ff5022b13e29d1803640a12361899b0174"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-ab8b20813efe.woff2",
+      "sha256": "ce48c8f42ed1659df11fa8c9d3d57596afb5383d3537e1a70c836b2cc699db1a"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-adcf1d6b6049.woff2",
+      "sha256": "e90d33efb8e09c9a4d4c061f59c035fa8ebd6d8fe3824c29eb1abfc0d7e9d9c1"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-b2bdec2cb611.woff2",
+      "sha256": "dfa871e4db4e5582d077c6be55222da33ac6e8f39cd33e6ed8f7fdd058b796e4"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-b44dd062e162.woff2",
+      "sha256": "e459c174c5fd1d360072fab540c2d833f8d3350a927b01cca3f88148aaec3cf7"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-b71cdcc85445.woff2",
+      "sha256": "5dd5e84947322ad943769aa36d9134b8233fa4221e542babe98b64f824d79c6f"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-b86f1feb88de.woff2",
+      "sha256": "cea85861c06f2116541c421f5ddef5e2fff1b91f004e48fac8af204b8bac8486"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-b9367411ba04.woff2",
+      "sha256": "9efef22fce6ed4d723ce957f7616e6c280689406b54f3c89bfd8833e3a0312e7"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-c302abfebde6.woff2",
+      "sha256": "59b1d13bedcf5c12a08ab972040bbc1d8eab7e40cf582b088997f5d08eca068d"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-c32884fdc520.woff2",
+      "sha256": "5e7eeacc84fb0e14511ba8b5ac81cf4d3203127e554d90999edd8087f56698b2"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-c37aeef0ba54.woff2",
+      "sha256": "d7b2b43c6cf022f319e90b568557f60f0b7058ab9a1b60cce599df090922cec3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-c3ea250bb323.woff2",
+      "sha256": "3a2247284b74fa6a2ccd10107365f259a00744041551363476b92318f434339e"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-c3fc1420875b.woff2",
+      "sha256": "d81380d9dd8d05680d3d2ba7fa9a831473f7d340b6ce32af11063b4d73118ca3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-c764af3a25d8.woff2",
+      "sha256": "3562cf3416a92cb9f2831407857ff1b70f0f14e66671f55fc818fa2a8411d192"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-ccd4d669a764.woff2",
+      "sha256": "9692ba2d33aa4c795956987e14366575ecbc352981ae6a7114bd457727cddd93"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-d34f57b9eec5.woff2",
+      "sha256": "f566efbed79d24085d19f7b6eac7adff4ab01a5dd66db0c53d4a847c8816c531"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-d91574944b7a.woff2",
+      "sha256": "0911100b53608b380eab7bf0f879a5418e6a0839968e75424055e3c0cb3189b9"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-db36de44f24c.woff2",
+      "sha256": "475a845fd23f4cbedac5c89189133462ac3e4f76adae2ba5f464c49b9f27c929"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-dd22f443d686.woff2",
+      "sha256": "32555d5143d763f175af8fc718faf83d39db9fe0c108c41c1bb5abc8331c0e58"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-dd7327a0c864.woff2",
+      "sha256": "adcf9fc8f639e955c89082a77f818c98f7b909f05a6fdf875dd0174613801123"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-dd8c9b573df6.woff2",
+      "sha256": "57a0369c4b77675ba1a1fb082ddbe1e7295734774420d5327b83a79af7edae75"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-dfe7cd3d5a7c.woff2",
+      "sha256": "6434ae9a8b511ac4661ae9edc7b1848c15cb13c65d4e1ec48e8b69a4c80174e3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-e2769a819377.woff2",
+      "sha256": "1195229dca099d5129fac3f4a4a8abbd6e60a454980bf1ae1897543a2284475a"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-e6a9661669a4.woff2",
+      "sha256": "71b55199d1490a0c4ba7795ee1adb6460c2235454809d24b17a93d61c2d131ff"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-e72cc5fb43d9.woff2",
+      "sha256": "640eba7a58c43bc7642f1bb1a402e831daad1b9e57d1a86f3169f36c212be619"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-e762a8ae57bb.woff2",
+      "sha256": "fbed7260234ad0056ecd2c729e3896d00678322d9db9d177f41ccc120264d3e6"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-e7ca582f2ed1.woff2",
+      "sha256": "b6baabe9aaac2371672ce830f078a90e0fb57dae37ef0926c61a11bc41fbafd3"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-ea59cc674f58.woff2",
+      "sha256": "52d01e2db91fdaabb65c1c1f931b53a141fab818ec1e7ecca29742fef6c61d3c"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-ea6708d858b5.woff2",
+      "sha256": "7c23510d150928c1d41605a433f47923a6763a2c98675b02c71c16f3fa876a22"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-eaed6edb42bb.woff2",
+      "sha256": "ffc12c1cfc6d27bf9c76e32d31f04cbc6db87a0eb502e4ccecbbee6f3b011ff6"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-edbe07582bd2.woff2",
+      "sha256": "369278225da93c7bda480f501d7ca9f004acaff1bdd3d60df874eddaae27f69b"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-ee0e1add2061.woff2",
+      "sha256": "ee44006cb7c5a9dd0786f97a246a07717511483090c7cbd4354795dddb157a15"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-ee66dbf9b476.woff2",
+      "sha256": "6a1a698b9a7fe536169d8f69c6d1c2d23c975816db7cec2345ae41a81cc544ca"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-f38e4af647f6.woff2",
+      "sha256": "62e9d990f68bf1921eec30b7a19a9bd64af5dc5af0964246a1673920589cbb92"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-f4c405283a24.woff2",
+      "sha256": "ce6a9f5fc5666236b9481e5d93aba8fac485a933a2f024c9345d031cbca40c4a"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-f8c83a880a24.woff2",
+      "sha256": "e7fccadb948a87765794c78194d86704802d91b61d4da04614a948eb2e0ecb41"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-fc9384f64b5c.woff2",
+      "sha256": "5fc65f704d01095033e6c459682bdc993714bd4ee0734d3d1e49286648173987"
+    },
+    {
+      "path": "frontend/public/fonts/noto-sans-sc-fe0cfca799a3.woff2",
+      "sha256": "9f92796490e4baf1c7a3e431351def75097a4ef211d0903ef081932a95235046"
+    },
+    {
+      "path": "frontend/public/fonts/notosansjp-OFL.txt",
+      "sha256": "babcfe66c8a098b2fa279bc724a3a342f8124f77ce18941fbcc1bbb39823cded"
+    },
+    {
+      "path": "frontend/public/fonts/notosanssc-OFL.txt",
+      "sha256": "babcfe66c8a098b2fa279bc724a3a342f8124f77ce18941fbcc1bbb39823cded"
+    },
+    {
+      "path": "frontend/public/fonts/nunito-59c4439e43d7.woff2",
+      "sha256": "d107f72673f443b440185eea74262d7aecbe8fb70150e397334e2ab202c5d301"
+    },
+    {
+      "path": "frontend/public/fonts/nunito-73a68363498c.woff2",
+      "sha256": "b63651df977d08650ff2e598a3979a490f114b59353605e091dd3fdb530f530e"
+    },
+    {
+      "path": "frontend/public/fonts/nunito-OFL.txt",
+      "sha256": "ee9491ad3ea5d390878695bd6cce49beb3cacd5c4312f8ab574b541e9f7afa21"
+    },
+    {
+      "path": "frontend/public/fonts/nunito-d8992a5338f7.woff2",
+      "sha256": "2d06f2c340ecb52c55153ec56093dc70b167699d7206246570f8ad4800190825"
+    },
+    {
+      "path": "frontend/public/fonts/nunito-d95b7307bfc2.woff2",
+      "sha256": "511ce967375fd2d924483d798f1086a533259fc675181f62944ec1176fe8786d"
+    },
+    {
+      "path": "frontend/public/fonts/nunito-dbc43460b8f7.woff2",
+      "sha256": "20fc9b6fc618e7c3c68d3ac750a2a5dfbceb8521675458d2cea580b5693e4798"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/Hiyori.2048/texture_00.png",
+      "sha256": "560aea0d910dc04950d669640b2ef17c0d817969e9909f477f166bb5cbd8ffbe"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/Hiyori.2048/texture_01.png",
+      "sha256": "87fe9ab7db81ab3025e0407229e449233581e00fa92c8e911923bc6c7d98ce84"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/Hiyori.cdi3.json",
+      "sha256": "0fc3fc76b7a68136056c8832c930c8af9f93899f359eded7349b481ea2342d03"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/Hiyori.moc3",
+      "sha256": "0323f5f377b9afef54318be09e9b4eea2a8cb266190ff9d2f843f95ecb77716c"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/Hiyori.model3.json",
+      "sha256": "16681a6b91a72219524d2ae746b88474c6d3bd18d5bb88163ecaf44181e97ae5"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/Hiyori.physics3.json",
+      "sha256": "c7a6d641893519c0bbc615545887f03f6c5b8031b4096873740b618370452fc1"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/Hiyori.pose3.json",
+      "sha256": "ff1cc242790f196c87a7379dc1340b608723db60af1b2825e00da8f351ffc1bf"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/Hiyori.userdata3.json",
+      "sha256": "75fe50a89ea695b46c98dce8991c2f3d67e3d7a479786e6310460289b552d29b"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/LICENSE.md",
+      "sha256": "425884684c746b46c0739f6f454e034bf6ee288d78405b8d9dc6f5ebfcaa53f6"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/NOTICE.txt",
+      "sha256": "30b9c1ff3ac604cc1e069fe3f4e3d5743538281e52f4533799d87175d6766072"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/expressions/curious.exp3.json",
+      "sha256": "62880d8622fde229632b19d34cdde3c36b0d8354ea597413ba08ac5e6b8c9f21"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/expressions/happy.exp3.json",
+      "sha256": "d7146d0895e3c6cde18338b8bafa858e5fe1bcc0f1cd0201832a773435b50588"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/expressions/shy.exp3.json",
+      "sha256": "dc1f1eef717c3b03253066acf77c16c8c982c991f470e7130c08dc828528b64e"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/expressions/surprised.exp3.json",
+      "sha256": "93658b86a3aab755a346d95898aed7b826a2f1e283953ecf0dd0c0843b9bc8de"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/motions/Hiyori_m01.motion3.json",
+      "sha256": "c4f0d982c685b81c1af0ced96c8f6bd5118b8a3fa972c3a12a46652b8d78461d"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/motions/Hiyori_m02.motion3.json",
+      "sha256": "858c582874a0c4badfec38d4caf19e232fea5ba714f5a2ac6a282c617910c154"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/motions/Hiyori_m03.motion3.json",
+      "sha256": "de33a8ce78226a5ff80cfa941fb5a4c50b6c1c4b346031ed44b384f772b62cf9"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/motions/Hiyori_m04.motion3.json",
+      "sha256": "54ddb94d0494772e10355429c547bb7e29601f38d663087804b0c793b29cc51f"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/motions/Hiyori_m05.motion3.json",
+      "sha256": "7f71061c9207ac1da6e06098ede9318307a7e75715a3ef97c82646acd9ee8620"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/motions/Hiyori_m06.motion3.json",
+      "sha256": "55c007646febe4cb76d20cbb0623086986dbb55c7ef82212693a5e26636a32ef"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/motions/Hiyori_m07.motion3.json",
+      "sha256": "3f06cb70f5654eed3389978885e4dff151b6cf9e8d59248680addcd267ff793a"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/motions/Hiyori_m08.motion3.json",
+      "sha256": "66022fff5cff3c30b7fc1295bf92e4975e3ab9980d5cb296b5e24a2a8acc6daf"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/motions/Hiyori_m09.motion3.json",
+      "sha256": "9edbd6a88e977221fa90625b5f94c9fd27212e1183288105584be8272543ade7"
+    },
+    {
+      "path": "frontend/public/live2d/hiyori/motions/Hiyori_m10.motion3.json",
+      "sha256": "ba0ba6764a80459432ffd48d6bd5ba261fd25f196208ade3016be74efb9d3dfc"
+    },
+    {
+      "path": "frontend/public/stage/README.md",
+      "sha256": "eeb2408ddbab06a8a18902ee783637b9ce9e9424c414d11247aac28c376932be"
+    },
+    {
+      "path": "frontend/public/stage/stage-room.jpg",
+      "sha256": "3089ab43648731cd76a1a6ef1827ad92597c2a9ada5b81bfd008b1af652a27c0"
+    },
+    {
+      "path": "frontend/public/worklets/pcm-player.js",
+      "sha256": "52198def5b22de849f1b49dfd161f1ea8545979447ee219219ebab2d69a7fff8"
+    },
+    {
+      "path": "frontend/scripts/gen-api.mjs",
+      "sha256": "8ca7228a591a31c90a6a990e41e7c6e58e428e0ae8c8feebb25cac978ceb96b3"
+    },
+    {
+      "path": "frontend/scripts/mock-services.mjs",
+      "sha256": "b7659c17ac8f546aac14f37bab924438ad1e9e2217c5f617f9c3c56ef863ce54"
+    },
+    {
+      "path": "frontend/src/App.tsx",
+      "sha256": "e0eac868ea8df53bf806178486e72e272a6fdf9a4f45e14d8be606361d0c2af8"
+    },
+    {
+      "path": "frontend/src/api/schema.d.ts",
+      "sha256": "7462502a4541037b0d9e55605fb18b4eac7d9d9860c69535e498092ae6e88284"
+    },
+    {
+      "path": "frontend/src/api/schema.sha256",
+      "sha256": "89248fc46ba54ce44351c6694342f563d30673c11093d581724935b43269707d"
+    },
+    {
+      "path": "frontend/src/api/schema.test.ts",
+      "sha256": "a502e4ee2fcc27d3b1f34526de0df08fe29462b3dd0926ce8725dac495edd0ec"
+    },
+    {
+      "path": "frontend/src/api/types.ts",
+      "sha256": "cb292e43a6f4e77ff150ad897f630f817b1a0ad2955d8bbc746ea33016ea3144"
+    },
+    {
+      "path": "frontend/src/audio/capture.ts",
+      "sha256": "f9f55388742529d87a8aeb56367c30a59d45920bd5a1f55f8c707d03ac490b06"
+    },
+    {
+      "path": "frontend/src/audio/pcm.test.ts",
+      "sha256": "ae9e796078dd00045aae4a7e52ab8fe81e9be15519713dcc06ef02817cac320c"
+    },
+    {
+      "path": "frontend/src/audio/pcm.ts",
+      "sha256": "5854b0257bba6685d952289feee8f3300e76a980b5a616cbce4a5c7f1be478be"
+    },
+    {
+      "path": "frontend/src/audio/player.test.ts",
+      "sha256": "5816667590c4fbceb12b5c0118ac44ae893b92443233396b8957818cc8663ff0"
+    },
+    {
+      "path": "frontend/src/audio/player.ts",
+      "sha256": "02aae3152c3e624ca805b77f73f67d01bf50fd24c23beb2f7fb6a0874f6db51c"
+    },
+    {
+      "path": "frontend/src/chat/chatEngine.integration.test.ts",
+      "sha256": "2f1798b4bd7e668a62055dd07d2edbb84668475313805760d788171ac878a818"
+    },
+    {
+      "path": "frontend/src/chat/chatEngine.test.ts",
+      "sha256": "b23938ef93090d07de0f262d59a9e43944d3ef3bf78117b2b1e633be07a453f7"
+    },
+    {
+      "path": "frontend/src/chat/chatEngine.ts",
+      "sha256": "597959a6f67a20ee8f14c0f3f8ebefbfcf96fdfc04ccf7d485b9e8290ed07a38"
+    },
+    {
+      "path": "frontend/src/chat/cueScheduler.test.ts",
+      "sha256": "d55f3592ea57e02b268d00ec8c72a61cf7f62c3d312bbcf7275ebffb4692cd5b"
+    },
+    {
+      "path": "frontend/src/chat/cueScheduler.ts",
+      "sha256": "fc61d617c2bc6f5c90103cebd8155aa68adc51bb45f3c793347833e6ba1490e1"
+    },
+    {
+      "path": "frontend/src/chat/engineInstance.ts",
+      "sha256": "3a436b7dc76ba96f7d2e96c87ecb37d2c90d0ecf47aaf852969b13f18a99ad07"
+    },
+    {
+      "path": "frontend/src/chat/pacing.test.ts",
+      "sha256": "10206b9c184fd3958566869f9e324794618ce27c4e5d1d00e24d83590c515c4e"
+    },
+    {
+      "path": "frontend/src/chat/pacing.ts",
+      "sha256": "8b1e80a96335c519120973ea8ed073ceb47dd3a567966a610a88a3afa09cd515"
+    },
+    {
+      "path": "frontend/src/components/BuiltinResourcesNotice.tsx",
+      "sha256": "012bc9dc4d921b894ed308987f3082be8f8289355e3feb35987ad5dd68857d7c"
+    },
+    {
+      "path": "frontend/src/components/DetailModal.test.tsx",
+      "sha256": "46341bb40bd972c8f849160df80fe239f89503043249027df199bc1945ac679d"
+    },
+    {
+      "path": "frontend/src/components/DetailModal.tsx",
+      "sha256": "7ea939b525859779caf5912ebd5da2b63b20d0429a73d6ef97e3a08e7576d78b"
+    },
+    {
+      "path": "frontend/src/components/DialogBox.tsx",
+      "sha256": "76a3cb7a0f44921ed4d3fb2e761f080a47546d04b4db387507f41dbbea9f7de2"
+    },
+    {
+      "path": "frontend/src/components/EcgCanvas.tsx",
+      "sha256": "2ff500bf5b940794ea2110fc96c9b2da8431004ebe1bc8b7ae0dfa94e2813678"
+    },
+    {
+      "path": "frontend/src/components/FirstMeeting.tsx",
+      "sha256": "3af6cfa4d291fc9f95e4a3e8c6025136125d76d820ceabc8bbae1955ae87be9a"
+    },
+    {
+      "path": "frontend/src/components/GridBackdrop.tsx",
+      "sha256": "3a0a5f88bc5ea0961e3e30bfe150e0719a96d19ac0724ad13b486f6f83caab7d"
+    },
+    {
+      "path": "frontend/src/components/ResourcePreview.tsx",
+      "sha256": "67a0666316b26712d64da3366c4cdfac62c32262a8c5ff73e8099818612e391c"
+    },
+    {
+      "path": "frontend/src/i18n/dict.test.ts",
+      "sha256": "4ba64c47d76d5dde31b2ad677e2d76b410d293bc7ef36c8a9810dd2463a3fe7a"
+    },
+    {
+      "path": "frontend/src/i18n/en.ts",
+      "sha256": "0dfeacdc7092e47cb61e9d0984e2e263e78f98614da87f383cd0dcd5a0279bfe"
+    },
+    {
+      "path": "frontend/src/i18n/index.ts",
+      "sha256": "98be94aaf9c9fc9fcc9f3f506c55917340cb7f4c3f239f92ccab13033e29e1b5"
+    },
+    {
+      "path": "frontend/src/i18n/ja.ts",
+      "sha256": "95d100893f4042129434b57ff8430df27eae25c40c65772f4274c7f6ff73e2c8"
+    },
+    {
+      "path": "frontend/src/i18n/lang.test.ts",
+      "sha256": "b8f5becc6818d6f90596a5523de2e961297f5003916560a73a9c7605315941fd"
+    },
+    {
+      "path": "frontend/src/i18n/zh.ts",
+      "sha256": "bdb39a70343fceb8de512b0f08cbe7dfaf43ecb092c3073468929c993273d34b"
+    },
+    {
+      "path": "frontend/src/lib/asr.ts",
+      "sha256": "e75fd759828530c3f37beba835a9e7d92978374165b7300b918f7033968a50b3"
+    },
+    {
+      "path": "frontend/src/lib/blobMask.ts",
+      "sha256": "279965c5f2dfdbd7e0697f1214c6cfcf75677f1fea48d1f8ba8c8c29c387704a"
+    },
+    {
+      "path": "frontend/src/lib/builtinSettings.test.ts",
+      "sha256": "77ddf82926972b895d0b54c09c11ff86a7b9699f76ad3ef9c19f24617dfd3fd0"
+    },
+    {
+      "path": "frontend/src/lib/checkpointGrid.test.ts",
+      "sha256": "8b3706eb8ef2149ec0b7346884933890c7e36573a96aed8f1eaf7d6a3ff781be"
+    },
+    {
+      "path": "frontend/src/lib/checkpointGrid.ts",
+      "sha256": "e01a14ae0bea31ef247e4091b54b73e35119ddd1ca3dd421f3488e658fa02cbd"
+    },
+    {
+      "path": "frontend/src/lib/errors.ts",
+      "sha256": "4b43f9f6c4ed03870d74a6d939618c16ef454832a4c512403943014d1113b058"
+    },
+    {
+      "path": "frontend/src/lib/grid.ts",
+      "sha256": "4cc8dcf99a0705cfb4e199b9fae1a372bd623e37ed8b71e66c659df7284da3a6"
+    },
+    {
+      "path": "frontend/src/lib/idb.ts",
+      "sha256": "2e8fe4f0824143f6fab121499a4b86f335c33b6320cbe6954c184f4abc1f0401"
+    },
+    {
+      "path": "frontend/src/lib/mcpJson.test.ts",
+      "sha256": "8b8d0fc00838cc0f7a9c45fb54154a4c1853f41c04fcd44a75c4ffcf4510ba50"
+    },
+    {
+      "path": "frontend/src/lib/mcpJson.ts",
+      "sha256": "01253c711f5e8e538e19f4b0fd3dcff225590f356b01ec23366aa0e58ae8aa5c"
+    },
+    {
+      "path": "frontend/src/lib/paging.test.ts",
+      "sha256": "13de4d4131d13e29ebf630e3ed28fbdff490a5097a172a0d7e53842eb783ab11"
+    },
+    {
+      "path": "frontend/src/lib/paging.ts",
+      "sha256": "2909ad929d8fde333801827b69ea01aece7dd12ed121d14ca0599c8d1105a1f9"
+    },
+    {
+      "path": "frontend/src/lib/ropeAngle.ts",
+      "sha256": "7cb10e5c5826e1bfe4698935577e2f4f1138c3219b04134a847447bc54b31365"
+    },
+    {
+      "path": "frontend/src/lib/store.defaults.test.ts",
+      "sha256": "4195598fb579fe4c4634374da382032c58e944dac856ccfce2ebb444775ba5ff"
+    },
+    {
+      "path": "frontend/src/lib/store.ts",
+      "sha256": "27e5cc8882e942427f99ada712bccb0d4ab95ce36889db52d094c4fbfdb24600"
+    },
+    {
+      "path": "frontend/src/lib/thinking.ts",
+      "sha256": "4bfb1b7957ac59bc9406422411e0e576e155fdac62662908af7d5927a55fe9d3"
+    },
+    {
+      "path": "frontend/src/lib/types.ts",
+      "sha256": "3ee8c7f0d468a2740d6aab323fad8b52769f060e76ae46eaecb8c2258e4a432d"
+    },
+    {
+      "path": "frontend/src/live2d/StageCanvas.tsx",
+      "sha256": "b8804e96ccc57a469787c6dedc12b71a07f726c8f28f934ab96d71d3f00a0e7e"
+    },
+    {
+      "path": "frontend/src/live2d/avatarZip.test.ts",
+      "sha256": "b8de46e820b4392afc50669d36052d7a294ca2de9bfc9440cddefe839bbdefa5"
+    },
+    {
+      "path": "frontend/src/live2d/avatarZip.ts",
+      "sha256": "339d39cc78f76e4865b02ad16b1896c77b0878f763923e65aacfb40283dfb5f5"
+    },
+    {
+      "path": "frontend/src/live2d/controlCatalog.test.ts",
+      "sha256": "aeaf1b6ab44bcc22cec86938fc19f365f569f863f1781819a2567bd2a31625f4"
+    },
+    {
+      "path": "frontend/src/live2d/controlCatalog.ts",
+      "sha256": "dad8513122e82bca186f9e68f0d7c74d308c52be724064042d641cda13fc50ab"
+    },
+    {
+      "path": "frontend/src/live2d/parameterMixer.ts",
+      "sha256": "fb11690eff4ad1c08caf15c81193dd5019a8dfa5fcae4eae03daa9279e6103bc"
+    },
+    {
+      "path": "frontend/src/live2d/performance.test.ts",
+      "sha256": "ba22f53ef4e4099912272e07bf9d28154029ad1d2d4d91898fb14cd3b28f9a1f"
+    },
+    {
+      "path": "frontend/src/live2d/performanceController.ts",
+      "sha256": "705b2fb566e792259c1001dce457f1d2c7f8e10eb890e37e8ae5dbfa6ca41ca3"
+    },
+    {
+      "path": "frontend/src/live2d/performanceTypes.ts",
+      "sha256": "29f58e5aa2441ab9c1aa113ce196ac3459d33736976fba0ccf12ad0b1226e234"
+    },
+    {
+      "path": "frontend/src/live2d/previewPlayback.test.ts",
+      "sha256": "35a06eebfb41c9a52373abb05841d751de0fdac3ee1546e30248fff7dc8f9603"
+    },
+    {
+      "path": "frontend/src/live2d/previewPlayback.ts",
+      "sha256": "c1ea137612398f274d2a7744d11bac9254c5a5435ca91a2e28443baab7368911"
+    },
+    {
+      "path": "frontend/src/live2d/resourceProfiles.ts",
+      "sha256": "9d01a98257ad0c20631d228fdde11ba3d7c65d1428835e2e1aae22d8ec5db0ec"
+    },
+    {
+      "path": "frontend/src/live2d/speechMouth.test.ts",
+      "sha256": "1eafa49906600c7e8b17df8090afb8e506682d8fa3943b48657964fdaec2ae39"
+    },
+    {
+      "path": "frontend/src/live2d/speechMouth.ts",
+      "sha256": "ae3af1c4eed62ca1a3bc5f5bd36b00a24a52fbfd4ef9929a2be4c6b11039a0cc"
+    },
+    {
+      "path": "frontend/src/live2d/stage.ts",
+      "sha256": "f2d07fd6aa733c527840244e5ceb160c043d35434d4f4d6022c28a5bc62b3e19"
+    },
+    {
+      "path": "frontend/src/main.tsx",
+      "sha256": "ab001f24cc1909f9f0a877261f48bf9685b157705edf53ab0079ad65aa9b8cfa"
+    },
+    {
+      "path": "frontend/src/pages/Backlog.tsx",
+      "sha256": "8a2e58979dd1a1a4750c2b05f8afb4ccd2c2837409d30cf6c5b5ddb819108e7c"
+    },
+    {
+      "path": "frontend/src/pages/Chat.tsx",
+      "sha256": "f7da73d6c64a2099b57b10fb73eea6e3f4de95e7341250816737ade5bf6f4af4"
+    },
+    {
+      "path": "frontend/src/pages/Checkpoint.tsx",
+      "sha256": "0a0f1cf838c5f7a7ecba401a4292f94ef7577b13195e9b547ea51f849cd1a3fa"
+    },
+    {
+      "path": "frontend/src/pages/Settings.tsx",
+      "sha256": "8912fe5812cc623aa316831f800679c9b392f436dd4312881a2c763904331c69"
+    },
+    {
+      "path": "frontend/src/pages/Title.tsx",
+      "sha256": "b7799d86b73a8631e50f54a9b642ac1e43bf7532c9c3d3bbb57125b529c6a20b"
+    },
+    {
+      "path": "frontend/src/pages/dialogPreviewSplit.test.ts",
+      "sha256": "307b34df9359539f931c178dfa6370bfb8faee9690e2a64cfc406a135b48b1e0"
+    },
+    {
+      "path": "frontend/src/pages/dialogPreviewSplit.ts",
+      "sha256": "dbe28e1ad38f932cc435529cd67bacd82dc099857e34c9650793f4dbf590993c"
+    },
+    {
+      "path": "frontend/src/pages/panels/Avatar.tsx",
+      "sha256": "460cce6fe6f400cef9df626bec5fef6f90690ba41fdd73f59af75c1e9a0753d9"
+    },
+    {
+      "path": "frontend/src/pages/panels/Memory.tsx",
+      "sha256": "2e4c3f0ae26563c675c81e6d6d2771fc8a879d760d86f091c4da33d94d292101"
+    },
+    {
+      "path": "frontend/src/pages/settings/DialogPreview.tsx",
+      "sha256": "c2290abbb57f5893da35ce9967aba765a4c2dc3306e8b5d163d0407b61a4b052"
+    },
+    {
+      "path": "frontend/src/pages/settings/ExtConfigModal.tsx",
+      "sha256": "ef9876f74b655bd9b59a279a4ada5e8250f4f0b21abd6f1deca0356cf32d273e"
+    },
+    {
+      "path": "frontend/src/pages/settings/ExtensionsTab.tsx",
+      "sha256": "3cfccfad25ed17291f5dc3ac21094cea851f782db468688af00d1b9d7eb8a7b2"
+    },
+    {
+      "path": "frontend/src/pages/settings/GeneralTab.tsx",
+      "sha256": "35a9f9525bd0498e7a8993300155c62efecaa4bf874b946fffe933c7a6df9183"
+    },
+    {
+      "path": "frontend/src/pages/settings/ModelsTab.tsx",
+      "sha256": "8966d26dd4fb8fc28ccfd13b2d9e41ed1c93d6eebb725ee142b7d0b3dc7b5919"
+    },
+    {
+      "path": "frontend/src/router.ts",
+      "sha256": "999a18c351477602a4c47ef2247114e8caf0292d23ac4fd3ee1ab195163d4836"
+    },
+    {
+      "path": "frontend/src/services/asrClient.test.ts",
+      "sha256": "da12b4bf92968fd204486266ee72648f93083255b2097c3d3f2dc21105aa4f5d"
+    },
+    {
+      "path": "frontend/src/services/asrClient.ts",
+      "sha256": "33c648fd02dcec34b6693b80d7d501119c6ff4cfede9412e368aeb4b61fe472a"
+    },
+    {
+      "path": "frontend/src/services/chatClient.test.ts",
+      "sha256": "adb0a12f5208b0e18bd399cb2279e5b1d5bed0c75037c8c301fc111d78c66148"
+    },
+    {
+      "path": "frontend/src/services/chatClient.ts",
+      "sha256": "dc6dbd9e30e0700da490f6291fd429eb6252cf52eea9bf1874e5710bc52604b4"
+    },
+    {
+      "path": "frontend/src/services/checkpointClient.ts",
+      "sha256": "168f1d83ecb3ede873022432610d8771ad93ddd743e14761eab23663d7c10d28"
+    },
+    {
+      "path": "frontend/src/services/extClient.ts",
+      "sha256": "4af2a4d98889f692bbfc404260d2eefa5e2805792eafa6631ac3c762e69e0cf3"
+    },
+    {
+      "path": "frontend/src/services/http.ts",
+      "sha256": "9214ab2180e44b0e1cae6af00f730948e25ab7936e11db59ef910edd237e450e"
+    },
+    {
+      "path": "frontend/src/services/memoryClient.ts",
+      "sha256": "0e4b8208736effe5a614bf851336eef2c0ba62a109cbb1eb10808d9b8c342e24"
+    },
+    {
+      "path": "frontend/src/services/onboardingClient.test.ts",
+      "sha256": "1617bb3f444816ecba6dc45f87b5f448d7213e2e42e74dd1302a80155f2e89cc"
+    },
+    {
+      "path": "frontend/src/services/onboardingClient.ts",
+      "sha256": "2f44a221a8bdeadb4365b6c369c7c9a08f1addee2cdf2b1a79853d7c58ef5bc1"
+    },
+    {
+      "path": "frontend/src/services/probe.ts",
+      "sha256": "7593d5277b19673c629e45de74d1a95bc43f47130c148d5c7c2bd6c66c42873b"
+    },
+    {
+      "path": "frontend/src/services/stateClient.test.ts",
+      "sha256": "a07fb1222a83dc8060cfc273ab1e7ecdc5a9c1a6bcbe75aac798e7de5504b0c1"
+    },
+    {
+      "path": "frontend/src/services/stateClient.ts",
+      "sha256": "8c0dae50878725933ebb2892acf96c12a18becce4ad7ef3ff590796a390bdd2f"
+    },
+    {
+      "path": "frontend/src/services/ttsClient.test.ts",
+      "sha256": "6daaffad7f2a354f0e354273f60f381739e3679320fed10396eb20adf2a6c68f"
+    },
+    {
+      "path": "frontend/src/services/ttsClient.ts",
+      "sha256": "c567c33d1006ee0aa8461358ee848387595fd79c70699a1571c9c744ca732c59"
+    },
+    {
+      "path": "frontend/src/styles/backlog.css",
+      "sha256": "c34b82d2be64902dc2f5bcf9bab8642ce545c69ab5a9ab25b2aa3892e811827c"
+    },
+    {
+      "path": "frontend/src/styles/base.css",
+      "sha256": "a7a3dfc4bb73363d1b4e4c2d1eb010772756f883e65c00bea650f1d603a3cecd"
+    },
+    {
+      "path": "frontend/src/styles/chat.css",
+      "sha256": "09e06dec9180fb90f863fdcf80d70a8eaa5a69a6f0901e0fc44e29c6d1602d66"
+    },
+    {
+      "path": "frontend/src/styles/checkpoint.css",
+      "sha256": "13c5021da50845b9fd9d8f8a44ae6936b285b8b9198694f3ffd634347ae70108"
+    },
+    {
+      "path": "frontend/src/styles/controls.css",
+      "sha256": "7838aefc21e958bf4f2dceec051e066c82d68f9fe3813221e5b3439b64c5ecf5"
+    },
+    {
+      "path": "frontend/src/styles/modal.css",
+      "sha256": "f55b54b1c0628574b4ac12aebf9d75dbb8e2cbfa13202a801a252db6aabffb9e"
+    },
+    {
+      "path": "frontend/src/styles/onboarding.css",
+      "sha256": "41f0446848d904c5a77dcaf67261f00ceb806f72f72cc4a5e7d88e8dfa620baa"
+    },
+    {
+      "path": "frontend/src/styles/persona.css",
+      "sha256": "0e9ab41a01c4638bb5110234b0baac60a6de9536e5cc0dff7c28ae194156e013"
+    },
+    {
+      "path": "frontend/src/styles/settings.css",
+      "sha256": "762385b5eb4e687bc643866729ccdf1e6301b2def385ed26234355ddccae82d7"
+    },
+    {
+      "path": "frontend/src/styles/title.css",
+      "sha256": "071db1a3690b0b11bec7314542c0a5545cf76646e4c8c24ff802b15de5359fbd"
+    },
+    {
+      "path": "frontend/src/ui/AddItemModal.tsx",
+      "sha256": "e8c8b7524c64d6f9d72354d71db4f521cf9fc672a2ace47e2ec8fcde2aa52552"
+    },
+    {
+      "path": "frontend/src/ui/Button.test.tsx",
+      "sha256": "ddffda592bc96f5d673f12459b77785f01672267873116889ed3129bd6f9a420"
+    },
+    {
+      "path": "frontend/src/ui/Button.tsx",
+      "sha256": "73554b4518a99439c8c63d5c1ef59d8a044549122bbec902a09d1886257109e9"
+    },
+    {
+      "path": "frontend/src/ui/Checkbox.tsx",
+      "sha256": "9fb715da26d1b6e37f8ea6db184ab4228404cc73244e8adeb1ee676678d80c39"
+    },
+    {
+      "path": "frontend/src/ui/Confirm.tsx",
+      "sha256": "d60581277e00b1028eb6fd98133c28264a54aadeae2225e7c1310ffc1da109c7"
+    },
+    {
+      "path": "frontend/src/ui/EditableItem.test.tsx",
+      "sha256": "e1a5225bfd5e3e099f8927a3c4cf8b5e25824dedb990d8456e0189a918609685"
+    },
+    {
+      "path": "frontend/src/ui/EditableItem.tsx",
+      "sha256": "d58051e0539d39e642383489021b4f8676b10db511ba8ff7fa3f068ee9d07390"
+    },
+    {
+      "path": "frontend/src/ui/FieldRow.tsx",
+      "sha256": "ad0a70e0f81c46b564109a5a480708f48ea6b2e4c2a25a03af098894c0cf81d1"
+    },
+    {
+      "path": "frontend/src/ui/Hint.test.tsx",
+      "sha256": "1014503897aacaae7353ec9df6abc3d959a621c69501052dcc975b2b201ada96"
+    },
+    {
+      "path": "frontend/src/ui/Hint.tsx",
+      "sha256": "109b32b0d46bcebcda13f6735351a283c107333a6b57ded801ba263804d9d165"
+    },
+    {
+      "path": "frontend/src/ui/Icon.tsx",
+      "sha256": "772de2071aa92e698b44a0afccc4db51017c551a2fc57bafe6d9eb348ba20a68"
+    },
+    {
+      "path": "frontend/src/ui/IconButton.tsx",
+      "sha256": "729a29f52604578bef748e29c0cc03beb4875b2b3d91c2129f053c42edfe0a9e"
+    },
+    {
+      "path": "frontend/src/ui/Modal.tsx",
+      "sha256": "c70a47bf10fa96805c424b9ea8c622f2e6c58999a2438abdc02d1caa842029cc"
+    },
+    {
+      "path": "frontend/src/ui/PageHeader.tsx",
+      "sha256": "98478a17658fd7617ba70c11adf07dbf44bd29b9b988c1a663c6be9859778c46"
+    },
+    {
+      "path": "frontend/src/ui/Pager.tsx",
+      "sha256": "1290709545d2a0aa1ced54b97bb11f28bf3626f86b3a9743420cee4030b2f4c4"
+    },
+    {
+      "path": "frontend/src/ui/Select.tsx",
+      "sha256": "7fef9ab6b9fbdc1f9553f8a92067f593090e2a0582c770faaf12347c533b1fb1"
+    },
+    {
+      "path": "frontend/src/ui/Slider.tsx",
+      "sha256": "cd5d193262616e2b5a3f13e556bba03181dc68e21de5cedff55e994e4604d75b"
+    },
+    {
+      "path": "frontend/src/ui/Switch.tsx",
+      "sha256": "cfa46f454ed408b3f50ea0d10679067d57841584d88e0a7ca1d1ff5541756b73"
+    },
+    {
+      "path": "frontend/src/ui/TooltipLayer.tsx",
+      "sha256": "69d7f305e9c2ad547593b395339a2c5cff361b796d8ef9553bca1177871353e6"
+    },
+    {
+      "path": "frontend/src/ui/icons.ts",
+      "sha256": "f9ea06ad6652dff57e2fc5c4e5ff2b7cc0e965d2b65c798e2b717554e9c6658e"
+    },
+    {
+      "path": "frontend/tsconfig.json",
+      "sha256": "6bdd759cfa5e86ef57c9f6c66a837c701e5ff6a04d7fe95c81b53ae9c5d783fd"
+    },
+    {
+      "path": "frontend/vite.config.ts",
+      "sha256": "6756e2ea9df2bb1ed7dc4ccb95a4efd00aa5a9c606ef3f567b92b4f2f102354c"
+    }
+  ]
+}

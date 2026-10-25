@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 import os
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -15,11 +16,6 @@ import yaml
 if TYPE_CHECKING:
     from ..models import State
 
-
-# 出厂默认：embedding 端点与模型（env 可覆盖）。放 core 层，
-# 这样 core 不反向依赖任何上层（models/services/api）。
-DEFAULT_EMBEDDING_URL = os.environ.get("MOMO_EMBEDDING_URL", "").rstrip("/")
-DEFAULT_EMBEDDING_MODEL = os.environ.get("MOMO_EMBEDDING_MODEL", "bge-m3")
 
 # 数据目录（momo.db + momo.yaml）。env 可覆盖——用于测试隔离与多实例共存，
 # 免得跑集成测试时写坏真实配置。
@@ -55,19 +51,8 @@ DEFAULT_STATE: dict[str, Any] = {
             "showStatus": True,
             "voiceInput": True,
         },
-        "llm": {"url": "", "key": "", "model": ""},
-        # mode: builtin（内置 SenseVoice）| openai（OpenAI 兼容 HTTP 端点）
-        "asr": {"mode": "builtin", "url": "", "key": ""},
+        "llm": {"url": "", "key": "", "model": "", "thinking": False},
         "tts": {"url": "", "key": "", "voice": "", "prompt": ""},
-        # 语义检索端点（设置页「模型」tab 可改）。
-        # url 留空 = 未配置语义检索，只用词面召回；env（MOMO_EMBEDDING_*）可覆盖。
-        # model 不预填：DEFAULT_EMBEDDING_MODEL 只作「填了 url 却没填 model」时的
-        # 内部兜底（见 core/embed.py），不作为出厂配置展示给用户。
-        "embedding": {
-            "url": DEFAULT_EMBEDDING_URL,
-            "key": "",
-            "model": "",
-        },
         # MCP 拓展清单（{name,transport,enabled} + stdio{command,args,env} / http{endpoint,headers}）
         "extensions": [],
     },
@@ -88,6 +73,16 @@ def _merge(defaults: Any, value: Any) -> Any:
     return value
 
 
+def _retire_remote_services(state: dict[str, Any]) -> dict[str, Any]:
+    """Retire ASR/embedding endpoints and credentials without mutating callers."""
+    clean = copy.deepcopy(state) if isinstance(state, dict) else {}
+    settings = clean.get("settings")
+    if isinstance(settings, dict):
+        settings.pop("asr", None)
+        settings.pop("embedding", None)
+    return clean
+
+
 def normalize_state(state: dict[str, Any] | None) -> State:
     """任意（可能残缺）state → 合并默认值后的完整 state。
 
@@ -95,7 +90,13 @@ def normalize_state(state: dict[str, Any] | None) -> State:
     （services/turn、services/compress、memory、services/prompt）直接下标访问即可，
     不需要 `(state.get("settings") or {}).get(...) or {}` 那层防御。
     """
-    merged = _merge(DEFAULT_STATE, state if isinstance(state, dict) else {})
+    merged = _merge(DEFAULT_STATE, _retire_remote_services(state or {}))
+    settings = merged.get("settings")
+    if not isinstance(settings, dict):
+        settings = merged["settings"] = copy.deepcopy(DEFAULT_STATE["settings"])
+    if not isinstance(settings.get("llm"), dict):
+        settings["llm"] = copy.deepcopy(DEFAULT_STATE["settings"]["llm"])
+    settings["llm"]["thinking"] = settings["llm"].get("thinking") is True
     # 内置形象条目恒存在（avatars 是整体替换的数组，深合并补不了成员缺失）。
     avatars = merged.get("avatars")
     if not isinstance(avatars, list):
@@ -127,10 +128,30 @@ def read_state() -> dict[str, Any] | None:
 def write_state(state: dict[str, Any]) -> None:
     """整体写入 momo.yaml（不做归一化，读取时再合并默认值）。"""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    STATE_PATH.write_text(
-        yaml.safe_dump(state, allow_unicode=True, sort_keys=False),
-        encoding="utf-8",
-    )
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=DATA_DIR,
+                                         prefix=".momo-", suffix=".yaml", delete=False) as stream:
+            temporary = Path(stream.name)
+            stream.write(yaml.safe_dump(_retire_remote_services(state), allow_unicode=True, sort_keys=False))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, STATE_PATH)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def retire_legacy_services() -> bool:
+    """One-time startup cleanup of retired credentials from an existing config."""
+    raw = read_state()
+    if raw is None:
+        return False
+    clean = _retire_remote_services(raw)
+    if clean == raw:
+        return False
+    write_state(clean)
+    return True
 
 
 def get_state() -> dict[str, Any]:

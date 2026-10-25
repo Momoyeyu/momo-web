@@ -1,10 +1,21 @@
 """ReAct loop：llm mock（首轮 tool_call → 次轮文本）、error 路径、history 落盘。"""
+
 from __future__ import annotations
 
 import json
 
 from app.core import llm
 from app.services import checkpoint, turn
+
+
+def acknowledge_events(events):
+    observed = {}
+    for event in events:
+        if event.get("t") != "sentence" or not event.get("runId"):
+            continue
+        rid = event["runId"]
+        observed[rid] = observed.get(rid, "") + event["text"]
+        checkpoint.acknowledge(rid, observed[rid], event["generation"])
 
 
 def _tool_call(name: str, args: str = "{}", call_id: str = "call_1"):
@@ -18,20 +29,32 @@ def _tool_call(name: str, args: str = "{}", call_id: str = "call_1"):
 def test_react_tool_then_text(monkeypatch):
     seen_messages = []
 
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         seen_messages.append(list(messages))
         assert tools  # tools 声明已传
         if len(seen_messages) == 1:
             yield {"type": "tool_calls", "calls": [_tool_call("common_time")]}
             return
-        yield {"type": "text", "delta": '你好呀。<|ACT {"expression":{"name":"开心"}}|>今天很开心！'}
+        yield {
+            "type": "text",
+            "delta": '你好呀。<|ACT {"expression":{"name":"开心"}}|>今天很开心！',
+        }
 
     monkeypatch.setattr(llm, "chat_stream", fake_chat)
 
-    events = list(turn.run_turn("在吗", {
-        'avatarId': 'a', 'revision': 'r', 'expressions': [{'name': '开心', 'desc': ''}],
-        'motions': [], 'expressionState': {'name': None, 'intensity': 0}
-    }))
+    events = list(
+        turn.run_turn(
+            "在吗",
+            {
+                "avatarId": "a",
+                "revision": "r",
+                "expressions": [{"name": "开心", "desc": ""}],
+                "motions": [],
+                "expressionState": {"name": None, "intensity": 0},
+            },
+        )
+    )
+    acknowledge_events(events)
 
     # 句事件：唯一口径切句，正文剥离指令，指令随 dirs 下发
     sents = [e for e in events if e["t"] == "sentence"]
@@ -40,7 +63,9 @@ def test_react_tool_then_text(monkeypatch):
         (1, "今天很开心！"),
     ]
     assert sents[0]["cues"] == []
-    assert sents[1]["cues"] == [{'id': '1:0', 'offset': 0, 'expression': {'name': '开心', 'intensity': 1.0}}]
+    assert sents[1]["cues"] == [
+        {"id": "1:0", "offset": 0, "expression": {"name": "开心", "intensity": 1.0}}
+    ]
 
     # 第二轮 messages 带 tool 结果（common_time → utc+tz JSON）
     tool_msgs = [m for m in seen_messages[-1] if m.get("role") == "tool"]
@@ -58,22 +83,22 @@ def test_react_tool_then_text(monkeypatch):
 
 
 def test_llm_error_yields_error_event(monkeypatch):
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         raise llm.LlmError("llm unreachable")
 
     monkeypatch.setattr(llm, "chat_stream", fake_chat)
     events = list(turn.run_turn("hi"))
-    assert events == [
-        {"t": "error", "message": "llm unreachable", "service": "llm"}
-    ]
+    acknowledge_events(events)
+    assert events == [{"t": "error", "message": "llm unreachable", "service": "llm"}]
 
 
 def test_max_rounds_without_content(monkeypatch):
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         yield {"type": "tool_calls", "calls": [_tool_call("common_time")]}
 
     monkeypatch.setattr(llm, "chat_stream", fake_chat)
     events = list(turn.run_turn("hi"))
+    acknowledge_events(events)
     assert len(events) == 1
     assert events[0]["t"] == "error"
     assert "5 rounds" in events[0]["message"]
@@ -83,13 +108,15 @@ def test_tool_memory_ops_via_react(monkeypatch):
     """tool_call 走真实 memory 层：add 成功、delete 未知 id 返回说明文本。"""
     rounds = []
 
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         rounds.append(list(messages))
         n = len(rounds)
         if n == 1:
             yield {
                 "type": "tool_calls",
-                "calls": [_tool_call("memory_add", '{"content": "用户喜欢草莓"}', "c1")],
+                "calls": [
+                    _tool_call("memory_add", '{"content": "用户喜欢草莓"}', "c1")
+                ],
             }
             return
         if n == 2:
@@ -102,6 +129,7 @@ def test_tool_memory_ops_via_react(monkeypatch):
 
     monkeypatch.setattr(llm, "chat_stream", fake_chat)
     events = list(turn.run_turn("帮我记一下"))
+    acknowledge_events(events)
     assert [e["text"] for e in events if e["t"] == "sentence"] == ["记好了！"]
 
     tool_msgs = [m for m in rounds[-1] if m.get("role") == "tool"]
@@ -144,11 +172,11 @@ def test_merge_assistant_groups_sentences_per_turn():
     """回放给 LLM 前，同回合的多句 assistant 必须合并成一条。"""
     merged = turn._merge_assistant(
         [
-            {"role": "user", "text": "问1", "at": "t"},
-            {"role": "assistant", "text": "答1。", "at": "t"},
-            {"role": "assistant", "text": "答2。", "at": "t"},
-            {"role": "user", "text": "问2", "at": "t"},
-            {"role": "assistant", "text": "答3。", "at": "t"},
+            {"role": "user", "text": "问1", "at": "t", "runId": "run1"},
+            {"role": "assistant", "text": "答1。", "at": "t", "runId": "run1"},
+            {"role": "assistant", "text": "答2。", "at": "t", "runId": "run1"},
+            {"role": "user", "text": "问2", "at": "t", "runId": "run2"},
+            {"role": "assistant", "text": "答3。", "at": "t", "runId": "run2"},
         ]
     )
     assert merged == [
@@ -163,7 +191,7 @@ def test_turn_speaks_before_and_after_tool_call(monkeypatch):
     """正文不再是回合的终点：工具调用前后都能说话，两段都成句落账。"""
     rounds = []
 
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         rounds.append(list(messages))
         if len(rounds) == 1:
             yield {"type": "text", "delta": "我查一下。"}
@@ -173,6 +201,7 @@ def test_turn_speaks_before_and_after_tool_call(monkeypatch):
 
     monkeypatch.setattr(llm, "chat_stream", fake_chat)
     events = list(turn.run_turn("几点了"))
+    acknowledge_events(events)
     sents = [e for e in events if e["t"] == "sentence"]
     assert [e["no"] for e in sents] == [0, 1]
     assert [e["text"] for e in sents] == ["我查一下。", "现在是三点。"]
@@ -192,69 +221,88 @@ def test_sentence_is_persisted_before_round_finishes(monkeypatch):
     """阶段二的核心：第一句在**整轮结束之前**就已落账 —— 生成期间就能看到。"""
     snapshots = []
 
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         yield {"type": "text", "delta": "第一句。第二句。"}
         # 流还没结束，此刻查 DB：第一句已经落账（第二句因「等下一个字符」还在缓冲）
         snapshots.append([m["text"] for m in checkpoint.live_messages()])
         yield {"type": "text", "delta": "第三句。"}
 
     monkeypatch.setattr(llm, "chat_stream", fake_chat)
-    list(turn.run_turn("在吗"))
+    for event in turn.run_turn("在吗"):
+        acknowledge_events([event])
     assert snapshots == [["在吗", "第一句。"]]
 
 
 def test_unanswered_failure_is_not_in_backlog_or_next_prompt(monkeypatch):
     gen = checkpoint.generation()
-    checkpoint.begin_turn('previous question', gen, 'previous')
-    checkpoint.append_sentence('previous answer', gen, 'previous')
+    checkpoint.begin_turn("previous question", gen, "previous")
+    checkpoint.append_sentence("previous answer", gen, "previous")
+    checkpoint.acknowledge(
+        checkpoint.current_run(gen, "previous"), "previous answer", gen
+    )
     before = checkpoint.live_messages()
 
     def unavailable(*args, **kwargs):
-        raise llm.LlmError('connection refused')
+        raise llm.LlmError("connection refused")
 
-    monkeypatch.setattr(llm, 'chat_stream', unavailable)
-    assert list(turn.run_turn('failed message'))[0]['t'] == 'error'
+    monkeypatch.setattr(llm, "chat_stream", unavailable)
+    assert list(turn.run_turn("failed message"))[0]["t"] == "error"
     assert checkpoint.live_messages() == before
-    assert all(m.get('content') != 'failed message' for m in turn.build_messages(turn.load_state(), 'retry'))
+    assert all(
+        m.get("content") != "failed message"
+        for m in turn.build_messages(turn.load_state(), "retry")
+    )
 
 
 def test_empty_response_does_not_leave_user_message(monkeypatch):
-    monkeypatch.setattr(llm, 'chat_stream', lambda *a, **kw: iter(()))
-    assert list(turn.run_turn('empty reply'))[-1]['t'] == 'error'
+    monkeypatch.setattr(llm, "chat_stream", lambda *a, **kw: iter(()))
+    assert list(turn.run_turn("empty reply"))[-1]["t"] == "error"
     assert checkpoint.live_messages() == []
 
 
 def test_partial_reply_is_retained_on_later_failure(monkeypatch):
     def broken_stream(*args, **kwargs):
-        yield {'type': 'text', 'delta': 'First sentence. Next'}
-        raise llm.LlmError('stream disconnected')
+        yield {"type": "text", "delta": "First sentence. Next"}
+        raise llm.LlmError("stream disconnected")
 
-    monkeypatch.setattr(llm, 'chat_stream', broken_stream)
-    events = list(turn.run_turn('partial response'))
-    assert events[-1]['t'] == 'error'
-    assert [m['text'] for m in checkpoint.live_messages()] == ['partial response', 'First sentence.']
+    monkeypatch.setattr(llm, "chat_stream", broken_stream)
+    events = list(turn.run_turn("partial response"))
+    acknowledge_events(events)
+    assert events[-1]["t"] == "error"
+    assert [m["text"] for m in checkpoint.live_messages()] == [
+        "partial response",
+        "First sentence.",
+    ]
 
 
 def test_unanswered_cleanup_does_not_remove_newer_exchange(monkeypatch):
     def unavailable(*args, **kwargs):
         gen = checkpoint.generation()
-        checkpoint.begin_turn('newer question', gen, 'newer')
-        checkpoint.append_sentence('newer answer', gen, 'newer')
-        raise llm.LlmError('older request failed')
+        checkpoint.begin_turn("newer question", gen, "newer")
+        checkpoint.append_sentence("newer answer", gen, "newer")
+        checkpoint.acknowledge(
+            checkpoint.current_run(gen, "newer"), "newer answer", gen
+        )
+        raise llm.LlmError("older request failed")
 
-    monkeypatch.setattr(llm, 'chat_stream', unavailable)
-    list(turn.run_turn('failed message'))
-    assert [m['text'] for m in checkpoint.live_messages()] == ['newer question', 'newer answer']
+    monkeypatch.setattr(llm, "chat_stream", unavailable)
+    list(turn.run_turn("failed message"))
+    assert [m["text"] for m in checkpoint.live_messages()] == [
+        "newer question",
+        "newer answer",
+    ]
 
 
 def test_unanswered_cleanup_respects_interrupt_generation(monkeypatch):
     def unavailable(*args, **kwargs):
-        checkpoint.interrupt_turn('interrupted question', '')
-        raise llm.LlmError('cancelled')
+        checkpoint.interrupt_turn("interrupted question", "")
+        raise llm.LlmError("cancelled")
 
-    monkeypatch.setattr(llm, 'chat_stream', unavailable)
-    list(turn.run_turn('interrupted question'))
-    assert [m['text'] for m in checkpoint.live_messages()] == ['interrupted question']
+    monkeypatch.setattr(llm, "chat_stream", unavailable)
+    list(turn.run_turn("interrupted question"))
+    assert [
+        m["text"] for m in checkpoint.live_messages()
+    ] == []  # no response was displayed
 
 
 def test_failed_request_backlog_stays_clean_when_reloaded(monkeypatch):
@@ -262,10 +310,10 @@ def test_failed_request_backlog_stays_clean_when_reloaded(monkeypatch):
     from app.main import app
 
     def unavailable(*args, **kwargs):
-        raise llm.LlmError('connection refused')
+        raise llm.LlmError("connection refused")
 
-    monkeypatch.setattr(llm, 'chat_stream', unavailable)
+    monkeypatch.setattr(llm, "chat_stream", unavailable)
     client = TestClient(app)
-    response = client.post('/api/chat', json={'text': 'failed request'})
+    response = client.post("/api/chat", json={"text": "failed request"})
     assert '"t": "error"' in response.text
-    assert client.get('/api/checkpoints/live').json()['messages'] == []
+    assert client.get("/api/checkpoints/live").json()["messages"] == []

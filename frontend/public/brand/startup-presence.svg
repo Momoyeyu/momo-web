@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 310" fill="none">
+  <defs>
+    <linearGradient id="paper" x1="83" y1="70" x2="163" y2="219" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F3ECDF"/>
+      <stop offset=".56" stop-color="#E4D9C9"/>
+      <stop offset="1" stop-color="#AD9A85"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="205" y1="69" x2="143" y2="242" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F0D7AC"/>
+      <stop offset=".47" stop-color="#E7BE77"/>
+      <stop offset="1" stop-color="#94764C"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="91" y1="219" x2="205" y2="254" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#A89A91"/>
+      <stop offset=".44" stop-color="#F3ECDF"/>
+      <stop offset="1" stop-color="#D9CBB5"/>
+    </linearGradient>
+  </defs>
+  <!-- Five separate paper surfaces leave the centre open. No character silhouette. -->
+  <path d="M148 43C120 48 91 62 76 84C53 116 64 145 90 164C110 178 133 186 140 211C147 180 134 159 114 141C96 124 90 110 99 90C109 68 128 55 148 43Z" fill="url(#paper)"/>
+  <path d="M183 67C209 89 218 114 208 137C200 156 181 165 168 179C150 199 150 221 162 243C137 221 134 196 149 172C161 152 182 139 188 119C194 101 191 83 183 67Z" fill="url(#gold)"/>
+  <path d="M82 202C106 214 119 233 140 239C160 245 183 239 204 221C189 246 169 263 146 261C120 259 112 238 98 229C90 223 82 221 74 223C81 217 85 211 82 202Z" fill="url(#fold)"/>
+  <path d="M114 54C130 31 153 25 175 31C157 34 143 42 133 53C126 59 120 61 113 62L114 54Z" fill="#E7BE77" opacity=".74"/>
+  <path d="M50 163C49 181 55 197 68 204C77 209 88 208 96 205C83 202 77 195 71 185C65 176 59 168 50 163Z" fill="#E7BE77" opacity=".59"/>
+  <!-- Fold seams catch a little light without outlining the entire form. -->
+  <path d="M100 89C84 117 107 140 127 158" stroke="#FFF6E4" stroke-opacity=".48" stroke-width=".8" stroke-linecap="round"/>
+  <path d="M187 121C183 144 159 160 151 178" stroke="#F6E1B9" stroke-opacity=".5" stroke-width=".7" stroke-linecap="round"/>
+  <path d="M114 242C138 264 164 258 184 243" stroke="#F3ECDF" stroke-opacity=".38" stroke-width=".7" stroke-linecap="round"/>
+  <path d="M229 159L231 165L237 167L231 169L229 175L227 169L221 167L227 165Z" fill="#E7BE77" opacity=".77"/>
+  <path d="M66 61L67.1 64.9L71 66L67.1 67.1L66 71L64.9 67.1L61 66L64.9 64.9Z" fill="#F3ECDF" opacity=".49"/>
+  <path d="M207 265L208 268L211 269L208 270L207 273L206 270L203 269L206 268Z" fill="#E7BE77" opacity=".37"/>
+  <circle cx="224" cy="95" r="1.2" fill="#E7BE77" opacity=".44"/>
+  <circle cx="58" cy="245" r="1" fill="#F3ECDF" opacity=".32"/>
+</svg>

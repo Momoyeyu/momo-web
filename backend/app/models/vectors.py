@@ -15,6 +15,7 @@ import json
 import sqlite3
 
 from ..core import db
+from .memories import ACTIVE_SQL
 
 
 def dim() -> int | None:
@@ -26,7 +27,7 @@ def dim() -> int | None:
         return None
 
 
-def ensure(want_dim: int) -> bool:
+def ensure(want_dim: int, namespace: str = "legacy") -> bool:
     """保证 memory_vec 存在且维度 = want_dim；维度漂移则重建（向量可懒算补回）。"""
     if db.sqlite_vec is None or want_dim <= 0:
         return False
@@ -34,9 +35,10 @@ def ensure(want_dim: int) -> bool:
         exists = conn.execute(
             "SELECT 1 FROM sqlite_master WHERE type='table' AND name='memory_vec'"
         ).fetchone()
-        if exists and dim() == want_dim:
+        if exists and dim() == want_dim and db.meta_get("vec_namespace") == namespace:
             return True
         conn.execute("DROP TABLE IF EXISTS memory_vec")
+        conn.execute("DROP TABLE IF EXISTS memory_vec_sources")
         conn.execute(
             f"CREATE VIRTUAL TABLE memory_vec USING vec0("
             f"id TEXT PRIMARY KEY, vec float[{int(want_dim)}] distance_metric=cosine)"
@@ -46,6 +48,25 @@ def ensure(want_dim: int) -> bool:
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
             (str(want_dim),),
         )
+        conn.execute(
+            "CREATE TABLE memory_vec_sources(id TEXT PRIMARY KEY, content TEXT NOT NULL)"
+        )
+        for event in ("DELETE", "UPDATE OF content"):
+            name = "memory_vec_invalidate_" + event.split()[0].lower()
+            conn.execute(f"DROP TRIGGER IF EXISTS {name}")
+            conn.execute(
+                f"CREATE TRIGGER {name} AFTER {event} ON memories BEGIN "
+                "DELETE FROM memory_vec WHERE id=old.id; "
+                "DELETE FROM memory_vec_sources WHERE id=old.id; END"
+            )
+        for key, value in (
+            ("vec_namespace", namespace),
+            ("vec_generation", db.new_id()),
+        ):
+            conn.execute(
+                "INSERT INTO meta(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (key, value),
+            )
     return True
 
 
@@ -76,3 +97,45 @@ def drop(conn: sqlite3.Connection, mem_id: str) -> None:
     if dim() is None:
         return
     conn.execute("DELETE FROM memory_vec WHERE id=?", (mem_id,))
+    if conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='memory_vec_sources'"
+    ).fetchone():
+        conn.execute("DELETE FROM memory_vec_sources WHERE id=?", (mem_id,))
+
+
+def missing(limit: int = 16) -> list[dict]:
+    """Compare exact source text so direct restore/import is also recoverable."""
+    return [
+        dict(r)
+        for r in db.query(
+            "SELECT m.id,m.content FROM memories m LEFT JOIN memory_vec_sources s ON m.id=s.id "
+            "LEFT JOIN memory_vec v ON m.id=v.id WHERE (s.content IS NOT m.content OR v.id IS NULL) AND "
+            + ACTIVE_SQL
+            + " LIMIT ?",
+            (limit,),
+        )
+    ]
+
+
+def put_current(
+    conn: sqlite3.Connection,
+    mem_id: str,
+    content: str,
+    vec: list[float],
+    generation: str,
+) -> bool:
+    current = conn.execute(
+        "SELECT m.content FROM memories m WHERE m.id=? AND " + ACTIVE_SQL, (mem_id,)
+    ).fetchone()
+    if (
+        not current
+        or current["content"] != content
+        or db.meta_get("vec_generation") != generation
+    ):
+        return False
+    put(conn, mem_id, vec)
+    conn.execute(
+        "INSERT OR REPLACE INTO memory_vec_sources(id,content) VALUES(?,?)",
+        (mem_id, content),
+    )
+    return True

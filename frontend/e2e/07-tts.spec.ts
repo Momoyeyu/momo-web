@@ -31,6 +31,10 @@ test("TTS 请求的 lang = 对话语言（日语/英语/auto 三种）", async (
     });
   });
 
+  const initial = await readState(request);
+  (initial.settings as {tts: {url:string; voice:string}}).tts = {url:'http://tts.test', voice:'ref.wav'};
+  await writeState(request, initial);
+
   // 先自己造一个回合：不能依赖别的 spec 留下的数据 —— 06-chat 的收尾会把它自己的
   // assistant 行撤掉，排在它后面就必然找不到可回放条目（假失败）。
   await gotoRoute(page, "chat");

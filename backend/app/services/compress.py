@@ -5,8 +5,9 @@
 - 折叠单位是完整 user→assistant 对：一次折掉最旧 ~一半；已有摘要随新段滚入。
 - 单飞：非阻塞锁保证同时至多一个压缩任务；失败静默（下回合重试）。
 - 竞态：写回在一个事务里校验 live.generation 未变（期间 load/打断
-  换过会话就放弃折叠）再删 folded 段 + 写 summary。
+  换过会话就放弃折叠）推进 summary_cursor + 写 summary；账本原文永久保留。
 """
+
 from __future__ import annotations
 
 from threading import Lock, Thread
@@ -39,7 +40,12 @@ def maybe_compress(prompt_tokens: Any) -> bool:
     except (TypeError, ValueError):
         tokens = 0
     if tokens < COMPRESS_TOKEN_THRESHOLD:
-        return False
+        from . import checkpoint
+
+        # A bounded recent window no longer reaches the old token threshold.
+        # Summarize observed history before it falls outside that window.
+        if len(checkpoint.context_rows(limit=41)) < 40:
+            return False
     if not _lock.acquire(blocking=False):
         return False  # 单飞：已有压缩在跑
     Thread(target=_worker, daemon=True).start()
@@ -66,17 +72,20 @@ def _fold_count(history: list[Any]) -> int:
 def compress_once() -> bool:
     """同步压缩一次（后台 worker 与测试共用）。成功写回 → True。"""
     state = load_state()
-    gen = db.query(
-        "SELECT generation, summary FROM sessions WHERE id=?", (LIVE_ID,)
-    )
-    gen_n = int(gen[0]["generation"]) if gen else 0
-    old_summary = str(gen[0]["summary"] or "").strip() if gen else ""
-    rows = db.query(
-        "SELECT seq, role, text FROM messages WHERE session_id=? ORDER BY seq",
-        (LIVE_ID,),
-    )
-    history = [dict(r) for r in rows]
+    from . import checkpoint
+
+    snapshot = checkpoint.summary_state()
+    gen_n = snapshot["generation"]
+    old_summary = str(snapshot["summary"] or "").strip()
+    history = checkpoint.context_rows()
     fold_n = _fold_count(history)
+    # End only at an explicit run boundary, never in a multi-sentence reply.
+    while (
+        fold_n > 0
+        and fold_n < len(history)
+        and history[fold_n - 1]["run_id"] == history[fold_n]["run_id"]
+    ):
+        fold_n -= 1
     if fold_n < 2:
         return False
     seg = history[:fold_n]
@@ -98,23 +107,25 @@ def compress_once() -> bool:
         ],
     )
     new_summary = str(msg.get("content") or "").strip()
-    if not new_summary:
+    if not new_summary or len(new_summary) > 6000:
         return False
 
     max_seq = seg[-1]["seq"]
     with db.tx() as c:
         cur = c.execute(
-            "SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)
+            "SELECT generation,summary_version,summary_cursor FROM sessions WHERE id=?",
+            (LIVE_ID,),
         ).fetchone()
         # 压缩期间 load/打断换过会话 → 放弃（下回合基于新上下文重试）
-        if cur is None or int(cur["generation"]) != gen_n:
+        if (
+            cur is None
+            or int(cur["generation"]) != gen_n
+            or int(cur["summary_version"]) != snapshot["version"]
+            or int(cur["summary_cursor"]) != snapshot["cursor"]
+        ):
             return False
         c.execute(
-            "DELETE FROM messages WHERE session_id=? AND seq<=?",
-            (LIVE_ID, max_seq),
-        )
-        c.execute(
-            "UPDATE sessions SET summary=? WHERE id=?",
-            (new_summary, LIVE_ID),
+            "UPDATE sessions SET summary=?,summary_cursor=?,summary_version=summary_version+1 WHERE id=?",
+            (new_summary, max_seq, LIVE_ID),
         )
     return True

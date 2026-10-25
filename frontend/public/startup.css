@@ -1,0 +1,192 @@
+:root {
+  --startup-bg: #18151f;
+  --startup-panel: #28232e;
+  --startup-gold: #e7be77;
+  --startup-text: #f3ecdf;
+  --startup-muted: #b7aebd;
+  --startup-line: #49414d;
+}
+
+.startup-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  justify-content: safe center;
+  overflow: auto;
+  padding: 38px 32px;
+  background: var(--startup-bg);
+  color: var(--startup-text);
+  font: 400 12px/1.8 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-align: center;
+  isolation: isolate;
+  opacity: 1;
+  transition: opacity 700ms cubic-bezier(.4, 0, .2, 1);
+}
+
+.startup-screen,
+.startup-screen * { box-sizing: border-box; }
+.startup-screen[hidden],
+.startup-screen [hidden] { display: none !important; }
+.startup-screen[data-state='leaving'] { opacity: 0; }
+
+.startup-vignette {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 300px 260px at 50% 43%, #e7be7708, transparent 85%),
+    radial-gradient(ellipse 70% 90% at 50% 40%, transparent 15%, #110e1766 100%);
+}
+
+.startup-art {
+  position: relative;
+  flex: 0 0 auto;
+  width: 220px;
+  height: 244px;
+  margin: -26px 0 22px;
+}
+
+.startup-art img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: startup-paper-float 8s ease-in-out infinite;
+}
+
+.startup-art::before {
+  content: '';
+  position: absolute;
+  inset: 23px -29px 7px;
+  border: 1px solid #e7be7714;
+  border-radius: 50%;
+  transform: rotate(-24deg);
+  pointer-events: none;
+}
+
+.startup-art::after {
+  content: '';
+  position: absolute;
+  top: 58px;
+  right: 5px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--startup-gold);
+  box-shadow: -216px 111px 0 -1px #f3ecdf66, -37px 166px 0 -1px #e7be7744;
+  opacity: .5;
+  animation: startup-dust-drift 11s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.startup-brand {
+  flex: 0 0 auto;
+  margin: 0;
+  line-height: 1;
+}
+
+.startup-brand img { display: block; width: 105px; height: auto; margin: 0 auto; }
+.startup-message { max-width: 32em; min-height: 22px; margin: 18px 0 0; color: var(--startup-muted); font: inherit; letter-spacing: .04em; }
+
+.startup-track {
+  position: relative;
+  flex: 0 0 auto;
+  width: 84px;
+  height: 1px;
+  margin: 23px 0 0;
+  overflow: hidden;
+  background: var(--startup-line);
+}
+
+.startup-track-light {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 32px;
+  background: linear-gradient(90deg, transparent, var(--startup-gold), transparent);
+  opacity: .9;
+  transform: translateX(-34px);
+  animation: startup-light-pass 2.8s ease-in-out infinite;
+}
+
+.startup-actions { display: flex; flex: 0 0 auto; justify-content: center; gap: 12px; margin: 23px 0 0; }
+.startup-actions button {
+  min-height: 36px;
+  min-width: 92px;
+  padding: 7px 18px;
+  border: 1px solid #e7be7766;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--startup-gold);
+  font: inherit;
+  cursor: pointer;
+}
+.startup-actions button:hover { background: #e7be7710; border-color: var(--startup-gold); }
+.startup-actions button:focus-visible { outline: 2px solid var(--startup-gold); outline-offset: 4px; }
+.startup-actions button:disabled { opacity: .5; cursor: default; }
+.startup-error-note { max-width: 32em; margin: 12px 0 0; color: var(--startup-muted); font: inherit; font-size: 11px; line-height: 1.8; }
+
+.startup-screen[data-stage='restoring'] .startup-track-light { animation-duration: 3.4s; }
+.startup-screen[data-stage='ready'] .startup-track-light { animation: none; width: 100%; transform: none; opacity: .75; background: var(--startup-gold); }
+.startup-screen[data-stage='error'] .startup-art img,
+.startup-screen[data-stage='error'] .startup-art::after { animation-play-state: paused; }
+.startup-screen[data-stage='error'] .startup-track-light { animation: none; transform: none; width: 100%; opacity: .25; }
+.startup-screen[data-stage='error'] .startup-message { color: var(--startup-text); }
+
+@keyframes startup-paper-float {
+  0%, 100% { transform: translateY(0) rotate(-.7deg); opacity: .91; }
+  50% { transform: translateY(-5px) rotate(.7deg); opacity: 1; }
+}
+@keyframes startup-dust-drift {
+  0%, 100% { transform: translate(0, 0); opacity: .35; }
+  50% { transform: translate(-3px, -7px); opacity: .65; }
+}
+@keyframes startup-light-pass {
+  0% { transform: translateX(-34px); opacity: 0; }
+  22% { opacity: .9; }
+  78% { opacity: .9; }
+  100% { transform: translateX(88px); opacity: 0; }
+}
+
+/* Compact desktop windows retain status and retry without a separate layout. */
+@media (max-height: 560px) {
+  .startup-screen { padding: 24px; }
+  .startup-art { width: 160px; height: 178px; margin-top: 0; margin-bottom: 14px; }
+  .startup-art::before { inset: 18px -20px 6px; }
+  .startup-art::after { top: 42px; right: 3px; box-shadow: -157px 81px 0 -1px #f3ecdf66, -27px 121px 0 -1px #e7be7744; }
+  .startup-brand img { width: 95px; }
+  .startup-message { margin-top: 13px; }
+  .startup-track { margin-top: 18px; }
+  .startup-actions { margin-top: 17px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startup-screen { transition: none; }
+  .startup-art img, .startup-art::after, .startup-track-light { animation: none; transform: none; }
+  .startup-art img { opacity: 1; }
+  .startup-art::after { opacity: .4; }
+  .startup-track-light { width: 32px; left: 26px; opacity: .65; }
+}
+
+/* Optional local artwork: decorative only, never part of startup readiness. */
+.startup-presence-figure {
+  position: fixed;
+  right: 3vw;
+  bottom: -7vh;
+  width: min(50vw, 540px);
+  height: 91vh;
+  z-index: -1;
+  pointer-events: none;
+  background: url('/brand/momo-presence-v2.webp') center top / contain no-repeat;
+  opacity: .12;
+}
+@media (max-width: 700px) {
+  .startup-presence-figure { right: -12vw; opacity: .025; }
+}

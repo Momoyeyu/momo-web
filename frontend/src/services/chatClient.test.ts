@@ -147,3 +147,17 @@ describe("chat 的错误路径", () => {
     expect(await collect(ac.signal)).toEqual([]);
   });
 });
+
+describe('durable life protocol', () => {
+  it('preserves event and run identity across fragmented sentence frames', async () => {
+    const expected = {...sentence(0,'你好。'),runId:'run-1',eventId:'event-1',seq:8,generation:3,userEventId:'user-1',userSeq:7};
+    expect((await drain(sse([frame(expected)])))[0]).toEqual(expected);
+  });
+});
+
+it('authenticates observed-text ACK with the owner captured by that turn',async()=>{
+  const fetch=vi.fn(async(_url:unknown,_init?:RequestInit)=>Response.json({ok:true}));vi.stubGlobal('fetch',fetch);
+  const {acknowledgeDisplay}=await import('./chatClient');
+  await acknowledgeDisplay('run-1',3,'seen',{clientId:'client-1',leaseId:'lease-1'});
+  expect(JSON.parse(String(fetch.mock.calls[0]![1]?.body))).toEqual({runId:'run-1',generation:3,text:'seen',clientId:'client-1',leaseId:'lease-1'});
+});

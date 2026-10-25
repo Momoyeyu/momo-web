@@ -1,532 +1,525 @@
-"""会话存档 checkpoint：data/momo.db 的 sessions/messages 表。
+"""One continuous relationship: durable events, bounded context, immutable legacy slots.
 
-- 当前会话 = sessions 中固定活跃行 id='live'，回合随落账实时追加 messages；
-  存档 = 快照行（slots 1..120 手动槽 / auto=1 自动档不占号）。
-- Save：live → 复制为新快照行 + 复制 messages；Load：live 先自动快照
-  （写入 auto 槽），目标快照灌回 live。
-- live.generation：load / interrupt 时 +1。回合在开始时记下代际，
-  assistant 落账时校验——读档或打断使在途回合的写入作废。
-- 全部读写走 db.tx() / db.query()，并发安全由单连接 + BEGIN IMMEDIATE 保证。
+Generated events are not conversation until the client acknowledges displayed text.
+No compaction, interruption or failed request deletes the original event payload.
 """
-from __future__ import annotations
 
+from __future__ import annotations
 import sqlite3
 from typing import Any
-
 from ..core import db
-from ..models import CheckpointDetail, CheckpointMeta, StoredMessage
+from ..models import StoredMessage, CheckpointDetail, CheckpointMeta
 
-PREVIEW_LEN = 40
-MAX_SLOT = 120  # 手动存档槽位上限（12 格/页 × 10 页）
-LIVE_HISTORY_MAX = 100  # live 会话行消息数上限（超出截尾，边界不拆回合）
 LIVE_ID = db.LIVE_ID
+PREVIEW_LEN = 40
+now_iso = db.now_iso
 
 
 class CheckpointError(Exception):
-    """存档操作失败。kind: not_found（404）/ invalid（400）/ conflict（409）。"""
-
-    def __init__(self, message: str, kind: str = "invalid") -> None:
+    def __init__(self, message: str, kind: str = "gone") -> None:
         super().__init__(message)
         self.kind = kind
 
 
-now_iso = db.now_iso
+def generation() -> int:
+    return int(
+        db.query("SELECT generation FROM sessions WHERE id=?", (LIVE_ID,))[0][
+            "generation"
+        ]
+    )
 
 
-def _default_title() -> str:
-    """默认存档名 = 本地时间（如 2025-01-02 15:04）。"""
-    from datetime import datetime
+def summary_state() -> dict[str, Any]:
+    r = db.query(
+        "SELECT summary,summary_cursor,summary_version,generation FROM sessions WHERE id=?",
+        (LIVE_ID,),
+    )[0]
+    return {
+        "summary": r["summary"],
+        "cursor": int(r["summary_cursor"]),
+        "version": int(r["summary_version"]),
+        "generation": int(r["generation"]),
+    }
 
-    return datetime.now().astimezone().strftime("%Y-%m-%d %H:%M")
-
-
-def _new_id() -> str:
-    return db.new_id(8)
-
-
-# ---------- live 会话（当前会话行） ----------
 
 def live_summary() -> str:
-    rows = db.query("SELECT summary FROM sessions WHERE id=?", (LIVE_ID,))
-    return str(rows[0]["summary"]) if rows else ""
+    return str(summary_state()["summary"])
+
+
+def _message(r: sqlite3.Row) -> StoredMessage:
+    return {
+        "role": r["role"],
+        "text": r["display_text"] if r["display_text"] is not None else r["text"],
+        "at": r["at"],
+        "seq": int(r["seq"]),
+        "eventId": r["event_id"],
+        "runId": r["run_id"],
+        "source": r["source"],
+        "externalMessageId": r["external_message_id"],
+    }
 
 
 def live_messages() -> list[StoredMessage]:
-    """当前会话消息（展示/注入上下文用；不含 role 外的内部列）。"""
-    rows = db.query(
-        "SELECT role, text, at FROM messages WHERE session_id=? ORDER BY seq",
-        (LIVE_ID,),
-    )
     return [
-        {"role": r["role"], "text": r["text"], "at": r["at"]} for r in rows
+        _message(r)
+        for r in db.query(
+            "SELECT * FROM messages WHERE session_id=? AND visible=1 ORDER BY seq",
+            (LIVE_ID,),
+        )
     ]
 
 
-def generation() -> int:
-    rows = db.query("SELECT generation FROM sessions WHERE id=?", (LIVE_ID,))
-    return int(rows[0]["generation"]) if rows else 0
+def history_page(before_seq: int | None = None, limit: int = 100) -> dict[str, Any]:
+    limit = max(1, min(int(limit), 200))
+    bound = int(before_seq) if before_seq is not None else 9223372036854775807
+    rows = db.query(
+        "SELECT * FROM messages WHERE session_id=? AND visible=1 AND seq<? ORDER BY seq DESC LIMIT ?",
+        (LIVE_ID, bound, limit + 1),
+    )
+    more = len(rows) > limit
+    selected = list(reversed(rows[:limit]))
+    return {
+        "messages": [_message(r) for r in selected],
+        "hasMore": more,
+        "nextBefore": int(selected[0]["seq"]) if more and selected else None,
+    }
+
+
+def context_rows(
+    *, after_summary: bool = True, limit: int = 80, oldest: bool = True
+) -> list[dict[str, Any]]:
+    cursor = summary_state()["cursor"] if after_summary else -1
+    rows = db.query(
+        """SELECT m.* FROM messages m WHERE m.session_id=? AND m.visible=1 AND m.seq>?
+        AND NOT EXISTS (SELECT 1 FROM messages excluded JOIN suppressed_sources s ON s.event_id=excluded.event_id
+                        WHERE excluded.run_id=m.run_id AND excluded.session_id=?) ORDER BY m.seq """
+        + ("ASC" if oldest else "DESC")
+        + " LIMIT ?",
+        (LIVE_ID, cursor, LIVE_ID, max(1, min(limit, 200))),
+    )
+    if not oldest:
+        rows = list(reversed(rows))
+    return [
+        dict(r)
+        | {"text": r["display_text"] if r["display_text"] is not None else r["text"]}
+        for r in rows
+    ]
+
+
+def context_messages(limit: int = 40, max_chars: int = 24000) -> list[StoredMessage]:
+    # Slice by explicit run boundaries; oversized individual text is clipped only
+    # in this prompt projection. The player's original history remains untouched.
+    rows = context_rows(limit=max(1, limit) + 1, oldest=False)
+    selected = []
+    size = 0
+    for r in reversed(rows):
+        if len(selected) >= max(1, limit) or size + len(r["text"]) > max_chars:
+            break
+        selected.append(r)
+        size += len(r["text"])
+    selected.reverse()
+    if selected:
+        first = selected[0]["run_id"]
+        if rows and any(
+            r["run_id"] == first for r in rows[: len(rows) - len(selected)]
+        ):
+            selected = [r for r in selected if r["run_id"] != first]
+    return [_message(r) for r in selected]
 
 
 def _next_seq(c: sqlite3.Connection, sid: str) -> int:
-    r = c.execute(
-        "SELECT COALESCE(MAX(seq)+1, 0) AS s FROM messages WHERE session_id=?",
-        (sid,),
-    ).fetchone()
-    return int(r["s"])
+    return int(
+        c.execute(
+            "SELECT COALESCE(MAX(seq)+1,0) FROM messages WHERE session_id=?", (sid,)
+        ).fetchone()[0]
+    )
 
 
-def begin_turn(text: str, gen: int, at: str) -> bool:
-    """回合开始：代际仍有效时把 user 消息追加进 live。
+def current_run(gen: int, at: str) -> str | None:
+    rows = db.query(
+        "SELECT id FROM runs WHERE generation=? AND at=? ORDER BY rowid DESC LIMIT 1",
+        (gen, at),
+    )
+    return str(rows[0]["id"]) if rows else None
 
-    False = 代际已变（期间发生 load/interrupt），在途回合作废。
-    """
-    with db.tx() as c:
-        cur = c.execute(
-            "SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)
+
+def _run(c, gen, at, run_id=None):
+    if run_id:
+        return c.execute(
+            "SELECT * FROM runs WHERE id=? AND generation=?", (run_id, gen)
         ).fetchone()
-        if cur is None or int(cur["generation"]) != gen:
+    return c.execute(
+        "SELECT * FROM runs WHERE generation=? AND at=? ORDER BY rowid DESC LIMIT 1",
+        (gen, at),
+    ).fetchone()
+
+
+def _insert(
+    c, role, text, at, run_id, source="meeting", external_message_id=None, visible=False
+):
+    eid = db.new_id(32)
+    c.execute(
+        """INSERT INTO messages(session_id,seq,role,text,at,event_id,run_id,source,external_message_id,status,visible)
+                 VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            LIVE_ID,
+            _next_seq(c, LIVE_ID),
+            role,
+            text,
+            at,
+            eid,
+            run_id,
+            source,
+            external_message_id,
+            "shown" if visible else "generated",
+            int(visible),
+        ),
+    )
+    c.execute("UPDATE sessions SET updated_at=? WHERE id=?", (at, LIVE_ID))
+    return eid
+
+
+def begin_turn(
+    text: str,
+    gen: int,
+    at: str,
+    *,
+    run_id: str | None = None,
+    source: str = "meeting",
+    external_message_id: str | None = None,
+) -> bool:
+    with db.tx() as c:
+        if (
+            int(
+                c.execute(
+                    "SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)
+                ).fetchone()[0]
+            )
+            != gen
+        ):
+            return False
+        rid = run_id or db.new_id(32)
+        if (
+            external_message_id
+            and c.execute(
+                "SELECT 1 FROM runs WHERE source=? AND external_message_id=?",
+                (source, external_message_id),
+            ).fetchone()
+        ):
+            return False
+        if c.execute("SELECT 1 FROM runs WHERE id=?", (rid,)).fetchone():
             return False
         c.execute(
-            "INSERT INTO messages(session_id,seq,role,text,at) VALUES(?,?,?,?,?)",
-            (LIVE_ID, _next_seq(c, LIVE_ID), "user", text, at),
+            "INSERT INTO runs VALUES(?,?,?,?,?,?,?,?)",
+            (
+                rid,
+                gen,
+                at,
+                source,
+                external_message_id,
+                "processing",
+                now_iso(),
+                now_iso(),
+            ),
         )
-        c.execute(
-            "UPDATE sessions SET updated_at=? WHERE id=?", (at, LIVE_ID)
-        )
+        _insert(c, "user", text, at, rid, source, external_message_id)
         return True
+
+
+def append_sentence(
+    text: str, gen: int, at: str, *, run_id: str | None = None, visible: bool = False
+) -> bool:
+    with db.tx() as c:
+        if (
+            int(
+                c.execute(
+                    "SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)
+                ).fetchone()[0]
+            )
+            != gen
+        ):
+            return False
+        run = _run(c, gen, at, run_id)
+        if run is None or run["status"] not in {"processing", "generated"}:
+            return False
+        _insert(
+            c,
+            "assistant",
+            text,
+            at,
+            run["id"],
+            run["source"],
+            run["external_message_id"],
+            visible,
+        )
+        if visible:
+            c.execute(
+                "UPDATE messages SET visible=1,status='shown' WHERE run_id=? AND role='user'",
+                (run["id"],),
+            )
+        return True
+
+
+def append_opening(
+    c: sqlite3.Connection, text: str, at: str, *, run_id: str, source: str = "meeting"
+) -> str:
+    gen = int(
+        c.execute("SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)).fetchone()[
+            0
+        ]
+    )
+    c.execute(
+        "INSERT OR IGNORE INTO runs VALUES(?,?,?,?,NULL,'generated',?,?)",
+        (run_id, gen, at, source, at, at),
+    )
+    return _insert(c, "assistant", text, at, run_id, source)
+
+
+def _ack(c, run_id: str, seen: str, *, allow_shrink=False) -> bool:
+    rows = c.execute(
+        "SELECT * FROM messages WHERE session_id=? AND run_id=? AND role='assistant' ORDER BY seq",
+        (LIVE_ID, run_id),
+    ).fetchall()
+    full = "".join(r["text"] for r in rows)
+    prior = "".join(
+        (r["display_text"] if r["display_text"] is not None else r["text"])
+        for r in rows
+        if r["visible"]
+    )
+    if not full.startswith(seen) or (not allow_shrink and len(seen) < len(prior)):
+        return False
+    remaining = len(seen)
+    for r in rows:
+        shown = r["text"][:remaining]
+        remaining = max(0, remaining - len(r["text"]))
+        c.execute(
+            "UPDATE messages SET visible=?,display_text=?,status=? WHERE event_id=?",
+            (int(bool(shown)), shown, "shown" if shown else "generated", r["event_id"]),
+        )
+    c.execute(
+        "UPDATE messages SET visible=?,status=? WHERE run_id=? AND role='user'",
+        (int(bool(seen)), "delivered" if seen else "accepted", run_id),
+    )
+    if seen:
+        from .memory import apply_pending
+
+        apply_pending(c, run_id)
+    return True
+
+
+def acknowledge(run_id: str | None, seen_text: str, gen: int) -> bool:
+    if not run_id:
+        return False
+    with db.tx() as c:
+        if (
+            int(
+                c.execute(
+                    "SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)
+                ).fetchone()[0]
+            )
+            != gen
+        ):
+            return False
+        run = c.execute(
+            "SELECT * FROM runs WHERE id=? AND generation=?", (run_id, gen)
+        ).fetchone()
+        if run is None or run["status"] == "interrupted":
+            return False
+        accepted = _ack(c, run_id, str(seen_text or ""))
+        if accepted and run["status"] == "generated":
+            full = "".join(
+                r["text"]
+                for r in c.execute(
+                    "SELECT text FROM messages WHERE run_id=? AND role='assistant' ORDER BY seq",
+                    (run_id,),
+                )
+            )
+            if full == seen_text:
+                c.execute(
+                    "UPDATE runs SET status='shown',updated_at=? WHERE id=?",
+                    (now_iso(), run_id),
+                )
+        return accepted
+
+
+def finish_turn(
+    gen: int, at: str, status: str = "completed", *, run_id: str | None = None
+) -> None:
+    with db.tx() as c:
+        run = _run(c, gen, at, run_id)
+        if run is None or run["status"] == "interrupted":
+            return
+        count = c.execute(
+            "SELECT COUNT(*) FROM messages WHERE run_id=? AND role='assistant'",
+            (run["id"],),
+        ).fetchone()[0]
+        unseen = c.execute(
+            "SELECT 1 FROM messages WHERE run_id=? AND role='assistant' AND (visible=0 OR (display_text IS NOT NULL AND display_text!=text)) LIMIT 1",
+            (run["id"],),
+        ).fetchone()
+        result = ("generated" if unseen else "shown") if count else "failed"
+        if status != "completed":
+            result = status
+        c.execute(
+            "UPDATE runs SET status=?,updated_at=? WHERE id=?",
+            (result, now_iso(), run["id"]),
+        )
 
 
 def discard_unanswered_turn(gen: int, at: str) -> None:
-    """Remove this turn's provisional user row only when it has no reply.
-
-    Generation guards protect loaded/interrupted history. Match this turn by its
-    timestamp, and stop at the next user boundary so newer turns stay intact.
-    """
     with db.tx() as c:
-        cur = c.execute("SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)).fetchone()
-        if cur is None or int(cur["generation"]) != gen:
+        run = _run(c, gen, at)
+        if run is None:
             return
-        user = c.execute(
-            "SELECT seq FROM messages WHERE session_id=? AND role='user' AND at=?"
-            " ORDER BY seq DESC LIMIT 1", (LIVE_ID, at),
-        ).fetchone()
-        if user is None:
-            return
-        following = c.execute(
-            "SELECT role FROM messages WHERE session_id=? AND seq>? ORDER BY seq LIMIT 1",
-            (LIVE_ID, user["seq"]),
-        ).fetchone()
-        if following is not None and following["role"] == "assistant":
-            return
-        c.execute("DELETE FROM messages WHERE session_id=? AND seq=?", (LIVE_ID, user["seq"]))
+        if not c.execute(
+            "SELECT 1 FROM messages WHERE run_id=? AND role='assistant'", (run["id"],)
+        ).fetchone():
+            c.execute(
+                "UPDATE messages SET visible=0,status='failed' WHERE run_id=?",
+                (run["id"],),
+            )
+            c.execute(
+                "UPDATE runs SET status='failed',updated_at=? WHERE id=?",
+                (now_iso(), run["id"]),
+            )
 
 
-def append_sentence(text: str, gen: int, at: str) -> bool:
-    """assistant 单句落账：代际一致才写入；读档/打断后 gen 漂移 → 丢弃。
-
-    一次回复会调用 N 次（一回合 N 句，DB 里就是 N 行 assistant）。回合边界由
-    其后的 user 行界定，因此不需要额外的 turn_id 列：合并回放、裁剪、打断
-    都可以由「user 行 = 回合起点」这条规则推出（见 turn._merge_assistant）。
-
-    写入成功后同事务内裁剪 live.messages 至上限。
-    """
-    with db.tx() as c:
-        cur = c.execute(
-            "SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)
-        ).fetchone()
-        if cur is None or int(cur["generation"]) != gen:
-            return False
-        c.execute(
-            "INSERT INTO messages(session_id,seq,role,text,at) VALUES(?,?,?,?,?)",
-            (LIVE_ID, _next_seq(c, LIVE_ID), "assistant", text, at),
-        )
-        c.execute(
-            "UPDATE sessions SET updated_at=? WHERE id=?", (at, LIVE_ID)
-        )
-        _trim_live(c)
-        return True
-
-
-def _trim_live(c: sqlite3.Connection) -> None:
-    """live.messages 保留最新 LIVE_HISTORY_MAX 条，删除更旧的。
-
-    裁剪边界不拆散完整回合：剩余的最早一条必须是 role='user'——
-    切在 assistant 上则向前回退到最近的 user 边界（多留若干条）。
-    """
-    rows = c.execute(
-        "SELECT seq, role FROM messages WHERE session_id=? ORDER BY seq",
-        (LIVE_ID,),
-    ).fetchall()
-    if len(rows) <= LIVE_HISTORY_MAX:
-        return
-    cut = len(rows) - LIVE_HISTORY_MAX
-    while cut > 0 and rows[cut]["role"] != "user":
-        cut -= 1
-    c.execute(
-        "DELETE FROM messages WHERE session_id=? AND seq<?",
-        (LIVE_ID, rows[cut]["seq"]),
+def run_event_ids(gen: int, at: str) -> list[str]:
+    rid = current_run(gen, at)
+    return (
+        [
+            str(r["event_id"])
+            for r in db.query("SELECT event_id FROM messages WHERE run_id=?", (rid,))
+        ]
+        if rid
+        else []
     )
 
 
-def interrupt_turn(user: str, assistant: str) -> None:
-    """打断落账调和：代际 +1（在途回合的落账作废），并让 live 的**本回合**与
-    「用户实际看到的文本」对齐：
-
-    - 本回合 user 行还在（内容匹配）→ 其后的 assistant 行按前缀对齐：
-      整句保留、没看到的删除、只剩半句就补一行（回复还没落账则整段补上）
-    - 本回合 user 行都没落账（回合没到 backend）→ 直接补写整个结果
-
-    幂等：重复打断同一回合不会重复写 user 行（对齐收敛到同一状态）。
-    """
-    user = str(user or "")
-    assistant = str(assistant or "")
+def interrupt_turn(user: str, assistant: str, *, run_id: str | None = None) -> None:
+    user, assistant = str(user or ""), str(assistant or "")
     with db.tx() as c:
-        c.execute(
-            "UPDATE sessions SET generation=generation+1 WHERE id=?", (LIVE_ID,)
-        )
-        now = now_iso()
-        # 本回合 = 最后一条 user 行（内容需匹配）及其之后的全部 assistant 行。
-        # 不能只取最后两行：句级落账下一回合会有多条 assistant 行，那时最后两行都是
-        # assistant，看不到 user 行，会被误判成「回合没到 backend」而重复插入 user。
-        last_user = c.execute(
-            "SELECT seq, text FROM messages WHERE session_id=? AND role='user'"
-            " ORDER BY seq DESC LIMIT 1",
-            (LIVE_ID,),
-        ).fetchone()
-
-        if last_user and last_user["text"] == user:
-            turn_rows = c.execute(
-                "SELECT rowid, text FROM messages"
-                " WHERE session_id=? AND role='assistant' AND seq > ? ORDER BY seq",
-                (LIVE_ID, last_user["seq"]),
-            ).fetchall()
-            # 用户看到的是这些句子的**前缀**（可能还差半句）：整句保留、没看到的删掉、
-            # 只剩半句就补一行；一句都还没落账时 turn_rows 为空，这里直接补整段。
-            # 幂等：重复打断收敛到同一状态。
-            acc = ""
-            keep = 0
-            for r in turn_rows:
-                if assistant.startswith(acc + r["text"]):
-                    acc += r["text"]
-                    keep += 1
-                else:
-                    break
-            for r in turn_rows[keep:]:
-                c.execute("DELETE FROM messages WHERE rowid=?", (r["rowid"],))
-            rest = assistant[len(acc) :]
-            if rest:
-                c.execute(
-                    "INSERT INTO messages(session_id,seq,role,text,at)"
-                    " VALUES(?,?,?,?,?)",
-                    (LIVE_ID, _next_seq(c, LIVE_ID), "assistant", rest, now),
-                )
-        elif user:
-            # 回合没走到 backend（SSE 没到就被打断）：把结果补成一致
-            seq = _next_seq(c, LIVE_ID)
+        gen = int(
             c.execute(
-                "INSERT INTO messages(session_id,seq,role,text,at)"
-                " VALUES(?,?,?,?,?)",
-                (LIVE_ID, seq, "user", user, now),
-            )
-            if assistant:
-                c.execute(
-                    "INSERT INTO messages(session_id,seq,role,text,at)"
-                    " VALUES(?,?,?,?,?)",
-                    (LIVE_ID, seq + 1, "assistant", assistant, now),
-                )
-        c.execute(
-            "UPDATE sessions SET updated_at=? WHERE id=?", (now, LIVE_ID)
+                "SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)
+            ).fetchone()[0]
         )
+        c.execute("UPDATE sessions SET generation=generation+1 WHERE id=?", (LIVE_ID,))
+        if run_id:
+            run = c.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
+        else:
+            run = c.execute(
+                "SELECT r.* FROM runs r JOIN messages m ON m.run_id=r.id WHERE m.role='user' AND m.session_id=? ORDER BY m.seq DESC LIMIT 1",
+                (LIVE_ID,),
+            ).fetchone()
+            if (
+                run
+                and not c.execute(
+                    "SELECT 1 FROM messages WHERE run_id=? AND role='user' AND text=?",
+                    (run["id"], user),
+                ).fetchone()
+            ):
+                run = None
+        if run:
+            if assistant:
+                rows = c.execute(
+                    "SELECT text FROM messages WHERE run_id=? AND role='assistant' ORDER BY seq",
+                    (run["id"],),
+                ).fetchall()
+                full = "".join(r["text"] for r in rows)
+                if not full and assistant:
+                    _insert(
+                        c, "assistant", assistant, run["at"], run["id"], run["source"]
+                    )
+            _ack(c, run["id"], assistant, allow_shrink=True)
+            c.execute(
+                "UPDATE runs SET status='interrupted',updated_at=? WHERE id=?",
+                (now_iso(), run["id"]),
+            )
+        elif user and assistant:
+            rid = db.new_id(32)
+            at = now_iso()
+            c.execute(
+                "INSERT INTO runs VALUES(?,?,?,'meeting',NULL,'interrupted',?,?)",
+                (rid, gen, at, at, at),
+            )
+            _insert(c, "user", user, at, rid, visible=True)
+            _insert(c, "assistant", assistant, at, rid, visible=True)
 
 
-# ---------- 快照 / 展示 ----------
-
-def _messages_of(c: sqlite3.Connection, sid: str) -> list[StoredMessage]:
-    rows = c.execute(
-        "SELECT role, text, at FROM messages WHERE session_id=? ORDER BY seq",
-        (sid,),
-    ).fetchall()
+def _messages_of(c, sid):
     return [
-        {"role": r["role"], "text": r["text"], "at": r["at"]} for r in rows
+        _message(r)
+        for r in c.execute(
+            "SELECT * FROM messages WHERE session_id=? AND visible=1 ORDER BY seq",
+            (sid,),
+        )
     ]
 
 
-def _copy_messages(c: sqlite3.Connection, src: str, dst: str) -> None:
-    """整段复制 src 会话的 messages 到 dst（dst 原有先清）。"""
-    c.execute("DELETE FROM messages WHERE session_id=?", (dst,))
-    c.execute(
-        "INSERT INTO messages(session_id,seq,role,text,at)"
-        " SELECT ?, seq, role, text, at FROM messages"
-        " WHERE session_id=? ORDER BY seq",
-        (dst, src),
-    )
-
-
-def _preview_of(c: sqlite3.Connection, sid: str) -> str:
-    """列表预览：末条消息文本压空白后截 ~40 字（最新一句对话）。"""
-    r = c.execute(
-        "SELECT text FROM messages WHERE session_id=?"
-        " ORDER BY seq DESC LIMIT 1",
-        (sid,),
-    ).fetchone()
-    if r is None:
-        return ""
-    return " ".join(str(r["text"]).split())[:PREVIEW_LEN]
-
-
-def _meta_row(r: sqlite3.Row, preview: str) -> CheckpointMeta:
-    slot = r["slot"]
+def _entry(c, r) -> CheckpointDetail:
     return {
         "id": r["id"],
-        "title": r["title"],
+        "slot": r["slot"],
         "auto": bool(r["auto"]),
-        "slot": int(slot) if slot is not None else None,
+        "title": r["title"],
+        "summary": r["summary"],
         "createdAt": r["created_at"],
         "updatedAt": r["updated_at"],
-        "preview": preview,
-    }
-
-
-def meta(entry: CheckpointDetail) -> CheckpointMeta:
-    """存档全文 → 列表项（丢 messages，用末条算出 preview）。"""
-    msgs = entry.get("messages")
-    if isinstance(msgs, list) and msgs:
-        last = msgs[-1]
-        text = (
-            " ".join(str(last.get("text") or "").split())[:PREVIEW_LEN]
-            if isinstance(last, dict)
-            else ""
-        )
-    else:
-        text = ""
-    return {
-        "id": str(entry.get("id") or ""),
-        "title": str(entry.get("title") or ""),
-        "auto": bool(entry.get("auto")),
-        "slot": entry.get("slot"),
-        "createdAt": str(entry.get("createdAt") or ""),
-        "updatedAt": str(entry.get("updatedAt") or ""),
-        "preview": text,
-    }
-
-
-def _entry(c: sqlite3.Connection, r: sqlite3.Row) -> CheckpointDetail:
-    """会话行 → 存档全文 dict（含 messages）。"""
-    m = _meta_row(r, _preview_of(c, r["id"]))
-    return {
-        "id": m["id"],
-        "title": m["title"],
-        "auto": m["auto"],
-        "slot": m["slot"],
-        "createdAt": m["createdAt"],
-        "updatedAt": m["updatedAt"],
-        "summary": r["summary"],
         "messages": _messages_of(c, r["id"]),
     }
 
 
-# ---------- CRUD ----------
+def meta(entry) -> CheckpointMeta:
+    return {
+        k: entry[k] for k in ("id", "slot", "auto", "title", "createdAt", "updatedAt")
+    } | {
+        "preview": entry["messages"][-1]["text"][:PREVIEW_LEN]
+        if entry["messages"]
+        else ""
+    }
+
 
 def list_checkpoints() -> list[CheckpointMeta]:
-    """auto 槽置顶，其后手动存档按 slot 升序（不含 live 行）。"""
     with db.tx() as c:
-        rows = c.execute(
-            "SELECT * FROM sessions WHERE id != ?"
-            " ORDER BY auto DESC, slot ASC",
-            (LIVE_ID,),
-        ).fetchall()
-        return [_meta_row(r, _preview_of(c, r["id"])) for r in rows]
+        return [
+            meta(_entry(c, r))
+            for r in c.execute(
+                "SELECT * FROM sessions WHERE id!=? ORDER BY auto DESC,slot", (LIVE_ID,)
+            ).fetchall()
+        ]
 
 
 def get_checkpoint(sid: str) -> CheckpointDetail:
-    if sid == LIVE_ID:
-        raise CheckpointError("存档不存在", kind="not_found")
     with db.tx() as c:
         r = c.execute(
-            "SELECT * FROM sessions WHERE id=?", (sid,)
+            "SELECT * FROM sessions WHERE id!=? AND id=?", (LIVE_ID, sid)
         ).fetchone()
         if r is None:
-            raise CheckpointError("存档不存在", kind="not_found")
+            raise CheckpointError("Legacy archive not found", "not_found")
         return _entry(c, r)
 
 
-def _assign_slot(c: sqlite3.Connection, slot: Any) -> int:
-    """确定新存档槽位：指定空槽则用之，未指定取最小编号空槽。"""
-    used = {
-        int(r["slot"])
-        for r in c.execute(
-            "SELECT slot FROM sessions WHERE auto=0 AND slot IS NOT NULL"
-            " AND id != ?",
-            (LIVE_ID,),
-        ).fetchall()
-    }
-    if slot is None:
-        for n in range(1, MAX_SLOT + 1):
-            if n not in used:
-                return n
-        raise CheckpointError(f"手动存档已满（{MAX_SLOT} 槽）", kind="conflict")
-    if not (isinstance(slot, int) and not isinstance(slot, bool) and 1 <= slot <= MAX_SLOT):
-        raise CheckpointError(f"槽位号需在 1–{MAX_SLOT} 之间")
-    if slot in used:
-        raise CheckpointError(f"槽位 {slot} 已被占用", kind="conflict")
-    return int(slot)
+def _gone(*args, **kwargs):
+    raise CheckpointError(
+        "Multiple save slots were retired. Your continuous history is saved automatically; use full-profile backup for recovery."
+    )
 
 
-def create_checkpoint(
-    title: str | None = None, slot: int | None = None
-) -> CheckpointDetail:
-    """快照当前会话新建存档；title 空 → 默认当前时间；slot 空 → 最小空槽。"""
-    with db.tx() as c:
-        sslot = _assign_slot(c, slot)
-        now = now_iso()
-        sid = _new_id()
-        c.execute(
-            "INSERT INTO sessions"
-            "(id,slot,auto,title,summary,created_at,updated_at) VALUES(?,?,0,?,?,?,?)",
-            (
-                sid,
-                sslot,
-                (title or "").strip() or _default_title(),
-                live_summary(),
-                now,
-                now,
-            ),
-        )
-        _copy_messages(c, LIVE_ID, sid)
-        return _entry(c, c.execute(
-            "SELECT * FROM sessions WHERE id=?", (sid,)
-        ).fetchone())
+create_checkpoint = overwrite_checkpoint = delete_checkpoint = load_checkpoint = (
+    save_auto
+) = new_session = _gone
 
 
-def overwrite_checkpoint(sid: str, title: str | None = None) -> CheckpointDetail:
-    """重命名（title 非空时）+ 用当前会话内容覆盖。"""
-    _guard_snapshot_id(sid)
-    with db.tx() as c:
-        r = c.execute("SELECT * FROM sessions WHERE id=?", (sid,)).fetchone()
-        if r is None:
-            raise CheckpointError("存档不存在", kind="not_found")
-        if r["auto"]:
-            raise CheckpointError("自动存档槽不可覆盖", kind="invalid")
-        now = now_iso()
-        t = (title or "").strip()
-        c.execute(
-            "UPDATE sessions SET summary=?, updated_at=?"
-            + (", title=?" if t else "")
-            + " WHERE id=?",
-            (live_summary(), now, t, sid) if t else (live_summary(), now, sid),
-        )
-        _copy_messages(c, LIVE_ID, sid)
-        return _entry(c, c.execute(
-            "SELECT * FROM sessions WHERE id=?", (sid,)
-        ).fetchone())
-
-
-def delete_checkpoint(sid: str) -> CheckpointDetail:
-    _guard_snapshot_id(sid)
-    with db.tx() as c:
-        r = c.execute("SELECT * FROM sessions WHERE id=?", (sid,)).fetchone()
-        if r is None:
-            raise CheckpointError("存档不存在", kind="not_found")
-        if r["auto"]:
-            raise CheckpointError("自动存档槽不可删除", kind="invalid")
-        entry = _entry(c, r)
-        c.execute("DELETE FROM sessions WHERE id=?", (sid,))
-        return entry
-
-
-def _guard_snapshot_id(sid: str) -> None:
-    if sid == LIVE_ID:
-        raise CheckpointError("存档不存在", kind="not_found")
-
-
-# ---------- Load ----------
-
-
-def _write_auto(c: sqlite3.Connection, summary: str) -> None:
-    """当前 live 内容写入 auto 槽：已有 auto 槽原地覆盖，否则新建。"""
-    now = now_iso()
-    row = c.execute(
-        "SELECT id FROM sessions WHERE auto=1 AND id != ?", (LIVE_ID,)
-    ).fetchone()
-    if row is None:
-        aid = _new_id()
-        c.execute(
-            "INSERT INTO sessions"
-            "(id,slot,auto,title,summary,created_at,updated_at)"
-            " VALUES(?,NULL,1,?,?,?,?)",
-            (aid, _default_title(), summary, now, now),
-        )
-    else:
-        aid = row["id"]
-        c.execute(
-            "UPDATE sessions SET summary=?, updated_at=? WHERE id=?",
-            (summary, now, aid),
-        )
-    _copy_messages(c, LIVE_ID, aid)
-
-
-def load_checkpoint(sid: str) -> CheckpointDetail:
-    """加载存档覆盖当前会话。返回存档全文。
-
-    不做任何自动备份：当前会话是否保留由前端在加载前确认，用户想保留
-    应手动存档。代际 +1：load 之后在途回合的 append_sentence 全部作废。
-    """
-    _guard_snapshot_id(sid)
-    with db.tx() as c:
-        target = c.execute(
-            "SELECT * FROM sessions WHERE id=?", (sid,)
-        ).fetchone()
-        if target is None:
-            raise CheckpointError("存档不存在", kind="not_found")
-        _copy_messages(c, sid, LIVE_ID)
-        now = now_iso()
-        c.execute(
-            "UPDATE sessions SET summary=?, updated_at=?,"
-            " generation=generation+1 WHERE id=?",
-            (str(target["summary"] or ""), now, LIVE_ID),
-        )
-        return _entry(c, target)
-
-
-def save_auto() -> None:
-    """当前会话非空时写入 auto 槽（不清空 live）。
-
-    auto 槽的唯一写入时机：从对话页退回标题页时由前端调用。
-    """
-    with db.tx() as c:
-        live = c.execute(
-            "SELECT summary FROM sessions WHERE id=?", (LIVE_ID,)
-        ).fetchone()
-        if live is None:
-            return
-        n = c.execute(
-            "SELECT COUNT(*) AS n FROM messages WHERE session_id=?",
-            (LIVE_ID,),
-        ).fetchone()["n"]
-        if n:
-            _write_auto(c, str(live["summary"] or ""))
-
-
-def new_session() -> None:
-    """开启新会话：live 非空先快照进 auto 槽，然后清空 live。
-
-    代际 +1：在途回合的 append_sentence 全部作废（其 user 行已随原
-    live 进 auto 槽）。
-    """
-    with db.tx() as c:
-        live = c.execute(
-            "SELECT summary FROM sessions WHERE id=?", (LIVE_ID,)
-        ).fetchone()
-        if live is not None:
-            n = c.execute(
-                "SELECT COUNT(*) AS n FROM messages WHERE session_id=?",
-                (LIVE_ID,),
-            ).fetchone()["n"]
-            if n:
-                _write_auto(c, str(live["summary"] or ""))
-        c.execute("DELETE FROM messages WHERE session_id=?", (LIVE_ID,))
-        c.execute(
-            "UPDATE sessions SET summary='', updated_at=?,"
-            " generation=generation+1 WHERE id=?",
-            (now_iso(), LIVE_ID),
-        )
+def event_metadata(gen: int, at: str, *, run_id: str | None = None) -> dict[str, Any]:
+    rid = run_id or current_run(gen, at)
+    rows = db.query(
+        "SELECT role,event_id,seq FROM messages WHERE run_id=? ORDER BY seq", (rid,)
+    )
+    result = {"runId": rid}
+    for r in rows:
+        if r["role"] == "user" and "userEventId" not in result:
+            result.update(userEventId=r["event_id"], userSeq=int(r["seq"]))
+        elif r["role"] == "assistant":
+            result.update(eventId=r["event_id"], seq=int(r["seq"]))
+    return result

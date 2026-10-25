@@ -3,6 +3,7 @@
 //
 // 协议（port message）：
 //   in : { type: "push", samples: Float32Array }   追加一段待播采样（24kHz mono）
+//   in : { type: "pause", paused: boolean }        保留游标，暂停 / 继续排播
 //   in : { type: "clear" }                          清空缓冲（barge-in / stop）
 //   out: { type: "rms", rms: number }               输出能量（含静音块，自然归零）
 //   out: { type: "drain" }                          队列播空，提示口型复位
@@ -19,10 +20,14 @@ class PcmPlayerProcessor extends AudioWorkletProcessor {
     this.sumSq = 0; // 累计平方和
     this.count = 0; // 累计采样数
     this.wasEmpty = true;
+    this.paused = false;
     this.port.onmessage = (event) => {
       var msg = event.data;
       if (msg && msg.type === "push" && msg.samples) {
         this.chunks.push(msg.samples);
+      } else if (msg && msg.type === "pause") {
+        this.paused = !!msg.paused;
+        this.blocks = 0;this.sumSq = 0;this.count = 0;
       } else if (msg && msg.type === "clear") {
         this.chunks = [];
         this.offset = 0;
@@ -32,6 +37,7 @@ class PcmPlayerProcessor extends AudioWorkletProcessor {
 
   process(_inputs, outputs) {
     var out = outputs[0][0];
+    if (this.paused) {out.fill(0);return true;}
     var n = out.length;
     var written = 0;
     while (written < n && this.chunks.length > 0) {

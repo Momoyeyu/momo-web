@@ -6,12 +6,13 @@
   → 模型开始回复"的 VN 对话节奏，这个粒度刚好够用。
 - **语言**跟随设置里的对话语言（chatLang）：SenseVoice 支持
   auto/zh/en/ja/ko/yue，我们用 zh/en/ja（其余回落 auto）。
-- **模型缺失不致命**：`ready()` 返回缺失清单，API 层据此回错误事件，
-  前端自动提示"内置 ASR 不可用"。自定义 ASR 不受影响。
-- 识别器按语言缓存：模型加载约 1s、常驻约 300MB，换语言时才重建。
+- 安装资源不完整时报告错误；运行时不联网获取模型。
+- 所有会话共用一个识别器，语言切换替换该实例；最后一条会话关闭即释放。
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import threading
 from pathlib import Path
@@ -28,7 +29,8 @@ MIN_SPEECH_SECONDS = 0.2
 
 MODELS_DIR = Path(
     os.environ.get("MOMO_ASR_MODELS")
-    or (Path(__file__).resolve().parents[2] / "models" / "asr")
+    or (Path(os.environ["MOMO_RESOURCES_DIR"]) / "asr" if os.environ.get("MOMO_RESOURCES_DIR")
+        else Path(__file__).resolve().parents[2] / "models" / "asr")
 )
 SENSE_DIR = MODELS_DIR / "sense-voice"
 MODEL_PATH = SENSE_DIR / "model.int8.onnx"
@@ -44,58 +46,101 @@ class AsrError(RuntimeError):
 
 
 def _ensure_onnxruntime_lib() -> None:
-    """修 sherpa-onnx macOS cp314 wheel 的已知打包缺陷。
+    """Preflight native libraries; packaged wheels must be usable as installed.
 
-    该 wheel 的 rpath 指向 `sherpa_onnx/lib/libonnxruntime.dylib`，但文件
-    没打进去。装了 onnxruntime 时把它的 dylib 补到那个位置即可，只做一次。
+    The compatibility repair is restricted to a writable development virtualenv
+    and discovers installed packages rather than assuming backend/.venv layout.
+    Offline releases must pass native smoke tests during their platform build.
     """
     try:
         import sherpa_onnx  # noqa: F401
-
         return
-    except ImportError:
-        pass
-    try:
-        import onnxruntime  # noqa: F401
-    except ImportError:
-        raise AsrError("sherpa-onnx 无法加载：缺少 onnxruntime") from None
-    lib_dir = Path(__file__).resolve().parents[2] / ".venv"  # 仅开发环境兜底
-    candidates = list(lib_dir.glob("lib/python*/site-packages/onnxruntime/capi/libonnxruntime*.dylib"))
-    target_dir = next(
-        iter(Path(os.environ.get("VIRTUAL_ENV", "")).glob("lib/python*/site-packages/sherpa_onnx/lib")),
-        None,
-    )
-    if target_dir and candidates:
-        target = target_dir / "libonnxruntime.dylib"
-        if not target.exists():
+    except ImportError as original:
+        import importlib.metadata
+        import sys
+        if sys.prefix != sys.base_prefix:
             try:
-                target.write_bytes(candidates[0].read_bytes())
-            except OSError:
+                sherpa = importlib.metadata.distribution("sherpa-onnx")
+                ort = importlib.metadata.distribution("onnxruntime")
+                target = Path(sherpa.locate_file("sherpa_onnx/lib/libonnxruntime.dylib"))
+                candidates = list(Path(ort.locate_file("onnxruntime/capi")).glob("libonnxruntime*.dylib"))
+                if target.parent.is_dir() and candidates and not target.exists():
+                    target.write_bytes(candidates[0].read_bytes())
+                    import sherpa_onnx  # noqa: F401
+                    return
+            except (ImportError, OSError, importlib.metadata.PackageNotFoundError):
                 pass
-    import sherpa_onnx  # noqa: F401  （失败则抛 ImportError，由上层转 AsrError）
+        raise AsrError(f"内置语音运行库不可用：{original}") from original
 
 
 def missing_models() -> list[str]:
-    """缺失的模型文件（相对路径）。空 = 齐备。"""
-    need = {"sense-voice/model.int8.onnx": MODEL_PATH, "sense-voice/tokens.txt": TOKENS_PATH, "silero_vad.onnx": VAD_PATH}
-    return [name for name, p in need.items() if not p.exists()]
+    """Missing/truncated model files; cheap status check, no model hashing."""
+    need = {"sense-voice/model.int8.onnx": (MODEL_PATH, 239233841),
+            "sense-voice/tokens.txt": (TOKENS_PATH, 315894),
+            "silero_vad.onnx": (VAD_PATH, 1807522)}
+    unavailable = []
+    for name, (path, expected_size) in need.items():
+        try:
+            if not path.is_file() or path.stat().st_size != expected_size:
+                unavailable.append(name)
+        except OSError:
+            unavailable.append(name)
+    return unavailable
 
 
 def ready() -> bool:
     return not missing_models()
 
 
+# A single model remains resident even with multiple languages/sessions. All
+# allocation and decoding use the same lock, so language changes cannot allocate
+# duplicate recognizers concurrently.
 _recognizers: dict[str, Any] = {}
-_rec_lock = threading.Lock()
+_rec_lock = threading.RLock()
+_active_sessions = 0
+_integrity_stamp: tuple | None = None
+
+
+def _verify_models() -> None:
+    """Hash at session start only when file metadata changes, never per frame."""
+    global _integrity_stamp
+    manifest_path = Path(__file__).resolve().parents[2] / "resources" / "asr" / "manifest.json"
+    if os.environ.get("MOMO_RESOURCES_DIR") and not os.environ.get("MOMO_ASR_MODELS"):
+        manifest_path = MODELS_DIR / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text())
+        required = {"sense-voice/model.int8.onnx", "sense-voice/tokens.txt", "silero_vad.onnx"}
+        entries = [entry for entry in manifest["files"] if entry["path"] in required]
+        if {entry["path"] for entry in entries} != required or len(entries) != len(required):
+            raise ValueError("Incomplete model manifest")
+        files = [(MODELS_DIR / entry["path"], entry) for entry in entries]
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        raise AsrError("内置语音资源清单缺失或损坏，请修复安装") from exc
+    try:
+        stamp = ((str(manifest_path), manifest_path.stat().st_mtime_ns),) + tuple(
+            (str(path), path.stat().st_size, path.stat().st_mtime_ns) for path, _ in files)
+        if stamp == _integrity_stamp:
+            return
+        for path, entry in files:
+            if path.stat().st_size != entry.get("size_bytes"):
+                raise AsrError(f"内置语音资源损坏：{entry['path']}")
+            with path.open("rb") as stream:
+                digest = hashlib.file_digest(stream, "sha256").hexdigest()
+            if digest != entry.get("sha256"):
+                raise AsrError(f"内置语音资源损坏：{entry['path']}")
+    except OSError as exc:
+        raise AsrError(f"内置语音资源缺失：{exc.filename}") from exc
+    _integrity_stamp = stamp
 
 
 def _recognizer(lang: str) -> Any:
-    """按语言取（并缓存）识别器。加载失败抛 AsrError。"""
+    """Return the sole resident recognizer, replacing it on language changes."""
     code = _LANG.get(lang, "auto")
     with _rec_lock:
         rec = _recognizers.get(code)
         if rec is not None:
             return rec
+        _recognizers.clear()  # release old model before allocating its replacement
         try:
             _ensure_onnxruntime_lib()
             import sherpa_onnx
@@ -107,7 +152,7 @@ def _recognizer(lang: str) -> Any:
                 use_itn=True,
                 language=code,
             )
-        except Exception as e:  # noqa: BLE001 - 统一转领域错误
+        except Exception as e:
             raise AsrError(f"识别器加载失败：{e}") from e
         _recognizers[code] = rec
         return rec
@@ -138,17 +183,42 @@ class AsrSession:
     def __init__(self, lang: str) -> None:
         if not ready():
             raise AsrError("模型缺失：" + ", ".join(missing_models()))
+        global _active_sessions
+        self._closed = True
         self._lang = _LANG.get(lang, "auto")
-        self._vad = _vad()
         self._speaking = False
-        self._rec = _recognizer(self._lang)
+        with _rec_lock:
+            _verify_models()
+            self._vad = _vad()
+            try:
+                _recognizer(self._lang)
+            except Exception:
+                self._vad = None
+                raise
+            _active_sessions += 1
+            self._closed = False
         # int16 分帧残留（VAD 内部按 512 窗口处理，这里只需保证样本连续）
         self._carry = np.zeros(0, dtype=np.float32)
+
+    def close(self) -> None:
+        """Release VAD and, after the final session, the shared recognizer."""
+        global _active_sessions
+        with _rec_lock:
+            if self._closed:
+                return
+            self._closed = True
+            self._vad = None
+            self._carry = np.zeros(0, dtype=np.float32)
+            _active_sessions -= 1
+            if _active_sessions == 0:
+                _recognizers.clear()
 
     # ---- 音频入口 ----
 
     def feed(self, pcm: bytes) -> list[dict[str, str]]:
         """喂一帧 s16le 16k mono，返回本帧产生的零到多个事件。"""
+        if self._closed:
+            raise AsrError("语音会话已关闭")
         if not pcm:
             return []
         samples = np.frombuffer(pcm, dtype=np.int16).astype(np.float32) / 32768.0
@@ -159,6 +229,8 @@ class AsrSession:
 
     def flush(self) -> list[dict[str, str]]:
         """收尾：把 VAD 里没吐完的尾段强制吐出来（用户松手/断连时调用）。"""
+        if self._closed:
+            return []
         events: list[dict[str, str]] = []
         self._vad.flush()
         events.extend(self._drain_segments())
@@ -200,9 +272,10 @@ class AsrSession:
 
     def _transcribe(self, samples: np.ndarray) -> str:
         with _rec_lock:
-            stream = self._rec.create_stream()
+            rec = _recognizer(self._lang)
+            stream = rec.create_stream()
             stream.accept_waveform(SAMPLE_RATE, samples)
-            self._rec.decode_stream(stream)
+            rec.decode_stream(stream)
             return str(stream.result.text or "")
 
 

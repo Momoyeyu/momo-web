@@ -13,14 +13,14 @@ import {
 import type { EngineHandlers } from "../chat/engineInstance";
 import type { ChatStatus } from "../lib/types";
 import { navigate } from "../router";
-import { saveAutoCheckpoint } from "../services/checkpointClient";
 import { useT, resolveChatLang } from "../i18n";
 import { getStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
 import { getState, speakerName, subscribe } from "../lib/store";
-import { asrConfigured, ttsConfigured } from "../lib/asr";
+import { ttsConfigured } from "../lib/asr";
 import Button from "../ui/Button";
 import Icon from "../ui/Icon";
+import FirstMeeting from "../components/FirstMeeting";
 import DialogBox from "../components/DialogBox";
 import "../styles/chat.css";
 
@@ -31,16 +31,15 @@ const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
   speaking: "chat.speaking",
 };
 
-export default function Chat() {
+export default function Chat({active}: {active: boolean}) {
   const t = useT();
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
   useSyncExternalStore(subscribe, getState);
   const name = speakerName();
   const showStatus = getState().settings.general.showStatus;
-  // 语音输入开关 + ASR 配置双重门控（与设置页「通用」同一个开关）。
+  // 内置语音输入与设置页「通用」共用同一个开关。
   const micAllowed =
-    getState().settings.general.voiceInput &&
-    asrConfigured(getState().settings.asr);
+    getState().settings.general.voiceInput;
   const ttsReady = ttsConfigured(getState().settings.tts);
   const [status, setStatus] = useState<ChatStatus>(getChatEngine().status);
   const [micOn, setMicOn] = useState(getChatEngine().listening);
@@ -48,8 +47,25 @@ export default function Chat() {
   const [streamActive, setStreamActive] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [modelError, setModelError] = useState(false);
   const [input, setInput] = useState("");
   const [closeUp, setCloseUp] = useState(() => getStage().getCloseUp());
+  const dialog = useRef<HTMLDivElement>(null);
+  const [entered, setEntered] = useState(false);
+  // Follow the actual CSS animation rather than a second, competing timer.
+  // No animations (reduced motion) resolves immediately; cancelled entries
+  // cannot unlock a newer page or start the first meeting behind its cover.
+  useEffect(() => {
+    setEntered(false);
+    if (!active) return;
+    let cancelled = false;
+    const animations = dialog.current?.getAnimations() ?? [];
+    void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
+      if (!cancelled) setEntered(true);
+    });
+    return () => { cancelled = true; };
+  }, [active]);
+  const interactive = active && entered;
   const errTimer = useRef<number | null>(null);
   // 引擎侧消息变化（含跨页产生的新消息）时刷新本页引用。
   useSyncExternalStore(subscribeTranscript, transcriptVersion);
@@ -59,6 +75,7 @@ export default function Chat() {
     const showErr = (e: Error): void => {
       let msg = e.message || t("chat.errDefault");
       if (e instanceof ServiceError) {
+        if (e.service === "llm") setModelError(true);
         const detail =
           e.failure === "unconfigured"
             ? t("chat.errCfg")
@@ -87,8 +104,6 @@ export default function Chat() {
       onError: (e) => showErr(e),
     };
     attachEngine(h);
-    // 回到 chat 页：恢复离开前挂起的麦克风监听。
-    engine.resumeMic();
     // 挂载即同步当前相位与字幕（可能已有回合在跑）。
     setStatus(engine.status);
     setMicOn(engine.listening);
@@ -96,22 +111,28 @@ export default function Chat() {
     setStreamText(engine.display);
     return () => {
       detachEngine(h);
-      // 离开 chat 页：暂停麦克风/ASR（避免在别的页面还在听）。
-      engine.suspendMic();
       if (errTimer.current !== null) window.clearTimeout(errTimer.current);
     };
   }, []);
 
+  useEffect(() => {
+    const engine = getChatEngine();
+    engine.setSceneActive(interactive);
+    if(interactive)engine.resumeMic();
+    return () => {engine.setSceneActive(false);engine.suspendMic();};
+  }, [interactive]);
+
   const send = (): void => {
     const text = input.trim();
     if (!text) return;
+    setModelError(false);
     getChatEngine().sendText(text);
     setInput("");
   };
 
   const toggleMic = (): void => {
     const eng = getChatEngine();
-    if (eng.listening) {
+    if (eng.microphoneActive) {
       eng.stopListening();
       setMicOn(false);
     } else {
@@ -136,10 +157,11 @@ export default function Chat() {
   const busy = status === "thinking" || status === "speaking";
 
   return (
-    <div className="chat-page">
+    <div className="chat-page" inert={!interactive}>
+      {interactive && <FirstMeeting connectionFailed={modelError} />}
       {error && <div className="chat-error">{error}</div>}
 
-      <div className="dialog-zone">
+      <div className="dialog-zone" ref={dialog}>
         <DialogBox
           lang={resolveChatLang(getState().settings.general)}
           name={name}
@@ -212,23 +234,6 @@ export default function Chat() {
             <Icon name="backlog" />
           </Button>
           <Button
-            className="tb"
-            disabled={busy}
-            title={busy ? t("checkpoint.busySave") : t("checkpoint.save")}
-            aria-label={t("checkpoint.save")}
-            onClick={() => navigate("checkpoint", { checkpointMode: "save" })}
-          >
-            <Icon name="save" />
-          </Button>
-          <Button
-            className="tb"
-            aria-label={t("checkpoint.load")}
-            title={t("checkpoint.load")}
-            onClick={() => navigate("checkpoint", { checkpointMode: "load" })}
-          >
-            <Icon name="load" />
-          </Button>
-          <Button
             className={`tb${muted || !ttsReady ? " tb-off" : ""}`}
             onClick={toggleVoice}
             disabled={!ttsReady}
@@ -256,8 +261,6 @@ export default function Chat() {
             aria-label={t("common.backTitle")}
             title={t("common.backTitle")}
             onClick={() => {
-              // 退出对话 = 本段进度落 auto 槽（auto 唯一的写入时机）
-              void saveAutoCheckpoint().catch(() => {});
               navigate("title");
             }}
           >

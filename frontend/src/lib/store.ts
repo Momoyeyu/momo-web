@@ -46,10 +46,8 @@ const DEFAULT_SETTINGS: Settings = {
   // 服务地址与模型一律留空：新用户按输入框里的灰色提示自己填。
   // 这里曾经预填过 deepseek / 本机端口 / 某台内网 embedding 服务器的地址 ——
   // 那些是开发者的环境，不该随仓库发给每个 clone 的人。
-  llm: { url: "", key: "", model: "" },
-  asr: { mode: "builtin", url: "", key: "", model: "" },
+  llm: { url: "", key: "", model: "", thinking: false },
   tts: { url: "", key: "", voice: "", prompt: "" },
-  embedding: { url: "", key: "", model: "" },
   extensions: [],
 };
 
@@ -162,10 +160,8 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
   return {
     settings: {
       general: { ...d.settings.general, ...s?.general },
-      llm: { ...d.settings.llm, ...s?.llm },
-      asr: { ...d.settings.asr, ...s?.asr },
+      llm: { ...d.settings.llm, ...s?.llm, thinking: s?.llm?.thinking === true },
       tts: { ...d.settings.tts, ...s?.tts },
-      embedding: { ...d.settings.embedding, ...s?.embedding },
       extensions: normalizeExtensions(s?.extensions),
     },
     avatars,
@@ -187,6 +183,9 @@ function load(): PersistedState {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let saveInFlight: Promise<boolean> = Promise.resolve(true);
+let persistencePaused = 0;
+let saveQueued = false;
 
 const inBrowser = (): boolean =>
   typeof window !== "undefined" && typeof fetch === "function";
@@ -206,11 +205,33 @@ export async function bootPersist(): Promise<void> {
 /** 防抖 PUT /api/state；失败静默（localStorage 仍兜底）。 */
 function remoteSave(): void {
   if (!inBrowser()) return;
+  if (persistencePaused) { saveQueued = true; return; }
   if (saveTimer !== null) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    void putState({ ...passthrough, ...state });
+    const snapshot = { ...passthrough, ...state };
+    saveInFlight = saveInFlight.then(() => putState(snapshot));
   }, 300);
+}
+
+/** Hold debounced writes across a consistent backup or destructive restore.
+ * Successful restore leaves the hold active until document reload; otherwise
+ * an old local calibration update could overwrite the imported configuration.
+ */
+export async function pausePersistence(): Promise<() => void> {
+  persistencePaused++;
+  if (saveTimer !== null) { clearTimeout(saveTimer); saveTimer = null; }
+  saveQueued = false;
+  const resume = (): void => {
+    persistencePaused--;
+    if (!persistencePaused && saveQueued) { saveQueued = false; remoteSave(); }
+  };
+  try {
+    await saveInFlight;
+    if (inBrowser() && !await putState({ ...passthrough, ...state }))
+      throw new Error('Could not save configuration');
+    return resume;
+  } catch (error) { resume(); throw error; }
 }
 
 function persist(): void {

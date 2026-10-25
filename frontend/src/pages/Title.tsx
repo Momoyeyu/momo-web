@@ -1,107 +1,28 @@
-// 主页：纯色背景 + 左上品牌 + 右侧视觉小说式菜单（胶囊按钮、悬停饰标、错峰入场）。
-// 菜单：开始（开新会话：live 快照进 auto 槽后清空）/ 继续（读最新档进对话页，
-// 无存档置灰）/ 读档 / 设置。
-// 存档入口只在对话页——标题页没有可保存的现场。
-
-import { useEffect, useState } from "react";
-import { navigate } from "../router";
-import { useT } from "../i18n";
-import {
-  listCheckpoints,
-  loadCheckpoint,
-  newSession,
-} from "../services/checkpointClient";
-import { resyncPassthrough } from "../lib/store";
-import { loadTranscript } from "../chat/engineInstance";
+// 回到同一个 momo。进入见面不清空记录，也不恢复另一条时间线。
+import {useSyncExternalStore} from "react";
+import {navigate} from "../router";
+import {useT} from "../i18n";
+import {getChatEngine,subscribeTranscript,transcriptVersion} from "../chat/engineInstance";
 import EcgCanvas from "../components/EcgCanvas";
 import Button from "../ui/Button";
-import type { CheckpointMeta } from "../lib/types";
+import {PRESENCE_URL,TITLE_PRESENCE} from "../lib/presenceTransition";
 import "../styles/title.css";
 
 export default function Title() {
   const t = useT();
-  const [saves, setSaves] = useState<CheckpointMeta[] | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    listCheckpoints()
-      .then(setSaves)
-      .catch(() => setSaves([]));
-  }, []);
-
-  // 最新档：updatedAt 最大的槽（含 auto）——继续 = 回到最近一次现场。
-  const latest =
-    saves && saves.length
-      ? saves.reduce((a, b) => (a.updatedAt >= b.updatedAt ? a : b))
-      : null;
-
-  // 开始新会话：live 非空先由 backend 快照进 auto 槽，然后清空现场。
-  const start = async (): Promise<void> => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await newSession();
-      await resyncPassthrough();
-      loadTranscript([]);
-      navigate("chat");
-    } catch {
-      setBusy(false);
-    }
-  };
-
-  const cont = async (): Promise<void> => {
-    if (!latest || busy) return;
-    setBusy(true);
-    try {
-      const save = await loadCheckpoint(latest.id);
-      await resyncPassthrough(); // 掐掉在途防抖写并重拉 passthrough
-      loadTranscript(save.messages ?? []);
-      navigate("chat");
-    } catch {
-      setBusy(false);
-    }
-  };
-
-  const items: {
-    key: string;
-    labelKey: string;
-    hint: string;
-    disabled?: boolean;
-    onClick: () => void;
-  }[] = [
-    {
-      key: "start",
-      labelKey: "title.start",
-      hint: "start",
-      disabled: busy,
-      onClick: () => void start(),
-    },
-    {
-      key: "continue",
-      labelKey: "title.continue",
-      hint: "continue",
-      disabled: !latest || busy,
-      onClick: () => void cont(),
-    },
-    {
-      key: "load",
-      labelKey: "checkpoint.load",
-      hint: "load",
-      onClick: () => navigate("checkpoint", { checkpointMode: "load" }),
-    },
-    {
-      key: "config",
-      labelKey: "title.config",
-      hint: "config",
-      onClick: () => navigate("settings"),
-    },
+  useSyncExternalStore(subscribeTranscript, transcriptVersion);
+  const known = getChatEngine().history.length > 0;
+  const items = [
+    {key: "meet", labelKey: known ? "title.continue" : "title.start", hint: "meet", onClick: () => navigate("chat")},
+    {key: "config", labelKey: "title.config", hint: "config", onClick: () => navigate("settings")},
   ];
 
   return (
     <div className="title-screen">
       <EcgCanvas />
+      <img className="title-presence" src={PRESENCE_URL} style={{left:`${TITLE_PRESENCE.left*100}%`,top:`${TITLE_PRESENCE.top*100}%`,width:`${TITLE_PRESENCE.width*100}%`}} width="1024" height="1536" alt="" aria-hidden="true" decoding="async" />
       <header className="title-brand">
-        <h1 className="title-logo">momo</h1>
+        <h1 className="title-logo" aria-label="momo"><img className="title-brand-mark" src="/brand/momo-mark.svg" alt="" /><img className="title-brand-wordmark" src="/brand/momo-wordmark.svg" alt="momo" /></h1>
         <div className="title-rule" />
         <p className="title-tagline">{t("title.tagline")}</p>
       </header>
@@ -112,7 +33,6 @@ export default function Title() {
             key={m.key}
             className="menu-item"
             style={{ animationDelay: `${0.12 + i * 0.08}s` }}
-            disabled={m.disabled}
             onClick={m.onClick}
           >
             <span className="mi-orn" />

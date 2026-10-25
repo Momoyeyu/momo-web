@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { presentation } from './helpers/runtime';
+import {waitForChatReady} from './helpers';
 
 async function runtime(page: Page, action: string): Promise<any> {
   return page.evaluate(async (action) => {
@@ -83,7 +84,7 @@ test('configured real TTS drives mouth opening and releases the channel after dr
   test.skip(!state.settings.tts.url || !state.settings.tts.voice, 'No speech service/voice configured.');
   state.settings.general={...state.settings.general,lang:'zh',chatLang:'zh',voiceInput:false,textSpeed:70,sentenceSpeed:100,voiceVolume:100};
   await page.route('**/api/state',r=>r.fulfill({json:state}));
-  await page.route('**/api/checkpoints/live',r=>r.fulfill({json:{summary:'',messages:[]}}));
+  await page.route('**/api/life/history**',r=>r.fulfill({json:{summary:'',messages:[]}}));
   await page.route('**/api/chat',r=>r.fulfill({contentType:'text/event-stream',body:'data: '+JSON.stringify({t:'sentence',no:0,text:'欢迎回来，今天有什么开心的事情想和我说呢？',at:'',cues:[{id:'tts:0',offset:0,expression:{name:'happy',intensity:0.8}}]})+'\n\ndata: {"t":"done"}\n\n'}));
   await page.goto('/#/chat');await expect.poll(()=>presentation(page).then(s=>s?.expressions.length??0)).toBe(4);
   await page.evaluate(async()=>{
@@ -93,6 +94,7 @@ test('configured real TTS drives mouth opening and releases the channel after dr
       if(stage.speechMouth.sample(performance.now()).weight===1) (window as any).__audioPeak=Math.max((window as any).__audioPeak,stage.model.internalModel.coreModel.getParameterValueById('ParamMouthOpenY'));
     });
   });
+  await waitForChatReady(page);
   await page.locator('.input-row input').fill('口型联调');await page.getByRole('button',{name:'发送',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>(window as any).__audioPeak),{timeout:90_000}).toBeGreaterThan(0.05);
   await expect(page.getByRole('button',{name:'发送',exact:true})).toBeVisible({timeout:90_000});

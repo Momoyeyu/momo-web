@@ -5,7 +5,7 @@ for (const lang of ['zh', 'en', 'ja']) {
     const state = await (await request.get('/api/state')).json();
     state.settings.general = { ...state.settings.general, lang, chatLang: 'auto', voiceInput: false };
     await page.route('**/api/state', route => route.fulfill({ json: state }));
-    await page.route('**/api/checkpoints/live', route => route.fulfill({ json: { summary: '', messages: [] } }));
+    await page.route('**/api/life/history**', route => route.fulfill({ json: { summary: '', messages: [] } }));
     const fontErrors: string[] = [];
     page.on('response', r => { if (r.url().includes('/fonts/') && !r.ok()) fontErrors.push(r.url()); });
     await page.goto('/#/chat');

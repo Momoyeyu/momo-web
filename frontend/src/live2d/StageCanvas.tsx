@@ -6,13 +6,20 @@ import { useEffect, useRef } from "react";
 import { getAvatarId, subscribe } from "../lib/store";
 import { getStage } from "./stage";
 
-export default function StageCanvas({ visible }: { visible: boolean }) {
+export default function StageCanvas({ visible, onReady }: { visible: boolean; onReady: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const homeRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const home = homeRef.current;
     if (!home) return;
+    let cancelled = false;
+    const prepared = () => { if (!cancelled) { clearTimeout(deadline); onReady(); } };
+    // Imported / unavailable models must not leave startup covering usable UI forever.
+    const deadline = window.setTimeout(prepared, 3000);
+    const room = new Image();
+    room.src = '/stage/stage-room.jpg';
+    const roomReady = room.decode().catch(() => {});
     const canvas = canvasRef.current ??= document.createElement("canvas");
     canvas.className = "live2d-canvas";
     Object.assign(canvas.style, { position: "absolute", inset: "0", width: "100%", height: "100%" });
@@ -22,24 +29,25 @@ export default function StageCanvas({ visible }: { visible: boolean }) {
       stage.init(canvas);
       stage.setChatHost(home);
     } catch {
-      return; // WebGL 不可用等：背景图兜底，页面照常可用
+      void roomReady.then(prepared); // WebGL unavailable: reveal the prepared background.
+      return () => { cancelled = true; clearTimeout(deadline); };
     }
     // 加载当前形象并订阅切换（设置页换模型即时生效；
     // 同模型重复调用在 stage 内去重，导入失败内部回退内置）。
     let lastId: string | null = null;
-    const load = (): void => {
+    const load = (): Promise<void> => {
       const id = getAvatarId();
-      if (id === lastId) return;
+      if (id === lastId) return Promise.resolve();
       lastId = id;
-      void stage.loadAvatar().catch(() => {});
+      return stage.loadAvatar().catch(() => {});
     };
-    load();
+    void Promise.all([roomReady, load()]).then(prepared);
     const tap = () => stage.tap();
     canvas.addEventListener("click", tap);
-    const unsubscribe = subscribe(load);
-    return () => { unsubscribe(); canvas.removeEventListener("click", tap); };
+    const unsubscribe = subscribe(() => { void load(); });
+    return () => { cancelled = true; clearTimeout(deadline); unsubscribe(); canvas.removeEventListener("click", tap); };
     // 不随组件卸载 dispose：舞台是应用级常驻单例。
-  }, []);
+  }, [onReady]);
 
   useEffect(() => { getStage().setChatVisible(visible); }, [visible]);
 

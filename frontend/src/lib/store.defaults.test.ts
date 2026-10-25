@@ -14,15 +14,13 @@ describe("出厂配置不含任何预填信息", () => {
     expect(s.llm.url).toBe("");
     expect(s.llm.key).toBe("");
     expect(s.llm.model).toBe("");
-    expect(s.asr.url).toBe("");
-    expect(s.asr.key).toBe("");
     expect(s.tts.url).toBe("");
     expect(s.tts.key).toBe("");
     expect(s.tts.voice).toBe("");
-    expect(s.embedding.url).toBe("");
-    expect(s.embedding.key).toBe("");
-    expect(s.embedding.model).toBe("");
     expect(s.extensions).toEqual([]);
+    expect(s.llm.thinking).toBe(false);
+    expect(s).not.toHaveProperty("asr");
+    expect(s).not.toHaveProperty("embedding");
   });
 
   it("配置里没有人设：人设写死在 backend，前端只留展示名", () => {

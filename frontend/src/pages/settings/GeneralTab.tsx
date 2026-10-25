@@ -1,10 +1,11 @@
+import DataTransfer from "./DataTransfer";
 // 「通用」tab：界面语言与对话语言、语音输入/输出、对话框透明度与速度、对话框预览。
 // 原先这些都挤在 Settings.tsx 里，状态与补丁函数一并搬过来。
 import { useState, useSyncExternalStore } from "react";
 
 import { getChatEngine } from "../../chat/engineInstance";
 import { useT, tFor, LANGS } from "../../i18n";
-import { asrConfigured, ttsConfigured as ttsReadyOf } from "../../lib/asr";
+import { ttsConfigured as ttsReadyOf } from "../../lib/asr";
 import { getState, speakerName, subscribe, update } from "../../lib/store";
 import type { Settings as SettingsData } from "../../lib/types";
 import FieldRow from "../../ui/FieldRow";
@@ -19,7 +20,6 @@ export default function GeneralTab() {
 
   const [voiceMuted, setVoiceMuted] = useState(getChatEngine().muted);
   const ttsReady = ttsReadyOf(settings.tts);
-  const asrReady = asrConfigured(settings.asr);
 
   const toggleVoice = (on: boolean): void => {
     const eng = getChatEngine();
@@ -43,6 +43,7 @@ export default function GeneralTab() {
 
 
   return (
+<div className="general-settings">
 <div className="settings-cols">
 {/* 左栏：语言 / 语音两个独立面板，与右栏「对话框设置」同级；
     末块吃掉剩余高度，两栏总高因此对齐 */}
@@ -90,14 +91,9 @@ export default function GeneralTab() {
   <div className="opt-list">
   <FieldRow
     label={t("settings.voiceInput")}
-    hint={!asrReady ? t("settings.voiceNeedAsr") : undefined}
   >
     <Switch
-      on={asrReady && settings.general.voiceInput}
-      disabled={!asrReady}
-      title={
-        !asrReady ? t("settings.voiceNeedAsr") : undefined
-      }
+      on={settings.general.voiceInput}
       onChange={toggleVoiceInput}
     />
   </FieldRow>
@@ -175,6 +171,8 @@ export default function GeneralTab() {
     />
   </div>
 </section>
+</div>
+<DataTransfer />
 </div>
   );
 }

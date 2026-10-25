@@ -10,7 +10,7 @@ test.beforeEach(async ({ page, request }) => {
   state.settings.general = { ...state.settings.general, lang: 'zh', voiceInput: false };
   // Preview and edits must never write the user's real configuration or history.
   await page.route('**/api/state', route => route.fulfill({ json: state }));
-  await page.route('**/api/checkpoints/live', route => route.fulfill({ json: { summary: '', messages: [] } }));
+  await page.route('**/api/life/history**', route => route.fulfill({ json: { summary: '', messages: [] } }));
 });
 
 test('resource dialog owns the live canvas and returns it when closed', async ({ page }) => {

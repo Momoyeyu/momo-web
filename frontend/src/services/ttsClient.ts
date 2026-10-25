@@ -1,3 +1,4 @@
+import { runtimeFetch } from "./runtime";
 // TTS 客户端：统一走后端代理 `POST /api/tts/speech`（OpenAI 形状），
 // 后端再翻译成 GPT-SoVITS api_v2。这样前端不关心引擎差异，也不会有 CORS /
 // 混合内容问题；将来换引擎只改后端。
@@ -43,7 +44,7 @@ export async function streamSpeech(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(SPEECH_PATH, {
+    res = await runtimeFetch(SPEECH_PATH, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -107,7 +108,7 @@ export async function uploadRefAudio(
   form.append("file", file, file.name);
   let res: Response;
   try {
-    res = await fetch("/api/tts/ref", { method: "POST", body: form });
+    res = await runtimeFetch("/api/tts/ref", { method: "POST", body: form });
   } catch {
     throw new ServiceError("tts", "unreachable");
   }

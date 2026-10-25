@@ -1,10 +1,10 @@
 """一回合的编排：组装 → ReAct → 落账 → 切句推流。
 
-    build_messages    system prompt + 摘要 + 最近窗口 + 本回合输入
-    react             流式 LLM 调用、工具回填、边到边切句推流，≤5 轮
-    checkpoint.*      user 落账 / assistant **逐句**落账（代际校验）
-    compress.*        回合末按用量触发后台压缩（不阻塞推流）
-    core.sentences    切句（唯一口径，前端不再切句）
+build_messages    system prompt + 摘要 + 最近窗口 + 本回合输入
+react             流式 LLM 调用、工具回填、边到边切句推流，≤5 轮
+checkpoint.*      user 落账 / assistant **逐句**落账（代际校验）
+compress.*        回合末按用量触发后台压缩（不阻塞推流）
+core.sentences    切句（唯一口径，前端不再切句）
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from ..core.sentences import Sentence, SentenceStream
 from ..core import db
 from ..core.state import load as load_state
 from ..models import ChatMessage, ErrorEvent, State, StoredMessage, TurnEvent
-from . import checkpoint, compress, memory
+from . import checkpoint, compress, memory, onboarding
 from .capability import TOOLS, builtin_names, run_call
 from .prompt import build_system_prompt
 
@@ -30,52 +30,99 @@ SUMMARY_PREFIX = "以下是本次对话此前部分的摘要，其后的最新�
 # ==================== 主流程 ====================
 
 
-def run_turn(text: str, presentation: dict | None = None) -> Iterator[TurnEvent]:
+def run_turn(
+    text: str,
+    presentation: dict | None = None,
+    first_meeting: bool = False,
+    *,
+    run_id: str | None = None,
+    source: str = "meeting",
+    external_message_id: str | None = None,
+) -> Iterator[TurnEvent]:
     """一回合：yield 增量/错误事件（结束即返回）。流程见 services/turn.py。"""
+    onboarding.status()  # Initialize/migrate before this turn adds a player row.
     state = load_state()
+    # Capture before reading history: a load/new session during prompt assembly
+    # must invalidate the whole turn, not authorize its old context in a new scene.
+    at, gen = db.now_iso(), checkpoint.generation()
     messages = build_messages(state, text, presentation)  # 节点 B
-
-    at, gen = db.now_iso(), checkpoint.generation()  # 代际快照
-    if not checkpoint.begin_turn(text, gen, at):
+    if not checkpoint.begin_turn(
+        text,
+        gen,
+        at,
+        run_id=run_id,
+        source=source,
+        external_message_id=external_message_id,
+    ):
         return  # 会话已被读档/重置 → 本回合静默作废
 
+    errored = False
     try:
-        with mcp.open_tools(state["settings"]["extensions"], builtin_names()) as ext_tools:
+        direction = onboarding.resolve(text, gen, at, allow_new=first_meeting)
+        if direction:
+            messages.insert(-1, {"role": "system", "content": direction})
+        with mcp.open_tools(
+            state["settings"]["extensions"], builtin_names()
+        ) as ext_tools:
             for event in react(messages, ext_tools, state, gen, at, presentation):
                 if event["t"] == "error":
+                    errored = True
                     # Roll back before publishing the error so a retry's prompt
                     # cannot pick up an unanswered, failed input.
                     checkpoint.discard_unanswered_turn(gen, at)
                 yield event
+    except llm.LlmError as e:
+        errored = True
+        checkpoint.discard_unanswered_turn(gen, at)
+        yield _error(str(e))
     finally:
+        onboarding.settle_reply(at)
         # Also handles setup exceptions, empty/control-only responses and close.
         checkpoint.discard_unanswered_turn(gen, at)
+        status = (
+            "interrupted"
+            if checkpoint.generation() != gen
+            else "failed"
+            if errored
+            else "completed"
+        )
+        checkpoint.finish_turn(gen, at, status)
 
 
 # ==================== 节点实现 ====================
 
 
-def build_messages(state: State, text: str, presentation: dict | None = None) -> list[ChatMessage]:
+def build_messages(
+    state: State, text: str, presentation: dict | None = None
+) -> list[ChatMessage]:
     """节点 B：system prompt + 压缩摘要（若有）+ 最近窗口 history + 本回合输入。"""
     messages: list[ChatMessage] = [
-        {"role": "system", "content": build_system_prompt(state, memory.pins(), presentation)}
+        {
+            "role": "system",
+            "content": build_system_prompt(state, memory.pins(), presentation),
+        }
     ]
     summary = checkpoint.live_summary().strip()
     if summary:
         messages.append({"role": "system", "content": SUMMARY_PREFIX + summary})
-    for past in _merge_assistant(checkpoint.live_messages())[-HISTORY_WINDOW:]:
+    for past in _merge_assistant(checkpoint.context_messages())[-HISTORY_WINDOW:]:
         messages.append(past)
-    if presentation and presentation['expressions']:
+    if presentation and presentation["expressions"]:
         # History intentionally stores pure dialogue. Re-state the live output mode
         # after it so plain historical messages do not suppress this turn's acting.
-        messages.append({'role': 'system', 'content': (
-            'Live performance mode remains active for THIS reply, even though past dialogue contains no controls. '
-            'Act out your response using fitting controls; use expression:null when none of the available faces fits serious comfort or displeasure. Place a cue before the relevant words, '
-            'and switch within a sentence at a meaningful turn rather than only between sentences. '
-            'For serious listening or sincere displeasure, begin with <|ACT {"expression":null}|>; do not use the first resource as a default opening. '
-            'Use the catalog descriptions to choose the fitting face, speak in the configured language, '
-            'and do not copy the example text or explain your controls.'
-        )})
+        messages.append(
+            {
+                "role": "system",
+                "content": (
+                    "Live performance mode remains active for THIS reply, even though past dialogue contains no controls. "
+                    "Act out your response using fitting controls; use expression:null when none of the available faces fits serious comfort or displeasure. Place a cue before the relevant words, "
+                    "and switch within a sentence at a meaningful turn rather than only between sentences. "
+                    'For serious listening or sincere displeasure, begin with <|ACT {"expression":null}|>; do not use the first resource as a default opening. '
+                    "Use the catalog descriptions to choose the fitting face, speak in the configured language, "
+                    "and do not copy the example text or explain your controls."
+                ),
+            }
+        )
     messages.append({"role": "user", "content": text})
     return messages
 
@@ -91,14 +138,23 @@ def _merge_assistant(msgs: list[StoredMessage]) -> list[ChatMessage]:
     回合边界由 user 行界定，故「连续 assistant 必属同回合」成立。
     """
     out: list[ChatMessage] = []
+    previous_run = None
     for m in msgs:
         # role 过滤是防御（老数据/手工写入）：正常落库只有 user/assistant
         if m["role"] not in ("user", "assistant"):
             continue
-        if m["role"] == "assistant" and out and out[-1]["role"] == "assistant":
+        run_id = m.get("runId")
+        if (
+            m["role"] == "assistant"
+            and out
+            and out[-1]["role"] == "assistant"
+            and run_id
+            and run_id == previous_run
+        ):
             out[-1]["content"] += m["text"]
         else:
             out.append({"role": m["role"], "content": m["text"]})
+        previous_run = run_id
     return out
 
 
@@ -112,13 +168,13 @@ def react(
 ) -> Iterator[TurnEvent]:
     """节点 R→D→E→CNT→H：流式调 LLM，正文**边到边切句落账并推句事件**。
 
-    与改造前的本质差别：**正文不再是回合的终点**。一轮调用里文本可以出现多次
-    （工具调用前后的说明都算），只有「本轮结束且没有工具调用」才收尾；因此
-   用户在生成过程中就能看到/听到前几句，而不必等整段生成完。
+     与改造前的本质差别：**正文不再是回合的终点**。一轮调用里文本可以出现多次
+     （工具调用前后的说明都算），只有「本轮结束且没有工具调用」才收尾；因此
+    用户在生成过程中就能看到/听到前几句，而不必等整段生成完。
 
-    文本增量与工具调用增量在同一条 assistant 消息里交错到达（见 llm.chat_stream），
-    工具参数是分片下发的、在客户端按 index 累积。
-    工具表：无可用拓展时原样下发内置表（`TOOLS` 本身，不做拷贝）。
+     文本增量与工具调用增量在同一条 assistant 消息里交错到达（见 llm.chat_stream），
+     工具参数是分片下发的、在客户端按 index 累积。
+     工具表：无可用拓展时原样下发内置表（`TOOLS` 本身，不做拷贝）。
     """
     tools = TOOLS + ext_tools.decls if ext_tools.decls else TOOLS
     llm_cfg = state["settings"]["llm"]
@@ -129,10 +185,13 @@ def react(
     def take(sent: Sentence) -> TurnEvent | None:
         """成句 → 落账 → 句事件；None = 代际漂移（读档/打断），调用方应停止。"""
         nonlocal seq
-        if checkpoint.generation() != gen or (sent.text and not checkpoint.append_sentence(sent.text, gen, at)):
+        if checkpoint.generation() != gen or (
+            sent.text and not checkpoint.append_sentence(sent.text, gen, at)
+        ):
             return None
         ev: TurnEvent = {
             "t": "sentence",
+            "generation": gen,
             "no": seq,
             "text": sent.text,
             "cues": [
@@ -141,6 +200,7 @@ def react(
                 if (payload := allowed_act(c.payload, presentation))
             ],
             "at": at,
+            **checkpoint.event_metadata(gen, at),
         }
         seq += 1
         return ev
@@ -148,8 +208,20 @@ def react(
     for _ in range(MAX_ROUNDS):
         calls: list[dict[str, Any]] | None = None
         round_text = ""
+        reasoning: dict[str, Any] = {}  # Private protocol state, never a TurnEvent.
+        if checkpoint.generation() != gen:
+            return
         try:
-            for ev in llm.chat_stream(llm_cfg, messages, tools=tools, usage_out=usage):
+            for ev in llm.chat_stream(
+                llm_cfg,
+                messages,
+                tools=tools,
+                usage_out=usage,
+                reasoning_out=reasoning,
+                cancelled=lambda: checkpoint.generation() != gen,
+            ):
+                if checkpoint.generation() != gen:
+                    return
                 if ev["type"] == "text":
                     delta = str(ev["delta"])
                     round_text += delta
@@ -161,9 +233,13 @@ def react(
                 elif ev["type"] == "tool_calls":
                     calls = ev["calls"]
         except llm.LlmError as e:
+            if checkpoint.generation() != gen:
+                return
             yield _error(str(e))  # 节点 ERR（不发 done，由 api 层决定）
             return
 
+        if checkpoint.generation() != gen:
+            return
         if calls:
             # 工具轮：本轮 assistant 消息（含前言正文）原样回传 + 回填工具结果
             messages.append(
@@ -171,10 +247,18 @@ def react(
                     "role": "assistant",
                     "content": round_text or None,
                     "tool_calls": calls,
+                    **reasoning,
                 }
             )
             for call in calls:
-                messages.append(run_call(call, ext_tools))
+                if checkpoint.generation() != gen:
+                    return
+                with memory.source_scope(
+                    checkpoint.run_event_ids(gen, at), generation=gen
+                ):
+                    if checkpoint.generation() != gen:
+                        return
+                    messages.append(run_call(call, ext_tools))
             continue
 
         # 本轮没有工具调用 → 收尾：flush 残余句，然后结束回合

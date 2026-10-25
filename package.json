@@ -1,0 +1,1 @@
+{"name":"momo-web","private":true,"type":"module","packageManager":"pnpm@12.6.0","scripts":{"dev":"node scripts/web-dev.mjs","check":"pnpm --dir frontend typecheck && pnpm --dir frontend test && backend/.venv/bin/python -m pytest backend/tests -q","test:e2e":"node scripts/browser-e2e.mjs","promote":"python3 scripts/promote.py"}}

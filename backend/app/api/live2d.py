@@ -12,4 +12,4 @@ def cubism_core() -> Response:
         return Response(live2d.runtime(), media_type='application/javascript',
                         headers={'Cache-Control': 'public, max-age=86400'})
     except (httpx.HTTPError, OSError, ValueError) as error:
-        raise HTTPException(502, 'Cubism runtime could not be loaded. Retry when the official CDN is reachable.') from error
+        raise HTTPException(502, 'Cubism runtime could not be loaded. Verify bundled resources.') from error

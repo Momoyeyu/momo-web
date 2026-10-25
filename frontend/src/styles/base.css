@@ -375,3 +375,9 @@ textarea::placeholder {
 .muted {
   color: var(--text-dim);
 }
+
+/* The lease gate covers only the incoming meeting; navigation retains RoPE. */
+.meeting-gate {position:absolute;inset:0;z-index:80;display:grid;place-items:center;background:rgba(20,17,26,.66);backdrop-filter:blur(10px);}
+.meeting-gate-panel {max-width:440px;margin:24px;padding:24px 28px;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--panel);text-align:center;color:var(--text);}
+.meeting-gate-panel p {line-height:1.75;margin:0;}
+.meeting-gate-actions {display:flex;justify-content:center;gap:12px;margin-top:20px;}

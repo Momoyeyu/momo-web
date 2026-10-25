@@ -20,7 +20,7 @@ def test_write_then_read_normalized():
     assert s["settings"]["general"]["lang"] == "en"
     # 缺失字段补默认值
     assert s["settings"]["general"]["dialogOpacity"] == 66
-    assert s["settings"]["llm"] == {"url": "", "key": "", "model": ""}
+    assert s["settings"]["llm"] == {"url": "", "key": "", "model": "", "thinking": False}
     # 人设不属于配置（唯一来源 resources/soul.md）
     assert "persona" not in store.DEFAULT_STATE
     # 未知字段透传
@@ -115,3 +115,56 @@ def test_default_state_has_no_stale_pins_key():
     """旧格式的 pins 键（初始记忆）已废弃：State 模型里没有它，也不该再回去。"""
     st = store.load()
     assert "pins" not in st
+
+
+def test_migrate_builtin_services_removes_remote_credentials_and_keeps_user_settings():
+    old = {
+        "settings": {
+            "llm": {"url": "https://api.deepseek.com", "key": "keep", "model": "deepseek-chat"},
+            "tts": {"url": "http://tts.local", "key": "keep-tts", "voice": "mine.wav"},
+            "asr": {"mode": "openai", "url": "http://old-asr", "key": "retire"},
+            "embedding": {"url": "http://old-embedding", "key": "retire-too", "model": "old"},
+            "general": {"voiceInput": False, "lang": "ja"},
+        },
+        "custom": {"preserve": True},
+    }
+    s = store.normalize_state(old)
+    assert "asr" not in s["settings"]
+    assert "embedding" not in s["settings"]
+    assert s["settings"]["llm"] == {"url": "https://api.deepseek.com", "key": "keep", "model": "deepseek-chat", "thinking": False}
+    assert s["settings"]["tts"]["voice"] == "mine.wav"
+    assert s["settings"]["general"]["voiceInput"] is False
+    assert s["settings"]["general"]["lang"] == "ja"
+    assert s["custom"] == old["custom"]
+    assert old["settings"]["asr"]["key"] == "retire"  # No in-place mutation.
+
+
+def test_put_retired_services_does_not_persist_their_credentials():
+    client = TestClient(app)
+    assert client.put('/api/state', json={"settings": {
+        "asr": {"url": "http://old", "key": "retired-asr-secret"},
+        "embedding": {"url": "http://old", "key": "retired-embedding-secret"},
+        "llm": {"thinking": True},
+    }}).status_code == 204
+    text = store.STATE_PATH.read_text()
+    assert "retired-asr-secret" not in text
+    assert "retired-embedding-secret" not in text
+    assert store.load()["settings"]["llm"]["thinking"] is True
+
+
+def test_startup_retires_legacy_service_secrets_from_existing_yaml():
+    # Simulate a file produced by the previous application version.
+    store.STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    store.STATE_PATH.write_text(yaml.safe_dump({"settings": {
+        "asr": {"key": "retired-old-key", "mode": "openai"},
+        "embedding": {"key": "retired-vector-key"},
+        "llm": {"url": "https://api.deepseek.com", "key": "keep-key"},
+        "general": {"voiceInput": False},
+    }}))
+    with TestClient(app) as client:
+        assert client.get('/api/state').status_code == 200
+        persisted = store.STATE_PATH.read_text()
+        assert 'retired-old-key' not in persisted
+        assert 'retired-vector-key' not in persisted
+        assert store.load()['settings']['llm']['key'] == 'keep-key'
+        assert store.load()['settings']['general']['voiceInput'] is False

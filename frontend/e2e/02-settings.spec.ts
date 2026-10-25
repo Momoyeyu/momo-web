@@ -142,6 +142,14 @@ test("通用 tab：语言/语音是与对话框设置同级的两个面板，语
   ]);
   expect(Math.abs((left?.height ?? 0) - (right?.height ?? 0))).toBeLessThan(2);
 
+  const backup = await page.locator('.data-transfer-panel').boundingBox();
+  expect(backup!.y).toBeGreaterThanOrEqual(left!.y + left!.height);
+  const actions = await page.locator('.data-transfer-actions button').evaluateAll(buttons => buttons.map(button=>{
+    const box=button.getBoundingClientRect();return {top:box.top,left:box.left,right:box.right};
+  }));
+  expect(Math.abs(actions[0].top-actions[1].top)).toBeLessThan(1);
+  expect(actions[1].left-actions[0].right).toBeGreaterThanOrEqual(8);
+
   // 语义检索不再有开关（改为按 embedding 是否配置自动判定，后端有单测钉住）
   await expect(page.getByText("语义检索", { exact: true })).toHaveCount(0);
 
@@ -273,7 +281,7 @@ test("拓展 tab：点模型卡片弹出「表情与动作」，并可按名检�
   await expect(page.locator(".modal-meta")).toContainText("表情与动作");
   const row = page.locator(".avatar-res-row").first();
   await expect(row).toBeVisible();
-  const desc = row.locator(".avatar-res-desc");
+  const desc = row.getByRole("textbox", {name: /· 实际表现$/});
   const before = await desc.inputValue();
   await desc.fill("e2e-描述");
   await expect(desc).toHaveValue("e2e-描述");

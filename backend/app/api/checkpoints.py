@@ -1,4 +1,5 @@
 """/api/checkpoints：会话存档槽位 REST（Save/Load），模式同 /api/memories。"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Response
@@ -16,7 +17,7 @@ router = APIRouter()
 
 
 def _raise_http(e: checkpoint.CheckpointError) -> None:
-    code = {"not_found": 404, "conflict": 409}.get(e.kind, 400)
+    code = {"not_found": 404, "conflict": 409, "gone": 410}.get(e.kind, 400)
     raise HTTPException(status_code=code, detail=str(e))
 
 
@@ -62,9 +63,7 @@ def get_checkpoint(sid: str) -> CheckpointDetail:
 
 
 @router.put("/api/checkpoints/{sid}")
-def overwrite_checkpoint(
-    sid: str, body: CheckpointIn | None = None
-) -> CheckpointMeta:
+def overwrite_checkpoint(sid: str, body: CheckpointIn | None = None) -> CheckpointMeta:
     """重命名 + 用当前会话内容覆盖该槽。"""
     try:
         return checkpoint.meta(
@@ -86,14 +85,20 @@ def delete_checkpoint(sid: str) -> Response:
 @router.post("/api/checkpoints/live/new", status_code=204)
 def new_session() -> Response:
     """开启新会话：live 非空先快照进 auto 槽，然后清空 live。"""
-    checkpoint.new_session()
+    try:
+        checkpoint.new_session()
+    except checkpoint.CheckpointError as e:
+        _raise_http(e)
     return Response(status_code=204)
 
 
 @router.post("/api/checkpoints/auto", status_code=204)
 def save_auto() -> Response:
     """当前会话写入 auto 槽（不清空 live）。从对话页退回标题页时调用。"""
-    checkpoint.save_auto()
+    try:
+        checkpoint.save_auto()
+    except checkpoint.CheckpointError as e:
+        _raise_http(e)
     return Response(status_code=204)
 
 
@@ -104,3 +109,13 @@ def load_checkpoint(sid: str) -> CheckpointDetail:
         return checkpoint.load_checkpoint(sid)
     except checkpoint.CheckpointError as e:
         _raise_http(e)
+
+
+@router.get("/api/life/live")
+def continuous_transcript():
+    return {"summary": checkpoint.live_summary(), **checkpoint.history_page(limit=100)}
+
+
+@router.get("/api/life/history")
+def continuous_history(before: int | None = None, limit: int = 100):
+    return checkpoint.history_page(before_seq=before, limit=limit)

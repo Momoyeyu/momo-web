@@ -12,7 +12,7 @@
   padding: 6cqh 16px;
 }
 
-/* Backlog 是阅读流，不跟存档页的宽幅面板走：保持瘦长阅读栏，
+/* Backlog 保持瘦长阅读栏，
    只比原先（680px）略宽一点。 */
 .backlog-panel {
   display: flex;
@@ -109,3 +109,5 @@
   word-break: break-word;
 }
 
+.backlog-earlier {display:flex;justify-content:center;padding:0 0 20px;}
+.bl-item {content-visibility:auto;contain-intrinsic-size:auto 100px;}

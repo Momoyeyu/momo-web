@@ -202,11 +202,22 @@ async def status() -> dict:
         out["detail"] = "未上传参考音频"
         return out
     try:
+        headers = {"Authorization": f"Bearer {cfg['key']}"} if cfg.get("key") else {}
         async with httpx.AsyncClient(timeout=_STATUS_TIMEOUT, trust_env=False) as c:
-            # api_v2 是 FastAPI：/docs 一定存在且轻量，比打一次真实合成便宜
-            r = await c.get(base.rstrip("/") + "/docs")
-        out["reachable"] = r.status_code < 500
-        out["detail"] = f"HTTP {r.status_code}"
+            r = await c.get(base.rstrip("/") + "/readyz", headers=headers)
+            if r.status_code in (404, 405):
+                # External api_v2 installations may not implement our readiness
+                # contract. A missing documentation endpoint is never success.
+                r = await c.get(base.rstrip("/") + "/docs", headers=headers)
+                out["reachable"] = r.is_success
+                out["detail"] = f"HTTP {r.status_code}"
+            else:
+                try:
+                    readiness = r.json()
+                except ValueError:
+                    readiness = {}
+                out["reachable"] = r.status_code == 200 and isinstance(readiness, dict) and readiness.get("ready") is True
+                out["detail"] = "ready" if out["reachable"] else f"Not ready (HTTP {r.status_code})"
     except httpx.HTTPError as e:
         out["detail"] = f"连接失败：{e.__class__.__name__}"
     return out

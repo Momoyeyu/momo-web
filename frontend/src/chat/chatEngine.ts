@@ -3,7 +3,8 @@
 // 打断（SpeechStarted / stop）= 停播放 + abort SSE/TTS。
 // 设置每次回合开始从 store 现读——setting 页改动无需重启即生效。
 
-import { createAsr, setAsrChatLang } from "../services/asrClient";
+import {meetingIdentity} from "../services/meetingClient";
+import { createAsr } from "../services/asrClient";
 import { ttsConfigured } from "../lib/asr";
 import type { AsrEngine } from "../services/asrClient";
 import { MicStreamer } from "../audio/capture";
@@ -15,14 +16,17 @@ import { getSettings, newId, subscribe } from "../lib/store";
 import type {
   ChatMessage,
   ChatStatus,
-  CheckpointMessage,
+  StoredMessage,
   Settings,
 } from "../lib/types";
 import { resolveChatLang } from "../i18n";
 import { streamSpeech } from "../services/ttsClient";
-import { chat, interrupt as sendInterrupt } from "../services/chatClient";
+import { chat, acknowledgeDisplay, interrupt as sendInterrupt } from "../services/chatClient";
 import type { PerformanceCue, PresentationSnapshot } from "../live2d/performanceTypes";
 import { dueCues } from "./cueScheduler";
+import { meetingGeneration } from "../services/onboardingClient";
+import {storedMessage} from "./transcript";
+import type {SentenceIdentity} from "../services/chatClient";
 import { charsPerSec, dwellMs, sentencePauseMs } from "./pacing";
 
 interface ChatEngineEvents {
@@ -52,6 +56,7 @@ interface TtsItem {
 /** 展示队列项：一句话 + 它的 TTS（无语音/静音时 tts=null，走驻留计时）
  *  + 句内待触发指令（展示游标越过其偏移才派发）。 */
 interface SentItem {
+  message: ChatMessage | null;
   text: string;
   tts: TtsItem | null;
   /** 本句附着的表情/动作指令，按到达顺序。 */
@@ -82,6 +87,16 @@ interface Turn {
   audioAbort: AbortController;
   userText: string;
   userMessageId: string;
+  userMessage: ChatMessage | null;
+  runId: string | null;
+  owner: ReturnType<typeof meetingIdentity>;
+  ackText: string;
+  ackSentText: string;
+  ackRunning: boolean;
+  ackAt: number;
+  ackQueue: Promise<void>;
+  opening: boolean;
+  generation: number | null;
   /** assistant 已产出全文（打断按此落账）。 */
   text: string;
   llmDone: boolean;
@@ -120,6 +135,7 @@ export class ChatEngine {
   private asr: AsrEngine | null = null;
   private micOn = false;
   private micStarting = false;
+  private micAttempt = 0;
   /** 离开 chat 页的挂起标记；micIntended 记录挂起前用户开着麦（回来恢复）。 */
   private micSuspended = false;
   private micIntended = false;
@@ -129,17 +145,33 @@ export class ChatEngine {
    *  backend 可能先收新消息再收截断，把新回合落账作废）。 */
   private sendQueue: Promise<void> = Promise.resolve();
   private disposed = false;
+  private openingScheduled = false;
   private voiceMuted = false;
   private unsubVolume: (() => void) | null = null;
   /** 最近一次上屏字幕（Chat 页中途挂载时同步用）。 */
   private lastDisplay = "";
+  private sceneActive=true;
+  private presentationPaused=false;
+  private presentationPausedAt=0;
+  private readonly visibilityChanged=()=>this.applyPresentationVisibility();
 
   constructor(ev: ChatEngineEvents) {
     this.events = ev;
+    if(typeof document!=="undefined")document.addEventListener("visibilitychange",this.visibilityChanged);
+    this.applyPresentationVisibility();
     this.applyVolume();
     this.unsubVolume = subscribe(() => this.applyVolume());
     this.player.onMouthOpen = (v) =>
       this.tryStage((s) => s.setMouthOpen(v, this.player.playing));
+    this.player.onUnavailable = () => {
+      const t = this.turn;
+      if (!t) return;
+      t.audioAbort.abort();
+      for (const item of t.sentences) item.tts = null;
+      this.safe(() => this.player.stop());
+      this.flushTts(t);
+      this.maybeFinish(t);
+    };
     this.player.onDrain = () => {
       const t = this.turn;
       if (t) this.maybeFinish(t);
@@ -155,6 +187,11 @@ export class ChatEngine {
   /** 麦克风是否开着（持续监听形态，与回合状态正交）。 */
   get listening(): boolean {
     return this.micOn;
+  }
+
+  /** Pending activation counts as on for the toggle, so a second click cancels it. */
+  get microphoneActive(): boolean {
+    return this.micOn || this.micStarting;
   }
 
   /** 语音输出静音开关（工具栏即时切换，不持久化）。 */
@@ -194,7 +231,7 @@ export class ChatEngine {
     }
     const cfg = getSettings();
     if (!ttsConfigured(cfg.tts)) return Promise.resolve();
-    this.safe(() => this.player.stop());
+    this.safe(() => {this.player.stop();this.player.setPaused(false);});
     return streamSpeech(m.text, {
       // 回放与实时合成同一口径：语言 = 对话语言
       lang: resolveChatLang(cfg.general),
@@ -210,11 +247,11 @@ export class ChatEngine {
   readonly history: ChatMessage[] = [];
 
   /**
-   * 读档灌入：用存档 messages 整体替换内存转写（backlog/字幕显示它）。
+   * 启动恢复：用最近记录恢复内存转写（backlog/字幕显示它）。
    * 在途回合先打断（其部分落账随旧转写一起被覆盖）；字幕 = 最后一条
    * assistant 的末句，无则空。调用方负责 bumpTranscript 通知订阅者。
    */
-  loadHistory(messages: CheckpointMessage[]): void {
+  loadHistory(messages: StoredMessage[]): void {
     this.tryStage((st) => st.cancelPerformance());
     if (this.turn) this.interruptNow(false);
     this.safe(() => this.player.stop());
@@ -222,10 +259,7 @@ export class ChatEngine {
     for (const m of messages) {
       if (m.role !== "user" && m.role !== "assistant") continue;
       this.history.push({
-        id: newId("m"),
-        role: m.role,
-        text: String(m.text ?? ""),
-        at: String(m.at ?? ""),
+        ...storedMessage(m),
       });
     }
     const last = [...this.history]
@@ -248,7 +282,14 @@ export class ChatEngine {
     );
   }
 
-  private async doSend(trimmed: string): Promise<void> {
+  /** First meeting uses normal pacing / TTS / ACT, without a fictitious user. */
+  beginFirstMeeting(): void {
+    if (this.disposed || this.openingScheduled || this.phase !== "idle") return;
+    this.openingScheduled = true;
+    this.sendQueue = this.sendQueue.then(() => this.doSend("", true)).catch(() => {});
+  }
+
+  private async doSend(trimmed: string, opening = false): Promise<void> {
     if (this.disposed) return;
     // 新输入隐式打断在途回合（绕过防抖，保证打断一定生效）；
     // await 回传完成：backend 先修正尾对再收新消息，保证消息不乱序。
@@ -270,8 +311,6 @@ export class ChatEngine {
       text: trimmed,
       at: new Date().toISOString(),
     };
-    this.history.push(userMsg);
-    this.events.onUserMessage(userMsg);
 
     const turn: Turn = {
       presentation: null,
@@ -279,7 +318,17 @@ export class ChatEngine {
       abort: new AbortController(),
       audioAbort: new AbortController(),
       userText: trimmed,
-      userMessageId: userMsg.id,
+      userMessageId: opening ? "" : userMsg.id,
+      userMessage: opening ? null : userMsg,
+      runId: null,
+      owner: meetingIdentity(),
+      ackText: "",
+      ackSentText: "",
+      ackRunning: false,
+      ackAt: 0,
+      ackQueue: Promise.resolve(),
+      opening,
+      generation: meetingGeneration(),
       text: "",
       llmDone: false,
       finished: false,
@@ -311,16 +360,10 @@ export class ChatEngine {
       this.micIntended = false;
       return;
     }
-    // 内置引擎总能连（模型缺失由 backend 回 error 事件）；自定义引擎要求 url
-    if (cfg.asr.mode === "openai" && !cfg.asr.url.trim()) {
-      this.events.onError(new ServiceError("asr", "unconfigured"));
-      return;
-    }
     this.micStarting = true;
+    const attempt = ++this.micAttempt;
     const mic = new MicStreamer();
-    // 语言跟随对话语言：内置引擎按它选识别语言，openai 引擎按它传 language
-    setAsrChatLang(cfg.general.lang, cfg.general.chatLang);
-    const asr = createAsr(cfg.asr, {
+    const asr = createAsr({
       onSpeechStarted: () => {
         if (this.phase !== "idle") this.interrupt();
       },
@@ -331,30 +374,37 @@ export class ChatEngine {
       onClose: (_code: number) => {
         // 服务端断连：若我们认为还在听，收尾回到非监听态。
         if (this.asr === asr) {
-          this.asr = null;
-          this.micOn = false;
-          this.safe(() => this.mic?.cancel());
-          this.mic = null;
-          this.emitStatus();
+          // Invalidate pending permission/start too; a late grant must not record.
+          this.stopListening();
         }
       },
     });
+    // Store pending resources too: stop/navigation must cancel a connecting socket.
+    this.mic = mic;
+    this.asr = asr;
+    const current = (): boolean => !this.disposed && attempt === this.micAttempt && this.micIntended;
     try {
       // 连接就绪后再开采集，避免开头几帧静默丢弃。
       await asr.connect();
+      if (!current()) return;
       await mic.start((pcm) => asr.send(pcm), {
         onError: (e) => this.events.onError(toError(e)),
       });
-      this.mic = mic;
-      this.asr = asr;
+      if (!current()) return;
       this.micOn = true;
       this.emitStatus();
     } catch (e) {
       this.safe(() => mic.cancel());
       this.safe(() => asr.close());
-      this.events.onError(toError(e));
+      if (current()) this.events.onError(toError(e));
     } finally {
-      this.micStarting = false;
+      if (!current() || !this.micOn) {
+        this.safe(() => mic.cancel());
+        this.safe(() => asr.close());
+        if (this.asr === asr) { this.asr = null; this.mic = null; }
+        if (attempt === this.micAttempt) this.micIntended = false;
+      }
+      if (attempt === this.micAttempt) this.micStarting = false;
     }
   }
 
@@ -374,7 +424,7 @@ export class ChatEngine {
     if (!this.micSuspended) return;
     this.micSuspended = false;
     const cfg = getSettings();
-    if (this.micIntended && cfg.general.voiceInput && cfg.asr.url.trim()) {
+    if (this.micIntended && cfg.general.voiceInput) {
       void this.startListening();
     }
   }
@@ -382,6 +432,8 @@ export class ChatEngine {
   /** 关麦（释放 ASR 连接与采集）。无条件清意向——
    *  挂起态由 suspendMic 自己先存意向再调本函数。 */
   stopListening(): void {
+    this.micAttempt++;
+    this.micStarting = false;
     this.micIntended = false;
     this.micOn = false;
     const mic = this.mic;
@@ -394,7 +446,7 @@ export class ChatEngine {
   }
 
   /** 打断：停播放、abort 在途 LLM/TTS、当前 assistant 消息按已展示部分落账，
-   *  并回传 backend 截断持久化（两侧一致）。persist=false 用于读档等
+   *  并回传 backend 截断持久化（两侧一致）。persist=false 用于启动恢复等
    *  无需回传的场景（live 即将被整体覆盖）。
    *  300ms 防抖——重复触发（SpeechStarted + 手动停止）忽略。
    *  回传 promise 挂进发送队列：紧随其后的 sendText 等它落地再发新回合。 */
@@ -411,10 +463,38 @@ export class ChatEngine {
     this.sendQueue = this.sendQueue.then(() => done);
   }
 
+  setSceneActive(active:boolean):void {
+    this.sceneActive=active;this.applyPresentationVisibility();
+  }
+
+  private applyPresentationVisibility():void {
+    const paused=!this.sceneActive||typeof document!=="undefined"&&document.visibilityState==="hidden";
+    if(paused===this.presentationPaused)return;
+    const now=Date.now();
+    if(paused)this.presentationPausedAt=now;
+    else if(this.turn){
+      const elapsed=now-this.presentationPausedAt;
+      if(this.turn.disp.doneAt)this.turn.disp.doneAt+=elapsed;
+      if(this.turn.disp.pausedUntil)this.turn.disp.pausedUntil+=elapsed;
+    }
+    this.presentationPaused=paused;
+    this.safe(()=>this.player.setPaused(paused));
+  }
+
+  /** Explicit meeting exit flushes observed text before the lease is revoked. */
+  finishMeeting(): Promise<void> {
+    const done=this.turn?this.interruptNow(true):Promise.resolve();
+    if(!this.turn)this.safe(()=>this.player.stop());
+    this.sendQueue=this.sendQueue.then(()=>done);
+    this.suspendMic();
+    return this.sendQueue;
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     this.unsubVolume?.();
+    if(typeof document!=="undefined")document.removeEventListener("visibilitychange",this.visibilityChanged);
     this.interruptNow(false);
     this.stopListening();
     this.safe(() => this.player.dispose());
@@ -451,26 +531,21 @@ export class ChatEngine {
     turn.inflight = 0;
     this.safe(() => this.player.stop());
     this.turn = null;
-    // 落账以「用户实际看到的文本」为准：backlog / 存档 / 下回合上下文
+    // 落账以「用户实际看到的文本」为准：backlog / 下回合上下文
     // 与回传 backend 的截断值一致（assistant 可空，空则本地也不落账）。
     const seen = this.seenText(turn);
+    this.publishSeen(turn);
     const done = persist
-      ? sendInterrupt(turn.userText, seen)
+      ? this.acknowledgeSeen(turn,true).then(() => turn.runId
+          ? sendInterrupt(turn.userText,seen,turn.generation ?? undefined,turn.runId,turn.owner)
+          : turn.generation == null ? sendInterrupt(turn.userText,seen) : sendInterrupt(turn.userText,seen,turn.generation))
       : Promise.resolve();
-    // 各句已逐句进转写；打断时按「用户实际看到的」重建本轮尾部，
-    // 与回传 backend 的 seen 同源（backend 用同一规则裁剪 DB 里的本轮行）。
-    if (turn.pushed > 0) {
-      this.history.splice(this.history.length - turn.pushed, turn.pushed);
-    }
+    // Keep each durable event's identity. Backlog may group by runId for display,
+    // but collapsing rows here would duplicate them when the ledger page arrives.
     if (seen) {
-      const msg: ChatMessage = {
-        id: `${turn.id}-seen`,
-        role: "assistant",
-        text: seen,
-        at: new Date().toISOString(),
-      };
-      this.history.push(msg);
-      this.events.onAssistantDone(msg);
+      const sentenceIds=new Set(turn.sentences.flatMap(item=>item.message?[item.message.id]:[]));
+      const last=[...this.history].reverse().find(message=>sentenceIds.has(message.id));
+      if (last) this.events.onAssistantDone(last);
     }
     // 表情是回合内状态：回合中止/结束统一复位。
     this.tryStage((st) => st.cancelPerformance());
@@ -480,11 +555,20 @@ export class ChatEngine {
 
   private async runTurn(turn: Turn, cfg: Settings, userText: string): Promise<void> {
     try {
-      for await (const ev of chat(userText, turn.abort.signal, turn.presentation)) {
+      for await (const ev of chat(userText, turn.abort.signal, turn.presentation, turn.opening, turn.id)) {
         if (this.turn !== turn) return; // 已被打断
         if (ev.t === "sentence") {
+          if (ev.generation != null) turn.generation = ev.generation;
+          if (ev.runId) {
+            turn.runId = ev.runId;
+            if (turn.userMessage) {
+              turn.userMessage.runId=ev.runId;turn.userMessage.source="meeting";
+              if (ev.userEventId) {turn.userMessage.id=ev.userEventId;turn.userMessage.eventId=ev.userEventId;turn.userMessageId=ev.userEventId;}
+              if (ev.userSeq != null) turn.userMessage.seq=ev.userSeq;
+            }
+          }
           turn.text += ev.text;
-          this.pushSentence(turn, cfg, ev.text, ev.cues);
+          this.pushSentence(turn, cfg, ev.text, ev.cues, ev);
         } else if (ev.t === "error") {
           throw new ServiceError("llm", "http", 0, ev.message);
         }
@@ -499,6 +583,7 @@ export class ChatEngine {
       const index = this.history.findIndex((m) => m.id === turn.userMessageId);
       if (index >= 0) this.history.splice(index, 1);
     }
+    if (turn.opening && !turn.text.trim()) this.openingScheduled = false;
     turn.llmDone = true;
     this.maybeFinish(turn);
   }
@@ -509,27 +594,22 @@ export class ChatEngine {
     cfg: Settings,
     sentence: string,
     cues: PerformanceCue[],
+    identity: SentenceIdentity = {},
   ): void {
     if (turn.finished) return;
-    const item: SentItem = { text: sentence, tts: null, cues, cueIdx: 0 };
+    const item: SentItem = { text: sentence, tts: null, cues, cueIdx: 0, message:null };
     turn.sentences.push(item);
     if (!sentence) return; // Ordered control-only units never enter history or speech.
-    // 句落账即进转写：**流式期间 backlog 就能看到这一句**，不必等回合结束。
-    // id 用「回合 id + 句序」，与重载后按行重建的转写形态一致。
-    const msg: ChatMessage = {
-      id: `${turn.id}-${turn.sentences.length - 1}`,
-      role: "assistant",
-      text: sentence,
-      at: new Date().toISOString(),
+    item.message = {
+      id: identity.eventId || `${turn.id}-${turn.sentences.length - 1}`,
+      ...(identity.eventId ? {eventId:identity.eventId} : {}),
+      ...(identity.seq == null ? {} : {seq:identity.seq}),
+      runId: turn.runId ?? turn.id,source:"meeting",
+      role:"assistant",text:"",at:new Date().toISOString(),
     };
-    turn.pushed += 1;
-    this.history.push(msg);
-    this.events.onSentence(msg);
     if (this.voiceMuted || turn.audioAbort.signal.aborted) return;
-    if (!ttsConfigured(cfg.tts)) {
-      this.reportTtsOnce(turn, new ServiceError("tts", "unconfigured"));
-      return;
-    }
+    // Voice is optional; missing configuration is a valid text-only mode.
+    if (!ttsConfigured(cfg.tts)) return;
     const tts: TtsItem = { chunks: [], pushed: 0, done: false };
     item.tts = tts;
     turn.inflight += 1;
@@ -574,6 +654,7 @@ export class ChatEngine {
    * 未轮到的句先在本地攒着——这样每句音频正好在该句展示时开声，句间停顿天然生效。
    */
   private flushTts(turn: Turn): void {
+    if(this.presentationPaused)return;
     if (this.turn !== turn || turn.finished) return;
     const ss = turn.sentences;
     while (turn.pushIndex < ss.length && turn.pushIndex <= turn.disp.idx) {
@@ -595,6 +676,7 @@ export class ChatEngine {
 
   /** 播放 tick：逐字上屏 → 判切句 → 供 TTS 块 → 判收尾。 */
   private displayTick(turn: Turn): void {
+    if(this.presentationPaused)return;
     if (this.turn !== turn || turn.finished) return;
     this.flushTts(turn);
     const now = performance.now();
@@ -628,6 +710,8 @@ export class ChatEngine {
       turn.disp.emitted = shown;
       this.lastDisplay = shown;
       this.events.onDisplay(shown);
+      this.publishSeen(turn);
+      void this.acknowledgeSeen(turn,turn.disp.reveal >= target);
       if (shown && this.phase === "thinking") this.setPhase("speaking");
     }
 
@@ -659,6 +743,55 @@ export class ChatEngine {
     this.maybeFinish(turn);
   }
 
+  /** Publish only observed prefixes. Generated but unseen replies are not history. */
+  private publishSeen(turn: Turn): void {
+    const seen = this.seenText(turn);
+    if (!seen) return;
+    if (turn.userMessage && !this.history.some(message => message.id === turn.userMessageId)) {
+      turn.userMessage.runId=turn.runId ?? turn.id;turn.userMessage.source="meeting";
+      this.history.push(turn.userMessage);this.events.onUserMessage(turn.userMessage);
+    }
+    for (let index=0;index<=turn.disp.idx && index<turn.sentences.length;index++) {
+      const item=turn.sentences[index]!;
+      const message=item.message;
+      if (!message) continue;
+      const text=index<turn.disp.idx ? item.text : Array.from(item.text).slice(0,Math.floor(turn.disp.reveal)).join("");
+      if (!text || message.text===text) continue;
+      message.text=text;
+      if (!this.history.some(existing => existing.id===message.id)) {this.history.push(message);turn.pushed++;}
+      this.events.onSentence(message);
+    }
+  }
+
+  private acknowledgeSeen(turn: Turn, force=false): Promise<void> {
+    if (!turn.runId || turn.generation == null) return turn.ackQueue;
+    const seen=this.seenText(turn);
+    if (!force && Date.now()-turn.ackAt<100) return turn.ackQueue;
+    turn.ackText=seen;turn.ackAt=Date.now();
+    if(turn.ackRunning||turn.ackSentText===seen)return turn.ackQueue;
+    const runId=turn.runId,generation=turn.generation;
+    turn.ackRunning=true;
+    turn.ackQueue=(async()=>{
+      let retries=0;
+      // A slow transport consumes the latest cumulative prefix, rather than
+      // queueing an unbounded request for every typewriter frame.
+      while(turn.ackSentText!==turn.ackText){
+        const latest=turn.ackText;
+        try{
+          if(turn.owner)await acknowledgeDisplay(runId,generation,latest,turn.owner);
+          else await acknowledgeDisplay(runId,generation,latest);
+          turn.ackSentText=latest;retries=0;
+        }
+        catch(error){
+          if(retries++<1){await new Promise(resolve=>setTimeout(resolve,100));continue;}
+          if(!this.disposed)this.events.onError(toError(error));
+          break;
+        }
+      }
+    })().finally(()=>{turn.ackRunning=false;});
+    return turn.ackQueue;
+  }
+
   /** 收尾判定：LLM 流完 + TTS 请求全部完成 + 展示队列播完 + （若有音频）player 播空。 */
   private maybeFinish(turn: Turn): void {
     if (this.turn !== turn || turn.finished) return;
@@ -671,7 +804,10 @@ export class ChatEngine {
   private completeTurn(turn: Turn): void {
     turn.finished = true;
     clearInterval(turn.timer);
+    this.publishSeen(turn);
+    const acknowledged = this.acknowledgeSeen(turn,true);
     this.turn = null;
+    this.sendQueue = this.sendQueue.then(() => acknowledged);
     // 各句已在 pushSentence 里逐句落账，这里只发「回合结束」信号
     if (turn.text.trim()) {
       const last = [...this.history].reverse().find((m) => m.role === "assistant");

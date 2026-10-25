@@ -1,5 +1,6 @@
+import { runtimeFetch } from "./runtime";
 // backend REST 共享助手：JSON 收发 + 非 2xx 抛错（带 status）。
-// 将来迁 Tauri 时只换这层实现为 invoke()。
+// Desktop requests use the memory-only runtime capability adapter.
 
 class ApiError extends Error {
   constructor(
@@ -15,7 +16,7 @@ export async function apiFetch(
   path: string,
   init?: RequestInit,
 ): Promise<Response> {
-  const res = await fetch(path, init);
+  const res = await runtimeFetch(path, init);
   if (!res.ok) throw new ApiError(res.status, `HTTP ${res.status}`);
   return res;
 }

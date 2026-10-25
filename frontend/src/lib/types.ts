@@ -5,17 +5,7 @@ export interface LlmConfig {
   url: string;
   key: string;
   model: string;
-}
-
-/** ASR 端点（ws(s)://…[/v1/listen]，Deepgram 对齐流式）。 */
-export interface AsrConfig {
-  /** builtin = backend 内置 SenseVoice；openai = 任何 OpenAI 兼容 HTTP 端点。 */
-  mode: "builtin" | "openai";
-  /** openai 模式：base URL（http(s)://host/v1 或完整 /audio/transcriptions）。 */
-  url: string;
-  key: string;
-  /** openai 模式：模型名（OpenAI 官方要 whisper-1；自托管多为任意值）。 */
-  model: string;
+  thinking: boolean;
 }
 
 /** TTS 端点：GPT-SoVITS api_v2 服务地址（前端统一走 backend 的 /api/tts/speech）。 */
@@ -31,23 +21,18 @@ export interface TtsConfig {
   // 由调用方按请求传入（见 services/ttsClient.ts 的 SpeakOptions.lang）。
 }
 
-/** 语义检索 embedding 端点（http(s)://…，POST /v1/embeddings，OpenAI 对齐）。
- *  由 backend 记忆检索消费；url 留空 = 只用词面召回。 */
-export interface EmbeddingConfig {
-  url: string;
-  key: string;
-  model: string;
-}
-
 /** 界面语言（i18n）；新增语言同时在 i18n/ 注册字典。 */
 // 与后端契约同形的类型由 OpenAPI 生成（api/types.ts），这里只转出 ——
 // 页面继续从 lib/types 取类型，不必关心它们从哪来。
 export type { Memory } from "../api/types";
-export type {
-  CheckpointDetail as CheckpointSave,
-  CheckpointMeta,
-  StoredMessage as CheckpointMessage,
-} from "../api/types";
+/** Durable transcript identity, independent of the prompt's bounded context window. */
+export type StoredMessage = import("../api/types").StoredMessage & {
+  eventId?: string;
+  runId?: string;
+  source?: string;
+  externalMessageId?: string | null;
+  seq?: number;
+};
 
 export type Lang = "zh" | "ja" | "en";
 
@@ -67,9 +52,8 @@ export interface GeneralConfig {
   voiceVolume: number;
   /** chat 页左上角是否显示对话状态条（空闲/聆听/思考/回应）。 */
   showStatus: boolean;
-  /** 语音输入（ASR 麦克风）；asr.url 未配置时强制为关。 */
+  /** 使用内置识别的语音输入开关。 */
   voiceInput: boolean;
-  /** 记忆语义检索（embedding）；embedding.url 未配置时强制为关。 */
 }
 
 /** MCP 拓展登记项：外部 MCP server 的连接配置（backend 每回合按此连接并
@@ -98,9 +82,7 @@ export interface McpExtension {
 export interface Settings {
   general: GeneralConfig;
   llm: LlmConfig;
-  asr: AsrConfig;
   tts: TtsConfig;
-  embedding: EmbeddingConfig;
   /** 已登记的 MCP 拓展清单。 */
   extensions: McpExtension[];
 }
@@ -146,6 +128,11 @@ export interface AvatarMeta {
 
 export interface ChatMessage {
   id: string;
+  eventId?: string;
+  runId?: string;
+  source?: string;
+  externalMessageId?: string | null;
+  seq?: number;
   role: "user" | "assistant";
   text: string;
   at: string;
@@ -153,9 +140,6 @@ export interface ChatMessage {
 
 export type ChatStatus = "idle" | "listening" | "thinking" | "speaking";
 
-/** 存档里的单条消息（backend history 快照；无前端 id）。 */
-/** 存档槽列表项（GET /api/checkpoints；preview = 末条消息截断）。 */
-/** 存档全文（GET /api/checkpoints/{id} 与 load 返回）。 */
 /** /api/state 持久化载荷（backend momo.yaml ↔ localStorage 缓存共用 schema）。
  *  初始记忆（pin）与会话历史在 momo.db，不在此 schema。 */
 export interface PersistedState {

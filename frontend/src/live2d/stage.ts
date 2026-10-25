@@ -1,3 +1,4 @@
+import { desktop } from "../services/runtime";
 import { SpeechMouth } from "./speechMouth";
 import { motionPlayback, type MotionPlaybackEntry, type PreviewPlayback } from "./previewPlayback";
 // pixi 舞台 + pixi-live2d-display（Cubism 4）模型加载。
@@ -11,6 +12,8 @@ import { ParameterMixer } from "./parameterMixer";
 import { PerformanceController } from "./performanceController";
 import type { PerformanceCue, PresentationSnapshot } from "./performanceTypes";
 import * as PIXI from "pixi.js";
+// Native WebViews keep strict CSP; this installs Pixi's static shader synchronizers.
+import "@pixi/unsafe-eval";
 import { getAvatarId, getAvatars } from "../lib/store";
 import { getBlob } from "../lib/idb";
 import { makeAvatarSource, wireZipLoader } from "./avatarZip";
@@ -21,7 +24,7 @@ if (typeof window !== "undefined") {
 }
 
 const DEFAULT_CORE_URL =
-  "/api/live2d/core";
+  "/live2d/live2dcubismcore.min.js";
 const DEFAULT_AVATAR_URL = "/live2d/hiyori/Hiyori.model3.json";
 const CORE_TIMEOUT_MS = 30000;
 const FALLBACK_DIALOG_ZONE_H = 140;
@@ -34,6 +37,7 @@ let corePromise: Promise<void> | null = null;
 
 /** Cubism Core script url（VITE_MOMO_CUBISM_CORE_URL 可换自建镜像）。 */
 function cubismCoreUrl(): string {
+  if (desktop()) return DEFAULT_CORE_URL;
   const v = import.meta.env.VITE_MOMO_CUBISM_CORE_URL;
   return typeof v === "string" && v.trim() ? v : DEFAULT_CORE_URL;
 }

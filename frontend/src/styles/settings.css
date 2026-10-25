@@ -694,3 +694,13 @@
 .resource-preview-progress { position: absolute; z-index: 2; bottom: 0; left: 0; right: 0; height: 3px; background: var(--line-soft); pointer-events: none; }
 .resource-preview-progress > span { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform 100ms linear; }
 @media (prefers-reduced-motion: reduce) { .resource-preview-progress > span { transition: none; } }
+
+/* Only exceptional built-in resource states appear; normal settings stay quiet. */
+.builtin-resource-notice {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.builtin-resource-notice p { margin: 0; }

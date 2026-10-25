@@ -62,3 +62,34 @@ export async function deleteBlob(key: string): Promise<void> {
     // 清理失败无妨：孤儿 blob 只占磁盘，不影响逻辑
   }
 }
+
+/** Wait for transaction completion so a failed model import cannot partially commit. */
+export async function allBlobs(): Promise<Record<string, Blob>> {
+  if (!hasIdb()) return {};
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readonly');
+    const result: Record<string, Blob> = {};
+    const cursor = tx.objectStore(STORE).openCursor();
+    cursor.onsuccess = () => {
+      const row = cursor.result;
+      if (row) { result[String(row.key)] = row.value as Blob; row.continue(); }
+    };
+    tx.oncomplete = () => resolve(result);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+export async function replaceBlobs(blobs: Record<string, Blob>): Promise<void> {
+  if (!hasIdb()) throw new Error('Model storage unavailable');
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    store.clear();
+    for (const [key, value] of Object.entries(blobs)) store.put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}

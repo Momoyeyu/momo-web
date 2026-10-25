@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { presentation } from './helpers/runtime';
+import {waitForChatReady} from './helpers';
 
 // Intercept configuration/chat only; exercise the real vendored model and renderer.
 // All writes are intercepted so the user's settings, memory and conversation stay intact.
@@ -46,6 +47,7 @@ test('queued cues follow visible text, while transcript stays plain', async ({ p
   });
   await page.goto('/#/chat');
   await expect.poll(() => presentation(page).then(snapshot => snapshot?.expressions.length ?? 0)).toBe(4);
+  await waitForChatReady(page);
   await page.getByPlaceholder(/输入|说点/).fill('你好');
   await page.getByRole('button', { name: '发送', exact: true }).click();
   await expect.poll(() => face(page)).toBe('happy');
@@ -72,6 +74,7 @@ test('short audio does not rush the remaining text or its late cue', async ({ pa
   }) + '\n\ndata: {"t":"done"}\n\n' }));
   await page.goto('/#/chat');
   await expect.poll(() => presentation(page).then(snapshot => snapshot?.expressions.length ?? 0)).toBe(4);
+  await waitForChatReady(page);
   await page.getByPlaceholder(/输入|说点|和 momo/).fill('你好');
   await page.getByRole('button', { name: '发送', exact: true }).click();
   await expect.poll(() => face(page)).toBe('happy');

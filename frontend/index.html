@@ -5,9 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>momo</title>
+    <link rel="stylesheet" href="/startup.css" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root" inert aria-hidden="true" aria-busy="true"></div>
+    <section id="startup" class="startup-screen" data-stage="connecting">
+      <div class="startup-vignette" aria-hidden="true"></div>
+      <div class="startup-presence-figure" aria-hidden="true"></div>
+      <div class="startup-art" aria-hidden="true"><img src="/brand/startup-presence.svg" width="220" height="244" alt="" /></div>
+      <div class="startup-brand"><img src="/brand/momo-wordmark.svg" width="105" height="32" alt="momo" /></div>
+      <p class="startup-message" role="status" aria-live="polite" aria-atomic="true">正在准备和你见面</p>
+      <div class="startup-track" aria-hidden="true"><span class="startup-track-light"></span></div>
+      <div class="startup-actions" hidden><button type="button" data-startup-retry>再试一次</button></div>
+      <p class="startup-error-note" hidden></p>
+    </section>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

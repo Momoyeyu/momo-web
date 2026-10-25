@@ -14,7 +14,10 @@ sys.path.insert(0, str(backend))
 import yaml
 
 request = json.load(sys.stdin)
-original = yaml.safe_load((backend / 'data/momo.yaml').read_text())
+fixture = os.environ.get('MOMO_BROWSER_LLM_CONFIG')
+if not fixture:
+    raise ValueError('Real provider tests require explicit MOMO_BROWSER_LLM_CONFIG')
+original = yaml.safe_load(Path(fixture).read_text(encoding='utf-8'))
 with tempfile.TemporaryDirectory(prefix='momo-performance-') as directory:
     os.environ['MOMO_DATA_DIR'] = directory
     from app.core import state, db

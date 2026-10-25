@@ -1,15 +1,17 @@
 import { test, expect } from '@playwright/test';
 import { execFile } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { readFileSync, writeFileSync } from 'node:fs';
 const cases: {id:string; prompt:string; faces:string[]; avoidJoy:boolean; guided?:boolean}[] = JSON.parse(readFileSync(new URL('./fixtures/performance-prompts.json', import.meta.url), 'utf8'));
 import { presentation } from './helpers/runtime';
+import {waitForChatReady} from './helpers';
 
 const backend = fileURLToPath(new URL('../../backend/', import.meta.url));
 function realTurn(body: unknown): Promise<{status: number; body: string}> {
   return new Promise((resolve, reject) => {
-    const child = execFile(`${backend}.venv/bin/python`, [`${backend}tests/helpers/real_performance_turn.py`],
-      { cwd: backend, timeout: 100_000, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => {
+    const child = execFile(join(backend,'.venv',process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'), [join(backend,'tests/helpers/real_performance_turn.py')],
+      { cwd: backend, env:{...process.env,PYTHONIOENCODING:'utf-8'}, timeout: 100_000, maxBuffer: 4 * 1024 * 1024 }, (error, stdout) => {
         if (error) reject(error); else { try { resolve(JSON.parse(stdout)); } catch (error) { reject(error); } }
       });
     child.stdin!.end(JSON.stringify(body));
@@ -28,7 +30,7 @@ test('real provider chooses calibrated controls and the stage executes them', as
   const results: object[] = [];
   let events: any[] = [];
   await page.route('**/api/state', r => r.fulfill({json: state}));
-  await page.route('**/api/checkpoints/live', r => r.fulfill({json: {summary: '', messages: []}}));
+  await page.route('**/api/life/history**', r => r.fulfill({json: {summary: '', messages: []}}));
   await page.route('**/api/chat/interrupt', r => r.fulfill({status: 204}));
   await page.route('**/api/chat', async route => {
     const result = await realTurn(route.request().postDataJSON());
@@ -54,6 +56,7 @@ test('real provider chooses calibrated controls and the stage executes them', as
       });
     });
     events = [];
+    await waitForChatReady(page);
     await page.locator('.input-row input').fill(c.prompt);
     await page.getByRole('button', {name:'发送', exact:true}).click();
     await expect.poll(() => events.some(e => e.t === 'done' || e.t === 'error'), {timeout: 110_000}).toBe(true);
@@ -67,8 +70,7 @@ test('real provider chooses calibrated controls and the stage executes them', as
       if (cue.expression) expect(catalog.expressions.some(r => r.name === cue.expression.name)).toBe(true);
       if (cue.motion) expect(catalog.motions.some(r => r.name === cue.motion)).toBe(true);
     }
-    mkdirSync(`${backend}data/references`, {recursive:true});
-    writeFileSync(`${backend}data/references/002-real-performance-latest.json`, JSON.stringify([...results,{id:c.id,prompt:c.prompt,text:sentences.map(s=>s.text).join(''),faces,motions}],null,2));
+    writeFileSync(testInfo.outputPath('real-performance.json'), JSON.stringify([...results,{id:c.id,prompt:c.prompt,text:sentences.map(s=>s.text).join(''),faces,motions}],null,2));
     if (c.faces.length) expect(faces.some(f => c.faces.includes(f))).toBe(true);
     if (c.avoidJoy) {
       expect(faces).not.toContain('happy'); expect(faces).not.toContain('shy');
@@ -89,7 +91,7 @@ test('real provider chooses calibrated controls and the stage executes them', as
     const result = {id:c.id,prompt:c.prompt,text:sentences.map(s=>s.text).join(''),faces,motions,guided:c.guided??false,renderedFaces:[...new Set(frames.map((f:any)=>f.name).filter(Boolean))],withinSentenceChanges:sentences.some(s => (s.cues??[]).filter((q:any)=>q.expression).length>1),trace};
     if (c.guided) expect(result.withinSentenceChanges).toBe(true);
     results.push(result);
-    writeFileSync(`${backend}data/references/002-real-performance-latest.json`, JSON.stringify(results,null,2));
+    writeFileSync(testInfo.outputPath('real-performance.json'), JSON.stringify(results,null,2));
     await testInfo.attach(c.id, {body:JSON.stringify(result,null,2),contentType:'application/json'});
     console.log(c.id,JSON.stringify({faces,motions}));
   }

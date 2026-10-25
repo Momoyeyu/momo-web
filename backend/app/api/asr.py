@@ -42,8 +42,8 @@ async def asr_stream(ws: WebSocket) -> None:
         await ws.close()
         return
 
-    await ws.send_json({"type": "ready", "language": asr.status(lang)["language"]})
     try:
+        await ws.send_json({"type": "ready", "language": asr.status(lang)["language"]})
         while True:
             msg = await ws.receive()
             if msg["type"] == "websocket.disconnect":
@@ -72,7 +72,8 @@ async def asr_stream(ws: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
+        session.close()
         try:
             await ws.close()
-        except RuntimeError:
+        except (RuntimeError, WebSocketDisconnect):
             pass

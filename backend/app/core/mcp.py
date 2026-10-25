@@ -1,393 +1,263 @@
-"""拓展模块：把已启用 MCP server 的工具导入 ReAct 循环（core/mcp.py）。
+"""MCP façade: Cordis owns connections; Python owns permissions and execution order.
 
-- 设置页登记 {name, transport(stdio|http), enabled} + stdio 分支
-  {command, args[], env{}} + http 分支 {endpoint, headers{}}
-- 回合开始并发连接 enabled server → tools/list → 工具以 {server}_{tool}
-  前缀名注入；server 连不上即不注入（不可用即不可见，不报错给用户）
-- tools/call 转发回对应 server；失败把错误文本作为 tool result 回模型
-- 每回合重建连接（连接状态变化下一回合生效），turn 结束关闭
-
-MCP SDK 是 async 的，而 run_turn 是同步生成器——hub 开专属 daemon 线程
-跑常驻 asyncio loop，同步侧经 run_coroutine_threadsafe 调用。每个 server
-的连接/会话由同一个 task 全程持有（anyio cancel scope 要求进/出同一
-task），close 通过 asyncio.Event 通知各 task 自行退出清理。
+There is no Python MCP event loop or transport in the active path. A turn gets a
+catalog projection; leaving the turn never closes another turn's connection.
 """
 from __future__ import annotations
 
-import asyncio
 import contextlib
+import hashlib
 import json
-import logging
-import os
+from pathlib import Path
 import re
 import shlex
 import threading
-from typing import TYPE_CHECKING, Any, Iterator
+from types import SimpleNamespace
+from typing import Any, Iterator
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
-from mcp.client.streamable_http import (
-    create_mcp_http_client,
-    streamable_http_client,
-)
+from .plugin_host import PluginHost
 
-if TYPE_CHECKING:
-    from ..models import ProbeResult
-
-
-log = logging.getLogger(__name__)
-
-CONNECT_TIMEOUT = 8.0  # 单个 server：连接 + initialize + tools/list
-OPEN_TIMEOUT = 10.0    # 全部 server 就绪的总等待上限（不拖回合）
-CALL_TIMEOUT = 30.0    # 单次 tools/call
-CLOSE_TIMEOUT = 5.0
-
+CONNECT_TIMEOUT = 8.0
+OPEN_TIMEOUT = 12.0
+CALL_TIMEOUT = 30.0
 _NAME_RE = re.compile(r"[^a-zA-Z0-9_]")
+_SCOPES = frozenset({'mcp.tools', 'channels.send', 'activities.game', 'activities.computer'})
+_coordinator = SimpleNamespace(host=None, mode='paused', virtual_enabled=False)
+
+
+def _runtime():
+    return _coordinator
 
 
 def sanitize(name: Any) -> str:
-    """server/工具名合法化：只留 [a-zA-Z0-9_]，其余转 _；空名兜底。"""
-    s = _NAME_RE.sub("_", str(name or ""))
-    return s or "ext"
+    return _NAME_RE.sub('_', str(name or '')) or 'ext'
+
+
+def _field(value, name, default=None):
+    return value.get(name, default) if isinstance(value, dict) else getattr(value, name, default)
 
 
 def tool_decl(server_key: str, tool: Any) -> dict[str, Any]:
-    """MCP Tool → OpenAI function 声明（inputSchema 原样透传）。"""
-    desc = getattr(tool, "description", None) or getattr(tool, "title", None) or ""
-    schema = getattr(tool, "input_schema", None)
-    if not isinstance(schema, dict):
-        schema = {"type": "object", "properties": {}}
-    return {
-        "type": "function",
-        "function": {
-            "name": f"{server_key}_{sanitize(getattr(tool, 'name', ''))}",
-            "description": str(desc),
-            "parameters": schema,
-        },
-    }
+    original = str(_field(tool, 'name', ''))
+    name = f'{sanitize(server_key)}_{sanitize(original)}'
+    if len(name) > 64:
+        name = name[:51] + '_' + hashlib.sha256(name.encode()).hexdigest()[:12]
+    schema = _field(tool, 'inputSchema', _field(tool, 'input_schema'))
+    return {'type': 'function', 'function': {
+        'name': name,
+        'description': str(_field(tool, 'description') or _field(tool, 'title') or ''),
+        'parameters': schema if isinstance(schema, dict) else {'type': 'object', 'properties': {}},
+    }}
 
 
 def result_text(result: Any) -> str:
-    """CallToolResult → 纯文本：text 块拼接，非文本块序列化。"""
-    parts: list[str] = []
-    for c in getattr(result, "content", None) or []:
-        if getattr(c, "type", None) == "text" and getattr(c, "text", None) is not None:
-            parts.append(str(c.text))
+    parts = []
+    for block in _field(result, 'content', []) or []:
+        if _field(block, 'type') == 'text' and _field(block, 'text') is not None:
+            parts.append(str(_field(block, 'text')))
+        elif isinstance(block, dict):
+            parts.append(json.dumps(block, ensure_ascii=False))
         else:
-            try:
-                parts.append(c.model_dump_json())
-            except Exception:
-                parts.append(str(c))
-    if parts:
-        return "\n".join(parts)
-    sc = getattr(result, "structured_content", None)
-    if sc is not None:
-        try:
-            return json.dumps(sc, ensure_ascii=False)
-        except Exception:
-            return str(sc)
-    return "tool error" if getattr(result, "is_error", False) else "ok"
+            try: parts.append(block.model_dump_json())
+            except Exception: parts.append(str(block))
+    if parts: return '\n'.join(parts)
+    structured = _field(result, 'structuredContent', _field(result, 'structured_content'))
+    if structured is not None: return json.dumps(structured, ensure_ascii=False)
+    return 'tool error' if _field(result, 'isError', _field(result, 'is_error', False)) else 'ok'
 
 
 class _Source:
-    """一个已连接 server：合法化前缀 + session + 原始工具清单。"""
-
-    __slots__ = ("prefix", "session", "tools")
-
-    def __init__(self, prefix: str, session: ClientSession, tools: list[Any]):
-        self.prefix = prefix
-        self.session = session
-        self.tools = tools
+    def __init__(self, prefix, session, tools):
+        self.prefix, self.session, self.tools = prefix, session, tools
 
 
 class ExtTools:
-    """一回合内有效的拓展工具集合：decls 注入 tools 参数，call() 转发。"""
+    def __init__(self):
+        self.decls = []
+        self._routes = {}
 
-    def __init__(self) -> None:
-        self.decls: list[dict[str, Any]] = []
-        self._routes: dict[str, tuple[_Source, str]] = {}
-
-    def add_source(self, src: _Source, taken: set[str]) -> None:
-        """导入一个 server 的工具；与已有名（内置/其他 server）撞名则丢弃。"""
+    def add_source(self, src, taken):
         for tool in src.tools:
             decl = tool_decl(src.prefix, tool)
-            name = decl["function"]["name"]
-            if name in taken:
-                log.warning("mcp tool name clash dropped: %s", name)
-                continue
+            name = decl['function']['name']
+            if name in taken: continue
             taken.add(name)
-            self._routes[name] = (src, str(tool.name))
+            self._routes[name] = (src.session, str(_field(tool, 'name', '')))
             self.decls.append(decl)
 
-    def has(self, name: str) -> bool:
+    def has(self, name):
         return name in self._routes
 
-    def call(self, name: str, args: dict[str, Any]) -> str:
-        """转发 tools/call 到归属 server；失败文本化（不向上抛）。"""
+    def call(self, name, args):
         route = self._routes.get(name)
-        if route is None:
-            return f"未知工具：{name}"
-        src, orig = route
-        try:
-            result = hub.call_tool(src.session, orig, args)
-            return result_text(result)
-        except Exception as e:
-            return f"工具执行失败：{e}"
+        if route is None: return f'未知工具：{name}'
+        try: return result_text(hub.call_tool(*route, args))
+        except Exception:
+            # Provider errors can contain headers, URLs, keys or private content.
+            return '工具执行失败：当前工具不可用或授权已失效。'
 
 
-def _configured(ext: dict[str, Any]) -> bool:
-    """配置完整性：stdio 要 command，http 要 endpoint；缺了视为不可用。"""
-    if str(ext.get("transport") or "http") == "stdio":
-        return bool(str(ext.get("command") or "").strip())
-    return bool(str(ext.get("endpoint") or "").strip())
+def _configured(ext):
+    return bool(str(ext.get('command' if ext.get('transport') == 'stdio' else 'endpoint') or '').strip())
 
 
-def _str_dict(raw: Any) -> dict[str, str]:
-    """键值对字段归一化：只收 str 键值，其余丢弃。"""
-    if not isinstance(raw, dict):
-        return {}
-    return {str(k): str(v) for k, v in raw.items() if isinstance(v, str)}
+def _str_dict(raw):
+    if not isinstance(raw, dict): return {}
+    return {str(key): value for key, value in raw.items() if isinstance(value, str)}
 
 
-def _stdio_params(ext: dict[str, Any]) -> StdioServerParameters:
-    """stdio 分支 → StdioServerParameters。
+def _stdio_params(ext):
+    """Compatibility parsing only; no Python transport, no parent environment copy."""
+    command = str(ext.get('command') or '').strip()
+    raw = ext.get('args', [])
+    args = shlex.split(raw) if isinstance(raw, str) else [str(arg) for arg in raw] if isinstance(raw, list) else []
+    parts = [command] if Path(command).is_file() else shlex.split(command)
+    if not parts: raise ValueError('Unconfigured MCP command')
+    return SimpleNamespace(command=parts[0], args=parts[1:] + args, env=_str_dict(ext.get('env')))
 
-    command 是可执行名（如 npx/uvx）；args 是参数数组（容忍旧式字符串，
-    按 shell 规则拆分）；env 键值对叠加在 os.environ 上注入子进程——
-    密钥类凭据（如 TAVILY_API_KEY）经此传递。
-    """
-    command = str(ext.get("command") or "").strip()
-    if not command:
-        raise ValueError("empty command")
-    raw_args = ext.get("args")
-    if isinstance(raw_args, str):
-        args = shlex.split(raw_args)
-    elif isinstance(raw_args, list):
-        args = [str(a) for a in raw_args]
+
+def _permissions(ext):
+    # Existing explicit enabled=true grants a user-trusted general MCP server.
+    # Reviewed channel/game/computer adapters must declare their actual scopes.
+    declared = ext.get('declaredPermissions', ['mcp.tools'])
+    granted = ext.get('grantedPermissions', ['mcp.tools'])
+    if not isinstance(declared, list) or not isinstance(granted, list): return set(), set()
+    if any(not isinstance(scope, str) for scope in declared + granted): return set(), set()
+    if not set(declared) <= _SCOPES or not set(granted) <= _SCOPES: return set(), set()
+    return set(declared), set(granted)
+
+
+def _translate(ext, plugin_id):
+    config = {'id': plugin_id, 'type': 'mcp', 'enabled': True, 'timeoutMs': int(CALL_TIMEOUT * 1000), 'connectTimeoutMs': int(CONNECT_TIMEOUT * 1000)}
+    if ext.get('transport') == 'stdio':
+        params = _stdio_params(ext)
+        config.update(transport='stdio', command=params.command, args=params.args, env=params.env)
+        if ext.get('cwd'): config['cwd'] = str(ext['cwd'])
     else:
-        args = []
-    # command 应为可执行名；旧数据可能是整行命令——shlex 拆出首 token
-    # 作命令、其余前置于 args。
-    parts = shlex.split(command)
-    if len(parts) > 1:
-        command, args = parts[0], parts[1:] + args
-    env = {**os.environ, **_str_dict(ext.get("env"))}
-    return StdioServerParameters(command=command, args=args, env=env)
+        config.update(transport='sse' if ext.get('transport') == 'sse' else 'streamable-http', url=str(ext.get('endpoint') or ''), headers=_str_dict(ext.get('headers')))
+    return config
+
+
+def _entries(extensions):
+    entries, duplicates = {}, {}
+    for ext in extensions if isinstance(extensions, list) else []:
+        if not isinstance(ext, dict) or ext.get('enabled') is not True or not _configured(ext): continue
+        identity = json.dumps({key: ext.get(key) for key in ('id', 'name', 'transport', 'command', 'endpoint')}, sort_keys=True, ensure_ascii=False)
+        suffix = hashlib.sha256(identity.encode()).hexdigest()[:12]
+        ordinal = duplicates.get(suffix, 0)
+        duplicates[suffix] = ordinal + 1
+        plugin_id = f'mcp_{sanitize(ext.get("name"))[:20]}_{suffix}_{ordinal}'
+        declared, granted = _permissions(ext)
+        if not declared or not declared <= granted: continue
+        try: entries[plugin_id] = {'config': _translate(ext, plugin_id), 'prefix': sanitize(ext.get('name')), 'declared': declared, 'granted': granted}
+        except (ValueError, TypeError): continue
+    return entries
 
 
 class McpHub:
-    """专属线程 + 常驻 asyncio loop 的 MCP 连接枢纽（惰性启动的单例）。"""
-
-    def __init__(self) -> None:
-        self._loop: asyncio.AbstractEventLoop | None = None
-        self._lock = threading.Lock()
-        # 以下仅由 loop 线程内的协程读写
-        self._closers: set[asyncio.Event] = set()  # 每个存活 serve task 的退出事件
-        self._tasks: list[asyncio.Task[None]] = []
+    """Catalog/permission bridge to the coordinator's sole Cordis child."""
+    def __init__(self):
+        self._lock = threading.RLock()
+        self._reconcile_lock = threading.Lock()
+        self._desired = {}
+        self._configured_once = False
+        self._revision = 0
+        self._host_id = None
         self.current = ExtTools()
 
-    # ---- 同步侧（run_turn 调用） ----
+    def bind(self, coordinator):
+        """Service-layer composition supplies the sole coordinator dependency."""
+        global _coordinator
+        _coordinator = coordinator
 
-    def open(self, extensions: Any, reserved: set[str]) -> ExtTools:
-        """连接 enabled 且配置完整的 server；任何失败都收敛为空集合。
+    def _allowed(self, entry):
+        mode = _runtime().mode
+        scopes = {'mcp.tools'} if mode == 'meeting' else _SCOPES if mode == 'daily' else set()
+        return bool(entry['declared']) and entry['declared'] <= entry['granted'] & scopes
 
-        extensions 来自 momo.yaml（用户可编辑、可能被写坏），故这里按 Any 收、
-        运行时逐层校验，不信任类型。
-        reserved：需要避让的工具名（内置能力名）——由 service 层传入，
-        client 层不反向依赖 service。
-        """
-        enabled = [
-            e
-            for e in (extensions if isinstance(extensions, list) else [])
-            if isinstance(e, dict)
-            and e.get("enabled") is not False
-            and _configured(e)
-        ]
-        if not enabled:
-            return ExtTools()
-        try:
-            self._ensure_loop()
-            self.close()  # 防御：上个 turn 没走到 close 时先清残留
-            fut = asyncio.run_coroutine_threadsafe(
-                self._open_async(enabled, reserved), self._loop
-            )
-            tools = fut.result(timeout=OPEN_TIMEOUT + 2)
-            return tools if isinstance(tools, ExtTools) else ExtTools()
-        except Exception:
-            log.exception("mcp open failed")
-            return ExtTools()
-
-    def close(self) -> None:
-        """通知各 server task 退出（连接/子进程随之清理）。"""
-        loop = self._loop
-        if loop is None or not self._tasks:
-            return
-        try:
-            fut = asyncio.run_coroutine_threadsafe(self._close_async(), loop)
-            fut.result(timeout=CLOSE_TIMEOUT + 3)
-        except Exception:
-            log.exception("mcp close failed")
-
-    def call_tool(
-        self, session: ClientSession, name: str, args: dict[str, Any]
-    ) -> Any:
-        """同步侧发起 tools/call（在常驻 loop 上跑 session 协程）。"""
-        self._ensure_loop()
-        fut = asyncio.run_coroutine_threadsafe(
-            session.call_tool(name, args), self._loop
-        )
-        return fut.result(timeout=CALL_TIMEOUT)
-
-    def probe(self, ext: dict[str, Any]) -> ProbeResult:
-        """单条拓展的连通性探测（设置页状态点）：connect + list_tools + close。
-
-        返回形状见 models.ProbeResult；任何失败都文本化，不向上抛。
-        配置不完整直接判失败，不尝试连接。
-        """
-        if not isinstance(ext, dict) or not _configured(ext):
-            return {"ok": False, "tools": 0, "error": "unconfigured"}
-        try:
-            self._ensure_loop()
-            fut = asyncio.run_coroutine_threadsafe(
-                self._probe_async(ext), self._loop
-            )
-            r = fut.result(timeout=CONNECT_TIMEOUT + 2)
-            return r if isinstance(r, dict) else {"ok": False, "tools": 0}
-        except Exception as e:
-            return {"ok": False, "tools": 0, "error": str(e) or type(e).__name__}
-
-    # ---- loop 线程内 ----
-
-    def _ensure_loop(self) -> None:
+    def configure(self, extensions):
+        # Publish the new gate before any network I/O. Existing ExtTools objects
+        # therefore cannot execute a disabled/reclassified plugin.
         with self._lock:
-            if self._loop is not None:
-                return
-            loop = asyncio.new_event_loop()
-            threading.Thread(
-                target=loop.run_forever, daemon=True, name="mcp-loop"
-            ).start()
-            self._loop = loop
+            self._desired = _entries(extensions)
+            self._revision += 1
+            revision = self._revision
+            self._configured_once = True
+            host = _runtime().host
+            self._host_id = host
+            configs = self._configs_locked()
+        if host:
+            # Dispatch immediately: Node withdraws disabled gates before waiting
+            # for its serialized connection lifecycle queue.
+            try: host.request('plugins.configure', {'plugins': configs, 'tolerateErrors': True, 'configurationRevision': revision}, timeout=OPEN_TIMEOUT)
+            except Exception: pass
 
-    async def _open_async(
-        self, enabled: list[dict[str, Any]], reserved: set[str]
-    ) -> ExtTools:
-        # 防御：残留的旧 serve task 先放行退出（并发回合/上轮未走到 close）
-        for ev in self._closers:
-            ev.set()
-        self._tasks = [t for t in self._tasks if not t.done()]
-        futs: list[asyncio.Future[_Source | None]] = []
-        for ext in enabled:
-            f: asyncio.Future[_Source | None] = self._loop.create_future()
-            futs.append(f)
-            self._tasks.append(asyncio.create_task(self._serve(ext, f)))
-        try:
-            sources = await asyncio.wait_for(
-                asyncio.gather(*futs, return_exceptions=True),
-                timeout=OPEN_TIMEOUT,
-            )
-        except Exception:
-            sources = []
-        tools = ExtTools()
-        taken = set(reserved)
-        for src in sources:
-            if isinstance(src, _Source):
-                tools.add_source(src, taken)
-        self.current = tools
+    def _configs_locked(self):
+        configs = [item['config'] for item in self._desired.values()]
+        if getattr(_runtime(), 'virtual_enabled', False): configs.append({'id': 'virtual', 'type': 'virtual', 'enabled': True})
+        return configs
+
+    def _reconcile(self):
+        host = _runtime().host
+        if not host: return []
+        with self._reconcile_lock:
+            with self._lock: configs, revision = self._configs_locked(), self._revision
+            try:
+                host.request('plugins.configure', {'plugins': configs, 'tolerateErrors': True, 'configurationRevision': revision}, timeout=OPEN_TIMEOUT)
+                return host.request('plugins.listTools').get('tools', [])
+            except Exception: return []
+
+    def open(self, extensions, reserved):
+        host = _runtime().host
+        if not host: return ExtTools()
+        with self._lock:
+            if not self._configured_once:
+                self._desired = _entries(extensions)
+                self._configured_once = True
+                self._revision += 1
+            self._host_id = host
+        catalog = self._reconcile()
+        tools, taken = ExtTools(), set(reserved)
+        with self._lock:
+            for plugin_id, entry in self._desired.items():
+                if not self._allowed(entry): continue
+                listed = [dict(tool, name=tool['originalName']) for tool in catalog if tool.get('pluginId') == plugin_id]
+                tools.add_source(_Source(entry['prefix'], plugin_id, listed), taken)
+            self.current = tools
         return tools
 
-    async def _serve(
-        self, ext: dict[str, Any], ready: asyncio.Future[_Source | None]
-    ) -> None:
-        """单 server 生命周期：进/出 AsyncExitStack 必须在同一 task。"""
-        done = asyncio.Event()
-        self._closers.add(done)
+    def call_tool(self, plugin_id, original_name, args):
+        with self._lock:
+            entry = self._desired.get(plugin_id)
+            if not entry or not self._allowed(entry): raise PermissionError('MCP capability is disabled')
+        result = _runtime().command('plugins.callTool', {'name': f'{plugin_id}__{original_name}', 'arguments': args})
+        return result['result']
+
+    def probe(self, ext):
+        if not isinstance(ext, dict) or not _configured(ext): return {'ok': False, 'tools': 0, 'error': 'unconfigured'}
+        host = PluginHost('probe-' + __import__('uuid').uuid4().hex, lambda *_: None, lambda: 0)
         try:
-            async with contextlib.AsyncExitStack() as stack:
-                src = await self._connect(stack, ext)
-                if not ready.done():
-                    ready.set_result(src)
-                await done.wait()
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            log.info("mcp server %r unavailable: %s", ext.get("name"), e)
-        finally:
-            self._closers.discard(done)
-            if not ready.done():
-                ready.set_result(None)
+            host.start()
+            config = _translate(ext, 'probe')
+            host.request('plugins.configure', {'plugins': [config]}, timeout=CONNECT_TIMEOUT + 3)
+            tools = host.request('plugins.listTools').get('tools', [])
+            return {'ok': True, 'tools': len(tools)}
+        except Exception: return {'ok': False, 'tools': 0, 'error': 'unavailable'}
+        finally: host.close()
 
-    async def _connect(
-        self, stack: contextlib.AsyncExitStack, ext: dict[str, Any]
-    ) -> _Source:
-        async with asyncio.timeout(CONNECT_TIMEOUT):
-            if str(ext.get("transport") or "http") == "stdio":
-                read, write = await stack.enter_async_context(
-                    stdio_client(_stdio_params(ext))
-                )
-            else:
-                endpoint = str(ext.get("endpoint") or "")
-                if not endpoint:
-                    raise ValueError("empty endpoint")
-                # headers 原样全量透传（鉴权统一走这里：Authorization 或自定义头）
-                headers = _str_dict(ext.get("headers"))
-                client = await stack.enter_async_context(
-                    create_mcp_http_client(headers=headers or None)
-                )
-                read, write = await stack.enter_async_context(
-                    streamable_http_client(endpoint, http_client=client)
-                )
-            session = await stack.enter_async_context(ClientSession(read, write))
-            await session.initialize()
-            listed = await session.list_tools()
-        return _Source(
-            sanitize(ext.get("name")), session, list(listed.tools or [])
-        )
-
-    async def _probe_async(self, ext: dict[str, Any]) -> dict[str, Any]:
-        """probe 的 loop 侧实现：ExitStack 随协程退出即断开连接。"""
-        try:
-            async with contextlib.AsyncExitStack() as stack:
-                src = await self._connect(stack, ext)
-            return {"ok": True, "tools": len(src.tools)}
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            return {
-                "ok": False,
-                "tools": 0,
-                "error": str(e) or type(e).__name__,
-            }
-
-    async def _close_async(self) -> None:
-        for ev in self._closers:
-            ev.set()
-        tasks = self._tasks
-        self._tasks = []
-        self.current = ExtTools()
-        if tasks:
-            try:
-                await asyncio.wait_for(
-                    asyncio.gather(*tasks, return_exceptions=True),
-                    timeout=CLOSE_TIMEOUT,
-                )
-            except Exception:
-                for t in tasks:
-                    t.cancel()
+    def close(self):
+        # Application shutdown owns the host process. This method only retires
+        # the façade; turn scope never invokes it.
+        with self._lock:
+            self.current = ExtTools()
+            self._desired = {}
+            self._configured_once = False
+            self._host_id = None
 
 
 @contextlib.contextmanager
 def open_tools(extensions: Any, reserved: set[str]) -> Iterator[ExtTools]:
-    """一回合可用的拓展工具集；退出时关闭连接。
-
-    连不上/未配置的 server 直接不进工具表（不可用即不可见），
-    任何失败都收敛为空集合，故这里没有异常路径。
-    """
-    tools = hub.open(extensions, reserved)
-    try:
-        yield tools
-    finally:
-        hub.close()
+    yield hub.open(extensions, reserved)
 
 
-# 进程级单例：loop 线程惰性启动，挂到 interpreter 退出（daemon）。
 hub = McpHub()

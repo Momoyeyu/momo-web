@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from threading import Lock
+import os
+from pathlib import Path
 
 import httpx
 
@@ -12,6 +14,12 @@ _lock = Lock()
 
 
 def runtime() -> bytes:
+    if os.environ.get('MOMO_DESKTOP_TOKEN'):
+        # Desktop serves the pinned Core from frontend assets; never download at runtime.
+        path = Path(os.environ['MOMO_RESOURCES_DIR']) / 'live2d/live2dcubismcore.min.js'
+        if not path.is_file():
+            raise ValueError('Bundled Cubism runtime missing')
+        return path.read_bytes()
     path = state.DATA_DIR / 'cache/cubism-core-05.js'
     with _lock:
         if path.is_file():

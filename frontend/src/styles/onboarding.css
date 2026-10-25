@@ -1,0 +1,25 @@
+/* The connection gate uses the same quiet panel / gold action as settings. */
+.first-meeting-setup {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100cqh - 40px);
+  overflow-y: auto;
+}
+.first-meeting-setup:focus { outline: none; }
+.first-meeting-setup h2 { margin: 0; font-size: 22px; }
+.first-meeting-setup p { margin: 0; line-height: 1.7; }
+.first-meeting-setup form { display: grid; gap: 16px; margin-top: 8px; }
+.first-meeting-field { display: grid; gap: 8px; }
+.first-meeting-setup input { width: 100%; min-width: 0; }
+.first-meeting-error { color: #ec9d9d; }
+.first-meeting-connect { position: absolute; right: 24px; top: 24px; }
+
+.first-meeting-setup h2 { display: flex; align-items: center; gap: 8px; }
+.first-meeting-setup h2 .hint { font-size: 14px; color: var(--text-dim); }
+.first-meeting-help-toggle { padding: 0; border: 0; background: none; cursor: pointer; }
+.first-meeting-help-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 50%; }
+.first-meeting-help { font-size: 13px; padding: 12px 14px; border-left: 2px solid var(--line); }
+.first-meeting-help p + p { margin-top: 8px; }
+.first-meeting-provider a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.first-meeting-provider a:hover { color: var(--text); }
+.first-meeting-provider a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+.first-meeting-field-label { display: inline-flex; align-items: center; gap: 6px; }

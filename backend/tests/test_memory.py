@@ -120,21 +120,8 @@ def test_edit_excludes_self_in_dedup():
     assert edited["content"].endswith("！")
 
 
-def test_embedding_config_needs_url():
-    """语义召回只看 embedding 是否配置——开关本身已移除。
-
-    没配服务地址 → {}（调用方走词面兜底）；配了 → 原样返回。
-    """
-    from app.core import state as cfg
-
-    state = cfg.normalize_state(None)
-    state["settings"]["embedding"]["url"] = ""
-    cfg.write_state(state)
-    assert memory.embedding_config() == {}
-
-    state["settings"]["embedding"]["url"] = "http://127.0.0.1:11434"
-    cfg.write_state(state)
-    assert memory.embedding_config().get("url") == "http://127.0.0.1:11434"
+def test_embedding_config_is_builtin():
+    assert memory.embedding_config() == {"kind": "local"}
 
 
 def test_search_jaccard_fallback(monkeypatch):
@@ -149,7 +136,8 @@ def test_search_jaccard_fallback(monkeypatch):
     assert "今天天气很好" not in [r["content"] for r in res]
 
 
-def test_search_embedding_path_and_lazy_fill(monkeypatch):
+def test_search_embedding_path_and_background_fill(monkeypatch):
+    monkeypatch.setattr(memory, "schedule_index", lambda: None)
     vecs = {
         "query": [1.0, 0.0],
         "苹果": [0.0, 1.0],
@@ -169,6 +157,7 @@ def test_search_embedding_path_and_lazy_fill(monkeypatch):
     memory.add_memory("西瓜")
     pin = memory.add_memory("用户叫夜羽", pinned=True)
 
+    memory.rebuild_index()
     res = memory.search_memories("query")
     assert len(res) <= 5
     # pin cosine 最高 → 第一（pin 也是真实行 id）
@@ -177,7 +166,7 @@ def test_search_embedding_path_and_lazy_fill(monkeypatch):
     ids = [r["id"] for r in res]
     assert m2["id"] in ids  # 香蕉 cosine 次高
 
-    # 懒算补写：memory_vec 已有候选项的向量
+    # 后台补写完成后可以使用语义召回
     vec_ids = {r["id"] for r in db.query("SELECT id FROM memory_vec")}
     assert {m1["id"], m2["id"], pin["id"]} <= vec_ids
 

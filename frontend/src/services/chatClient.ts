@@ -1,3 +1,5 @@
+import {meetingIdentity} from "./meetingClient";
+import { runtimeFetch } from "./runtime";
 // backend chat 客户端：POST /api/chat {text} → SSE（text/event-stream）。
 // ReAct 循环、prompt 组装、切句、记忆工具调用全部在 backend；
 // 前端只消费**句事件**（sentence）并逐句上屏/朗读。
@@ -8,6 +10,7 @@
 //   {"t":"done"}                       回合结束
 //   {"t":"error","message":"…"}        回合失败（yield 给调用方映射成 Error）
 
+import { firstMeetingPending, acknowledgeMeetingGeneration } from "./onboardingClient";
 import { ServiceError } from "../lib/errors";
 
 /**
@@ -16,15 +19,19 @@ import { ServiceError } from "../lib/errors";
  * 返回在回传完成（响应体收完）后兑现的 Promise——调用方可 await 它来
  * 给「打断 → 新回合」排序；失败静默（打断本身已本地生效，backend 幂等调和）。
  */
-export function interrupt(user: string, assistant: string): Promise<void> {
+export function interrupt(user: string, assistant: string, generation?: number, runId?: string, owner = meetingIdentity()): Promise<void> {
   try {
-    return fetch("/api/chat/interrupt", {
+    return runtimeFetch("/api/chat/interrupt", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ user, assistant }),
+      body: JSON.stringify({ ...owner, user, assistant, ...(generation == null ? {} : {generation}), ...(runId ? {runId} : {}) }),
       keepalive: true,
     }).then(
-      (r) => r.arrayBuffer().then(() => undefined),
+      (r) => r.arrayBuffer().then(() => {
+        if (r.ok && r.headers.has("x-momo-generation")) {
+          acknowledgeMeetingGeneration(Number(r.headers.get("x-momo-generation")));
+        }
+      }),
       () => undefined,
     );
   } catch {
@@ -35,8 +42,22 @@ export function interrupt(user: string, assistant: string): Promise<void> {
 
 import type { PerformanceCue, PresentationSnapshot } from "../live2d/performanceTypes";
 
+export interface SentenceIdentity {
+  runId?: string;
+  eventId?: string;
+  seq?: number;
+  userEventId?: string;
+  userSeq?: number;
+}
+export function acknowledgeDisplay(runId: string, generation: number, text: string, owner = meetingIdentity()): Promise<void> {
+  return runtimeFetch('/api/life/ack', {
+    method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({...owner,runId,generation,text}),keepalive:true,signal:AbortSignal.timeout(5000),
+  }).then(response => {if (!response.ok) throw new ServiceError('llm','http',response.status);});
+}
+
 export type ChatEvent =
-  | { t: "sentence"; no: number; text: string; cues: PerformanceCue[]; at: string }
+  | ({ t: "sentence"; no: number; generation?: number; text: string; cues: PerformanceCue[]; at: string } & SentenceIdentity)
   | { t: "done" }
   | { t: "error"; message: string };
 
@@ -56,12 +77,24 @@ function parseEvent(data: string): ChatEvent | null {
       text?: unknown;
       message?: unknown;
       no?: unknown;
+      generation?: unknown;
+      runId?: unknown;
+      eventId?: unknown;
+      seq?: unknown;
+      userEventId?: unknown;
+      userSeq?: unknown;
       cues?: unknown;
       at?: unknown;
     };
     if (j.t === "sentence" && typeof j.text === "string") {
       return {
         t: "sentence",
+        ...(typeof j.runId === "string" ? {runId:j.runId} : {}),
+        ...(typeof j.eventId === "string" ? {eventId:j.eventId} : {}),
+        ...(typeof j.seq === "number" ? {seq:j.seq} : {}),
+        ...(typeof j.userEventId === "string" ? {userEventId:j.userEventId} : {}),
+        ...(typeof j.userSeq === "number" ? {userSeq:j.userSeq} : {}),
+        ...(typeof j.generation === "number" ? {generation: j.generation} : {}),
         no: typeof j.no === "number" ? j.no : 0,
         text: j.text,
         cues: Array.isArray(j.cues) ? (j.cues as PerformanceCue[]) : [],
@@ -90,13 +123,15 @@ export async function* chat(
   text: string,
   signal?: AbortSignal,
   presentation: PresentationSnapshot | null = null,
+  opening = false,
+  messageId: string = crypto.randomUUID(),
 ): AsyncGenerator<ChatEvent> {
   let res: Response;
   try {
-    res = await fetch("/api/chat", {
+    res = await runtimeFetch(opening ? "/api/onboarding/opening" : "/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, presentation }),
+      body: JSON.stringify({ text, messageId, presentation, firstMeeting: firstMeetingPending(), ...meetingIdentity() }),
       signal: signal ?? null,
     });
   } catch (e) {

@@ -1,26 +1,24 @@
-// 「模型」tab：LLM / ASR / TTS / Embedding 四个端点卡片（地址、密钥、模型、探测）。
+// 「模型」tab：LLM / TTS 两个服务配置卡片（地址、密钥、模型、探测）。
 // 原先这些都挤在 Settings.tsx 里，状态与辅助一并搬过来。
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { useT } from "../../i18n";
 import { getState, subscribe, update } from "../../lib/store";
 import type { Settings as SettingsData } from "../../lib/types";
-import { probeAsr, probeEmbedding, probeLlm, probeTts } from "../../services/probe";
+import { probeLlm, probeTts } from "../../services/probe";
 import { uploadRefAudio } from "../../services/ttsClient";
 import type { ProbeResult } from "../../services/probe";
 import Button from "../../ui/Button";
 import FieldRow from "../../ui/FieldRow";
 import Hint from "../../ui/Hint";
-import Select from "../../ui/Select";
+import Switch from "../../ui/Switch";
+import { supportsThinking } from "../../lib/thinking";
 
-type EndpointSection = "llm" | "asr" | "tts" | "embedding";
+type EndpointSection = "llm" | "tts";
 
 const URL_SCHEMES: Record<EndpointSection, string[]> = {
   llm: ["http:", "https:"],
   tts: ["http:", "https:"],
-  // asr 自定义模式走 OpenAI HTTP 转写协议（内置模式不走 url）
-  asr: ["http:", "https:"],
-  embedding: ["http:", "https:"],
 };
 
 /** URL 合法性：空为未配置（不算错），非空必须能解析且协议匹配。 */
@@ -41,9 +39,7 @@ export default function ModelsTab() {
 
   const [showKey, setShowKey] = useState<Record<EndpointSection, boolean>>({
     llm: false,
-    asr: false,
     tts: false,
-    embedding: false,
   });
   const [probes, setProbes] = useState<
     Partial<Record<EndpointSection, ProbeResult | "running">>
@@ -56,9 +52,7 @@ export default function ModelsTab() {
     (s: SettingsData) => Promise<ProbeResult>
   > = {
     llm: (s) => probeLlm(s.llm),
-    asr: (s) => probeAsr(s.asr),
     tts: (s) => probeTts(s.tts),
-    embedding: (s) => probeEmbedding(s.embedding),
   };
 
   // 探测结果直接显示在按钮上，固定展示 PROBE_HOLD_MS 后复原；期间不可再点。
@@ -185,7 +179,7 @@ export default function ModelsTab() {
   // 返回目标与来源页一致：chat 进来回 chat，其余回 title。
   const patchEndpoint = (sec: EndpointSection, key: string, v: string): void => {
     update({
-      settings: { ...settings, [sec]: { ...settings[sec], [key]: v } },
+      settings: { ...settings, [sec]: { ...settings[sec], [key]: v, ...(sec === "llm" && key === "url" && !supportsThinking(v) ? { thinking: false } : {}) } },
     });
   };
 
@@ -209,9 +203,7 @@ export default function ModelsTab() {
   );
   return (
 <div className="settings-cols">
-{/* 每个小标题各自成格，与「通用」页一致（2 列网格里一格一组）。
-    网格按行填充：第 1 行 LLM｜Embedding（各 3 行），第 2 行 ASR｜TTS（各 4 行）
-    —— 同一行的卡片行数一致，两行内部各自等高。 */}
+{/* 两张卡片均为四行，共用标签、控件和底部对齐线。 */}
 <section className="panel settings-col opt-list">
   <h3 className="opt-group">
     {t("settings.groups.llm")}
@@ -229,55 +221,14 @@ export default function ModelsTab() {
       onChange={(e) => patchEndpoint("llm", "model", e.target.value)}
     />
   </FieldRow>
-</section>
-<section className="panel settings-col opt-list">
-  <h3 className="opt-group">
-    {t("settings.groups.embedding")}
-  </h3>
-  {urlRow("embedding", "settings.embUrlPh")}
-  {keyRow("embedding")}
-  <FieldRow label={t("settings.model")}>
-    <input
-      value={settings.embedding.model}
-      placeholder={t("settings.embModelPh")}
-      onChange={(e) =>
-        patchEndpoint("embedding", "model", e.target.value)
-      }
-    />
-  </FieldRow>
-</section>
-<section className="panel settings-col opt-list">
-  <h3 className="opt-group">
-    {t("settings.groups.asr")}
-    <Hint
-      text={
-        settings.asr.mode === "builtin"
-          ? t("settings.asrBuiltinHint")
-          : t("settings.asrHint")
-      }
-      side="down"
-    />
-  </h3>
-  <FieldRow label={t("settings.asrMode")}>
-    <Select
-      value={settings.asr.mode}
-      options={[
-        { value: "builtin", label: t("settings.asrBuiltin") },
-        { value: "openai", label: t("settings.asrOpenai") },
-      ]}
-      onChange={(v) => patchEndpoint("asr", "mode", v)}
-    />
-  </FieldRow>
-  {urlRow("asr", "settings.asrUrlPh", false, settings.asr.mode === "builtin")}
-  {keyRow("asr", settings.asr.mode === "builtin")}
-  <FieldRow label={t("settings.model")}>
-    <input
-      value={settings.asr.model}
-      disabled={settings.asr.mode === "builtin"}
-      placeholder={
-        settings.asr.mode === "builtin" ? "—" : t("settings.asrModelPh")
-      }
-      onChange={(e) => patchEndpoint("asr", "model", e.target.value)}
+  <FieldRow label={t("settings.thinking")} hint={t("settings.thinkingHint")}>
+    <Switch
+      on={settings.llm.thinking && supportsThinking(settings.llm.url)}
+      disabled={!supportsThinking(settings.llm.url)}
+      title={t("settings.thinking")}
+      onChange={(thinking) => update({
+        settings: { ...settings, llm: { ...settings.llm, thinking } },
+      })}
     />
   </FieldRow>
 </section>

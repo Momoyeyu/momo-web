@@ -15,6 +15,8 @@ const UPSTREAM = {
   asr: env("MOMO_WEB_ASR_UPSTREAM") ?? "http://127.0.0.1:17810",
   tts: env("MOMO_WEB_TTS_UPSTREAM") ?? "http://127.0.0.1:17811",
 };
+const devToken = env('MOMO_DESKTOP_TOKEN');
+const devOrigin = env('MOMO_WEB_ORIGIN');
 
 const strip = (name: string) => (path: string) =>
   path.replace(new RegExp(`^/proxy/${name}`), "") || "/";
@@ -28,6 +30,15 @@ export default defineConfig({
         changeOrigin: true,
         // 内置 ASR 走 /api/asr/stream（WS）
         ws: true,
+        // Capability stays in the Vite process, never in the client bundle.
+        headers: devToken ? {'x-momo-token': devToken} : undefined,
+        configure(proxy) {
+          const check = (req: {headers: Record<string, string | string[] | undefined>}) => {
+            const origin = req.headers.origin;
+            if (devOrigin && origin && origin !== devOrigin) delete req.headers['x-momo-token'];
+          };
+          proxy.on('proxyReq', (_out, req) => check(req));
+        },
       },
       "/proxy/llm": {
         target: UPSTREAM.llm,

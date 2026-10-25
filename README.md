@@ -1,92 +1,58 @@
-# momo
+# momo · Web 开发预览
 
-一款类 Neuro-Sama 的交互式 AI 游戏。本仓库是早期的 Web Demo 版本，Working in Progress ...
+**Can you feel my heart?**
 
-当前 Demo 覆盖的是游戏的基础交互层：视觉小说式的对话——Live2D 形象 + 语音输入/输出 + 流式字幕，配人格、记忆、存档槽位与拓展接入。
+momo 是一个逐渐熟悉你的 AI 伙伴。这是 v3 的 Web 体验迭代仓；已发行桌面应用、官网与 TTS 部署在 [momo](https://github.com/Momoyeyu/momo)。当前 v3 是开发预览，尚未作为正式版本发布。
 
-技术上是 React SPA 前端 + FastAPI 后端（前后端显式分离，frontend 将来原样进 Tauri WebView，backend 进 Rust Core）。
+[产品主页](https://momoyeyu.github.io/momo/) · [开发与验证](docs/development/v3-runtime.md) · [晋级桌面快照](docs/development/web-promotion.md)
 
-## 跑起来
+## 这一版
 
-```bash
-# 后端（config 存储 + ReAct agent + 记忆 RAG）
-cd backend && uv sync && uv run uvicorn app.main:app --port 7821
+- **同一个 momo**：只有一段持续关系，聊天自动保存；可以回顾历史、管理长期记忆和导出整份备份。
+- **面对面见面**：见面由服务端租约协调，切到设置 / 历史仍保留见面；退出后才释放。多窗口不会各自抢着生成。
+- **可停止的拓展**：Python 保留唯一推理与记忆，Cordis 管常驻插件、MCP 连接与可撤销执行。当前用虚拟入口验证底座，QQ / 微信 / Minecraft 尚未接入。
+- 继续保留 soul、逐句表情 / 动作与语音同步、初次见面、中英日界面，以及内置 ASR / embedding。
 
-# 前端
-cd frontend && pnpm install && pnpm dev    # http://localhost:5173
+完整历史与模型上下文分开保存，压缩不删除原文。下一步将与项目维护者共同研究上下文管理，尤其是长期目标、压缩质量与记忆的配合。
+
+## 本机开发
+
+需要 Node.js 22.23.3 或更新的兼容版本、pnpm 12.6、Python 3.11+ 与 uv。生产桌面包自带运行时；Web 预览是本机开发入口，不是可直接公开部署的多人服务。
+
+```sh
+cd backend && uv sync --frozen && cd ..
+cd frontend && pnpm install --frozen-lockfile && cd ..
+cd plugin-host && npm ci && cd ..
+python3 scripts/prepare-core.py
+python3 scripts/prepare-models.py
+pnpm dev
 ```
 
-## 结构
+启动前准备固定的离线资源包；运行中不下载模型。已有合法资源可用 `MOMO_RESOURCES_DIR` 指向资源根目录。打开终端显示的本机地址，首次见面时连接兼容 OpenAI 格式的 LLM API；TTS 可稍后配置。
 
-```
-frontend/   React+TS+Vite：UI、语音链路（ASR/TTS/音频）、Live2D、backlog
-            services 通过 HTTP 调 backend（vite 代理 /api → :7821）
-backend/    FastAPI：state 存储、ReAct 循环（LLM + memory/common.time 工具）、
-            记忆存储 + RAG（bge-m3 embedding，mac-studio 直连）
-docs/       backend-api.md：前后端契约
-```
-
-API 契约详见 `docs/backend-api.md`。
-
-## 页面
-
-- **title**：主页，视觉小说式菜单 + 心跳主题的动态背景
-- **chat**：VN 式底部对话框。文字输入或麦克风连续语音 → backend ReAct → SSE 流式回复 → 字幕 + TTS 播放 + 口型/表情；说话中可随时打断（语音 barge-in 或停止按钮）
-- **backlog**：回顾子页，视觉小说式历史回放
-- **checkpoint**：存档 / 读档，固定 120 个槽位（10 页滑轨），auto 槽为读档前的自动备份
-- **settings**：通用 / 模型（LLM·ASR·TTS·Embedding·形象）/ 记忆 / 拓展（MCP）
-
-## 语音
-
-- **ASR 默认内置**：SenseVoice-Small（int8）+ silero VAD，跑在 backend 进程内（中日英），无需外部服务。首次使用先下载模型：
-
-  ```bash
-  cd backend && uv run python scripts/download_asr_models.py   # ~240MB，落盘 backend/models/asr/
-  ```
-
-  模型缺失时设置页会提示「缺少模型」；也可在「模型」tab 把 ASR 切成**自定义（OpenAI 兼容）**，填 `whisper.cpp` / `Speaches` / `LocalAI` / `Groq` / `OpenAI` 的 base URL（`…/v1`）与模型名。
-- **TTS 由 backend 代理到 GPT-SoVITS api_v2**（`POST /api/tts/speech` → 上游 `POST /tts`，流式裸 PCM，采样率随模型 32k/48k 由响应头带回）：
-
-  ```bash
-  # 在跑 GPT-SoVITS 的机器上（如带 GPU 的笔记本）
-  python api_v2.py -a 0.0.0.0 -p 9880 -c GPT_SoVITS/configs/tts_infer.yaml
-  ```
-
-  设置页「模型 → TTS」填服务地址（`http://<host>:9880`）、参考音频的服务端路径、以及参考音频对应的文本（留空则免参考文本合成）。
-- LLM 仅支持 OpenAI 兼容接口（`POST /v1/chat/completions`）。
-
-## 语音
-
-- **ASR 默认内置**：SenseVoice-Small（int8）+ silero VAD，跑在 backend 进程内（中日英），无需外部服务。首次使用先下载模型：
-
-  ```bash
-  cd backend && uv run python scripts/download_asr_models.py   # ~240MB，落盘 backend/models/asr/
-  ```
-
-  模型缺失时设置页会提示「缺少模型」；也可在「模型」tab 把 ASR 切成**自定义（OpenAI 兼容）**，填 `whisper.cpp` / `Speaches` / `LocalAI` / `Groq` / `OpenAI` 的 base URL（`…/v1`）与模型名。
-- **TTS 由 backend 代理到 GPT-SoVITS api_v2**（`POST /api/tts/speech` → 上游 `POST /tts`，流式裸 PCM，采样率随模型 32k/48k 由响应头带回）：
-
-  ```bash
-  # 在跑 GPT-SoVITS 的机器上（如带 GPU 的笔记本）
-  python api_v2.py -a 0.0.0.0 -p 9880 -c GPT_SoVITS/configs/tts_infer.yaml
-  ```
-
-  设置页「模型 → TTS」填服务地址（`http://<host>:9880`）、参考音频的服务端路径、以及参考音频对应的文本（留空则免参考文本合成）。
-- LLM 仅支持 OpenAI 兼容接口（`POST /v1/chat/completions`）。
+默认预览数据在 `.workbuddy/dev-data/`，与桌面数据分开。启动器会检查端口、独占本目录、生成临时鉴权并管理自己启动的进程。端口被占用时明确退出，不杀其他服务；Ctrl+C 会回收自己的内核和插件进程。
 
 ## 验证
 
-```bash
-cd frontend && pnpm test && pnpm typecheck && pnpm build
-cd backend && uv run pytest
+```sh
+node frontend/node_modules/typescript/bin/tsc --noEmit --project frontend/tsconfig.json
+cd frontend && node node_modules/vitest/vitest.mjs run && cd ..
+cd backend && .venv/bin/python -m pytest -q && cd ..
+npm --prefix plugin-host test
+backend/.venv/bin/python -m pytest scripts/test_promote.py -q
+node scripts/browser-e2e.mjs
 ```
 
-## 说明
+真实供应商、内置模型推理与原生安装包另行显式验证；模拟供应商通过不代表真实 LLM / TTS 已通过。测试使用临时数据，不会读取玩家聊天。详细命令与边界见开发文档。
 
-- 状态（设置/人设/初始记忆/形象列表）由 backend `momo.yaml` 权威存储，localStorage 仅作离线缓存。
-- Live2D 模型 zip 存浏览器 IndexedDB（不经 backend）。
-- Live2D Cubism Core 运行时从官方 CDN 加载（`VITE_MOMO_CUBISM_CORE_URL` 可换镜像）。
+## 两仓如何协作
 
-## 已知限制（Tauri 迁移待办）
+共享业务只在这里修改。经浏览器验证、维护者体验后，固定 Git revision 用 `scripts/promote.py` 单向导入 momo 的 `app/`；清单记录来源与哈希，目标漂移时拒绝覆盖。Tauri 壳、官网、发行脚本仍由 momo 维护。
 
-- **未保存弹窗无法自动移动光标到「保存并离开」**：浏览器没有任何移动系统光标的 JS API（安全限制，防 clickjacking）。迁移 Tauri 后用 `WebviewWindow.set_cursor_position()` 直接实现。
+旧 Web 实验工作区和它的未提交源码已保全，恢复开发不会覆盖原数据。请勿在两仓分别修改同一份共享代码，或让两个内核共用同一生活目录。
+
+## 数据、素材与许可
+
+用户配置、API 密钥、聊天、记忆、录音与自选参考音不进入 Git 或安装包。没有默认角色参考音频；玩家自行提供有权使用的素材。Hiyori、Cubism Core、字体和离线模型适用各自许可，见 [第三方声明](THIRD_PARTY_NOTICES.md)。项目代码采用 [MIT](LICENSE.md)。
+
+问题与改进建议欢迎通过 [Issues](https://github.com/Momoyeyu/momo-web/issues) 提交；报告时隐藏密钥与私人对话，并注明复现步骤、系统和 revision。

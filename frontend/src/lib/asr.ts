@@ -1,10 +1,5 @@
-// ASR 配置判定：内置引擎永远"已配置"（模型缺失由 backend 状态兜底），
-// 自定义引擎要求填了 url。设置页的开关门控与对话页的麦克风门控共用这里。
-import type { AsrConfig, TtsConfig } from "./types";
-
-export function asrConfigured(cfg: AsrConfig): boolean {
-  return cfg.mode === "builtin" ? true : cfg.url.trim() !== "";
-}
+// TTS readiness: endpoint plus uploaded reference audio. ASR is always built in.
+import type { TtsConfig } from "./types";
 
 /**
  * TTS 是否可用：服务地址 + **已上传参考音频**。
