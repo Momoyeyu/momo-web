@@ -1,8 +1,6 @@
 // 回到同一个 momo。进入见面不清空记录，也不恢复另一条时间线。
-import {useSyncExternalStore} from "react";
 import {navigate} from "../router";
 import {useT} from "../i18n";
-import {getChatEngine,subscribeTranscript,transcriptVersion} from "../chat/engineInstance";
 import EcgCanvas from "../components/EcgCanvas";
 import Button from "../ui/Button";
 import {PRESENCE_URL,TITLE_PRESENCE} from "../lib/presenceTransition";
@@ -10,10 +8,8 @@ import "../styles/title.css";
 
 export default function Title() {
   const t = useT();
-  useSyncExternalStore(subscribeTranscript, transcriptVersion);
-  const known = getChatEngine().history.length > 0;
   const items = [
-    {key: "meet", labelKey: known ? "title.continue" : "title.start", hint: "meet", onClick: () => navigate("chat")},
+    {key: "meet", labelKey: "title.start", hint: "meet", onClick: () => navigate("chat")},
     {key: "config", labelKey: "title.config", hint: "config", onClick: () => navigate("settings")},
   ];
 

@@ -66,7 +66,6 @@ export const zh = {
   title: {
     tagline: "你能感受到我的心吗",
     start: "见面",
-    continue: "继续相处",
     config: "设置",
   },
   chat: {

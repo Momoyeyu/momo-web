@@ -64,7 +64,6 @@ export const en: Dict = {
   title: {
     tagline: "Can you feel my heart?",
     start: "Meet momo",
-    continue: "Continue together",
     config: "Config",
   },
   chat: {

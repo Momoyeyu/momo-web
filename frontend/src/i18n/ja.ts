@@ -64,7 +64,6 @@ export const ja: Dict = {
   title: {
     tagline: "私の心、感じる？",
     start: "会いにいく",
-    continue: "また会う",
     config: "設定",
   },
   chat: {

@@ -79,7 +79,7 @@ test('first launch speaks first, remembers the name, and does not repeat after r
   expect(legacyReset.status).toBe(410);
   await page.goto('/');
   await expect(page).not.toHaveURL(/#\/chat$/);
-  await page.getByRole('button',{name:'继续相处 meet'}).click();
+  await page.getByRole('button',{name:'见面 meet'}).click();
   await expect(page.locator('.subtitle')).toHaveText('你现在想聊什么？');
 });
 

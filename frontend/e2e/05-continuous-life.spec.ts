@@ -19,14 +19,14 @@ async function continuousLife(page:Page) {
 test('title meets the same momo without save slots or a new-session request',async({page})=>{
   const {forbidden}=await continuousLife(page);
   await page.goto('/#/title');
-  await expect(page.locator('.title-menu .mi-label')).toHaveText(['继续相处','设置']);
-  await page.getByRole('button',{name:'继续相处 meet'}).click();
+  await expect(page.locator('.title-menu .mi-label')).toHaveText(['见面','设置']);
+  await page.getByRole('button',{name:'见面 meet'}).click();
   await waitForChatReady(page);
   await expect(page.locator('.subtitle')).toHaveText('moment-250');
   await expect(page.getByRole('button',{name:/^(存档|读档)$/})).toHaveCount(0);
   await page.getByRole('button',{name:'返回标题',exact:true}).click();
   await expect(page.locator('.title-screen')).toBeVisible();
-  await page.getByRole('button',{name:'继续相处 meet'}).click();
+  await page.getByRole('button',{name:'见面 meet'}).click();
   await waitForChatReady(page);
   await expect(page.locator('.subtitle')).toHaveText('moment-250');
   expect(forbidden).toEqual([]);
@@ -113,7 +113,7 @@ test('fresh meetings synchronize other-entry history while subpage returns keep 
   await page.getByRole('button',{name:'返回标题',exact:true}).click();
   await expect(page.locator('.title-screen')).toBeVisible();
   rows.push({...rows.at(-1)!,eventId:'other-entry',seq:251,runId:'other-run',source:'virtual',text:'从另一个入口延续的问候。'});
-  await page.getByRole('button',{name:'继续相处 meet'}).click();await waitForChatReady(page);
+  await page.getByRole('button',{name:'见面 meet'}).click();await waitForChatReady(page);
   await expect(page.locator('.subtitle')).toHaveText('从另一个入口延续的问候。');
   expect(reads).toBe(initialReads+1);
 });
