@@ -1,5 +1,7 @@
 # 桌面整合的实现边界
 
+> 历史记录：本文保留 v2 将早期 Web MVP 整合到 Tauri 时的实现与验收。v3 已重新启用 Web 作为共享业务源码；当前流程见 [Web → 桌面晋级](web-promotion.md)，当前运行边界见 [v3 运行与验证](v3-runtime.md)。下面的旧存档、多端矩阵和归档决定不代表 v3 当前功能或状态。
+
 本轮以 app/migration/momo-web-baseline.json 冻结的源码快照为基线，包含 001–005、008、009 的实际交付及审查修复，旧 Rust 编排 / app/web 已退出活跃目录。源码中的未提交验收改动也纳入逐文件 SHA-256；原 momo-web 工作区与运行服务不受替换影响。
 
 React 游戏界面和 Python/FastAPI 业务保持原行为。Tauri 只承担窗口、单实例、应用目录、受控 sidecar 和退出清理，不在迁移同时重写业务。
