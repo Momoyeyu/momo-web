@@ -24,11 +24,13 @@ cd backend && uv sync --frozen && cd ..
 cd frontend && pnpm install --frozen-lockfile && cd ..
 cd plugin-host && npm ci && cd ..
 python3 scripts/prepare-core.py
-python3 scripts/prepare-models.py
+python3 scripts/prepare-models.py /absolute/path/to/momo-resources.zip
 pnpm dev
 ```
 
-启动前准备固定的离线资源包；运行中不下载模型。已有合法资源可用 `MOMO_RESOURCES_DIR` 指向资源根目录。打开终端显示的本机地址，首次见面时连接兼容 OpenAI 格式的 LLM API；TTS 可稍后配置。
+`prepare-models.py` 需要显式传入与 `scripts/offline-resources.json` 匹配的固定资源包。已有安装资源时可跳过该步，用 `MOMO_RESOURCES_DIR` 指向包含 `resource-manifest.json` 的资源根目录再启动。从上游源码准备模型见 [资源构建说明](backend/resources/README.md)；下载只发生在开发 / 构建阶段，运行中不下载模型。
+
+打开终端显示的本机地址，首次见面时连接兼容 OpenAI 格式的 LLM API；TTS 可稍后配置。
 
 默认预览数据在 `.workbuddy/dev-data/`，与桌面数据分开。启动器会检查端口、独占本目录、生成临时鉴权并管理自己启动的进程。端口被占用时明确退出，不杀其他服务；Ctrl+C 会回收自己的内核和插件进程。
 
