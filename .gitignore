@@ -16,7 +16,7 @@ __pycache__/
 .DS_Store
 .workbuddy/
 .superpowers/
-resources/
+/resources/
 backend/data/
 backend/models/
 backend/resources/embedding/**/*.onnx

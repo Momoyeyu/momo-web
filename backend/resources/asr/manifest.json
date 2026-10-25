@@ -1,0 +1,57 @@
+{
+  "format_version": 1,
+  "engine": "sensevoice",
+  "source_revision": "2365baeacb507f821a0c8120fcee3d484dba7a07",
+  "vad_revision": "fba88cd2e921609e7675c3aaf51e0b9b295da4bc",
+  "model_license": "FunASR Model Open Source License Agreement 1.1",
+  "vad_license": "MIT",
+  "files": [
+    {
+      "path": "sense-voice/model.int8.onnx",
+      "size_bytes": 239233841,
+      "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/model.int8.onnx"
+    },
+    {
+      "path": "sense-voice/tokens.txt",
+      "size_bytes": 315894,
+      "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/tokens.txt"
+    },
+    {
+      "path": "silero_vad.onnx",
+      "size_bytes": 1807522,
+      "sha256": "a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28",
+      "url": "https://huggingface.co/csukuangfj/vad/resolve/fba88cd2e921609e7675c3aaf51e0b9b295da4bc/silero_vad.onnx"
+    },
+    {
+      "path": "PROVENANCE.md",
+      "size_bytes": 1832,
+      "sha256": "41bbf6fb36f6fa3dc911e321707395b1a46a3d5b6c8fb1731f623a65047c1ff8"
+    },
+    {
+      "path": "licenses/FunASR-MODEL-LICENSE",
+      "size_bytes": 5306,
+      "sha256": "7dba975a2069691db4992b0592d70828b330d2f8a30a71450f4e152a554e84f8",
+      "url": "https://raw.githubusercontent.com/modelscope/FunASR/24217c8ff0b81f3d967593f0bf84609306929f99/MODEL_LICENSE"
+    },
+    {
+      "path": "licenses/ONNX-LICENSE-REFERENCE",
+      "size_bytes": 72,
+      "sha256": "f1a4057b359881cbfd625166abcd5830c92f2f54c89aaa139fd75138cd694e8e",
+      "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/LICENSE"
+    },
+    {
+      "path": "licenses/SenseVoice-LICENSE",
+      "size_bytes": 1062,
+      "sha256": "4bc3bffe14ebe38cc67309991e04f92866835eac1c5e2e1abd37163f67c6de5f",
+      "url": "https://raw.githubusercontent.com/FunAudioLLM/SenseVoice/586bbdb2b052f4fe19322581825228b6810a9fb3/LICENSE"
+    },
+    {
+      "path": "licenses/Silero-VAD-LICENSE",
+      "size_bytes": 1075,
+      "sha256": "2e63e9a38b6e8fc0c7bc37ce174caca1862870856c6daf5697cfb785e925520b",
+      "url": "https://raw.githubusercontent.com/snakers4/silero-vad/1e261b036686cd0017d500ee96acd1c4ba572a9d/LICENSE"
+    }
+  ]
+}
