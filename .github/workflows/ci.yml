@@ -1,0 +1,54 @@
+name: Web application checks
+
+on:
+  push:
+    branches: [master, v3/development]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.3'
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: frontend/package.json
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.14'
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - name: Install the locked plugin host
+        run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: plugin-host
+      - name: Check the Cordis host
+        run: npm test
+        working-directory: plugin-host
+      - name: Install the locked backend
+        run: uv sync --frozen
+        working-directory: backend
+      - name: Check backend and live host integration
+        run: uv run --frozen pytest -q
+        working-directory: backend
+      - name: Check snapshot promotion and drift rejection
+        run: uv run --project backend --frozen python -m pytest scripts/test_promote.py -q
+      - name: Install the locked frontend
+        run: pnpm install --frozen-lockfile --ignore-workspace
+        working-directory: frontend
+      - name: Prepare the pinned Cubism Core
+        run: uv run --project backend --frozen python scripts/prepare-core.py
+      - name: Check frontend types, tests and production build
+        run: pnpm typecheck && pnpm test && pnpm build
+        working-directory: frontend
