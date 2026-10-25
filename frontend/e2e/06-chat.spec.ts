@@ -1,13 +1,12 @@
 // 对话页：真实 LLM 回合（后端切句并剥指令 → SSE sentence 事件 → 前端逐句上屏与落账）、
 // backlog、控件态。
 //
-// ⚠️ 会真实写入 live 会话（这是 /api/chat 的固有行为）。用例只发**一条固定文案**，
-// afterEach 用 /api/chat/interrupt 撤掉 assistant 行；user 行没有 API 可删，
-// 故每跑一次会留在 live 里多一条 user（已知且可接受）。
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+// 对显式隔离的测试生活写入；不回滚账本或使用退役的存档 API。
+// 公共 helper 在测试结束后释放本窗口的见面租约。
+import { expect, test, type APIRequestContext, type Page } from "./fixtures";
 import { gotoRoute, settle } from "./helpers";
 
-/** 固定文案：afterEach 要靠它定位并撤回。 */
+/** 测试生活中的固定提示词。 */
 const PROMPT = "只回复四个字：测试通过";
 
 type LiveRow = { role: string; text: string };
@@ -16,11 +15,6 @@ async function liveRows(request: APIRequestContext): Promise<LiveRow[]> {
   const res = await request.get("/api/checkpoints/live");
   return ((await res.json()) as { messages: LiveRow[] }).messages;
 }
-
-test.afterEach(async ({ request }) => {
-  // 撤回本轮 assistant（幂等：没有匹配的尾对时什么也不做）
-  await request.post("/api/chat/interrupt", { data: { user: PROMPT, assistant: "" } });
-});
 
 test("控件态：输入为空时发送禁用，工具条与状态条齐备", async ({ page }) => {
   await gotoRoute(page, "chat");

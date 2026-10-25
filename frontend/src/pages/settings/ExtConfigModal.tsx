@@ -7,6 +7,7 @@ import { useState } from "react";
 import type { McpExtension } from "../../lib/types";
 import { useT } from "../../i18n";
 import { parseMcpJson } from "../../lib/mcpJson";
+import {extToForm,formToExt,type ExtForm} from "../../lib/mcpForm";
 import FieldRow from "../../ui/FieldRow";
 import Modal from "../../ui/Modal";
 import Switch from "../../ui/Switch";
@@ -22,49 +23,6 @@ function extEndpointError(url: string): boolean {
   } catch {
     return true;
   }
-}
-
-/** 弹窗表单草稿：args/env/headers 用文本/键值对形态便于编辑，保存时归一。 */
-interface ExtForm {
-  name: string;
-  transport: McpExtension["transport"];
-  enabled: boolean;
-  command: string;
-  /** stdio 参数：空格分隔文本，保存时拆数组。 */
-  argsText: string;
-  envPairs: [string, string][];
-  endpoint: string;
-  headerPairs: [string, string][];
-}
-
-function extToForm(ext: McpExtension): ExtForm {
-  return {
-    name: ext.name,
-    transport: ext.transport,
-    enabled: ext.enabled,
-    command: ext.command,
-    argsText: ext.args.join(" "),
-    envPairs: Object.entries(ext.env),
-    endpoint: ext.endpoint,
-    headerPairs: Object.entries(ext.headers),
-  };
-}
-
-function formToExt(f: ExtForm): McpExtension {
-  const dict = (pairs: [string, string][]): Record<string, string> =>
-    Object.fromEntries(
-      pairs.filter(([k]) => k.trim()).map(([k, v]) => [k.trim(), v]),
-    );
-  return {
-    name: f.name.trim(),
-    transport: f.transport,
-    enabled: f.enabled,
-    command: f.command.trim(),
-    args: f.argsText.split(/\s+/).filter(Boolean),
-    env: dict(f.envPairs),
-    endpoint: f.endpoint.trim(),
-    headers: dict(f.headerPairs),
-  };
 }
 
 /** 校验：名称必填；stdio 命令必填；http 端点必填且 http(s)://。 */
@@ -155,7 +113,8 @@ export default function ExtConfigModal({
     try {
       const exts = parseMcpJson(jsonText);
       if (exts.length === 1) {
-        setForm(extToForm(exts[0]));
+        // A connection snippet must not silently erase an adapter's reviewed scopes.
+        setForm(previous => extToForm(exts[0], previous));
         setJsonText("");
         setJsonErr(false);
         setJsonOpen(false);

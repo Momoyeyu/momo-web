@@ -242,3 +242,15 @@ test('tolerating a failed plugin still starts later healthy plugins', async t =>
   assert.equal(result.plugins.length, 1);
   assert.equal(result.plugins[0].id, 'virtual');
 });
+
+test('a stale tool binding cannot execute against a replacement account configuration', async t => {
+  const { req, permit, host } = await setup(t);
+  const config = { id: 'echo', type: 'mcp', transport: 'stdio', command: process.execPath, args: [fileURLToPath(new URL('./fixtures/mcp-server.mjs', import.meta.url))], bindingFingerprint: 'account-one' };
+  await req('plugins.configure', { plugins: [config] });
+  assert.equal((await req('plugins.listTools')).tools[0].configurationFingerprint, 'account-one');
+  await req('plugins.configure', { plugins: [{ ...config, bindingFingerprint: 'account-two' }] });
+  await assert.rejects(req('plugins.callTool', { name: 'echo__echo', permit: permit(), configurationFingerprint: 'account-one' }), { code: 'STALE_CONFIG' });
+  assert.equal(host.receipts.length, 0);
+  const response = await req('plugins.callTool', { name: 'echo__echo', permit: permit(), configurationFingerprint: 'account-two' });
+  assert.equal(JSON.parse(response.result.content[0].text).calls, 1);
+});

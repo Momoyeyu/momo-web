@@ -1,7 +1,7 @@
 // E2E 公共工具：路由跳转、配置快照/还原、定位器辅助。
 //
 // 测试必须打显式 MOMO_E2E_BASE_URL 隔离实例；配置快照仅用于测试间还原。
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "./fixtures";
 
 /** 应用外壳（四条路由各自的根容器）。 */
 const SHELL = ".title-screen, .chat-page, .settings-page, .backlog-page";
@@ -9,12 +9,15 @@ const SHELL = ".title-screen, .chat-page, .settings-page, .backlog-page";
 /**
  * 打开某条路由。
  *
- * 必须用 page.goto：Playwright 每个用例都是全新页面，只改 hash 在
- * about:blank 上不会导航。应用是「先拉 backend state 再渲染」，
- * 所以还要等外壳出现。
+ * 首次打开用 page.goto；应用内按真实 hash 导航，避免把子页跳转
+ * 误当作整个文档刷新。专门测试刷新时显式调用 page.reload。
  */
 export async function gotoRoute(page: Page, route = "title"): Promise<void> {
-  await page.goto(`/#/${route}`);
+  const base=new URL(process.env.MOMO_E2E_BASE_URL!);
+  const current=new URL(page.url());
+  if(current.origin===base.origin && await page.locator(SHELL).count())
+    await page.evaluate(next=>{location.hash=`#/${next}`;},route);
+  else await page.goto(`/#/${route}`);
   await expect(page.locator(SHELL).first()).toBeVisible();
   // A mounted shell can still be behind startup or a scene/dialogue entrance.
   // Functional tests type only once real players can interact with that shell.
@@ -129,13 +132,3 @@ export async function pickSelect(
   await fieldRow(page, label, scope).locator(".sel-face").click();
   await page.locator(".sel-opt").filter({ hasText: option }).first().click();
 }
-
-// Every spec targets isolated data. Release its real meeting before the next
-// browser document, without taking over another window or waiting for TTL.
-test.afterEach(async ({page}) => {
-  if (page.isClosed()) return;
-  await page.evaluate(async () => {
-    const resource=performance.getEntriesByType('resource').find(entry=>new URL(entry.name).pathname==='/src/services/meetingClient.ts');
-    if (resource) await (await import(resource.name)).leaveMeeting();
-  }).catch(()=>{});
-});

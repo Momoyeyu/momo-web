@@ -1,5 +1,6 @@
 """Explicit, bounded data transfer with SQLite online backup and verified staging."""
 
+from contextlib import closing
 import hashlib
 import io
 import json
@@ -25,9 +26,8 @@ def digest(data):
 def export_data():
     with db._lock, tempfile.TemporaryDirectory() as tmp:
         target = Path(tmp) / "momo.db"
-        with sqlite3.connect(target) as dest:
+        with closing(sqlite3.connect(target)) as dest:
             db.conn().backup(dest)
-        dest.close()
         files = {"momo.db": target.read_bytes()}
         files["momo.yaml"] = (
             state.STATE_PATH.read_bytes()
@@ -110,7 +110,37 @@ def validate(raw):
         return files
 
 
+def _reconcile_restored_extensions():
+    """Replace live authority while the maintenance barrier still owns attention.
+
+    Never wait for host RPC while holding the SQLite lock: the pipe reader may
+    need that same lock to persist a final execution receipt before replying.
+    """
+    from .coordinator import runtime
+
+    if not runtime.started:
+        return
+    from . import extend
+
+    extend.hub.close()
+    try:
+        if not extend.configure(state.load()["settings"]["extensions"]):
+            raise RuntimeError("Plugin host did not acknowledge restored capabilities")
+    except BaseException as error:
+        # This publishes an empty, configured gate even if the host is gone;
+        # an old turn snapshot cannot initialize the retired configuration again.
+        extend.hub.close()
+        extend.hub.configure([])
+        raise RuntimeError(
+            "Restore could not reconcile capabilities; momo remains paused"
+        ) from error
+
+
 def import_data(raw):
+    from .coordinator import runtime
+
+    if runtime.started and not runtime.restoring:
+        raise RuntimeError("Pause momo through data maintenance before restoring")
     files = validate(raw)
     previous_generation = int(
         db.query("SELECT generation FROM sessions WHERE id=?", (db.LIVE_ID,))[0][
@@ -128,7 +158,7 @@ def import_data(raw):
             item = stage / name
             item.parent.mkdir(parents=True, exist_ok=True)
             item.write_bytes(content)
-        with sqlite3.connect(stage / "momo.db") as test:
+        with closing(sqlite3.connect(stage / "momo.db")) as test:
             if test.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
                 raise ValueError("Invalid SQLite database")
             required = {"meta", "memories", "sessions", "messages"}
@@ -191,7 +221,44 @@ def import_data(raw):
                 if moved_previous:
                     os.replace(backup, root)
                 raise
-            else:
+        try:
+            _reconcile_restored_extensions()
+        except BaseException:
+            # The API reports failure, so restore the prior profile as well as
+            # keeping all capabilities withdrawn. Browser and backend projections
+            # then agree that this replacement did not commit.
+            with db._lock:
+                db.reset()
+                if installed and root.exists():
+                    shutil.rmtree(root)
                 if moved_previous:
-                    shutil.rmtree(backup)
+                    os.replace(backup, root)
+                db.conn()
+                with db.tx() as previous:
+                    rollback_generation = int(
+                        previous.execute(
+                            "SELECT generation FROM sessions WHERE id=?", (db.LIVE_ID,)
+                        ).fetchone()[0]
+                    )
+                    previous.execute(
+                        "UPDATE sessions SET generation=?,summary_version=summary_version+1 WHERE id=?",
+                        (
+                            max(
+                                previous_generation,
+                                imported_generation + 1,
+                                rollback_generation,
+                            )
+                            + 1,
+                            db.LIVE_ID,
+                        ),
+                    )
+                    previous.execute(
+                        "UPDATE runs SET status='interrupted',updated_at=? WHERE status IN ('processing','generated')",
+                        (db.now_iso(),),
+                    )
+            memory.schedule_index()
+            raise
+        else:
+            if moved_previous:
+                shutil.rmtree(backup)
         memory.schedule_index()

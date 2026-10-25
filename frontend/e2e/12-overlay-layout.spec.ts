@@ -1,4 +1,4 @@
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator } from './fixtures';
 
 async function insideStage(element: Locator) {
   const stage = await element.page().locator('.app-stage').boundingBox();

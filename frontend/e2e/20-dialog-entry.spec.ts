@@ -1,4 +1,4 @@
-import {test,expect,type Page,type TestInfo} from '@playwright/test';
+import {test,expect,type Page,type TestInfo} from './fixtures';
 import {writeFile} from 'node:fs/promises';
 
 type Frame = {time:number;route:string;startup:boolean;cover:boolean;ink:boolean;opacity:number;

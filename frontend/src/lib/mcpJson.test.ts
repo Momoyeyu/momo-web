@@ -97,4 +97,12 @@ describe("parseMcpJson", () => {
     expect(ext.enabled).toBe(false);
     expect(ext.env).toEqual({ A: "1" });
   });
+  it('retains adapter permissions instead of turning a game into a general tool',()=>{
+    const [ext]=parseMcpJson(JSON.stringify({command:'node',declaredPermissions:['activities.game'],grantedPermissions:['activities.game']}));
+    expect(ext).toMatchObject({declaredPermissions:['activities.game'],grantedPermissions:['activities.game']});
+  });
+  it.each([{declaredPermissions:['activities.game','unknown'],grantedPermissions:['activities.game']},{declaredPermissions:'all'},{grantedPermissions:[{}]}])('keeps invalid explicit permissions denied: %j',policy=>{
+    const [ext]=parseMcpJson(JSON.stringify({command:'node',...policy}));
+    expect(ext).toMatchObject({declaredPermissions:[],grantedPermissions:[]});
+  });
 });

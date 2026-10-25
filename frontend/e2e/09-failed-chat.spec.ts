@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {waitForChatReady} from './helpers';
 
 for (const failure of ['network', 'upstream error', 'empty stream']) {

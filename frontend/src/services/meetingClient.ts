@@ -29,6 +29,12 @@ function clearTimers():void {
   heartbeatTimer=null;expiryTimer=null;
 }
 function fail(reason:Failure='unavailable'):void {clearTimers();write(null);publish({state:'failed',lease:null,reason});}
+/** Only an existing owner capability restores a meeting on subpage refresh. */
+export function storedMeetingIdentity():{clientId:string;leaseId:string}|undefined {
+  const value=stored();
+  return typeof value?.clientId==='string'&&typeof value.leaseId==='string'
+    ? {clientId:value.clientId,leaseId:value.leaseId}:undefined;
+}
 export function meetingSnapshot():Snapshot{return snapshot;}
 export function subscribeMeeting(listener:()=>void):()=>void {listeners.add(listener);return()=>listeners.delete(listener);}
 export function meetingIdentity():{clientId:string;leaseId:string}|undefined {
@@ -86,12 +92,12 @@ export function enterMeeting():Promise<Lease>{
 }
 export function leaveMeeting(after:Promise<unknown>=Promise.resolve()):Promise<void>{
   if(departing)return departing;
-  const entering=pending,lease=snapshot.lease;
+  const entering=pending,lease=snapshot.lease??storedMeetingIdentity();
   generation++;pending=null;clearTimers();write(null);publish({state:'idle',lease:null});
   const operation=(async()=>{
     // Keep the old server lease alive long enough to persist the observed prefix.
     await after.catch(()=>undefined);
-    let identity=lease;
+    let identity:{clientId:string;leaseId:string}|undefined=lease;
     if(!identity&&entering){try{identity=await entering;}catch{/* Superseded entry releases itself. */}}
     if(identity)await post('leave',{clientId:identity.clientId,leaseId:identity.leaseId}).catch(()=>undefined);
   })().finally(()=>{if(departing===operation)departing=null;});

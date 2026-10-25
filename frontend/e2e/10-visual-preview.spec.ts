@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 for (const lang of ['zh', 'en', 'ja']) {
   test(`visual preview keeps aligned controls and local fonts (${lang})`, async ({ page, request }) => {

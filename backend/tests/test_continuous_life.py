@@ -277,12 +277,36 @@ def test_manual_forget_invalidates_generation_that_holds_old_prompt():
 
 def test_migration_can_preserve_existing_vector_extension_tables():
     from app.models import vectors
+
     if db.sqlite_vec is None:
-        pytest.skip('sqlite-vec unavailable')
-    memory.add_memory('legacy fact')
-    assert vectors.ensure(2,'legacy')
+        pytest.skip("sqlite-vec unavailable")
+    memory.add_memory("legacy fact")
+    assert vectors.ensure(2, "legacy")
     with db.tx() as c:
         c.execute("DELETE FROM meta WHERE key='continuous_schema'")
     db.reset()
-    assert memory.list_memories()[0]['content']=='legacy fact'
-    assert vectors.dim()==2
+    assert memory.list_memories()[0]["content"] == "legacy fact"
+    assert vectors.dim() == 2
+
+
+@pytest.mark.parametrize("pinned", [False, True])
+def test_forgetting_one_fact_preserves_other_memories_from_the_same_event(pinned):
+    add("My name is Yeyu and I like strawberries.", "I understand.", "two-facts")
+    source = checkpoint.run_event_ids(checkpoint.generation(), "two-facts")
+    with memory.source_scope(source):
+        name = memory.add_memory("The player name is Yeyu", pinned=pinned)
+        food = memory.add_memory("The player likes strawberries")
+    memory.delete_memory(food["id"])
+    assert memory.list_memories() == [name]
+    assert memory.search_memories("Yeyu") == [
+        {"id": name["id"], "content": name["content"]}
+    ]
+    if pinned:
+        assert memory.pins() == [name["content"]]
+    assert checkpoint.context_messages() == []
+    assert len(checkpoint.live_messages()) == 2
+    with (
+        memory.source_scope(source),
+        pytest.raises(memory.MemoryError, match="forgotten"),
+    ):
+        memory.add_memory("The player likes strawberries")

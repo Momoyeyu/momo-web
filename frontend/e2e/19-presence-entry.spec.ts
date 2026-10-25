@@ -1,4 +1,4 @@
-import {test, expect, type Page} from '@playwright/test';
+import {test, expect, type Page} from './fixtures';
 
 async function fixture(page: Page, lang = 'zh') {
   await page.route('**/api/**', async route => {

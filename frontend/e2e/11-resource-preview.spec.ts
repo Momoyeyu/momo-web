@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import JSZip from 'jszip';
 import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';

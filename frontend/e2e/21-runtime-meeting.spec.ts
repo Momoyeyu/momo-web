@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures';
 import './helpers';
 
 test.beforeEach(()=>test.skip(process.env.MOMO_RUNTIME_SMOKE!=='1','Opt in: requires an explicitly isolated running Python/Cordis instance.'));
@@ -36,4 +36,20 @@ test('actual unconfigured first meeting rejects an unusable API without saving i
   await expect(setup.getByRole('alert')).toContainText('连接未通过');
   await expect(setup).toBeVisible();
   expect((await(await request.get('/api/state')).json()).settings?.llm?.url??'').toBe('');
+});
+
+test('owned meeting survives refreshing backlog and settings without a new title entrance',async({page})=>{
+  await page.goto('/#/chat');
+  await expect.poll(()=>page.locator('.chat-page').evaluate(element=>!element.closest('[inert]'))).toBe(true);
+  // A fresh unconfigured fixture has its setup portal; this case needs established chat.
+  if(await page.locator('.first-meeting-setup').count())await page.locator('.first-meeting-setup').getByRole('button',{name:'取消',exact:true}).click();
+  test.skip(await page.locator('.title-screen').count()>0,'Requires an established isolated profile.');
+  for(const destination of ['记录','设置']){
+    await page.getByRole('button',{name:destination,exact:true}).click();
+    const restored=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/meeting/enter'&&response.status()===200);
+    await page.reload();await restored;
+    await page.getByRole('button',{name:'返回对话',exact:true}).click();
+    await expect.poll(()=>page.locator('.chat-page').evaluate(element=>!element.closest('[inert]'))).toBe(true);
+    await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
+  }
 });

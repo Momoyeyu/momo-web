@@ -47,3 +47,13 @@ it('waits for displayed text persistence before revoking the server lease',async
   persisted();await leaving;
   expect(fetch.mock.calls.at(-1)?.[0]).toBe('/api/meeting/leave');
 });
+
+it('releases an owned persisted lease after a subpage document reload',async()=>{
+  const values=new Map<string,string>([['momo.meeting-owner.v1',JSON.stringify({clientId:'stored-client',leaseId:'stored-lease'})]]);
+  vi.stubGlobal('sessionStorage',{getItem:(key:string)=>values.get(key)??null,setItem:(key:string,value:string)=>values.set(key,value),removeItem:(key:string)=>values.delete(key)});
+  fetch.mockResolvedValue(new Response(null,{status:204}));
+  await leaveMeeting();
+  expect(fetch.mock.calls.at(-1)?.[0]).toBe('/api/meeting/leave');
+  expect(JSON.parse(String(fetch.mock.calls.at(-1)?.[1]?.body))).toEqual({clientId:'stored-client',leaseId:'stored-lease'});
+  vi.unstubAllGlobals();
+});

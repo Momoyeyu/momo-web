@@ -21,8 +21,9 @@ def probe(ext: dict[str, Any]) -> ProbeResult:
     return hub.probe(ext)
 
 
-def configure(extensions: Any) -> None:
+def configure(extensions: Any) -> bool:
     """设置更新立即撤下禁用能力，再协调宿主连接生命周期。"""
     from .coordinator import runtime
+
     hub.bind(runtime)
-    hub.configure(extensions)
+    return hub.configure(extensions)

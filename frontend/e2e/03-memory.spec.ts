@@ -2,7 +2,7 @@
 //
 // 记忆存在 momo.db（真实实例），所以用例只做「建 → 断言 → 删」，
 // 并在 afterEach 用 API 兜底清掉本轮造的数据。
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext } from "./fixtures";
 import { openTab } from "./helpers";
 
 const PREFIX = "e2e-";

@@ -12,6 +12,7 @@ import { useState } from "react";
 
 import { useT } from "../i18n";
 import { fromRoute, navigate } from "../router";
+import {storedMeetingIdentity} from '../services/meetingClient';
 import Button from "../ui/Button";
 import BuiltinResourcesNotice from "../components/BuiltinResourcesNotice";
 import GridBackdrop from "../components/GridBackdrop";
@@ -36,7 +37,7 @@ const ROT_STEP = 70;
 export default function Settings() {
   const t = useT();
   const [tab, setTab] = useState<Section>("general");
-  const backRoute = fromRoute() === "chat" ? ("chat" as const) : ("title" as const);
+  const backRoute = fromRoute() === "chat" || storedMeetingIdentity() ? ("chat" as const) : ("title" as const);
   const backLabel =
     backRoute === "chat" ? t("common.backChat") : t("common.backTitle");
   const idx = TABS.indexOf(tab);

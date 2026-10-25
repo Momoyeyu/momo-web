@@ -60,6 +60,7 @@ export interface GeneralConfig {
  *  导入 tools/list，工具以 {server}_{tool} 注入）。
  *  通用字段 {name, transport, enabled}；stdio 分支 {command, args, env}，
  *  http 分支 {endpoint, headers}——两分支字段并存，按 transport 取用。 */
+export type McpPermission = "mcp.tools" | "channels.send" | "activities.game" | "activities.computer";
 export interface McpExtension {
   /** 显示名；同时用作工具名前缀（backend 会合法化为 [a-zA-Z0-9_]）。 */
   name: string;
@@ -77,6 +78,10 @@ export interface McpExtension {
   endpoint: string;
   /** http：请求头键值对——鉴权统一走这里（Authorization: Bearer …）。 */
   headers: Record<string, string>;
+  /** Reviewed adapters declare actual scopes; preserve these across configuration edits. */
+  declaredPermissions?: McpPermission[];
+  /** Explicitly granted scopes are separate from the adapter's declaration. */
+  grantedPermissions?: McpPermission[];
 }
 
 export interface Settings {

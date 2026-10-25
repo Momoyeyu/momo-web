@@ -1,4 +1,4 @@
-import {test, expect} from '@playwright/test';
+import {test, expect} from './fixtures';
 import {createHash} from 'node:crypto';
 import {readdir, readFile} from 'node:fs/promises';
 import {join, resolve} from 'node:path';

@@ -1,6 +1,6 @@
 // 冒烟：应用能起来、路由能走、控制台干净。
 // 真实实例的界面语言可能是 ja，用 useStateRestore 先固定为 zh（跑完还原）。
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { collectErrors, gotoRoute, openApp, useStateRestore } from "./helpers";
 
 const restore = useStateRestore();

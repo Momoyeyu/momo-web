@@ -7,7 +7,7 @@ python3 scripts/promote.py --target /absolute/path/to/momo --revision HEAD --boo
 python3 scripts/promote.py --target /absolute/path/to/momo --revision HEAD --bootstrap --apply --check "浏览器验证记录路径"
 ```
 
-首次导入才加 `--bootstrap`：所有既有目标文件必须仍与目标 HEAD 相同，未跟踪同名文件拒绝覆盖。之后省略此参数，校验 `app/migration/web-source.json` 中上次拥有的每个文件，包括待删除文件；目标本地改动 / 哈希漂移 / 新路径冲突全部拒绝。只删除上次拥有而新 revision 不再包含的文件。
+首次导入才加 `--bootstrap`：将目标 HEAD 内受管理目录的已跟踪文件确认为初始所有权，记录基线 revision；所有文件必须仍与该 HEAD 相同，包括 Web 已删除的旧组件。未跟踪同名文件拒绝覆盖。之后省略此参数，校验 `app/migration/web-source.json` 中上次拥有的每个文件，包括待删除文件；目标本地改动 / 哈希漂移 / 新路径冲突全部拒绝。只删除已确认拥有而新 revision 不再包含的文件，拒绝通过符号链接将写入转移到其他目录。
 
 源必须已提交且工作区干净；读取 Git blob，不遍历工作区收集数据。默认 dry-run。`--check` 只记录已有验证证据，**不执行测试，也不证明测试通过**。应用前全量检查，失败时回滚文件；相同 revision 二次晋级不产生 diff。目标提交应同时包含共享快照与清单，避免下次误判未提交漂移。
 

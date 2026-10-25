@@ -4,19 +4,14 @@
 // 走 backlog 的「回放」路径验证：它和实时回合共用同一处语言解析，
 // 是对这个需求最干净的观测点。
 // 拦下 /api/tts/speech（后端代理）读请求体，不依赖真实的 GPT-SoVITS。
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { gotoRoute, readState, useStateRestore, writeState } from "./helpers";
 
 const restore = useStateRestore();
 
-// 本用例要先自己造一个可回放的回合，收尾时把它的 assistant 行撤掉（幂等）。
+// 在隔离生活中创建可回放的真实展示记录；不回滚账本。
 const PROMPT = "只回复两个字：收到";
-test.afterEach(async ({ request }) => {
-  await request.post("/api/chat/interrupt", {
-    data: { user: PROMPT, assistant: "" },
-  });
-  await restore({ request });
-});
+test.afterEach(restore);
 
 type Body = { input?: string; lang?: string; voice?: string };
 
@@ -35,11 +30,11 @@ test("TTS 请求的 lang = 对话语言（日语/英语/auto 三种）", async (
   (initial.settings as {tts: {url:string; voice:string}}).tts = {url:'http://tts.test', voice:'ref.wav'};
   await writeState(request, initial);
 
-  // 先自己造一个回合：不能依赖别的 spec 留下的数据 —— 06-chat 的收尾会把它自己的
-  // assistant 行撤掉，排在它后面就必然找不到可回放条目（假失败）。
+  // 自己创建已实际展示的回合，不依赖其他 spec 的记录。
   await gotoRoute(page, "chat");
   await page.locator(".input-row input").fill(PROMPT);
   await page.getByLabel("发送").click();
+  await expect(page.getByLabel("发送",{exact:true})).toBeVisible();
 
   // 回合跑完（按钮可点）再断言；期间句子逐条落库，故这里等到的是真实持久化结果
   await gotoRoute(page, "backlog");
@@ -64,8 +59,6 @@ test("TTS 请求的 lang = 对话语言（日语/英语/auto 三种）", async (
     await writeState(request, state);
 
     await page.reload(); // 重新 boot 才能让 store 读到新配置
-    await page.waitForTimeout(900); // bootPersist 是异步的，等它把远端配置合并进来
-    await page.waitForTimeout(900); // bootPersist 是异步的，等它把远端配置合并进来
     await expect(page.locator(".bl-replay:not([disabled])").first()).toBeVisible();
 
     bodies.length = 0;

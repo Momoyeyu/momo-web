@@ -46,6 +46,29 @@ def destination(name):
     return None
 
 
+def source_name(target):
+    for name, mapped in FILES.items():
+        if target == mapped:
+            return name
+    for prefix, mapped in PREFIXES.items():
+        if target.startswith(mapped):
+            return prefix + target[len(mapped) :]
+    return None
+
+
+def safe_target(root, name):
+    relative = Path(name)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("Invalid target path")
+    target = root / relative
+    cursor = target
+    while cursor != root:
+        if cursor.is_symlink():
+            raise ValueError(f"Unsafe target symlink: {name}")
+        cursor = cursor.parent
+    return target
+
+
 def snapshot(source, revision):
     files = {}
     for line in git(source, "ls-tree", "-rz", "--full-tree", revision).split(b"\0"):
@@ -93,20 +116,32 @@ def promote(source, target, revision, bootstrap=False, apply=False, checks=()):
     files = snapshot(source, revision)
     if not files:
         raise ValueError("Empty source snapshot")
-    manifest_path = target / MANIFEST
+    manifest_path = safe_target(target, MANIFEST)
     previous = json.loads(manifest_path.read_text()) if manifest_path.exists() else None
     if previous is None and not bootstrap:
         raise ValueError("First import requires explicit --bootstrap")
     old = previous["files"] if previous else {}
+    bootstrap_revision = None
+    if previous is None:
+        # The first import explicitly takes ownership of the target's tracked
+        # shared baseline, including files this Web revision has retired.
+        bootstrap_revision = git(target, "rev-parse", "HEAD").decode().strip()
+        for name in (
+            git(target, "ls-tree", "-rz", "--name-only", "HEAD").decode().split("\0")
+        ):
+            original = source_name(name)
+            if original:
+                raw = git(target, "show", f"HEAD:{name}")
+                old[name] = {"source": original, "sha256": sha(raw)}
     # Every previously owned file must still match, including files to be deleted.
     for name, record in old.items():
         if not destination(record["source"]) == name:
             raise ValueError("Invalid previous ownership manifest")
-        p = target / name
+        p = safe_target(target, name)
         if p.is_symlink() or not p.is_file() or sha(p.read_bytes()) != record["sha256"]:
             raise ValueError(f"Target drift: {name}")
     for name in files.keys() - old.keys():
-        p = target / name
+        p = safe_target(target, name)
         if p.exists() or p.is_symlink():
             if previous:
                 raise ValueError(f"Unowned target collision: {name}")
@@ -141,6 +176,10 @@ def promote(source, target, revision, bootstrap=False, apply=False, checks=()):
         },
         "deleted": deleted,
     }
+    if bootstrap_revision:
+        record["bootstrapRevision"] = bootstrap_revision
+    elif previous and previous.get("bootstrapRevision"):
+        record["bootstrapRevision"] = previous["bootstrapRevision"]
     report = {
         "revision": revision,
         "changed": sorted(changed),

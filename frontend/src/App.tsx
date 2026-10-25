@@ -1,4 +1,4 @@
-import {enterMeeting,leaveMeeting,meetingSnapshot,subscribeMeeting} from "./services/meetingClient";
+import {enterMeeting,leaveMeeting,meetingSnapshot,subscribeMeeting,storedMeetingIdentity} from "./services/meetingClient";
 import {getChatEngine,loadTranscript} from "./chat/engineInstance";
 import {historyPage} from "./services/lifeClient";
 import {useT} from "./i18n";
@@ -76,7 +76,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   useEffect(() => {
     if (route === "title") {
       void leaveMeeting(getChatEngine().finishMeeting());
-    } else if (route === "chat") {
+    } else if (route === "chat" || storedMeetingIdentity()) {
       void enterMeeting().then(() => {if (location.hash.replace(/^#\/?/,"") === "title") void leaveMeeting(getChatEngine().finishMeeting());}).catch(() => {});
     }
   },[route]);

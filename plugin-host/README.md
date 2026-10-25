@@ -57,6 +57,8 @@ Python 是唯一内核：生活记录、推理、记忆、队列和活动决策�
 
 Python 的 `core/mcp.py` 只投影目录并通过唯一协调器发出命令。设置更新是权威来源，旧回合快照不能重新启用已经禁用的插件；跨线程配置重排通过 `configurationRevision` 拦截。探测使用独立、短期宿主，不关闭真实对话的连接。
 
+工具投影还绑定配置及本次授权的 `configurationFingerprint`。参数、环境、headers、账号或权限变化，以及禁用后重新启用，都会使旧目录失效；Python 和宿主派发前分别核对，旧计划不能借同名工具使用新账号凭据。该指纹不包含可读配置或密钥；相同健康配置的正常重复协调保留原连接。
+
 已由用户启用的一般 MCP 配置视为可信任的 `mcp.tools` 授权。审核过的渠道 / 游戏 / 电脑适配器须声明 `declaredPermissions`，另由用户明确赋予 `grantedPermissions`；有效权限还要与当前活动相交。面对面模式禁止 `channels.send / activities.game / activities.computer`。这无法识别任意一般 MCP 服务器的隐藏副作用，也不构成权限沙箱；后续平台适配器不能将活动伪装成一般工具绕过此边界。
 
 内核 `core/credentials.py` 提供最小受控存储：随机不透明 ref、插件与已验证账号绑定、声明 / 授予 / 当前活动三重权限检查、过期与撤销。文件位于生活目录外的忽略路径 `.workbuddy/credentials/<profile>/`，目录 0700、文件 0600，默认备份不包含它。首版没有 OAuth / OIDC 交换端点，不能仅凭昵称、邮箱或登录成功推定获得平台聊天权限；具体提供方须在专项计划接入和验证。

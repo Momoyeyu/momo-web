@@ -17,7 +17,7 @@ momo 是一个逐渐熟悉你的 AI 伙伴。这是 v3 的 Web 体验迭代仓�
 
 ## 本机开发
 
-需要 Node.js 22.23.3 或更新的兼容版本、pnpm 12.6、Python 3.11+ 与 uv。生产桌面包自带运行时；Web 预览是本机开发入口，不是可直接公开部署的多人服务。
+需要 Node.js 22.23.3 或更新的兼容版本、pnpm 12.6 与 uv；后端 `.python-version` 固定本轮已验证的 Python 3.14。生产桌面包自带运行时；Web 预览是本机开发入口，不是可直接公开部署的多人服务。
 
 ```sh
 cd backend && uv sync --frozen && cd ..

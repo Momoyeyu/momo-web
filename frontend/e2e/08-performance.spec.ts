@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 import { presentation } from './helpers/runtime';
 import {waitForChatReady} from './helpers';
 

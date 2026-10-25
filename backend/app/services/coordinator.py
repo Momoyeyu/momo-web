@@ -160,6 +160,17 @@ class Coordinator:
         # A late actual receipt is a historical fact, never permission for a new action.
         with db.tx() as c:
             c.execute(
+                "INSERT OR IGNORE INTO outbox(command_id,run_id,epoch,status,payload,at) VALUES(?,?,?,?,?,?)",
+                (
+                    receipt["commandId"],
+                    str(receipt.get("runId") or "unattributed"),
+                    int(receipt.get("activityEpoch") or 0),
+                    "unknown",
+                    '{"origin":"recovered-receipt"}',
+                    db.now_iso(),
+                ),
+            )
+            c.execute(
                 "UPDATE outbox SET status=?,receipt=? WHERE command_id=?",
                 (
                     receipt.get("status", "unknown"),
@@ -405,7 +416,7 @@ class Coordinator:
         except HostError:
             with db.tx() as c:
                 c.execute(
-                    "UPDATE outbox SET status='unknown' WHERE command_id=?",
+                    "UPDATE outbox SET status='unknown' WHERE command_id=? AND status IN ('pending','executing')",
                     (permit["commandId"],),
                 )
             raise

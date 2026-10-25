@@ -94,3 +94,28 @@ def test_bootstrap_refuses_untracked_target_and_dirty_source(pair):
     (source / "frontend/a.ts").write_text("not committed")
     with pytest.raises(ValueError, match="reviewed source"):
         module.promote(source, target, "HEAD", bootstrap=True)
+
+
+def test_bootstrap_retires_deleted_tracked_shared_files_and_rejects_drift(pair):
+    source, target = pair
+    retired = target / "app/frontend/Checkpoint.tsx"
+    retired.write_text("retired")
+    commit(target)
+    retired.write_text("user edit")
+    with pytest.raises(ValueError, match="drift"):
+        module.promote(source, target, "HEAD", bootstrap=True)
+    retired.write_text("retired")
+    report = module.promote(source, target, "HEAD", bootstrap=True, apply=True)
+    assert report["deleted"] == ["app/frontend/Checkpoint.tsx"]
+    assert not retired.exists()
+    assert (target / "app/src-tauri/keep.rs").exists()
+
+
+def test_parent_symlink_cannot_redirect_writes_outside_target(pair, tmp_path):
+    source, target = pair
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (target / "app/backend").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        module.promote(source, target, "HEAD", bootstrap=True, apply=True)
+    assert not list(outside.iterdir())

@@ -4,6 +4,7 @@
 // 解析失败抛 McpJsonError——表单报错，不落库。
 
 import type { McpExtension } from "./types";
+import {mcpPermissions} from './mcpPermissions';
 
 export class McpJsonError extends Error {
   constructor(message: string) {
@@ -58,6 +59,7 @@ function toExtension(name: string, raw: unknown): McpExtension {
       env: strDict(o.env),
       endpoint: "",
       headers: {},
+      ...mcpPermissions(o),
     };
   }
   if (url || type === "http" || type === "sse" || type === "streamable-http") {
@@ -70,6 +72,7 @@ function toExtension(name: string, raw: unknown): McpExtension {
       env: {},
       endpoint: url,
       headers,
+      ...mcpPermissions(o),
     };
   }
   throw new McpJsonError("cannot detect transport (need command or url)");

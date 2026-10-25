@@ -10,6 +10,7 @@ import type {
 } from "./types";
 import { mergeBuiltinResources } from "../live2d/controlCatalog";
 import { fetchState, putState } from "../services/stateClient";
+import {mcpPermissions} from './mcpPermissions';
 
 export type { PersistedState };
 
@@ -139,6 +140,7 @@ function normalizeExtensions(raw: unknown): McpExtension[] {
       env: strDict(o.env),
       endpoint: typeof o.endpoint === "string" ? o.endpoint : "",
       headers: strDict(o.headers),
+      ...mcpPermissions(o),
     }));
 }
 

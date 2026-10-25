@@ -33,3 +33,5 @@ Web 仓路径为 `frontend/`、`backend/`、`plugin-host/`；以下配置在根 
 | MOMO_TEST_VIRTUAL | 仅隔离测试为 1 时启用虚拟入口 / 活动；正式应用默认不启用 |
 
 默认 Web 数据 `.workbuddy/dev-data/`，与桌面正式 profile 隔离；同目录第二内核会被 OS 锁拒绝。Web 代理持有一次性 `MOMO_DESKTOP_TOKEN`，不放入 `VITE_*`、浏览器存储或 URL。生产仍由 Tauri 提供临时 capability。
+
+后端开发环境由 `backend/.python-version` 固定为已验证的 Python 3.14，使用 `uv sync --frozen` 建立；不会随机器默认 Python 自动切换。

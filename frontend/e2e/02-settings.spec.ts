@@ -2,7 +2,7 @@
 //
 // 打的是真实实例，故：配置改动由 useStateRestore 整体快照还原；
 // 拓展记录只做「建 → 断言 → 删」。
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import {
   activePane,
   fieldRow,
@@ -118,6 +118,31 @@ test("拓展 tab：登记 stdio MCP server → 出现在列表 → 删除", asyn
   // 用完即删（配置随后还会被 afterEach 整体还原）
   await created.locator(".danger").click();
   await expect(page.locator(".ext-row").filter({ hasText: "e2e-echo" })).toHaveCount(0);
+});
+
+test('adapter permission policy survives JSON import, metadata edit and document reload',async({page,request})=>{
+  await openTab(page,'拓展');
+  await page.locator('.ext-panel .list-toolbar .icon-btn').click();
+  await page.locator('.ext-modal-head').getByRole('button',{name:'⇩ 从 JSON 填入',exact:true}).click();
+  const policy={declaredPermissions:['mcp.tools','activities.game'],grantedPermissions:['mcp.tools','activities.game']};
+  await page.locator('.ext-json textarea').fill(JSON.stringify({name:'e2e-scoped-game',command:'echo',enabled:false,...policy}));
+  await page.locator('.ext-json-ops').getByRole('button',{name:'填入',exact:true}).click();
+  await page.locator('.ext-actions').getByText('保存',{exact:true}).click();
+  const row=page.locator('.ext-row').filter({hasText:'e2e-scoped-game'});
+  await row.getByRole('button',{name:'编辑',exact:true}).click();
+  await page.locator('.ext-modal-head').getByRole('button',{name:'⇩ 从 JSON 填入',exact:true}).click();
+  await page.locator('.ext-json textarea').fill(JSON.stringify({command:'echo',enabled:false}));
+  await page.locator('.ext-json-ops').getByRole('button',{name:'填入',exact:true}).click();
+  await fieldRow(page,'名称','.ext-modal').locator('input').fill('e2e-scoped-renamed');
+  await page.locator('.ext-actions').getByText('保存',{exact:true}).click();
+  const persisted=async()=>((await readState(request)).settings as {extensions:{name:string}[]}).extensions.find(ext=>ext.name==='e2e-scoped-renamed');
+  await expect.poll(persisted).toMatchObject(policy);
+  await page.reload();
+  await openTab(page,'通用'); // An unrelated update sends the complete normalized state.
+  const saved=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/state'&&response.request().method()==='PUT'&&response.status()===204);
+  await fieldRow(page,'显示对话状态').locator('.switch').click();
+  await saved;
+  await expect.poll(persisted).toMatchObject(policy);
 });
 
 test("通用 tab：语言/语音是与对话框设置同级的两个面板，语义检索开关已移除", async ({

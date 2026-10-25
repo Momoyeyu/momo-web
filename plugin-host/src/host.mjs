@@ -279,15 +279,17 @@ export class PluginHost {
     const tools = [];
     for (const plugin of this.plugins.values()) {
       if (!plugin.enabled || !plugin.connected) continue;
-      for (const tool of plugin.tools) tools.push({ name: `${plugin.id}__${tool.name}`, description: tool.description ?? '', inputSchema: tool.inputSchema, pluginId: plugin.id, originalName: tool.name });
+      for (const tool of plugin.tools) tools.push({ name: `${plugin.id}__${tool.name}`, description: tool.description ?? '', inputSchema: tool.inputSchema, pluginId: plugin.id, originalName: tool.name,
+        ...(plugin.config.bindingFingerprint ? { configurationFingerprint: plugin.config.bindingFingerprint } : {}) });
     }
     return { version: this.toolVersion, tools };
   }
 
-  async callTool({ name, arguments: args = {}, permit }) {
+  async callTool({ name, arguments: args = {}, permit, configurationFingerprint }) {
     this.checkPermit(permit);
     const plugin = [...this.plugins.values()].find(item => item.enabled && item.connected && item.tools.some(tool => `${item.id}__${tool.name}` === name));
     if (!plugin) fail('TOOL_UNAVAILABLE', 'Tool is disabled or unavailable');
+    if (plugin.config.bindingFingerprint && plugin.config.bindingFingerprint !== configurationFingerprint) fail('STALE_CONFIG', 'Tool configuration has changed');
     const originalName = plugin.tools.find(tool => `${plugin.id}__${tool.name}` === name).name;
     const command = this.beginCommand(permit, 'mcp');
     const controller = new AbortController();
