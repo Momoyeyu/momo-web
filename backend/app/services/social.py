@@ -26,7 +26,7 @@ class SocialError(ValueError):
     pass
 
 
-PROVIDERS = ("qq", "wechat")
+PROVIDERS = ("qq",)
 CAPABILITIES = {"receive": True, "reply": True, "proactive": False,
                 "contacts": False, "history": False, "ownerBinding": True}
 PERMISSIONS = {"receive": True, "reply": True, "proactive": False,
@@ -121,7 +121,7 @@ class SocialAccounts:
 
     def list_accounts(self):
         return {"accounts": [self.get(p) for p in PROVIDERS],
-                "providers": [{"id": p, "name": "QQ" if p == "qq" else "微信",
+                "providers": [{"id": p, "name": "QQ",
                                "auth": "personal_bridge", "oauthMessaging": False,
                                "capabilities": dict(CAPABILITIES)} for p in PROVIDERS]}
 
@@ -163,7 +163,7 @@ class SocialAccounts:
                     raise SocialError("Invalid connection address")
                 try:
                     parsed = urlsplit(endpoint)
-                    schemes = {"ws", "wss"} if provider == "qq" else {"http", "https"}
+                    schemes = {"ws", "wss"}
                     valid = not endpoint or parsed.scheme in schemes and bool(parsed.hostname) and not any((parsed.username, parsed.password, parsed.query, parsed.fragment))
                 except ValueError:
                     valid = False
@@ -284,7 +284,8 @@ class SocialAccounts:
 
     def authorize_send(self, account_id, peer_id, revision, *, audience):
         with self.lock:
-            account = next((row for row in self._read().values() if row.get("accountId") == account_id), None)
+            account = next((row for provider, row in self._read().items()
+                            if provider in PROVIDERS and row.get("provider") == provider and row.get("accountId") == account_id), None)
             if (not account or not account["enabled"] or account.get("quarantined")
                 or not account["permissions"]["reply"] or account["policyRevision"] != revision
                 or not self._peer_allowed(account, peer_id) or peer_id == account["expectedSelfId"]

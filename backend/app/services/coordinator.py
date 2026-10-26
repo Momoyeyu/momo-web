@@ -16,6 +16,7 @@ from ..core.plugin_host import PluginHost, HostError
 
 LEASE_SECONDS = 15
 STOP_SECONDS = 5
+RETIRED_CHANNEL_PLUGINS = {"momo-wechat": "wechat"}
 current_run: ContextVar[str] = ContextVar("coordinator_run", default="")
 
 
@@ -170,7 +171,7 @@ class Coordinator:
         if name == "receipt":
             self.record_receipt(data)
         elif name == "inbox":
-            if data.get("source") in {"qq", "wechat"}:
+            if data.get("source") in {"qq"}:
                 from .social import social
                 normalized = social.authorize_event(data)
                 if normalized:
@@ -208,6 +209,8 @@ class Coordinator:
         return "queued"
 
     def enqueue(self, source, account, external_id, text, *, peer_id="", sender_id="", self_id="", audience="owner", policy_revision=""):
+        if source not in {"meeting", "qq", "virtual"}:
+            raise CoordinationError("Unsupported message source")
         self.schema()
         # Provider ids are local to an account AND peer, never globally unique.
         canonical = json.dumps([self_id, peer_id, external_id], ensure_ascii=False, separators=(",", ":")) if peer_id else str(external_id)
@@ -226,7 +229,7 @@ class Coordinator:
     def _release_held(self):
         self.schema()
         with db.tx() as c:
-            c.execute("UPDATE inbox SET status=? WHERE status IN ('queued','held_inactive','held_focus','held_paused','held_interrupt') AND source!='meeting'", (self._pending_status("qq"),))
+            c.execute("UPDATE inbox SET status=? WHERE status IN ('queued','held_inactive','held_focus','held_paused','held_interrupt') AND source IN ('qq','virtual')", (self._pending_status("qq"),))
 
     def record_receipt(self, receipt):
         if not receipt.get("commandId") or receipt.get("status") not in {"unknown", "started", "stopped", "completed", "delivered", "failed", "closed_unknown"}:
@@ -259,6 +262,64 @@ class Coordinator:
         rows = db.query("SELECT * FROM outbox WHERE status='unknown'")
         return [r for r in rows if json.loads(r["payload"]).get("method") in {"plugins.callTool", "channels.send"} or json.loads(r["receipt"] or "{}").get("requiresReconciliation")]
 
+    @staticmethod
+    def _retired_channel_command(row):
+        try:
+            payload = json.loads(row["payload"])
+            params = payload.get("params", payload)
+            source = RETIRED_CHANNEL_PLUGINS.get(params.get("pluginId"))
+            if payload.get("method") == "channels.send" and source:
+                return source, params
+        except (ValueError, TypeError, AttributeError):
+            pass
+        return None
+
+    def retired_operations(self):
+        """Unresolved retired sends only; no account storage or credentials."""
+        self.schema()
+        records = []
+        for row in db.query("SELECT * FROM outbox WHERE status='unknown' ORDER BY at DESC"):
+            retired = self._retired_channel_command(row)
+            if retired:
+                source, params = retired
+                records.append({"commandId": row["command_id"], "source": source,
+                    "accountId": params.get("accountId"), "peerId": params.get("peerId"),
+                    "status": "unknown", "createdAt": row["at"], "deliveryStatus": "unknown"})
+                if len(records) == 100:
+                    break
+        return {"records": records}
+
+    def end_retired_wait(self, command_id, *, executor_stopped):
+        """A local human ends waiting, without inventing a delivery outcome."""
+        if executor_stopped is not True:
+            raise CoordinationError("Confirm the retired executor was stopped first")
+        with self.transition:
+            self.schema()
+            rows = db.query("SELECT * FROM outbox WHERE command_id=?", (command_id,))
+            row = rows[0] if rows else None
+            if row is None or not self._retired_channel_command(row):
+                raise ValueError("No matching retired unknown operation")
+            prior = json.loads(row["receipt"] or "{}")
+            if row["status"] == "closed_unknown" and prior.get("retired") is True and prior.get("executorStoppedByUser") is True:
+                return self.snapshot()
+            if row["status"] != "unknown":
+                raise ValueError("No matching retired unknown operation")
+            with self.condition:
+                if self.active:
+                    raise CoordinationError("Settle the active operation before reconciliation")
+            # The retired adapter cannot be loaded by this host. The explicit
+            # human attestation concerns any old standalone executor; it is
+            # not a claim of provider acceptance or machine-verified delivery.
+            self.record_receipt({"commandId": command_id, "runId": row["run_id"],
+                "activityEpoch": row["epoch"], "status": "closed_unknown",
+                "deliveryStatus": "unknown", "reconciled": True,
+                "retired": True, "executorStoppedByUser": True})
+            with self.condition:
+                self.condition.notify_all()
+            if self._unresolved_commands():
+                return self.snapshot()
+            return self._recover_attention_locked(resume_owner=False)
+
     def reconcile_command(self, command_id, outcome):
         if outcome not in {"completed", "failed", "closed_unknown"}:
             raise CoordinationError("An observed outcome or explicit close-unknown is required")
@@ -276,7 +337,7 @@ class Coordinator:
             if outcome == "closed_unknown" and payload.get("accountId"):
                 from .social import social
                 provider = str(payload.get("pluginId", "")).removeprefix("momo-")
-                if provider in {"qq", "wechat"}:
+                if provider in {"qq"}:
                     social.quarantine(provider)
             with self.condition:
                 self.condition.notify_all()
@@ -393,36 +454,39 @@ class Coordinator:
             self.owner["expiresAt"] = time.monotonic() + LEASE_SECONDS
             return self._lease()
 
-    def recover_attention(self):
+    def recover_attention(self, *, resume_owner=True):
         """Called only by the authenticated human reconciliation endpoint."""
         with self.transition:
-            self.schema()
-            if self._unresolved_commands():
-                raise CoordinationError("Other unknown commands still need reconciliation")
+            return self._recover_attention_locked(resume_owner=resume_owner)
+
+    def _recover_attention_locked(self, *, resume_owner):
+        self.schema()
+        if self._unresolved_commands():
+            raise CoordinationError("Other unknown commands still need reconciliation")
+        with self.condition:
+            self.mode = "stopping"
+        try:
+            self._revoke("human_recovery")
             with self.condition:
-                self.mode = "stopping"
-            try:
-                self._revoke("human_recovery")
-                with self.condition:
-                    owner_valid = bool(self.owner and self.owner["expiresAt"] > time.monotonic())
-                if owner_valid:
-                    self._grant()
-                with self.condition:
-                    if owner_valid and self.owner and self.owner["expiresAt"] > time.monotonic():
-                        self.mode = "meeting"
-                    else:
-                        self.owner, self.mode = None, "dormant"
-                        self.focus = False
-                        self._persist_attention_policy()
-                    self.presentation = None
-                    self.interrupt_hold = False
-                    self._release_held()
-                    self.condition.notify_all()
-                    return self.snapshot()
-            except (HostError, CoordinationError) as error:
-                with self.condition:
-                    self.mode = "paused"
-                raise CoordinationError("Executor stop or permission could not be confirmed") from error
+                owner_valid = bool(resume_owner and self.owner and self.owner["expiresAt"] > time.monotonic())
+            if owner_valid:
+                self._grant()
+            with self.condition:
+                if owner_valid and self.owner and self.owner["expiresAt"] > time.monotonic():
+                    self.mode = "meeting"
+                else:
+                    self.owner, self.mode = None, "dormant"
+                    self.focus = False
+                    self._persist_attention_policy()
+                self.presentation = None
+                self.interrupt_hold = False
+                self._release_held()
+                self.condition.notify_all()
+                return self.snapshot()
+        except (HostError, CoordinationError) as error:
+            with self.condition:
+                self.mode = "paused"
+            raise CoordinationError("Executor stop or permission could not be confirmed") from error
 
     def require_meeting(self, client, lease):
         with self.condition:
@@ -514,6 +578,8 @@ class Coordinator:
 
     @contextmanager
     def run(self, run_id, source="meeting", client=None, lease=None, *, account_id=None):
+        if source not in {"meeting", "qq", "virtual"}:
+            raise CoordinationError("Unsupported message source")
         with self.condition:
             if source == "meeting": self.require_meeting(client, lease)
             self.queue.append(run_id)
@@ -610,7 +676,7 @@ class Coordinator:
         # command. An uncertain or completed send is never retried here.
         with self.condition:
             held = (self.mode == "meeting" or self.rebinding and self.mode == "stopping") and (self.interrupt_hold or self.focus or self.phone_paused)
-            if not held or item["source"] not in {"qq", "wechat"}:
+            if not held or item["source"] not in {"qq"}:
                 return False
             with db.tx() as c:
                 if c.execute("SELECT 1 FROM outbox WHERE run_id=?", (item["run_id"],)).fetchone():
@@ -698,13 +764,18 @@ class Coordinator:
             rows = db.query("SELECT * FROM inbox WHERE status='queued' ORDER BY seq LIMIT 1")
             if not rows or rows[0]["source"] == "meeting": continue
             first = rows[0]
+            # Historical and restored inbox rows keep their text, but only
+            # reviewed current transports can acquire inference or delivery.
+            if first["source"] != "qq" and not (first["source"] == "virtual" and self.virtual_enabled):
+                self.inbox_status(first["id"], "held_scope")
+                continue
             rid = first["run_id"]
             try:
                 with self.run(rid, first["source"], account_id=first["account_id"]) as admission:
                     from . import turn, checkpoint
                     run_epoch, run_generation = admission
                     plugin_context = None
-                    if first["source"] in {"qq", "wechat"}:
+                    if first["source"] in {"qq"}:
                         from .social import social
                         from .turn_context import validate_plugin_context
                         incoming = {"source": first["source"], "accountId": first["account_id"], "peerId": first["peer_id"], "senderId": first["sender_id"], "selfId": first["self_id"], "conversationKind": "private", "externalMessageId": first["raw_external_id"], "text": first["text"], "policyRevision": int(first["policy_revision"] or 0)}
@@ -730,7 +801,7 @@ class Coordinator:
                             if not self._hold_unstarted_reply(first):
                                 self.inbox_status(first["id"], "interrupted")
                             continue
-                        if first["source"] in {"qq", "wechat"}:
+                        if first["source"] in {"qq"}:
                             normalized = social.authorize_event(incoming)
                             if normalized is None or normalized["audience"] != first["audience"] or not normalized["allowReply"]:
                                 self.inbox_status(first["id"], "held_scope")
@@ -743,14 +814,14 @@ class Coordinator:
                         current_run.reset(token)
                     reply = "".join(e.get("text", "") for e in events if e["t"] == "sentence")
                     if reply and self.valid_run(rid):
-                        method = "channels.send" if first["source"] in {"qq", "wechat"} else "virtual.deliver"
+                        method = "channels.send" if first["source"] in {"qq"} else "virtual.deliver"
                         params = {"text": reply, "accountId": first["account_id"]}
                         if method == "channels.send": params.update(pluginId="momo-" + first["source"], peerId=first["peer_id"], policyRevision=int(first["policy_revision"] or 0), audience=first["audience"])
                         result = self.command(method, params, rid)
                         receipt = result.get("receipt", result)
                         if receipt.get("status") in {"delivered", "completed"}:
                             gen = next(e["generation"] for e in events if e["t"] == "sentence")
-                            if first["source"] in {"qq", "wechat"}:
+                            if first["source"] in {"qq"}:
                                 checkpoint.acknowledge_external(rid, reply, receipt["commandId"])
                             else:
                                 checkpoint.acknowledge(rid, reply, gen)

@@ -1,9 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { PluginHost } from '../src/host.mjs';
 
@@ -39,11 +36,10 @@ async function onebot(t, { selfId = '123456', reply = true } = {}) {
   return { endpoint: `ws://127.0.0.1:${server.address().port}`, calls, setSelfId: value => { selfId = value; }, push: data => { for (const socket of sockets) socket.write(frame(data)); } };
 }
 async function setup(t, options = {}) {
-  const directory = options.channelStatePath ? null : await mkdtemp(join(tmpdir(), 'momo-host-test-'));
-  const events = [], host = new PluginHost({ emit: event => events.push(event), channelStatePath: directory ? join(directory, 'cursors.json') : options.channelStatePath, ...options }), token = 'test-token-'.repeat(5);
+  const events = [], host = new PluginHost({ emit: event => events.push(event), ...options }), token = 'test-token-'.repeat(5);
   const req = (method, params = {}) => host.request({ v: 1, id: randomUUID(), token, method, params });
   const hello = await req('hello', { coreInstance: 'core', token }); await req('heartbeat', { activityEpoch: 1 });
-  t.after(async () => { await host.close(); if (directory) await rm(directory, { recursive: true, force: true }); });
+  t.after(() => host.close());
   const permit = () => ({ coreInstance: 'core', hostInstance: hello.hostInstance, activityEpoch: host.epoch, runId: randomUUID(), commandId: randomUUID(), expiresAt: Date.now() + 5000 });
   return { req, host, events, permit };
 }
@@ -122,33 +118,6 @@ test('prompt context cannot escape when configuration is withdrawn during asynch
   await withdrawn;
 });
 
-test('WeChat context names the private text channel only for verified current peer and effective chat capability', async t => {
-  let health = { status: 'connected', actualSelfId: 'wxid_momo', identityKind: 'personal', identityVerified: true, executorQuiescent: true, capabilities: { receive: true, reply: true }, peers: [{ peerId: 'wxid_player', verified: true }] };
-  let sends = 0;
-  const server = createServer(async (request, response) => {
-    assert.equal(request.headers.authorization, 'Bearer wx-private');
-    for await (const _ of request) { /* consume */ }
-    response.setHeader('Content-Type', 'application/json');
-    if (request.url === '/v1/health') response.end(JSON.stringify(health));
-    else if (request.url.startsWith('/v1/inbox')) response.end('{"events":[],"cursor":"0"}');
-    else if (request.url === '/v1/send') { sends++; response.end('{}'); }
-    else response.end('{"executorQuiescent":true}');
-  });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => server.close(resolve)));
-  const { req } = await setup(t);
-  const endpoint = `http://127.0.0.1:${server.address().port}`;
-  await req('plugins.configure', { plugins: [{ id: 'momo-wechat', type: 'wechat', endpoint, accountId: 'wx-main', expectedSelfId: 'wxid_momo', credential: { token: 'wx-private' }, permissions: { receive: true, reply: true }, policyRevision: 3 }] });
-  const scope = { pluginId: 'momo-wechat', source: 'wechat', accountId: 'wx-main', peerId: 'wxid_player', policyRevision: 3 };
-  const result = await req('plugins.promptContext', scope);
-  assert.equal(result.scope, 'current_turn'); assert.equal(result.sections[0].id, 'wechat-private-chat');
-  assert.match(result.sections[0].content, /WeChat ordinary personal-account private chat/);
-  for (const secret of ['wxid_momo', 'wxid_player', 'wx-main', 'wx-private', endpoint]) assert.ok(!JSON.stringify(result).includes(secret));
-  await assert.rejects(req('plugins.promptContext', { ...scope, peerId: 'display name' }), { code: 'PEER_UNVERIFIED' });
-  health = { ...health, capabilities: { receive: true, reply: false } };
-  await assert.rejects(req('plugins.promptContext', scope), { code: 'CAPABILITY_UNAVAILABLE' });
-  assert.equal(sends, 0);
-});
-
 test('official QQ adapter verifies account, receives private events and sends only fixed text action', async t => {
   const bot = await onebot(t), { req, events, permit } = await setup(t);
   await req('plugins.configure', { plugins: [config(bot.endpoint)] });
@@ -201,25 +170,6 @@ test('a submitted QQ timeout is unknown, never retried, and explicit closed-unkn
   await assert.rejects(req('channels.send', { pluginId: 'momo-qq', accountId: 'qq-main', peerId: '456789', text: 'not until resumed', policyRevision: 1, permit: permit() }), { code: 'PLUGIN_UNAVAILABLE' });
 });
 
-test('WeChat gateway requires verified ordinary personal identity and pinned peers, then records client observation without claiming delivery', async t => {
-  const sent = [], server = createServer(async (request, response) => {
-    assert.equal(request.headers.authorization, 'Bearer wx-private');
-    let body = ''; for await (const chunk of request) body += chunk;
-    response.setHeader('Content-Type', 'application/json');
-    if (request.url === '/v1/health') response.end(JSON.stringify({ status: 'connected', actualSelfId: 'wxid_momo', identityKind: 'personal', identityVerified: true, executorQuiescent: true, capabilities: { receive: true, reply: true }, peers: [{ peerId: 'wxid_player', verified: true }] }));
-    else if (request.url.startsWith('/v1/inbox')) response.end(JSON.stringify({ events: [], cursor: '0' }));
-    else if (request.url === '/v1/send') { sent.push(JSON.parse(body)); response.end(JSON.stringify({ commandId: sent.at(-1).commandId, peerId: 'wxid_player', actualSelfId: 'wxid_momo', status: 'client_observed', executorQuiescent: true })); }
-    else if (request.url === '/v1/stop') response.end(JSON.stringify({ executorQuiescent: true }));
-    else { response.statusCode = 404; response.end('{}'); }
-  });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => server.close(resolve)));
-  const { req, permit } = await setup(t);
-  await req('plugins.configure', { plugins: [{ id: 'momo-wechat', type: 'wechat', endpoint: `http://127.0.0.1:${server.address().port}`, accountId: 'wx-main', expectedSelfId: 'wxid_momo', credential: { token: 'wx-private' }, permissions: { receive: true, reply: true }, policyRevision: 3, allowlistEnabled: false }] });
-  await assert.rejects(req('channels.send', { pluginId: 'momo-wechat', accountId: 'wx-main', peerId: 'display name', text: 'wrong identity', policyRevision: 3, permit: permit() }), { code: 'PEER_UNVERIFIED' });
-  const result = await req('channels.send', { pluginId: 'momo-wechat', accountId: 'wx-main', peerId: 'wxid_player', text: 'hi', policyRevision: 3, permit: permit() });
-  assert.equal(result.receipt.status, 'completed'); assert.equal(result.receipt.deliveryStatus, 'client_observed'); assert.equal(sent.length, 1);
-});
-
 test('QQ late provider confirmation is preserved on original command after timeout', async t => {
   const bot = await onebot(t, { reply: false }), { req, host, permit } = await setup(t);
   await req('plugins.configure', { plugins: [config(bot.endpoint)] });
@@ -244,86 +194,15 @@ test('withdrawn plugin gates prevent retries of unacknowledged old inbox events'
   release(); await changed;
 });
 
-test('WeChat HTTP server failure after submission stays unknown, not a safe failure', async t => {
-  const server = createServer(async (request, response) => {
-    for await (const _ of request) { /* consume */ }
-    response.setHeader('Content-Type', 'application/json');
-    if (request.url === '/v1/health') response.end(JSON.stringify({ status: 'connected', actualSelfId: 'wxid_momo', identityKind: 'personal', identityVerified: true, executorQuiescent: true, capabilities: { receive: true, reply: true }, peers: [{ peerId: 'wxid_player', verified: true }] }));
-    else if (request.url.startsWith('/v1/inbox')) response.end(JSON.stringify({ events: [], cursor: '0' }));
-    else { response.statusCode = 500; response.end(JSON.stringify({ status: 'unknown', error: 'backend failed after action', executorQuiescent: true })); }
-  });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => server.close(resolve)));
-  const { req, host, permit } = await setup(t);
-  await req('plugins.configure', { plugins: [{ id: 'momo-wechat', type: 'wechat', endpoint: `http://127.0.0.1:${server.address().port}`, accountId: 'wx-main', expectedSelfId: 'wxid_momo', credential: { token: 'wx-private' }, permissions: { receive: true, reply: true }, policyRevision: 1 }] });
-  const p = permit();
-  await assert.rejects(req('channels.send', { pluginId: 'momo-wechat', accountId: 'wx-main', peerId: 'wxid_player', text: 'once', policyRevision: 1, permit: p }), { code: 'OUTCOME_UNKNOWN' });
-  assert.equal(host.receipts.find(receipt => receipt.commandId === p.commandId).status, 'unknown');
-});
-
-test('WeChat identity-only authorization cannot dispatch chat even when user reply permission is enabled', async t => {
-  let sends = 0;
-  const server = createServer(async (request, response) => {
-    for await (const _ of request) { /* consume */ }
-    response.setHeader('Content-Type', 'application/json');
-    if (request.url === '/v1/health') response.end(JSON.stringify({ status: 'connected', actualSelfId: 'wxid_momo', identityKind: 'personal', identityVerified: true, executorQuiescent: true, capabilities: { receive: false, reply: false }, peers: [{ peerId: 'wxid_player', verified: true }] }));
-    else { sends++; response.end('{}'); }
-  });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => server.close(resolve)));
-  const { req, permit } = await setup(t);
-  await req('plugins.configure', { plugins: [{ id: 'momo-wechat', type: 'wechat', endpoint: `http://127.0.0.1:${server.address().port}`, accountId: 'wx-main', expectedSelfId: 'wxid_momo', credential: { token: 'wx-private' }, permissions: { receive: true, reply: true }, policyRevision: 1 }] });
-  await assert.rejects(req('channels.send', { pluginId: 'momo-wechat', accountId: 'wx-main', peerId: 'wxid_player', text: 'not allowed', policyRevision: 1, permit: permit() }), { code: 'CAPABILITY_UNAVAILABLE' });
-  assert.equal(sends, 0);
-});
-
-
-test('denied WeChat pages are durably discarded across host restart and allowlist relaxation', async t => {
-  const directory = await mkdtemp(join(tmpdir(), 'momo-cursor-')); t.after(() => rm(directory, { recursive: true, force: true }));
-  const statePath = join(directory, 'cursors.json'); let stored = [ { selfId: 'wxid_momo', peerId: 'wxid_player', senderId: 'wxid_player', conversationKind: 'private', externalMessageId: 'wxax:momo:player:1', text: 'previously denied' } ], acks = 0;
-  const server = createServer(async (request, response) => {
-    let body = ''; for await (const chunk of request) body += chunk;
-    response.setHeader('Content-Type', 'application/json');
-    if (request.url === '/v1/health') response.end(JSON.stringify({ status: 'connected', actualSelfId: 'wxid_momo', identityKind: 'personal', identityVerified: true, executorQuiescent: true, capabilities: { receive: true, reply: true, durableAck: true }, peers: [{ peerId: 'wxid_player', verified: true }] }));
-    else if (request.url.startsWith('/v1/inbox')) { const cursor = new URL(request.url, 'http://localhost').searchParams.get('cursor'); response.end(JSON.stringify({ events: cursor === '1' ? [] : stored, cursor: '1' })); }
-    else if (request.url === '/v1/ack') { assert.equal(JSON.parse(body).cursor, '1'); acks++; stored = []; response.end('{"acknowledged":true}'); }
-    else response.end('{}');
-  });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => server.close(resolve)));
-  const cfg = { id: 'momo-wechat', type: 'wechat', endpoint: `http://127.0.0.1:${server.address().port}`, accountId: 'wx-main', expectedSelfId: 'wxid_momo', credential: { token: 'wx-private' }, permissions: { receive: true, reply: true }, policyRevision: 1, allowlistEnabled: true, allowlist: [], pollMs: 100 };
-  const denied = await setup(t, { channelStatePath: statePath }); await denied.req('plugins.configure', { plugins: [cfg] });
-  await wait(80); assert.equal(denied.events.filter(e => e.event === 'inbox').length, 0);
-  assert.ok(acks > 0, 'all-denied page must be durably ACKed'); assert.equal(stored.length, 0);
-  assert.ok(!(await readFile(statePath, 'utf8')).includes('previously denied'));
-  await denied.host.close();
-  // Simulate a legacy / backed-up gateway keeping the old body: persisted cursor still fences it.
-  stored = [{ selfId: 'wxid_momo', peerId: 'wxid_player', senderId: 'wxid_player', conversationKind: 'private', externalMessageId: 'wxax:momo:player:1', text: 'previously denied' }];
-  const resumed = await setup(t, { channelStatePath: statePath }); await resumed.req('plugins.configure', { plugins: [{ ...cfg, policyRevision: 2, allowlistEnabled: false }] });
-  await wait(150); assert.equal(resumed.events.filter(e => e.event === 'inbox').length, 0);
-});
-
-test('fenced WeChat gateway needs a fresh bridge generation after host revoke', async t => {
-  let generation = 0, granted = false;
-  const sends = [];
-  const server = createServer(async (request, response) => {
-    let body = ''; for await (const chunk of request) body += chunk;
-    const input = body ? JSON.parse(body) : {};
-    response.setHeader('Content-Type', 'application/json');
-    if (request.url === '/v1/health') response.end(JSON.stringify({ status: 'connected', actualSelfId: 'wxid_momo', identityKind: 'personal', identityVerified: true, executorQuiescent: true, executionGeneration: granted ? generation : null, capabilities: { receive: true, reply: true, executionFence: true }, peers: [{ peerId: 'wxid_player', verified: true }] }));
-    else if (request.url.startsWith('/v1/inbox')) response.end('{"events":[],"cursor":"0"}');
-    else if (request.url === '/v1/grant') { generation++; granted = true; response.end(JSON.stringify({ executionGeneration: generation, executorQuiescent: true })); }
-    else if (request.url === '/v1/stop') { generation++; granted = false; response.end(JSON.stringify({ executionGeneration: generation, executorQuiescent: true })); }
-    else if (request.url === '/v1/send') {
-      assert.equal(granted, true); assert.equal(input.executionGeneration, generation);
-      sends.push(input.executionGeneration);
-      response.end(JSON.stringify({ commandId: input.commandId, peerId: input.peerId, actualSelfId: 'wxid_momo', status: 'client_observed', executorQuiescent: true }));
-    } else response.end('{}');
-  });
-  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => server.close(resolve)));
-  const { req, permit } = await setup(t);
-  await req('plugins.configure', { plugins: [{ id: 'momo-wechat', type: 'wechat', endpoint: `http://127.0.0.1:${server.address().port}`, accountId: 'wx-main', expectedSelfId: 'wxid_momo', credential: { token: 'wx-private' }, permissions: { receive: true, reply: true }, policyRevision: 1 }] });
-  const send = text => req('channels.send', { pluginId: 'momo-wechat', accountId: 'wx-main', peerId: 'wxid_player', text, policyRevision: 1, permit: permit() });
-  assert.equal((await send('first')).receipt.status, 'completed');
-  const stopped = await req('revoke', { activityEpoch: 2 }); assert.equal(stopped.stopped, true);
-  await req('grant', { activityEpoch: 2 });
-  assert.equal((await send('second')).receipt.status, 'completed');
-  assert.deepEqual(sends, [1, 3]);
+// Legacy account data may exist, but no adapter may reconnect to its gateway.
+test('retired WeChat configuration is rejected before any bridge connection or command', async t => {
+  const { req, host, events, permit } = await setup(t);
+  for (const enabled of [true, false]) {
+    await assert.rejects(req('plugins.configure', { plugins: [{ id: 'momo-wechat', type: 'wechat', enabled, endpoint: 'http://127.0.0.1:9848' }] }), { code: 'CONFIG' });
+  }
+  await assert.rejects(req('plugins.promptContext', { pluginId: 'momo-wechat', source: 'wechat', accountId: 'old-account', peerId: 'old-peer', policyRevision: 1 }), { code: 'PLUGIN_UNAVAILABLE' });
+  await assert.rejects(req('channels.send', { pluginId: 'momo-wechat', accountId: 'old-account', peerId: 'old-peer', text: 'must not execute', policyRevision: 1, permit: permit() }), { code: 'PLUGIN_UNAVAILABLE' });
+  assert.equal(host.plugins.size, 0);
+  assert.equal(host.commands.size, 0);
+  assert.ok(!events.some(event => event.event === 'inbox'));
 });

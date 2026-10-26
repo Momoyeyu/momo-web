@@ -595,6 +595,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/social/accounts/retired/end-wait": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End Retired Wait */
+        post: operations["end_retired_wait_api_social_accounts_retired_end_wait_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/retired/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Retired Records */
+        get: operations["retired_records_api_social_accounts_retired_records_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/social/accounts/{provider}": {
         parameters: {
             query?: never;
@@ -1175,6 +1209,13 @@ export interface components {
             restore: boolean;
             /** Runid */
             runId: string;
+        };
+        /** RetiredWaitIn */
+        RetiredWaitIn: {
+            /** Commandid */
+            commandId: string;
+            /** Executorstopped */
+            executorStopped: boolean;
         };
         /** SpeechIn */
         SpeechIn: {
@@ -2236,12 +2277,65 @@ export interface operations {
             };
         };
     };
+    end_retired_wait_api_social_accounts_retired_end_wait_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetiredWaitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retired_records_api_social_accounts_retired_records_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     save_api_social_accounts__provider__put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                provider: "qq" | "wechat";
+                provider: "qq";
             };
             cookie?: never;
         };
@@ -2276,7 +2370,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                provider: "qq" | "wechat";
+                provider: "qq";
             };
             cookie?: never;
         };
@@ -2307,7 +2401,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                provider: "qq" | "wechat";
+                provider: "qq";
             };
             cookie?: never;
         };
@@ -2338,7 +2432,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                provider: "qq" | "wechat";
+                provider: "qq";
             };
             cookie?: never;
         };
@@ -2373,7 +2467,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                provider: "qq" | "wechat";
+                provider: "qq";
             };
             cookie?: never;
         };
@@ -2408,7 +2502,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                provider: "qq" | "wechat";
+                provider: "qq";
             };
             cookie?: never;
         };
@@ -2439,7 +2533,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                provider: "qq" | "wechat";
+                provider: "qq";
             };
             cookie?: never;
         };

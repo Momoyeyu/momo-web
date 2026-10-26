@@ -1,14 +1,14 @@
-"""Local-user configuration for the two reviewed personal-account plugins."""
+"""Local-user configuration for the reviewed QQ personal-account plugin."""
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 from ..services.social import social, SocialError
 from ..services.coordinator import runtime, CoordinationError
 
 router = APIRouter(prefix="/api/social/accounts")
-Provider = Literal["qq", "wechat"]
+Provider = Literal["qq"]
 
 
 class PermissionIn(BaseModel):
@@ -49,6 +49,19 @@ class ReconcileIn(BaseModel):
     outcome: Literal["completed", "failed", "closed_unknown"]
 
 
+class RetiredWaitIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    commandId: str = Field(min_length=1, max_length=160)
+    executorStopped: StrictBool
+
+    @field_validator("executorStopped")
+    @classmethod
+    def require_stop_confirmation(cls, value):
+        if value is not True:
+            raise ValueError("Confirm the retired executor was stopped first")
+        return value
+
+
 def call(operation):
     try:
         return operation()
@@ -61,6 +74,22 @@ def call(operation):
 @router.get("")
 def accounts():
     return call(social.list_accounts)
+
+
+@router.get("/retired/records")
+def retired_records():
+    return call(runtime.retired_operations)
+
+
+@router.post("/retired/end-wait")
+def end_retired_wait(body: RetiredWaitIn):
+    def apply():
+        try:
+            attention = runtime.end_retired_wait(body.commandId, executor_stopped=body.executorStopped)
+        except ValueError as error:
+            raise SocialError(str(error)) from error
+        return {"ok": True, "records": runtime.retired_operations()["records"], "attention": attention}
+    return call(apply)
 
 
 @router.put("/{provider}")

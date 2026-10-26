@@ -1,4 +1,4 @@
-# QQ / 微信个人号桥接（004 / 005）
+# QQ 个人号桥接
 
 这是 momo 维护的官方插件，不表示腾讯官方认证。渠道通过 Python 唯一协调器收发，不创建独立的大脑。公开 OAuth 登录接口尚无已核实的普通个人号双向好友聊天权限；网页登录不等于聊天连接。
 
@@ -8,7 +8,7 @@
 
 | 方法 / 事件 | 内容 |
 | --- | --- |
-| `plugins.configure` | `momo-qq` / `momo-wechat`；账号、预期自身 ID、地址、私有令牌、权限、白名单、策略版本 |
+| `plugins.configure` | `momo-qq`；账号、预期自身 ID、地址、私有令牌、权限、白名单、策略版本 |
 | `plugins.promptContext` | 只读的当前回合渠道说明；核验插件、账号、联系人、策略版本和实际连接身份，不返回凭据 |
 | `channels.health` | 实际 ID、个人号身份、连接状态、真实能力、执行器静止证据；不返回令牌 |
 | `inbox` | 来源 / 插件 / 账号 / 自身 / 联系人 / 发送者 ID、私聊类型、事件 ID、正文、策略版本 |
@@ -20,15 +20,17 @@
 
 ### 模型如何知道自己在使用什么渠道
 
-当前渠道和联系人身份是两个独立事实：同一位玩家可以从本地 chat、QQ 或微信发消息。Python 每轮重新生成渠道事实，再合入已启用插件提供的 `current_turn` 说明，放在历史之后、本次输入之前。旧历史中的渠道猜测不能充当当前状态；切回本地 chat 后不沿用 QQ / 微信说明。
+当前渠道和联系人身份是两个独立事实：同一位玩家可以从本地 chat 或 QQ 发消息。Python 每轮重新生成渠道事实，再合入已启用插件提供的 `current_turn` 说明，放在历史之后、本次输入之前。旧历史中的渠道猜测不能充当当前状态；切回本地 chat 后不沿用 QQ 说明。
 
 插件提供的是经过审查的适配器静态说明，包含平台名称、私聊文字交互方式、自动回复路径与实际能力边界。它补充本轮提示词，不改写 soul，也不授予账号权限。账号配置、第三方工具返回值、联系人消息和凭据不能通过这个接口变成系统指令。上下文须匹配当前插件 / 渠道，限制段数和总长度；不可用或不匹配时保留输入并暂停该回合，不能凭旧上下文继续推理。
 
-QQ / 微信的最终回复由协调器投递到原私聊，模型不需要调用额外的发送工具，因此仅修改工具描述不足以提供当前渠道信息。远端回合不提供本地 `attention_control` 或 Live2D 演出指令；即使联系人已证明是玩家，也不据此开放本地专注控制。等待渠道核验期间若停止、开启专注或改变联系人归属，必须在推理前复核活动代际、权限与 audience，不能把已取消的输入重新归入新回合。
+QQ 的最终回复由协调器投递到原私聊，模型不需要调用额外的发送工具，因此仅修改工具描述不足以提供当前渠道信息。远端回合不提供本地 `attention_control` 或 Live2D 演出指令；即使联系人已证明是玩家，也不据此开放本地专注控制。等待渠道核验期间若停止、开启专注或改变联系人归属，必须在推理前复核活动代际、权限与 audience，不能把已取消的输入重新归入新回合。
 
-## QQ：OneBot 11 正向 WebSocket
+## QQ：OneBot 11 开发通信原型
 
-由用户自行运行 [NapCat](https://github.com/NapNeko/NapCatQQ)。NapCat 不是 MIT 许可；本项目不复制、修改或分发其源码 / 二进制，也不修改日常 QQ。Mac 部署可参考独立的 [Mac Installer](https://github.com/NapNeko/NapCat-Mac-Installer)。
+当前适配器连接独立的 OneBot 正向 WebSocket，用于开发协议与隔离 fixture 验证。这不是推荐给玩家的外部安装流程，也不表示设置内扫码和受管原生运行已经交付。[原生运行关口记录](qq-managed-runtime.md)说明当前账号目录隔离、启动资源及分发条件的缺口；上游 Mac 安装器共享日常 QQ 的登录数据，不能直接包装成独立实例。本项目目前不复制或分发 NapCat / QQ 二进制。
+
+以下保留开发协议合同；测试中使用合成 OneBot 服务，不要求玩家部署桥接：
 
 1. 专用会话扫码登录 momo 个人号，开启 OneBot 正向 WS 并设置随机 access token。
 2. 配置例如 `ws://127.0.0.1:3001`、私有令牌、momo QQ 号。远程必须 WSS。
@@ -38,65 +40,21 @@ QQ / 微信的最终回复由协调器投递到原私聊，模型不需要调用
 
 message ID 只证明平台 / 桥接接受，不能声称对方已读。入站标识组合自身号、私聊对象、平台时间与 sequence / message ID，后端持久去重。OneBot 推送没有持久 ACK，host 只能重试本进程仍保留的事件；桥接重启缺口仍需真实 E2E。
 
-## 微信：窄 HTTP 网关
+## 005 微信原型已归档
 
-Bearer 令牌认证，远程 HTTPS，本地仅 loopback HTTP：
+微信接入已从当前产品移除。宿主不再注册微信适配器，后端账号 API 只接受 QQ；旧微信配置不能建立连接、授权新来信或发送回复。Mac AX 桥接脚本、专用依赖、cursor 存储实现和对应协议测试已删除，本文不再提供运行方法。
 
-- GET /v1/health：status、actualSelfId、identityKind=personal、identityVerified、executorQuiescent、capabilities、verified peers；支持安全停止的桥还返回 executionFence 与 executionGeneration。
-- GET /v1/inbox?cursor=…：events 与 cursor；身份字段同统一 inbox。
-- POST /v1/grant：停止后显式授予新的 executionGeneration；带围栏的桥在首次连接后也必须先授予。
-- POST /v1/send：commandId / expectedSelfId / peerId / text / executionGeneration。响应回带原命令、账号、联系人、静止证明。结果为 client_observed / provider_accepted / provider_rejected / unknown。
-- POST /v1/stop：使旧 generation 立即失效，再等待执行器停止；取消请求不能冒充停止 UI 操作。HTTP handler 在读取请求正文前取得准入 generation，迟到的旧请求不能在 stop 后执行。旧桥仍可按权限收发，但不能提供可信的 executorQuiescent 证明。
-- 可选 durableAck 能力：POST /v1/ack 确认已处理或明确拒绝的 cursor，实验桥据此删除暂存正文；快照只保留散列。Host 将按账号、自身 ID 和端点隔离的 cursor 原子写入 `MOMO_DATA_DIR/private/channel-cursors.json`（0600，仅元数据），重配权限或重启后不会重读旧的拒绝页。
+历史中的 `source=wechat`、原始消息与真实回执仍作为既有事实保留。已有或恢复的微信收件任务被保留并禁止执行；worker 遇到旧的 queued 项时标记为 `held_scope`，不会进入推理或虚拟渠道投递；私有账号记录与原有用户数据不在此次移除中删除或迁移。以往假网关 / AX 驱动的通过记录只说明旧原型当时的测试结果，不代表当前存在微信能力；此前也未完成真实微信账号验收。
 
-没有可验证身份、联系人或停止证据就不能启用；不提供匿名接口、CORS 或任意 MCP / UI 工具。
+已有未知发送通过独立的归档恢复接口处理，不重新开放微信账号配置：
 
-### Mac AX 实验桥
+| 本机鉴权接口 | 合同 |
+| --- | --- |
+| `GET /api/social/accounts/retired/records` | 只列既有 `momo-wechat` / `channels.send` 未知操作的命令、账号、联系人与时间元数据；不读取账号配置或凭据，没有此类操作时为空 |
+| `POST /api/social/accounts/retired/end-wait` | 接收原 `commandId` 与严格的 `executorStopped: true`，由本机用户明确确认旧桥接执行器已停止后结束等待；不能指定成功 / 失败结果或任意插件 |
 
-`scripts/wechat-bridge.py` 参考 [wechat-mcp 的 WeChat 4.x AX 研究](https://github.com/dustin573/wechat-mcp)，独立实现窄网关，不包含其完整 MCP。仅直接定位 AX 元素，不激活应用、不抢焦点、不发全局点击 / 按键、不搜索联系人。
-
-```sh
-uv venv .workbuddy/wechat-bridge-venv --python 3.14
-uv pip install --python .workbuddy/wechat-bridge-venv/bin/python -r scripts/wechat-bridge-requirements.txt
-chmod 600 /absolute/private/wechat-bridge.json
-.workbuddy/wechat-bridge-venv/bin/python scripts/wechat-bridge.py \
-  --config /absolute/private/wechat-bridge.json \
-  --state-dir /absolute/private/wechat-bridge-state --doctor
-```
-
-配置示意（selector 是占位说明，不能作为真实验证）：
-
-```json
-{
-  "token": "a-private-random-token-at-least-24-characters",
-  "dedicatedSessionAcknowledged": false,
-  "expectedSelfId": "wxid_momo",
-  "selfIdentity": { "identifier": "verified-account-id-field", "value": "wxid_momo" },
-  "chatIdentifier": "chat_detail_view",
-  "headerIdentifier": "chat_header",
-  "peers": [{
-    "peerId": "wxid_player",
-    "privateConfirmed": true,
-    "identity": { "identifier": "verified-peer-id-field", "value": "wxid_player" }
-  }],
-  "editorIdentifier": "chat_input_text_view",
-  "sendIdentifier": "chat_send_button"
-}
-```
-
-先由玩家登录专用 momo 号，再核验实际版本的账号 / 联系人 ID 唯一 AX 定位和发送控件。联系人身份、消息列表、编辑器和发送按钮必须同属唯一当前私聊子树；发送前再次定位并核验。缺失时 doctor 返回 setup_required，不能直接把 expectedSelfId 当实际身份；显示名和第一个同名会话不作身份证据。专用会话必须明确确认，不能用于日常微信。
-
-就绪后移除 --doctor，仅监听 127.0.0.1:9848。AX / 屏幕录制权限由用户自行授予；桥接不会自动申请或操作登录窗口。
-
-### 验收边界
-
-- 本机安装 WeChat 4.1.13；尚未登录准备的 momo 号，真实 identity selector / 收发仍待账号级 spike，不能声称微信已打通。
-- 实验桥仅处理已验证且**当前可见的单个私聊**，不后台切换 / 遍历好友。全联系人连续监听需稳定原生 ID 网关，或后续受调度的 UI 导航。
-- 首屏历史只建立基线；后续匹配连续窗口重叠区，在 SQLite 内分配持久序号。无重叠不猜测；相同文字的两条消息保留不同序号。
-- 发送者从内存中的微信自身窗口截图左右边距判断，身份 / 窗口 / 归属不明即拒绝。截图不保存、不发送给外部视觉服务。
-- 命令操作前持久登记，重启不重放。观察到自身气泡仅记 client_observed，不能声称服务器送达或对方已读。
-- 桥接 JSON / SQLite / 会话 / 录屏属于私有用户数据，不能进 Git、默认导出或发布包。
+结束等待新增 `closed_unknown` 回执，投递证据仍为 `unknown`；保留原回执与正文，人工停止确认不冒充机器核验的静止证明。重复确认不重写事实，也不打断后来新建的 Boot 租约。其他未知外部副作用仍须核对；全部屏障清除后回到待机，下一次显式 Boot 才允许执行。原命令实际迟到的回执仍可补记事实，不能因此重连、重发或消费旧微信队列。设置仅在存在这些未结操作时展示归档恢复说明。
 
 ## 测试
 
-`npm --prefix plugin-host test` 覆盖隔离 OneBot WS / HTTP 网关 fixtures、Mac AX 绑定歧义与 journal 去重 / unknown 恢复。fixture 证明协议和故障语义，不能替代真实账号登录、客户端 AX 和跨端收发 E2E。
+`npm --prefix plugin-host test` 使用隔离 OneBot WS / MCP fixtures，覆盖 QQ 身份核验、权限与白名单、未知结果不重发、真实迟到回执，以及已归档微信配置和发送被拒绝。后端回归覆盖已归档账号不可授权、API 拒绝、旧队列正文保留且不执行，以及未知操作的鉴权、明确确认、幂等恢复和恢复后 Boot。fixture 证明协议和故障语义，真实账号登录与跨端收发仍需本人验收。

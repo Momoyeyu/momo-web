@@ -1,6 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { randomUUID } from 'node:crypto';
 
 export class ChannelError extends Error {
   constructor(code, message, submitted = false) { super(message); this.code = code; this.submitted = submitted; }
@@ -13,43 +11,6 @@ const disabledCapabilities = Object.freeze(Object.fromEntries(Object.keys(capabi
 // account identifiers, message bodies, or third-party prompt/tool metadata.
 const privateChatContext = platform => `Current conversation channel: ${platform} ordinary personal-account private chat. You are using your own ${platform} account to exchange private text messages with the current conversation partner. Your final answer will automatically be delivered to this same conversation; do not call or invent an additional send tool. Reply naturally in plain text suitable for a messaging app. Do not include Live2D/ACT controls, voice instructions, action tags, or stage directions. This context grants no ability to inspect contacts or older messages, start proactive conversations, handle groups, or perform unsupported actions. Do not claim those capabilities. Do not infer a person's identity or ownership, or physical phone/computer hardware, from channel or account identifiers. Follow the existing persona, privacy boundaries, and permissions; the channel does not replace them.`;
 const qqPromptContent = privateChatContext('QQ');
-const wechatPromptContent = privateChatContext('WeChat');
-
-export class ChannelCursorStore {
-  constructor(path) { this.path = path; this.writes = Promise.resolve(); }
-  key(config) { return createHash('sha256').update(JSON.stringify([config.accountId, config.expectedSelfId, config.endpoint])).digest('hex'); }
-  async load(config) {
-    try {
-      const state = JSON.parse(await readFile(this.path, 'utf8'));
-      if (state.version !== 1 || !state.cursors || typeof state.cursors !== 'object') throw Error('invalid cursor state');
-      const cursor = state.cursors[this.key(config)];
-      if (cursor === undefined) return '';
-      if (!/^\d{1,20}$/.test(cursor)) throw Error('invalid cursor');
-      return cursor;
-    } catch (cause) {
-      if (cause?.code === 'ENOENT') return '';
-      throw error('CURSOR_STATE', 'Private channel cursor state is unavailable');
-    }
-  }
-  async save(config, cursor) {
-    if (!/^\d{1,20}$/.test(cursor)) throw error('BRIDGE_PROTOCOL', 'WeChat cursor is invalid');
-    const write = async () => {
-      let state = { version: 1, cursors: {} };
-      try { state = JSON.parse(await readFile(this.path, 'utf8')); }
-      catch (cause) { if (cause?.code !== 'ENOENT') throw cause; }
-      if (state.version !== 1 || !state.cursors || typeof state.cursors !== 'object') throw Error('invalid cursor state');
-      state.cursors[this.key(config)] = cursor;
-      const directory = dirname(this.path);
-      await mkdir(directory, { recursive: true, mode: 0o700 });
-      const temporary = `${this.path}.${randomUUID()}.tmp`;
-      try { await writeFile(temporary, JSON.stringify(state), { mode: 0o600, flag: 'wx' }); await rename(temporary, this.path); }
-      finally { await rm(temporary, { force: true }); }
-    };
-    const pending = this.writes.then(write);
-    this.writes = pending.catch(() => {});
-    try { await pending; } catch { throw error('CURSOR_STATE', 'Private channel cursor state could not be saved'); }
-  }
-}
 
 function endpoint(config, protocols) {
   let url;
@@ -65,14 +26,13 @@ function endpoint(config, protocols) {
 
 /** Built-in adapters expose only private text events and fixed-recipient sends. */
 export class PersonalChannel {
-  constructor(config, { onInbox, onState = () => {}, onLateReceipt = () => {}, active = () => true, now = Date.now, cursorStore } = {}) {
+  constructor(config, { onInbox, onState = () => {}, onLateReceipt = () => {}, active = () => true, now = Date.now } = {}) {
     this.config = config;
     this.onInbox = onInbox;
     this.onState = onState;
     this.onLateReceipt = onLateReceipt;
     this.active = active;
     this.now = now;
-    this.cursorStore = cursorStore;
     this.pendingInbox = new Map();
     this.status = 'connecting';
     this.actualSelfId = null;
@@ -204,109 +164,4 @@ export class QQChannel extends PersonalChannel {
   }
   async stop() { return { executorQuiescent: this.activeSends === 0 }; }
   async close() { await super.close(); for (const entry of this.rpcPending?.values() ?? []) { clearTimeout(entry.timer); entry.cleanup?.(); entry.reject?.(error('OUTCOME_UNKNOWN', 'QQ connection closed before confirmation', entry.submitted)); } this.rpcPending?.clear(); this.socket?.close(); }
-}
-
-export class WeChatChannel extends PersonalChannel {
-  verifiedPromptPeer(peerId) { return this.peers?.has(peerId) === true; }
-  async verifyPromptScope(peerId) {
-    this.checkPromptScope(peerId);
-    await this.refreshHealth();
-    this.checkPromptScope(peerId);
-  }
-  promptContext() { return [{ id: 'wechat-private-chat', content: wechatPromptContent }]; }
-  async connect() {
-    this.url = endpoint(this.config, ['http:', 'https:']);
-    this.controllers = new Set();
-    this.cursor = this.cursorStore ? await this.cursorStore.load(this.config) : '';
-    this.pageCursor = null;
-    await this.refreshHealth();
-    if (this.status !== 'connected') throw error('LOGIN_REQUIRED', 'WeChat bridge requires a verified personal account session');
-    if (this.durableAck && this.cursor) await this.http('/v1/ack', { body: { expectedSelfId: this.config.expectedSelfId, cursor: this.cursor } });
-    this.pollTimer = setInterval(() => { void this.poll(); }, Math.max(100, Math.min(Number(this.config.pollMs) || 1000, 10000)));
-    this.pollTimer.unref();
-    void this.poll();
-  }
-  async http(path, { body, signal, submitted = false, beforeDispatch = () => {} } = {}) {
-    const controller = new AbortController(); this.controllers.add(controller);
-    const abort = () => controller.abort(); signal?.addEventListener('abort', abort, { once: true });
-    if (signal?.aborted) controller.abort();
-    const timer = setTimeout(abort, Math.max(50, Math.min(Number(this.config.timeoutMs) || 10000, 30000)));
-    try {
-      if (controller.signal.aborted) throw error('CANCELLED', 'WeChat request was stopped');
-      beforeDispatch();
-      const response = await fetch(new URL(path, this.url), { method: body === undefined ? 'GET' : 'POST', headers: { Authorization: `Bearer ${this.config.credential.token}`, ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), signal: controller.signal, redirect: 'error' });
-      const text = await response.text(); if (text.length > 1024 * 1024) throw error('BRIDGE_PROTOCOL', 'WeChat response exceeds supported size', submitted);
-      let result; try { result = JSON.parse(text); } catch { throw error('BRIDGE_PROTOCOL', 'WeChat bridge returned an invalid response', submitted); }
-      if (!response.ok) {
-        const knownUnsent = [401, 403, 409].includes(response.status) && (response.status === 401 || result.status === 'not_sent');
-        if (submitted && !knownUnsent) throw error('OUTCOME_UNKNOWN', 'WeChat gateway failed after submission; verify the original command', true);
-        throw error(response.status === 401 ? 'UNAUTHORIZED' : 'PROVIDER_REJECTED', 'WeChat bridge rejected the operation');
-      }
-      return result;
-    } catch (cause) { if (cause instanceof ChannelError) throw cause; throw error(submitted ? 'OUTCOME_UNKNOWN' : 'BRIDGE_UNAVAILABLE', submitted ? 'WeChat send outcome is unknown' : 'WeChat bridge is unavailable', submitted); }
-    finally { clearTimeout(timer); signal?.removeEventListener('abort', abort); this.controllers.delete(controller); }
-  }
-  async refreshHealth() {
-    const health = await this.http('/v1/health');
-    if (health.actualSelfId !== this.config.expectedSelfId || health.identityKind !== 'personal' || health.identityVerified !== true) { this.state('identity_mismatch', 'ACCOUNT_MISMATCH'); throw error('ACCOUNT_MISMATCH', 'WeChat personal account identity is not verified'); }
-    this.actualSelfId = health.actualSelfId;
-    this.durableAck = health.capabilities?.durableAck === true;
-    this.executionFence = health.capabilities?.executionFence === true;
-    this.executionGeneration = this.executionFence && Number.isSafeInteger(health.executionGeneration) ? health.executionGeneration : null;
-    this.remoteQuiescent = this.executionFence && health.executorQuiescent === true;
-    this.remoteCapabilities = { ...disabledCapabilities, receive: health.capabilities?.receive === true, reply: health.capabilities?.reply === true };
-    this.peers = new Set((Array.isArray(health.peers) ? health.peers : []).filter(peer => peer.verified === true && opaque(peer.peerId)).map(peer => peer.peerId));
-    this.state(health.status === 'connected' ? 'connected' : 'login_required');
-    return this.health();
-  }
-  async poll() {
-    if (this.closed || this.polling || this.pendingInbox.size || !this.active() || this.status !== 'connected' || !this.config.permissions?.receive || this.remoteCapabilities?.receive !== true) return;
-    this.polling = true;
-    try {
-      const data = await this.http(`/v1/inbox?cursor=${encodeURIComponent(this.cursor)}`);
-      if (!Array.isArray(data.events) || data.events.length > 100 || typeof data.cursor !== 'string' || data.cursor.length > 200) throw error('BRIDGE_PROTOCOL', 'WeChat inbox response is invalid');
-      for (const item of data.events) { if (this.peers.has(item.peerId)) this.receive(item); }
-      this.pageCursor = data.cursor;
-      if (!this.pendingInbox.size) await this.commitPage();
-    } catch (cause) { if (!this.closed) this.lastError = cause instanceof ChannelError ? cause.code : 'BRIDGE_UNAVAILABLE'; }
-    finally { this.polling = false; }
-  }
-  async ack(inboxId) {
-    const result = super.ack(inboxId);
-    if (!this.pendingInbox.size) await this.commitPage();
-    return result;
-  }
-  async commitPage() {
-    if (this.pageCursor === null || this.pageCursor === this.cursor) return;
-    if (this.cursorStore) await this.cursorStore.save(this.config, this.pageCursor);
-    this.cursor = this.pageCursor;
-    if (this.durableAck) await this.http('/v1/ack', { body: { expectedSelfId: this.config.expectedSelfId, cursor: this.pageCursor } });
-  }
-  async send({ peerId, text, commandId, signal, beforeDispatch }) {
-    this.check(peerId, 'reply');
-    await this.refreshHealth();
-    if (this.executionFence && this.executionGeneration === null) throw error('BRIDGE_PAUSED', 'WeChat bridge requires a fresh execution grant');
-    if (!this.peers.has(peerId)) throw error('PEER_UNVERIFIED', 'WeChat recipient must have a verified unique binding');
-    this.activeSends++; this.remoteQuiescent = false;
-    try {
-      const result = await this.http('/v1/send', { body: { commandId, expectedSelfId: this.config.expectedSelfId, peerId, text, ...(this.executionFence ? { executionGeneration: this.executionGeneration } : {}) }, signal, submitted: true, beforeDispatch: () => { this.check(peerId, 'reply'); beforeDispatch(); } });
-      if (result.commandId !== commandId || result.peerId !== peerId || result.actualSelfId !== this.actualSelfId || result.executorQuiescent !== true || !['client_observed', 'provider_accepted', 'provider_rejected'].includes(result.status)) throw error('OUTCOME_UNKNOWN', 'WeChat send confirmation does not match the original command', true);
-      this.remoteQuiescent = this.executionFence;
-      if (result.status === 'provider_rejected') throw error('PROVIDER_REJECTED', 'WeChat bridge rejected the operation');
-      return { deliveryStatus: result.status, ...(opaque(result.externalMessageId) ? { externalMessageId: result.externalMessageId } : {}) };
-    } finally { this.activeSends--; }
-  }
-  async stop() {
-    try { const result = await this.http('/v1/stop', { body: { expectedSelfId: this.config.expectedSelfId } }); this.executionGeneration = null; this.remoteQuiescent = this.executionFence && result.executorQuiescent === true; }
-    catch { this.remoteQuiescent = false; }
-    return { executorQuiescent: this.activeSends === 0 && this.remoteQuiescent };
-  }
-  async grant() {
-    if (!this.executionFence) return;
-    const result = await this.http('/v1/grant', { body: { expectedSelfId: this.config.expectedSelfId } });
-    if (!Number.isSafeInteger(result.executionGeneration) || result.executorQuiescent !== true) throw error('BRIDGE_PROTOCOL', 'WeChat execution grant is invalid');
-    this.executionGeneration = result.executionGeneration;
-    this.remoteQuiescent = true;
-  }
-  async close() { clearInterval(this.pollTimer); for (const controller of this.controllers ?? []) controller.abort(); if (!this.closed && (this.executionFence || !this.remoteQuiescent)) await this.stop(); await super.close(); }
 }

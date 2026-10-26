@@ -5,8 +5,7 @@ export const en: Dict = {
   "official": "Official plugins",
   "officialHint": "Momo uses her own accounts. Connections, permissions, and records are configured separately. Activities run only after Boot.",
   "providers": {
-    "qq": "QQ",
-    "wechat": "WeChat"
+    "qq": "QQ"
   },
   "enableProvider": "Enable {provider}",
   "noAccount": "No account configured",
@@ -36,6 +35,17 @@ export const en: Dict = {
     "records": "Records"
   },
   "recordsError": "Records are unavailable.",
+  "retiredTitle": "Unresolved archived operations ({count})",
+  "retiredHint": "These records came from the retired WeChat bridge.",
+  "retiredSource": "Retired WeChat operation",
+  "retiredAccount": "Old account",
+  "retiredPeer": "Original conversation",
+  "retiredMetadataMissing": "Not recorded",
+  "retiredUnknown": "Whether the message was sent remains unknown. Ending the wait only releases this old operation; it does not resend the message or restore WeChat.",
+  "retiredExecutorStopped": "I stopped the old WeChat bridge and its executor process, and confirmed they cannot continue sending.",
+  "endRetiredWait": "End wait",
+  "endingRetiredWait": "Ending wait…",
+  "retiredEndWaitError": "Could not end the wait. Confirm the old bridge and its executor have stopped, then retry.",
   "actionError": "Action failed. Check the connection and account, then retry.",
   "enabled": "Enable plugin",
   "expectedIdentity": "Momo’s account ID",
@@ -50,12 +60,11 @@ export const en: Dict = {
   "tokenHint": "Stored by the backend, excluded from models and default backups. Leave blank to keep the saved secret.",
   "tokenSaved": "Saved; leave blank to keep",
   "qqConnectionHint": "Sign in to momo’s personal account in a dedicated QQ client and connect a supported OneBot bridge. Website sign-in alone does not grant chat access.",
-  "wechatConnectionHint": "Connect a controlled bridge for a dedicated WeChat session. Account identity, unique conversation targeting, and messaging must pass verification.",
   "connect": "Save and connect",
   "disconnect": "Disconnect",
   "resume": "Resume new messages after review",
   "ownerBinding": "Link player identity",
-  "ownerHint": "Proof of account ownership is required to share your private memories across chat, QQ, and WeChat. Other contacts can chat within their permissions, with separate memories.",
+  "ownerHint": "Proof of account ownership is required to share your private memories across chat and QQ. Other contacts can chat within their permissions, with separate memories.",
   "ownerVerified": "Verified player: {id}",
   "peerId": "Your peer ID",
   "createChallenge": "Create verification code",
@@ -115,7 +124,6 @@ export const en: Dict = {
   "stopPhone": "Stop phone activity",
   "resumePhone": "Resume phone",
   "qq": "Replying on QQ…",
-  "wechat": "Replying on WeChat…",
   "controlError": "Could not update activity. Please retry."
 },
   meeting: {

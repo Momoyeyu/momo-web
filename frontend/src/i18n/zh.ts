@@ -5,8 +5,7 @@ export const zh = {
   "official": "官方插件",
   "officialHint": "让 momo 使用自己的账号。每项插件的连接、权限与记录独立设置；只有启动后才会执行。",
   "providers": {
-    "qq": "QQ",
-    "wechat": "微信"
+    "qq": "QQ"
   },
   "enableProvider": "启用 {provider}",
   "noAccount": "尚未配置账号",
@@ -36,6 +35,17 @@ export const zh = {
     "records": "记录"
   },
   "recordsError": "暂时无法读取记录。",
+  "retiredTitle": "历史未确认操作（{count}）",
+  "retiredHint": "这些记录来自已停用的微信桥接。",
+  "retiredSource": "已停用的微信操作",
+  "retiredAccount": "旧账号",
+  "retiredPeer": "原会话",
+  "retiredMetadataMissing": "未记录",
+  "retiredUnknown": "消息是否发出仍未知。结束等待只解除旧操作的等待，不会重发消息，也不会恢复微信。",
+  "retiredExecutorStopped": "我已停止旧微信桥接及其执行进程，并确认它不会继续发送。",
+  "endRetiredWait": "结束等待",
+  "endingRetiredWait": "正在结束等待…",
+  "retiredEndWaitError": "暂时无法结束等待。请确认旧桥接及其执行进程已停止，再重试。",
   "actionError": "操作未完成，请检查连接与账号后重试。",
   "enabled": "启用插件",
   "expectedIdentity": "momo 的账号 ID",
@@ -50,12 +60,11 @@ export const zh = {
   "tokenHint": "由后端保管，不进入模型或默认备份。留空保留已有密钥。",
   "tokenSaved": "已保存；留空保持",
   "qqConnectionHint": "在专用 QQ 客户端登录 momo 的个人号，然后连接受支持的 OneBot 桥接。网页登录不代表已获得聊天权限。",
-  "wechatConnectionHint": "连接专用微信会话的受控桥接。需要实际账号、唯一会话定位与收发能力核验，未通过时不会显示已连接。",
   "connect": "保存并连接",
   "disconnect": "断开连接",
   "resume": "核对后恢复新消息",
   "ownerBinding": "关联玩家身份",
-  "ownerHint": "跨 chat、QQ、微信承接你的私人记忆需要证明账号归属。其他好友仍可按权限聊天，各自记忆隔离。",
+  "ownerHint": "跨 chat、QQ 承接你的私人记忆需要证明账号归属。其他好友仍可按权限聊天，各自记忆隔离。",
   "ownerVerified": "已核验玩家：{id}",
   "peerId": "你的对端 ID",
   "createChallenge": "生成核验口令",
@@ -115,7 +124,6 @@ export const zh = {
   "stopPhone": "叫停手机活动",
   "resumePhone": "继续手机活动",
   "qq": "在回 QQ 消息…",
-  "wechat": "在回微信消息…",
   "controlError": "暂时未能变更活动状态，请重试。"
 },
   meeting: {

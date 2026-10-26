@@ -9,7 +9,7 @@ import re
 
 
 def validate_plugin_context(context, source):
-    if (not isinstance(context, dict)
+    if (source != "qq" or not isinstance(context, dict)
         or set(context) != {"pluginId", "source", "scope", "sections"}
         or context["source"] != source
         or context["pluginId"] != "momo-" + source
@@ -35,8 +35,10 @@ def validate_plugin_context(context, source):
 
 
 def build_turn_context(source, *, owner, plugin_context=None):
+    if source not in {"meeting", "qq", "virtual"}:
+        raise ValueError("Unsupported current interaction channel")
     local = source == "meeting"
-    label = {"meeting": "chat", "qq": "QQ", "wechat": "WeChat", "virtual": "virtual test channel"}.get(source, "external channel")
+    label = {"meeting": "chat", "qq": "QQ", "virtual": "virtual test channel"}[source]
     lines = ["# Current interaction (this turn only)", "Current reply channel: " + label + "."]
     if local:
         lines.append("The player is talking to you in the local chat interface. This current channel fact supersedes references to other channels in past dialogue.")

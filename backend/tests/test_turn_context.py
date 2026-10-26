@@ -35,17 +35,30 @@ def test_linked_owner_qq_turn_identifies_actual_channel(monkeypatch):
     assert prompt.load_soul() in messages[0]["content"]
 
 
-@pytest.mark.parametrize("source,label", [("qq", "QQ"), ("wechat", "WeChat")])
-def test_current_plugin_context_reaches_provider_after_history(monkeypatch, source, label):
+def test_current_plugin_context_reaches_provider_after_history(monkeypatch):
     gen = checkpoint.generation()
     checkpoint.begin_turn("old message", gen, "past", source="qq")
     checkpoint.append_sentence("I was using another app.", gen, "past")
     checkpoint.acknowledge(checkpoint.current_run(gen, "past"), "I was using another app.", gen)
-    messages, _ = capture(monkeypatch, source=source, plugin_context=contribution(source))
+    messages, _ = capture(monkeypatch, plugin_context=contribution())
     assert messages[-1]["role"] == "user"
-    assert "Current reply channel: " + label in messages[-2]["content"]
+    assert "Current reply channel: QQ" in messages[-2]["content"]
     assert "automatically delivered" in messages[-2]["content"]
     assert next(i for i, m in enumerate(messages) if m["role"] == "assistant") < len(messages) - 2
+
+
+@pytest.mark.parametrize("source", ["wechat", "unrecognized"])
+def test_retired_source_cannot_create_current_turn_or_plugin_context(monkeypatch, source):
+    from app.core import db
+    from app.services.turn_context import validate_plugin_context
+    called = []
+    monkeypatch.setattr(llm, "chat_stream", lambda *a, **k: called.append(True))
+    with pytest.raises(ValueError, match="Unsupported"):
+        list(turn.run_turn("old queued input", source=source, plugin_context=contribution(source)))
+    with pytest.raises(ValueError):
+        validate_plugin_context(contribution(source), source)
+    assert called == []
+    assert db.query("SELECT * FROM messages") == []
 
 
 def test_local_turn_does_not_inherit_previous_channel_or_lose_controls(monkeypatch):

@@ -1,6 +1,4 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { Context } from 'cordis';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -8,7 +6,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema, ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 
-import { QQChannel, WeChatChannel, ChannelError, ChannelCursorStore } from './channels.mjs';
+import { QQChannel, ChannelError } from './channels.mjs';
 
 export class HostError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -18,7 +16,7 @@ const opaque = value => typeof value === 'string' && value.length > 0 && value.l
 
 /** Only reviewed built-ins run here. Cordis scopes are lifecycle ownership, not a sandbox. */
 export class PluginHost {
-  constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000, channelStatePath = join(process.env.MOMO_DATA_DIR ?? fileURLToPath(new URL('../../data', import.meta.url)), 'private', 'channel-cursors.json') } = {}) {
+  constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000 } = {}) {
     this.ctx = new Context();
     this.hostInstance = randomUUID();
     this.emit = emit;
@@ -34,7 +32,6 @@ export class PluginHost {
     this.plugins = new Map();
     this.commands = new Map();
     this.channelQuarantines = new Map();
-    this.channelCursors = new ChannelCursorStore(channelStatePath);
     this.inflight = new Map();
     this.unresolved = new Map();
     this.receipts = [];
@@ -181,8 +178,8 @@ export class PluginHost {
     if (!Array.isArray(plugins) || plugins.length > 64) fail('CONFIG', 'Expected at most 64 plugin configurations');
     const desired = new Map();
     for (const config of plugins) {
-      if (!config || !/^[A-Za-z0-9_-]{1,64}$/.test(config.id ?? '') || !['mcp', 'virtual', 'qq', 'wechat'].includes(config.type) || desired.has(config.id)) fail('CONFIG', 'Invalid or duplicate plugin');
-      if (['qq', 'wechat'].includes(config.type) && config.id !== `momo-${config.type}`) fail('CONFIG', 'Only reviewed official channel adapters are supported');
+      if (!config || !/^[A-Za-z0-9_-]{1,64}$/.test(config.id ?? '') || !['mcp', 'virtual', 'qq'].includes(config.type) || desired.has(config.id)) fail('CONFIG', 'Invalid or duplicate plugin');
+      if (config.type === 'qq' && config.id !== `momo-${config.type}`) fail('CONFIG', 'Only reviewed official channel adapters are supported');
       if (config.enabled !== false) desired.set(config.id, config);
     }
     return desired;
@@ -216,7 +213,7 @@ export class PluginHost {
           apply: async ctx => {
             await ctx.effect(async () => {
               if (config.type === 'mcp') await this.connectMcp(plugin);
-              if (['qq', 'wechat'].includes(config.type)) await this.connectChannel(plugin);
+              if (config.type === 'qq') await this.connectChannel(plugin);
               if (this.closed || !plugin.enabled) { await this.closePluginConnection(plugin); fail('CLOSED', 'Plugin was stopped during startup'); }
               plugin.connected = true;
               return () => this.closePluginConnection(plugin);
@@ -238,8 +235,7 @@ export class PluginHost {
   }
 
   async connectChannel(plugin) {
-    const Channel = plugin.config.type === 'qq' ? QQChannel : WeChatChannel;
-    plugin.channel = new Channel(plugin.config, {
+    plugin.channel = new QQChannel(plugin.config, {
       now: this.now,
       active: () => plugin.enabled && this.plugins.get(plugin.id) === plugin,
       onInbox: data => this.event('inbox', data),
@@ -253,7 +249,6 @@ export class PluginHost {
         this.unresolved.delete(commandId);
         this.receipt(command, status, { ...facts, late: true });
       },
-      cursorStore: this.channelCursors,
     });
     await plugin.channel.connect();
     if (!this.paused && plugin.channel.grant) await plugin.channel.grant();
@@ -264,19 +259,13 @@ export class PluginHost {
   async channelHealth({ pluginId }) {
     const plugin = this.plugins.get(pluginId);
     if (!plugin?.channel) return { pluginId, status: 'disconnected', actualSelfId: null, capabilities: { receive: false, reply: false, proactive: false, contacts: false, history: false, groups: false }, executorQuiescent: true };
-    if (plugin.config.type === 'wechat') {
-      try { await plugin.channel.refreshHealth(); } catch {
-        plugin.channel.remoteQuiescent = false;
-        plugin.channel.state('disconnected', 'BRIDGE_UNAVAILABLE');
-      }
-    }
     return plugin.channel.health();
   }
 
   async promptContext({ pluginId, source, accountId, peerId, policyRevision }) {
     const plugin = this.plugins.get(pluginId);
     const checkCurrent = () => {
-      if (!plugin?.channel || !['qq', 'wechat'].includes(plugin.config.type) || !plugin.enabled || !plugin.connected || this.plugins.get(pluginId) !== plugin || plugin.channel.quarantined) fail('PLUGIN_UNAVAILABLE', 'Channel prompt context is unavailable');
+      if (!plugin?.channel || plugin.config.type !== 'qq' || !plugin.enabled || !plugin.connected || this.plugins.get(pluginId) !== plugin || plugin.channel.quarantined) fail('PLUGIN_UNAVAILABLE', 'Channel prompt context is unavailable');
       if (source !== plugin.config.type || accountId !== plugin.config.accountId || policyRevision !== plugin.config.policyRevision) fail('STALE_CONFIG', 'Channel prompt scope has changed');
       try { plugin.channel.checkPromptScope(peerId); }
       catch (cause) { throw new HostError(cause.code ?? 'CHANNEL', 'Channel prompt scope is not available'); }
@@ -530,7 +519,7 @@ export class PluginHost {
   async stopAll(reason) {
     await this.stopActivity(undefined, reason);
     const active = [...this.inflight.values()];
-    const channels = [...this.plugins.values()].filter(plugin => plugin.enabled && plugin.channel?.stop && plugin.config.type === 'wechat');
+    const channels = [...this.plugins.values()].filter(plugin => plugin.enabled && plugin.channel?.stop);
     const remoteUnknown = active.some(item => item.plugin.config.transport !== 'stdio');
     for (const item of active) item.controller.abort();
     const closing = [...new Set(active.map(item => item.plugin))].map(plugin => this.closePluginConnection(plugin));

@@ -156,8 +156,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
     // 转写已是句级：末条 assistant 就是最后一句，切句全在 backend
     : streamText || (lastAssistant ? lastAssistant.text : "");
   const busy = status === "thinking" || status === "speaking";
-  const phoneSource=attention.activity?.source??'';
-  const phoneBusy=phoneSource.includes('qq')||phoneSource.includes('wechat');
+  const phoneBusy=attention.activity?.source==='qq';
   const control=async(action:Parameters<typeof controlAttention>[0])=>{
     setControlling(true);
     try{if(action==='stop')getChatEngine().interrupt();await controlAttention(action);}
@@ -177,7 +176,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
           text={subtitle || <span className="muted">……</span>}
           // 状态并进对话框（铭牌右侧），不再是页面左上角的浮标
           status={
-            phoneBusy ? <div className="chat-status chat-phone-status" role="status"><span className="phone-status-icon"><Icon name="phone" size={14}/></span>{t(phoneSource.includes('wechat')?'attention.wechat':'attention.qq')}</div> : showStatus ? (
+            phoneBusy ? <div className="chat-status chat-phone-status" role="status"><span className="phone-status-icon"><Icon name="phone" size={14}/></span>{t('attention.qq')}</div> : showStatus ? (
               <div className={`chat-status status-${status}`}>
                 <span className="dot" />
                 {t(STATUS_LABEL_KEYS[status])}

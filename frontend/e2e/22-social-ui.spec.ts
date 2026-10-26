@@ -6,7 +6,7 @@ test('cold routes stay dormant until Boot, including settings and a direct chat 
   await expect(page.locator('.title-screen')).toBeVisible();
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
   await openTab(page,'拓展');
-  await expect(page.locator('.official-plugins .social-card')).toHaveCount(2);
+  await expect(page.locator('.official-plugins .social-card')).toHaveCount(1);
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
   await page.getByRole('button',{name:'返回标题',exact:true}).click();
   await bootChat(page);
@@ -20,16 +20,17 @@ test('cold routes stay dormant until Boot, including settings and a direct chat 
   await expect.poll(async()=> (await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
 });
 
-test('QQ and WeChat account panels keep separate drafts and enforce an empty allowlist',async({page,request},info)=>{
+test('QQ account settings preserve credentials and enforce an empty allowlist',async({page,request},info)=>{
   const accountsResponse=await request.get('/api/social/accounts');
   expect(accountsResponse.ok(),await accountsResponse.text()).toBe(true);
   const original=(await accountsResponse.json()).accounts as Array<{provider:string;allowlistEnabled:boolean;allowlist:Array<{peerId:string}>}>;
-  expect(original.map(account=>account.provider)).toEqual(['qq','wechat']);
+  expect(original.map(account=>account.provider)).toEqual(['qq']);
   expect(original.every(account=>account.allowlistEnabled===false)).toBe(true);
   try{
     await openTab(page,'拓展');
     const cards=page.locator('.official-plugins .social-card');
-    await expect(cards).toHaveCount(2);
+    await expect(cards).toHaveCount(1);
+    await expect(cards.getByRole('heading',{name:'QQ',exact:true})).toBeVisible();
     await cards.first().getByRole('button',{name:'配置'}).click();
     const dialog=page.getByRole('dialog',{name:'QQ 账号设置'});
     await expect(dialog).toBeVisible();
@@ -52,11 +53,10 @@ test('QQ and WeChat account panels keep separate drafts and enforce an empty all
     expect(saved.find((item:{provider:string})=>item.provider==='qq').allowlistEnabled).toBe(true);
     expect(saved.find((item:{provider:string})=>item.provider==='qq').allowlist).toEqual([]);
     expect(saved.find((item:{provider:string})=>item.provider==='qq').hasCredential).toBe(true);
-    expect(saved.find((item:{provider:string})=>item.provider==='wechat').allowlistEnabled).toBe(original.find(item=>item.provider==='wechat')?.allowlistEnabled);
     expect(JSON.stringify(saved)).not.toMatch(/"token"\s*:/);
     expect(JSON.stringify(saved)).not.toContain('e2e-write-only-credential');
     await cards.last().getByRole('button',{name:'配置'}).click();
-    await expect(page.getByRole('dialog',{name:'微信 账号设置'})).toBeVisible();
+    await expect(dialog).toBeVisible();
     await page.getByRole('dialog').getByRole('tab',{name:'记录'}).click();
     await expect(page.getByRole('dialog').getByText('还没有执行记录。')).toBeVisible();
   }finally{
@@ -77,4 +77,50 @@ test('chat focus can be changed while text input remains available',async({page,
   expect((await (await request.get('/api/meeting')).json()).focus).toBe(true);
   await focus.click();
   await expect(focus).toHaveAttribute('aria-pressed','false');
+});
+
+test('retired unknown operations require confirming the old executor stopped before ending a wait',async({page},info)=>{
+  const record={commandId:'retired-unknown-command',source:'wechat',accountId:'archived-account',peerId:'archived-peer',status:'unknown',createdAt:'2026-01-01T00:00:00Z',deliveryStatus:'unknown'};
+  let records:typeof record[]=[];
+  const closedBodies:unknown[]=[];
+  const retiredProviderRequests:string[]=[];
+  await page.route('**/api/social/accounts/retired/records',route=>route.fulfill({json:{records}}));
+  await page.route('**/api/social/accounts/retired/end-wait',async route=>{
+    closedBodies.push(route.request().postDataJSON());
+    if(closedBodies.length===1){await route.fulfill({status:409,json:{detail:'Old executor remains active'}});return;}
+    if(closedBodies.length===2){await route.fulfill({json:{ok:true,records:null}});return;}
+    records=[];
+    await route.fulfill({json:{ok:true,records,attention:{activation:'dormant',focus:false,phonePaused:false,busy:false,activity:null,presentation:null}}});
+  });
+  await page.route('**/api/social/accounts/wechat/**',route=>{retiredProviderRequests.push(route.request().url());return route.abort();});
+  await openTab(page,'拓展');
+  const archive=page.locator('.social-retired-records');
+  await expect(archive).toHaveCount(0);
+  records=[record];
+  await page.reload();
+  await openTab(page,'拓展');
+  await expect(archive).toBeVisible();
+  await archive.locator('summary').click();
+  await expect(archive.getByText('archived-account',{exact:true})).toBeVisible();
+  await expect(archive.getByText('archived-peer',{exact:true})).toBeVisible();
+  await expect(archive.getByText('retired-unknown-command',{exact:true})).toBeVisible();
+  await expect(archive.getByText('消息是否发出仍未知。结束等待只解除旧操作的等待，不会重发消息，也不会恢复微信。')).toBeVisible();
+  const endWait=archive.getByRole('button',{name:'结束等待',exact:true});
+  await expect(endWait).toBeDisabled();
+  expect(closedBodies).toEqual([]);
+  await archive.getByRole('checkbox',{name:'我已停止旧微信桥接及其执行进程，并确认它不会继续发送。'}).check();
+  await page.screenshot({path:info.outputPath('retired-operation-confirmation.png')});
+  await endWait.click();
+  await expect(archive.getByRole('alert')).toBeVisible();
+  await expect(archive.getByText('retired-unknown-command',{exact:true})).toBeVisible();
+  expect(closedBodies).toEqual([{commandId:'retired-unknown-command',executorStopped:true}]);
+  await endWait.click();
+  await expect.poll(()=>closedBodies.length).toBe(2);
+  await expect(archive.getByRole('alert')).toBeVisible();
+  await expect(archive.getByText('retired-unknown-command',{exact:true})).toBeVisible();
+  await endWait.click();
+  await expect(archive).toHaveCount(0);
+  expect(closedBodies).toEqual([{commandId:'retired-unknown-command',executorStopped:true},{commandId:'retired-unknown-command',executorStopped:true},{commandId:'retired-unknown-command',executorStopped:true}]);
+  expect(retiredProviderRequests).toEqual([]);
+  await expect(page.locator('.official-plugins .social-card')).toHaveCount(1);
 });

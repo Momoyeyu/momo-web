@@ -11,6 +11,75 @@ from app.services import checkpoint, memory, turn
 from app.services.coordinator import Coordinator, CoordinationError
 
 
+@pytest.mark.parametrize("source", ["wechat", "unrecognized"])
+def test_retired_or_unknown_ingress_is_rejected_before_persistence(source):
+    core = Coordinator()
+    core.virtual_enabled = True
+    with pytest.raises(CoordinationError, match="Unsupported"):
+        core.enqueue(source, "old-account", "old-event", "old text")
+    core.event("inbox", {"source": source, "accountId": "old-account", "externalMessageId": "old-event", "text": "old text"})
+    core.schema()
+    assert db.query("SELECT * FROM inbox") == []
+    with pytest.raises(CoordinationError, match="Unsupported"):
+        with core.run("old-run", source=source):
+            pytest.fail("retired channels cannot acquire the brain")
+
+
+@pytest.mark.parametrize("source", ["wechat", "unrecognized"])
+def test_restored_retired_queue_is_preserved_without_inference_or_virtual_delivery(monkeypatch, source):
+    core = Coordinator()
+    core.schema()
+    core.started, core.mode, core.virtual_enabled = True, "meeting", True
+    core.owner = {"clientId": "client-one", "leaseId": "lease", "expiresAt": time.monotonic() + 10}
+    with db.tx() as c:
+        c.execute("INSERT INTO inbox(id,source,account_id,external_id,text,status,run_id,at) VALUES('old',?,'old-account','old-event','preserved text','queued','old-run',?)", (source, db.now_iso()))
+    called = []
+    monkeypatch.setattr(turn, "run_turn", lambda *a, **k: called.append("inference") or iter([]))
+    monkeypatch.setattr(core, "command", lambda *a, **k: called.append("delivery") or {})
+    worker = threading.Thread(target=core._worker, daemon=True)
+    worker.start()
+    try:
+        for _ in range(100):
+            if db.query("SELECT status FROM inbox WHERE id='old'")[0]["status"] == "held_scope":
+                break
+            time.sleep(.01)
+    finally:
+        core.closed.set()
+        worker.join(1)
+    row = db.query("SELECT * FROM inbox WHERE id='old'")[0]
+    assert row["status"] == "held_scope"
+    assert row["text"] == "preserved text"
+    core._release_held()
+    assert db.query("SELECT status FROM inbox WHERE id='old'")[0]["status"] == "held_scope"
+    assert called == []
+    assert db.query("SELECT * FROM outbox") == []
+
+
+def test_retired_unknown_send_remains_historical_and_late_receipt_only_records_original_fact():
+    import hashlib
+    import json
+    core = Coordinator()
+    core.schema()
+    core.started, core.mode = True, "paused"
+    gen = checkpoint.generation()
+    checkpoint.begin_turn("historical input", gen, "original", run_id="retired-run", source="wechat")
+    checkpoint.append_sentence("historical reply", gen, "original")
+    checkpoint.finish_turn(gen, "original")
+    payload = {"method": "channels.send", "pluginId": "momo-wechat", "accountId": "wechat-old", "peerId": "old-peer", "textHash": hashlib.sha256(b"historical reply").hexdigest()}
+    with db.tx() as c:
+        c.execute("INSERT INTO outbox VALUES('old-command','retired-run',0,'unknown',?,NULL,?)", (json.dumps(payload), db.now_iso()))
+    receipt = {"commandId": "old-command", "runId": "retired-run", "pluginId": "momo-wechat", "accountId": "wechat-old", "peerId": "old-peer"}
+    core.record_receipt({**receipt, "status": "unknown", "deliveryStatus": "unknown"})
+    assert [row["command_id"] for row in core._unresolved_commands()] == ["old-command"]
+    assert [message["text"] for message in checkpoint.live_messages()] == ["historical input"]
+    core.record_receipt({**receipt, "status": "completed", "deliveryStatus": "provider_accepted", "late": True})
+    assert core._unresolved_commands() == []
+    assert [message["text"] for message in checkpoint.live_messages()] == ["historical input", "historical reply"]
+    assert core.mode == "paused", "historical receipts cannot resume business execution"
+    assert len(db.query("SELECT * FROM outbox")) == 1
+    assert len(db.query("SELECT * FROM command_receipts")) == 2
+
+
 def test_runtime_starts_dormant_and_title_leave_never_enables_background(monkeypatch):
     monkeypatch.setenv("MOMO_TEST_VIRTUAL", "1")
     core = Coordinator()

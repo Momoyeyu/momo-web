@@ -1125,6 +1125,27 @@
         "title": "ReplayIn",
         "type": "object"
       },
+      "RetiredWaitIn": {
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Commandid",
+            "type": "string"
+          },
+          "executorStopped": {
+            "title": "Executorstopped",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "commandId",
+          "executorStopped"
+        ],
+        "title": "RetiredWaitIn",
+        "type": "object"
+      },
       "SpeechIn": {
         "properties": {
           "input": {
@@ -2337,6 +2358,58 @@
         "summary": "Accounts"
       }
     },
+    "/api/social/accounts/retired/end-wait": {
+      "post": {
+        "operationId": "end_retired_wait_api_social_accounts_retired_end_wait_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetiredWaitIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End Retired Wait"
+      }
+    },
+    "/api/social/accounts/retired/records": {
+      "get": {
+        "operationId": "retired_records_api_social_accounts_retired_records_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Retired Records"
+      }
+    },
     "/api/social/accounts/{provider}": {
       "put": {
         "operationId": "save_api_social_accounts__provider__put",
@@ -2346,10 +2419,7 @@
             "name": "provider",
             "required": true,
             "schema": {
-              "enum": [
-                "qq",
-                "wechat"
-              ],
+              "const": "qq",
               "title": "Provider",
               "type": "string"
             }
@@ -2397,10 +2467,7 @@
             "name": "provider",
             "required": true,
             "schema": {
-              "enum": [
-                "qq",
-                "wechat"
-              ],
+              "const": "qq",
               "title": "Provider",
               "type": "string"
             }
@@ -2438,10 +2505,7 @@
             "name": "provider",
             "required": true,
             "schema": {
-              "enum": [
-                "qq",
-                "wechat"
-              ],
+              "const": "qq",
               "title": "Provider",
               "type": "string"
             }
@@ -2479,10 +2543,7 @@
             "name": "provider",
             "required": true,
             "schema": {
-              "enum": [
-                "qq",
-                "wechat"
-              ],
+              "const": "qq",
               "title": "Provider",
               "type": "string"
             }
@@ -2530,10 +2591,7 @@
             "name": "provider",
             "required": true,
             "schema": {
-              "enum": [
-                "qq",
-                "wechat"
-              ],
+              "const": "qq",
               "title": "Provider",
               "type": "string"
             }
@@ -2581,10 +2639,7 @@
             "name": "provider",
             "required": true,
             "schema": {
-              "enum": [
-                "qq",
-                "wechat"
-              ],
+              "const": "qq",
               "title": "Provider",
               "type": "string"
             }
@@ -2622,10 +2677,7 @@
             "name": "provider",
             "required": true,
             "schema": {
-              "enum": [
-                "qq",
-                "wechat"
-              ],
+              "const": "qq",
               "title": "Provider",
               "type": "string"
             }

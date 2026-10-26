@@ -5,8 +5,7 @@ export const ja: Dict = {
   "official": "公式プラグイン",
   "officialHint": "momo 自身のアカウントを使います。接続・権限・記録は個別に設定し、起動後のみ実行します。",
   "providers": {
-    "qq": "QQ",
-    "wechat": "WeChat"
+    "qq": "QQ"
   },
   "enableProvider": "{provider} を有効にする",
   "noAccount": "アカウント未設定",
@@ -36,6 +35,17 @@ export const ja: Dict = {
     "records": "記録"
   },
   "recordsError": "記録を取得できません。",
+  "retiredTitle": "未確認の過去の操作（{count}）",
+  "retiredHint": "これらは廃止済みの WeChat ブリッジによる記録です。",
+  "retiredSource": "廃止済みの WeChat 操作",
+  "retiredAccount": "旧アカウント",
+  "retiredPeer": "元の会話",
+  "retiredMetadataMissing": "記録なし",
+  "retiredUnknown": "メッセージが送信されたかは不明のままです。待機終了はこの古い操作の待機のみを解除し、再送や WeChat の再開は行いません。",
+  "retiredExecutorStopped": "旧 WeChat ブリッジと実行プロセスを停止し、これ以上送信しないことを確認しました。",
+  "endRetiredWait": "待機を終了",
+  "endingRetiredWait": "待機を終了中…",
+  "retiredEndWaitError": "待機を終了できません。旧ブリッジと実行プロセスの停止を確認してから再試行してください。",
   "actionError": "操作できませんでした。接続とアカウントを確認してください。",
   "enabled": "プラグインを有効化",
   "expectedIdentity": "momo のアカウント ID",
@@ -50,12 +60,11 @@ export const ja: Dict = {
   "tokenHint": "バックエンドで保管し、モデルや標準バックアップには含めません。空欄なら保存済みのキーを維持します。",
   "tokenSaved": "保存済み・空欄で維持",
   "qqConnectionHint": "専用 QQ クライアントで momo の個人アカウントにログインし、対応 OneBot ブリッジに接続します。Web ログインだけではチャット権限になりません。",
-  "wechatConnectionHint": "専用 WeChat セッションの制御ブリッジに接続します。実アカウント・会話の一意な特定・送受信能力の確認が必要です。",
   "connect": "保存して接続",
   "disconnect": "接続解除",
   "resume": "確認後に新着を再開",
   "ownerBinding": "プレイヤーの本人確認",
-  "ownerHint": "chat・QQ・WeChat で個人の記憶を共有するにはアカウント所有の確認が必要です。他の友達は許可範囲で会話でき、記憶は分離されます。",
+  "ownerHint": "chat・QQ で個人の記憶を共有するにはアカウント所有の確認が必要です。他の友達は許可範囲で会話でき、記憶は分離されます。",
   "ownerVerified": "確認済みプレイヤー：{id}",
   "peerId": "あなたの相手 ID",
   "createChallenge": "確認コードを生成",
@@ -115,7 +124,6 @@ export const ja: Dict = {
   "stopPhone": "スマホの操作を停止",
   "resumePhone": "スマホを再開",
   "qq": "QQ に返信中…",
-  "wechat": "WeChat に返信中…",
   "controlError": "活動の状態を変更できません。再試行してください。"
 },
   meeting: {

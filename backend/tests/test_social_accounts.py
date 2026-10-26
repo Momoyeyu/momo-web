@@ -11,8 +11,8 @@ def configured(store, provider="qq", **changes):
     values = {
         "enabled": True,
         "accountId": provider + "-main",
-        "expectedSelfId": "10001" if provider == "qq" else "wxid_momo",
-        "endpoint": "ws://127.0.0.1:3001" if provider == "qq" else "http://127.0.0.1:3002",
+        "expectedSelfId": "10001",
+        "endpoint": "ws://127.0.0.1:3001",
         "token": "private-bridge-token",
         "permissions": {"receive": True, "reply": True},
         **changes,
@@ -24,6 +24,28 @@ def event(**changes):
     return {"source": "qq", "accountId": "qq-main", "selfId": "10001",
             "peerId": "20002", "senderId": "20002", "conversationKind": "private",
             "externalMessageId": "message-1", "text": "hello", **changes}
+
+
+def test_retired_provider_configuration_and_persisted_account_cannot_execute():
+    from app.core.credentials import credentials
+    store = SocialAccounts()
+    configured(store)
+    ref = credentials.put(provider="wechat", account_key="wechat-old", plugin_id="momo-wechat", secret={"token": "isolated-retired-fixture"}, declared_scopes=["connect"], granted_scopes=["connect"])
+    credential_stat = credentials._path(ref).stat()
+    retired = {**store._read()["qq"], "provider": "wechat", "id": "momo-wechat", "accountId": "wechat-old", "credentialRef": ref}
+    store._write({**store._read(), "wechat": retired})
+    assert [row["provider"] for row in store.list_accounts()["accounts"]] == ["qq"]
+    assert [row["type"] for row in store.host_configs()] == ["qq"]
+    assert store.authorize_event(event(source="wechat", accountId="wechat-old")) is None
+    with pytest.raises(SocialError, match="Unsupported"):
+        store.put("wechat", {"enabled": True})
+    with pytest.raises(SocialError):
+        store.authorize_send("wechat-old", "20002", retired["policyRevision"], audience=store._audience(retired, "20002"))
+    store.put("qq", {"allowlistEnabled": True})
+    assert store._read()["wechat"] == retired, "retirement preserves stored private account metadata"
+    after = credentials._path(ref).stat()
+    assert (after.st_ino, after.st_size, after.st_mtime_ns) == (credential_stat.st_ino, credential_stat.st_size, credential_stat.st_mtime_ns)
+    assert credentials.metadata(ref)["provider"] == "wechat", "the retired credential is retained without revocation"
 
 
 def test_optional_allowlist_is_strict_only_when_enabled():
@@ -119,7 +141,7 @@ def test_canonical_profile_alias_can_read_private_account_storage(tmp_path, monk
     alias.symlink_to(parent, target_is_directory=True)
     monkeypatch.setattr(state, "DATA_DIR", alias / "life")
     store = SocialAccounts()
-    assert len(store.list_accounts()["accounts"]) == 2
+    assert len(store.list_accounts()["accounts"]) == 1
     configured(store)
     monkeypatch.setattr(state, "DATA_DIR", parent / "life")
     assert store.get("qq")["enabled"] is True

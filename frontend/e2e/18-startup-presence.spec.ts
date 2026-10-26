@@ -14,6 +14,7 @@ async function fixture(page: Page, waitForState: Promise<void> = Promise.resolve
     if (url.pathname === '/api/checkpoints' || url.pathname === '/api/memories') body = [];
     if (url.pathname === '/api/resources/status') body = {asr:{ready:true},embedding:{state:'ready'},index:{state:'ready'}};
     if (url.pathname === '/api/social/accounts') body = {accounts:[],providers:[]};
+    if (url.pathname === '/api/social/accounts/retired/records') body = {records:[]};
     await route.fulfill({json:body});
   });
 }

@@ -369,7 +369,7 @@ describe('unanswered request failures', () => {
 describe('restored local avatar caption', () => {
   it.each([
     {
-      name: 'keeps the last local sentence when newer QQ, WeChat and other plugin replies exist',
+      name: 'keeps the last local sentence when newer QQ, retired WeChat and unknown plugin replies exist',
       messages: [
         {role:'assistant' as const,text:'local last sentence',at:'t',source:'meeting'},
         {role:'assistant' as const,text:'QQ private reply',at:'t',source:'qq'},
@@ -383,6 +383,7 @@ describe('restored local avatar caption', () => {
       messages: [
         {role:'assistant' as const,text:'QQ private reply',at:'t',source:'qq'},
         {role:'assistant' as const,text:'WeChat private reply',at:'t',source:'wechat'},
+        {role:'assistant' as const,text:'unknown remote reply',at:'t',source:'future-channel'},
       ],
       caption: '',
     },
