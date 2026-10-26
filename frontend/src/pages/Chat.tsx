@@ -23,6 +23,7 @@ import Icon from "../ui/Icon";
 import FirstMeeting from "../components/FirstMeeting";
 import DialogBox from "../components/DialogBox";
 import "../styles/chat.css";
+import {controlAttention,type AttentionState} from '../services/meetingClient';
 
 const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
   idle: "chat.idle",
@@ -31,7 +32,7 @@ const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
   speaking: "chat.speaking",
 };
 
-export default function Chat({active}: {active: boolean}) {
+export default function Chat({active,attention}: {active: boolean;attention:AttentionState}) {
   const t = useT();
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
   useSyncExternalStore(subscribe, getState);
@@ -50,6 +51,7 @@ export default function Chat({active}: {active: boolean}) {
   const [modelError, setModelError] = useState(false);
   const [input, setInput] = useState("");
   const [closeUp, setCloseUp] = useState(() => getStage().getCloseUp());
+  const [controlling,setControlling]=useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   const [entered, setEntered] = useState(false);
   // Follow the actual CSS animation rather than a second, competing timer.
@@ -155,6 +157,14 @@ export default function Chat({active}: {active: boolean}) {
     // 转写已是句级：末条 assistant 就是最后一句，切句全在 backend
     : streamText || (lastAssistant ? lastAssistant.text : "");
   const busy = status === "thinking" || status === "speaking";
+  const phoneSource=attention.activity?.source??'';
+  const phoneBusy=phoneSource.includes('qq')||phoneSource.includes('wechat');
+  const control=async(action:Parameters<typeof controlAttention>[0])=>{
+    setControlling(true);
+    try{if(action==='stop')getChatEngine().interrupt();await controlAttention(action);}
+    catch{setError(t('attention.controlError'));}
+    finally{setControlling(false);}
+  };
 
   return (
     <div className="chat-page" inert={!interactive}>
@@ -168,7 +178,7 @@ export default function Chat({active}: {active: boolean}) {
           text={subtitle || <span className="muted">……</span>}
           // 状态并进对话框（铭牌右侧），不再是页面左上角的浮标
           status={
-            showStatus ? (
+            phoneBusy ? <div className="chat-status chat-phone-status" role="status"><span className="phone-status-icon"><Icon name="phone" size={14}/></span>{t(phoneSource.includes('wechat')?'attention.wechat':'attention.qq')}</div> : showStatus ? (
               <div className={`chat-status status-${status}`}>
                 <span className="dot" />
                 {t(STATUS_LABEL_KEYS[status])}
@@ -225,6 +235,9 @@ export default function Chat({active}: {active: boolean}) {
           >
             {t(closeUp ? "performance.fullBody" : "performance.closeUp")}
           </Button>
+          <Button className={`tb tb-focus${attention.focus?' is-active':''}`} aria-pressed={attention.focus} disabled={controlling} onClick={()=>void control(attention.focus?'focus_off':'focus_on')} title={t('attention.focusHint')}><Icon name="focus" size={16}/><span>{t('attention.focus')}</span></Button>
+          {phoneBusy && <Button className="tb" disabled={controlling} onClick={()=>void control('stop')} aria-label={t('attention.stopPhone')} title={t('attention.stopPhone')}><Icon name="stop" size={15}/></Button>}
+          {attention.phonePaused && !attention.focus && <Button className="tb" disabled={controlling} onClick={()=>void control('resume_phone')} title={t('attention.resumePhone')}><Icon name="phone" size={16}/><span>{t('attention.resumePhone')}</span></Button>}
           <Button
             className="tb"
             aria-label={t("chat.backlog")}

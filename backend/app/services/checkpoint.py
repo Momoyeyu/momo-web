@@ -6,6 +6,10 @@ No compaction, interruption or failed request deletes the original event payload
 
 from __future__ import annotations
 import sqlite3
+import hashlib
+import json
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any
 from ..core import db
 from ..models import StoredMessage, CheckpointDetail, CheckpointMeta
@@ -13,6 +17,37 @@ from ..models import StoredMessage, CheckpointDetail, CheckpointMeta
 LIVE_ID = db.LIVE_ID
 PREVIEW_LEN = 40
 now_iso = db.now_iso
+_audience = ContextVar("transcript_audience", default="owner")
+_excluded_run = ContextVar("transcript_excluded_run", default="")
+
+
+def _scope_schema(c):
+    c.execute("CREATE TABLE IF NOT EXISTS run_audiences(run_id TEXT PRIMARY KEY,audience TEXT NOT NULL)")
+    c.execute("CREATE TABLE IF NOT EXISTS run_retries(run_id TEXT PRIMARY KEY,origin_run_id TEXT NOT NULL)")
+    c.execute("CREATE TABLE IF NOT EXISTS audience_summaries(audience TEXT PRIMARY KEY,summary TEXT NOT NULL DEFAULT '',cursor INTEGER NOT NULL DEFAULT -1,version INTEGER NOT NULL DEFAULT 0)")
+
+
+@contextmanager
+def audience_scope(audience="owner", *, exclude_run=None):
+    token = _audience.set(str(audience or "owner"))
+    excluded = _excluded_run.set(str(exclude_run or ""))
+    try:
+        yield
+    finally:
+        _audience.reset(token)
+        _excluded_run.reset(excluded)
+
+
+def audience():
+    return _audience.get()
+
+
+def _ensure_scope():
+    # May be called from onboarding's existing write transaction. Schema DDL
+    # neither starts another transaction nor commits the caller's atomic work.
+    with db._lock:
+        _scope_schema(db.conn())
+
 
 
 class CheckpointError(Exception):
@@ -30,6 +65,11 @@ def generation() -> int:
 
 
 def summary_state() -> dict[str, Any]:
+    _ensure_scope()
+    if audience() != "owner":
+        rows = db.query("SELECT * FROM audience_summaries WHERE audience=?", (audience(),))
+        r = dict(rows[0]) if rows else {"summary": "", "cursor": -1, "version": 0}
+        return {**r, "generation": generation()}
     r = db.query(
         "SELECT summary,summary_cursor,summary_version,generation FROM sessions WHERE id=?",
         (LIVE_ID,),
@@ -88,14 +128,16 @@ def history_page(before_seq: int | None = None, limit: int = 100) -> dict[str, A
 def context_rows(
     *, after_summary: bool = True, limit: int = 80, oldest: bool = True
 ) -> list[dict[str, Any]]:
+    _ensure_scope()
     cursor = summary_state()["cursor"] if after_summary else -1
     rows = db.query(
-        """SELECT m.* FROM messages m WHERE m.session_id=? AND m.visible=1 AND m.seq>?
+        """SELECT m.* FROM messages m WHERE m.session_id=? AND m.visible=1 AND m.seq>? AND m.run_id!=?
+        AND COALESCE((SELECT a.audience FROM run_audiences a WHERE a.run_id=m.run_id),'owner')=?
         AND NOT EXISTS (SELECT 1 FROM messages excluded JOIN suppressed_sources s ON s.event_id=excluded.event_id
                         WHERE excluded.run_id=m.run_id AND excluded.session_id=?) ORDER BY m.seq """
         + ("ASC" if oldest else "DESC")
         + " LIMIT ?",
-        (LIVE_ID, cursor, LIVE_ID, max(1, min(limit, 200))),
+        (LIVE_ID, cursor, _excluded_run.get(), audience(), LIVE_ID, max(1, min(limit, 200))),
     )
     if not oldest:
         rows = list(reversed(rows))
@@ -187,18 +229,18 @@ def begin_turn(
     run_id: str | None = None,
     source: str = "meeting",
     external_message_id: str | None = None,
+    retry_of: str | None = None,
 ) -> bool:
     with db.tx() as c:
-        if (
-            int(
-                c.execute(
-                    "SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)
-                ).fetchone()[0]
-            )
-            != gen
-        ):
+        _scope_schema(c)
+        if int(c.execute("SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)).fetchone()[0]) != gen:
             return False
         rid = run_id or db.new_id(32)
+        if retry_of:
+            origin = c.execute("SELECT r.source,a.audience,m.text FROM runs r JOIN messages m ON m.run_id=r.id AND m.role='user' LEFT JOIN run_audiences a ON a.run_id=r.id WHERE r.id=?", (retry_of,)).fetchone()
+            if not origin or origin["source"] != source or origin["text"] != text or (origin["audience"] or "owner") != audience():
+                return False
+            external_message_id = None
         if (
             external_message_id
             and c.execute(
@@ -222,7 +264,11 @@ def begin_turn(
                 now_iso(),
             ),
         )
-        _insert(c, "user", text, at, rid, source, external_message_id)
+        c.execute("INSERT INTO run_audiences VALUES(?,?)", (rid, audience()))
+        if retry_of:
+            c.execute("INSERT INTO run_retries VALUES(?,?)", (rid, retry_of))
+        else:
+            _insert(c, "user", text, at, rid, source, external_message_id, visible=source in {"qq", "wechat"})
         return True
 
 
@@ -310,7 +356,7 @@ def _ack(c, run_id: str, seen: str, *, allow_shrink=False) -> bool:
     return True
 
 
-def acknowledge(run_id: str | None, seen_text: str, gen: int) -> bool:
+def acknowledge(run_id: str | None, seen_text: str, gen: int, *, source: str | None = None) -> bool:
     if not run_id:
         return False
     with db.tx() as c:
@@ -326,7 +372,7 @@ def acknowledge(run_id: str | None, seen_text: str, gen: int) -> bool:
         run = c.execute(
             "SELECT * FROM runs WHERE id=? AND generation=?", (run_id, gen)
         ).fetchone()
-        if run is None or run["status"] == "interrupted":
+        if run is None or run["status"] == "interrupted" or (source is not None and run["source"] != source):
             return False
         accepted = _ack(c, run_id, str(seen_text or ""))
         if accepted and run["status"] == "generated":
@@ -378,7 +424,7 @@ def discard_unanswered_turn(gen: int, at: str) -> None:
             "SELECT 1 FROM messages WHERE run_id=? AND role='assistant'", (run["id"],)
         ).fetchone():
             c.execute(
-                "UPDATE messages SET visible=0,status='failed' WHERE run_id=?",
+                "UPDATE messages SET visible=CASE WHEN source IN ('qq','wechat') AND role='user' THEN 1 ELSE 0 END,status=CASE WHEN source IN ('qq','wechat') AND role='user' THEN 'received' ELSE 'failed' END WHERE run_id=?",
                 (run["id"],),
             )
             c.execute(
@@ -389,14 +435,12 @@ def discard_unanswered_turn(gen: int, at: str) -> None:
 
 def run_event_ids(gen: int, at: str) -> list[str]:
     rid = current_run(gen, at)
-    return (
-        [
-            str(r["event_id"])
-            for r in db.query("SELECT event_id FROM messages WHERE run_id=?", (rid,))
-        ]
-        if rid
-        else []
-    )
+    if not rid:
+        return []
+    _ensure_scope()
+    origins = db.query("SELECT origin_run_id FROM run_retries WHERE run_id=?", (rid,))
+    origin = origins[0]["origin_run_id"] if origins else rid
+    return [str(r["event_id"]) for r in db.query("SELECT event_id FROM messages WHERE run_id=? OR (run_id=? AND role='user')", (rid, origin))]
 
 
 def interrupt_turn(user: str, assistant: str, *, run_id: str | None = None) -> None:
@@ -526,3 +570,31 @@ def event_metadata(gen: int, at: str, *, run_id: str | None = None) -> dict[str,
         elif r["role"] == "assistant":
             result.update(eventId=r["event_id"], seq=int(r["seq"]))
     return result
+
+
+def generated_reply(run_id: str) -> str:
+    """Full immutable reply, used to validate a completed presentation ACK."""
+    return "".join(r["text"] for r in db.query("SELECT text FROM messages WHERE run_id=? AND role='assistant' ORDER BY seq", (run_id,)))
+
+
+def acknowledge_external(run_id: str, text: str, command_id: str) -> bool:
+    """Record a proven external send even after its execution epoch retired."""
+    with db.tx() as c:
+        row = c.execute("SELECT * FROM outbox WHERE command_id=? AND run_id=?", (command_id, run_id)).fetchone()
+        run = c.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
+        if row is None or run is None or run["source"] not in {"qq", "wechat"} or row["status"] not in {"completed", "delivered"}:
+            return False
+        payload = json.loads(row["payload"])
+        if payload.get("method") != "channels.send" or payload.get("textHash") != hashlib.sha256(text.encode()).hexdigest():
+            return False
+        if not _ack(c, run_id, text):
+            return False
+        c.execute("UPDATE runs SET status='shown',updated_at=? WHERE id=?", (now_iso(), run_id))
+        return True
+
+
+def replay_text(run_id: str, event_id: str) -> str | None:
+    rows = db.query("SELECT * FROM messages WHERE run_id=? AND role='assistant' AND visible=1 ORDER BY seq", (run_id,))
+    if not any(row["event_id"] == event_id for row in rows):
+        return None
+    return "".join(row["display_text"] if row["display_text"] is not None else row["text"] for row in rows)

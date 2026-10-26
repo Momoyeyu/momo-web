@@ -5,11 +5,17 @@ import EcgCanvas from "../components/EcgCanvas";
 import Button from "../ui/Button";
 import {PRESENCE_URL,TITLE_PRESENCE} from "../lib/presenceTransition";
 import "../styles/title.css";
+import {useState} from "react";
+import {enterMeeting,leaveMeeting,meetingSnapshot} from "../services/meetingClient";
+import {getChatEngine} from "../chat/engineInstance";
 
 export default function Title() {
   const t = useT();
+  const [starting,setStarting]=useState(false);
+  const [failed,setFailed]=useState(false);
+  const boot=async()=>{setStarting(true);setFailed(false);try{await leaveMeeting(getChatEngine().finishMeeting());await enterMeeting();navigate('chat');}catch{setFailed(true);}finally{setStarting(false);}};
   const items = [
-    {key: "meet", labelKey: "title.start", hint: "meet", onClick: () => navigate("chat")},
+    {key: "boot", labelKey: "title.start", hint: "boot", onClick: () => void boot()},
     {key: "config", labelKey: "title.config", hint: "config", onClick: () => navigate("settings")},
   ];
 
@@ -30,6 +36,7 @@ export default function Title() {
             className="menu-item"
             style={{ animationDelay: `${0.12 + i * 0.08}s` }}
             onClick={m.onClick}
+            disabled={starting}
           >
             <span className="mi-orn" />
             <span className="mi-label">{t(m.labelKey)}</span>
@@ -37,6 +44,7 @@ export default function Title() {
           </Button>
         ))}
       </nav>
+      {failed && <p className="title-boot-error" role="alert">{t(meetingSnapshot().reason==='owned'?'meeting.ownerUnavailable':'meeting.unavailable')}</p>}
     </div>
   );
 }

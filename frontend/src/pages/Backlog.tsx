@@ -14,6 +14,7 @@ import { navigate } from "../router";
 import { useT } from "../i18n";
 import Button from "../ui/Button";
 import {historyPage} from "../services/lifeClient";
+import {meetingIdentity} from "../services/meetingClient";
 import {groupTranscript, mergeHistory, storedMessage} from "../chat/transcript";
 import type {ChatMessage} from "../lib/types";
 import PageHeader from "../ui/PageHeader";
@@ -26,6 +27,7 @@ export default function Backlog() {
   useSyncExternalStore(subscribe, getState);
   const listRef = useRef<HTMLDivElement | null>(null);
   const [replaying, setReplaying] = useState<string | null>(null);
+  const [replayError,setReplayError]=useState(false);
   const engine = getChatEngine();
   const [saved, setSaved] = useState<ChatMessage[]>([]);
   const [before, setBefore] = useState<number | null>(null);
@@ -61,6 +63,7 @@ export default function Backlog() {
     return () => request.abort();
   }, [settled,retry]);
   useEffect(() => () => pageRequest.current?.abort(), []);
+  useEffect(() => () => {void engine.stopReplay();},[engine]);
   useLayoutEffect(() => {
     const element = listRef.current;
     // A failed first page must leave pagination and its scroll anchor uninitialized.
@@ -100,8 +103,9 @@ export default function Backlog() {
   const replay = (ids: string[]): void => {
     const entries = messages.filter(message => ids.includes(message.id));
     if (!entries.length || !idle) return;
+    setReplayError(false);
     setReplaying(entries[0]!.id);
-    void engine.replayMessage({...entries[0]!,text:entries.map(message => message.text).join("")}).finally(() => setReplaying(null));
+    void engine.replayMessage({...entries[0]!,text:entries.map(message => message.text).join("")}).catch(()=>setReplayError(true)).finally(() => setReplaying(null));
   };
 
   return (
@@ -118,6 +122,7 @@ export default function Backlog() {
         />
 
         <div className="backlog-list" ref={listRef}>
+          {replayError && <p role="alert" className="backlog-replay-error">{t('backlog.replayUnavailable')}</p>}
           {(hasMore || failed) && <div className="backlog-earlier"><Button size="sm" variant="ghost" disabled={loading} onClick={() => before == null ? setRetry(value=>value+1) : void earlier()}>{t(loading ? "backlog.loading" : failed ? "meeting.retry" : "backlog.earlier")}</Button></div>}
           {failed && <p role="alert" className="muted">{t("backlog.loadFailed")}</p>}
           {messages.length === 0 && !loading && (
@@ -131,13 +136,14 @@ export default function Backlog() {
                 {m.role === "assistant" && (
                   <Button
                     className="bl-replay"
-                    disabled={!idle || replaying !== null || !ttsConfigured || muted}
+                    disabled={!idle || replaying !== null || !ttsConfigured || muted || !meetingIdentity() || !m.runId || !m.eventId}
                     title={
                       !ttsConfigured
                         ? t("backlog.replayNeedTts")
                         : muted
                           ? t("backlog.replayMuted")
-                          : undefined
+                        : !meetingIdentity() ? t('backlog.replayNeedBoot')
+                        : !m.runId || !m.eventId ? t('backlog.replayNeedRecord') : undefined
                     }
                     onClick={() => replay(group.messages.map(message => message.id))}
                   >

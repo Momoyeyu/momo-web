@@ -85,9 +85,18 @@ def chat(req: ChatIn) -> StreamingResponse:
             "This message was already accepted; reload history instead of resending",
         )
 
+    try:
+        runtime.prepare_local(req.clientId, req.leaseId)
+    except CoordinationError as error:
+        runtime.inbox_status(inbox["id"], "held_interrupt")
+        raise HTTPException(409, str(error)) from error
+
     def stream() -> Iterator[str]:
         errored = False
         iterator = None
+        presentation_token = None
+        generation = None
+        generated = False
         try:
             with runtime.run(inbox["run_id"], client=req.clientId, lease=req.leaseId):
                 runtime.inbox_status(inbox["id"], "processing")
@@ -111,7 +120,13 @@ def chat(req: ChatIn) -> StreamingResponse:
                         current_run.reset(token)
                     if ev["t"] == "error":
                         errored = True
+                    if ev["t"] == "sentence" and ev.get("text"):
+                        generation = ev["generation"]
+                        presentation_token = runtime.present(inbox["run_id"], generation)
+                        if presentation_token:
+                            ev = {**ev, "presentationToken": presentation_token}
                     yield _sse(ev)
+                generated = True
         except Exception as e:  # 兜底：agent 未捕获的异常也走 error 事件
             errored = True
             yield _sse({"t": "error", "message": str(e), "service": "backend"})
@@ -119,8 +134,14 @@ def chat(req: ChatIn) -> StreamingResponse:
             if iterator is not None:
                 iterator.close()
             runtime.inbox_status(inbox["id"], "failed" if errored else "generated")
+            if errored or not generated:
+                with runtime.condition:
+                    if runtime.presentation and runtime.presentation["runId"] == inbox["run_id"]:
+                        runtime.presentation = None
+                    runtime.interrupt_hold = False
+                    runtime.condition.notify_all()
         if not errored:
-            yield _sse({"t": "done"})
+            yield _sse({"t": "done", "runId": inbox["run_id"], "generation": generation, **({"presentationToken": presentation_token} if presentation_token else {})})
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -136,6 +157,15 @@ def interrupt(req: InterruptIn) -> Response:
         runtime.require_meeting(req.clientId, req.leaseId)
     except CoordinationError as error:
         raise HTTPException(409, str(error)) from error
+    with runtime.condition:
+        if runtime.presentation and (req.runId is None or runtime.presentation["runId"] == req.runId):
+            runtime.presentation = None
+            runtime.interrupt_hold = False
+            runtime.condition.notify_all()
+        for token, item in list(runtime.paused_presentations.items()):
+            if req.runId is None or item["runId"] == req.runId:
+                runtime.paused_presentations.pop(token)
+        runtime.condition.notify_all()
     generation = onboarding.interrupt(
         req.user, req.assistant, req.generation, run_id=req.runId
     )

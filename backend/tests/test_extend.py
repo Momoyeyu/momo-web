@@ -31,7 +31,8 @@ def live_hub(monkeypatch):
         "test-python-mcp", lambda name, data: events.append((name, data)), lambda: 1
     )
     host.start()
-    runtime = SimpleNamespace(host=host, mode="daily", virtual_enabled=False)
+    runtime = SimpleNamespace(host=host, mode="meeting", virtual_enabled=False)
+    runtime.configure_host_plugins = lambda configs, tolerate_errors=True, revision=None: host.request("plugins.configure", {"plugins": configs, "tolerateErrors": tolerate_errors, "configurationRevision": revision}, timeout=15)
     runtime.command = lambda method, params: host.request(
         method, {**params, "permit": host.permit("test-run")}, timeout=15
     )
@@ -275,7 +276,7 @@ def test_reordered_old_reconcile_cannot_reenable_a_disabled_node_connection(
     assert runtime.host.request("plugins.listTools")["tools"] == []
 
 
-def test_reviewed_activity_scope_hidden_and_blocked_during_meeting(live_hub):
+def test_reviewed_activity_scope_is_available_when_active_and_blocked_during_focus(live_hub):
     facade, runtime, _ = live_hub
     game = extension(
         declaredPermissions=["mcp.tools", "activities.game"],
@@ -283,11 +284,13 @@ def test_reviewed_activity_scope_hidden_and_blocked_during_meeting(live_hub):
     )
     tools = facade.open([game], BUILTIN)
     assert tools.has("echo_echo")
-    runtime.mode = "meeting"
+    runtime.focus = True
     assert facade.open([game], BUILTIN).decls == []
     assert "授权已失效" in tools.call("echo_echo", {})
-    runtime.mode = "daily"
+    runtime.focus = False
     assert facade.open([game], BUILTIN).has("echo_echo")
+    runtime.mode = "dormant"
+    assert facade.open([game], BUILTIN).decls == []
 
 
 def test_ungranted_unknown_and_malformed_permissions_fail_closed(live_hub):

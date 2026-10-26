@@ -10,12 +10,17 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const options = {apiPort:7822, webPort:5174, resources:path.join(app,'resources/models'), evidence:null, smoke:false};
+const options = {apiPort:7822, webPort:5174, resources:path.join(app,'resources/models'), evidence:null, smoke:false, specs:[]};
 for(let index=2;index<process.argv.length;index++){
   const flag=process.argv[index];
   if(flag==='--help'){
-    console.log('Usage: node scripts/browser-e2e.mjs [--smoke] [--api-port 7822] [--web-port 5174] [--resources-dir PATH] [--evidence-dir PATH]');process.exit(0);
+    console.log('Usage: node scripts/browser-e2e.mjs [--smoke] [--spec e2e/NN-name.spec.ts] [--api-port 7822] [--web-port 5174] [--resources-dir PATH] [--evidence-dir PATH]');process.exit(0);
   } else if(flag==='--smoke') options.smoke=true;
+  else if(flag==='--spec'){
+    const spec=process.argv[++index];
+    if(!spec || !/^e2e\/[A-Za-z0-9._-]+\.spec\.ts$/.test(spec))throw new Error('Specs must be repository-relative e2e/*.spec.ts files');
+    options.specs.push(spec);
+  }
   else {
     const key={'--api-port':'apiPort','--web-port':'webPort','--resources-dir':'resources','--evidence-dir':'evidence'}[flag];
     const value=process.argv[++index];
@@ -84,6 +89,7 @@ interruption.catch(()=>{});
 process.once('SIGINT',interrupted);process.once('SIGTERM',interrupted);
 try{
   for(const file of [python,path.join(frontend,'node_modules/@playwright/test/cli.js'),path.join(frontend,'public/live2d/live2dcubismcore.min.js'),path.join(options.resources,'asr/manifest.json'),path.join(options.resources,'embedding/multilingual-e5-small/manifest.json')])await access(file);
+  for(const spec of options.specs)await access(path.join(frontend,spec));
   await Promise.all([freePort(options.apiPort),freePort(options.webPort)]);
   const data=await mkdtemp(path.join(tmpdir(),'momo-browser-e2e-'));
   const evidence=options.evidence??path.join(app,'target/browser-e2e',path.basename(data));
@@ -102,6 +108,7 @@ try{
   console.log(`Browser regression instance: ${baseURL}\nSynthetic data: ${data}\nEvidence: ${evidence}`);
   const args=['node_modules/@playwright/test/cli.js','test','--output',path.join(evidence,'test-results')];
   if(options.smoke)args.push('e2e/01-smoke.spec.ts');
+  else args.push(...options.specs);
   const run=start(process.execPath,args,frontend,{...env,MOMO_E2E_BASE_URL:baseURL},path.join(evidence,'playwright.log'));
   run.child.stdout.pipe(process.stdout);run.child.stderr.pipe(process.stderr);
   process.exitCode=await Promise.race([run.done,interruption]);

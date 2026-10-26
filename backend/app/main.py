@@ -92,6 +92,10 @@ from .api import archive
 
 app.include_router(archive.router)
 
+from .api import social
+
+app.include_router(social.router)
+
 from .core.maintenance import DataMaintenance
 
 app.add_middleware(

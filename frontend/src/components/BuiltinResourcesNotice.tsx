@@ -14,7 +14,7 @@ export default function BuiltinResourcesNotice() {
   useEffect(() => {
     const ctl = new AbortController();
     void apiJson<ResourceStatus>("/api/resources/status", {signal: ctl.signal})
-      .then(value => { if (!ctl.signal.aborted) setStatus(value); })
+      .then(value => { if (!ctl.signal.aborted && value?.asr && value.embedding && value.index) setStatus(value); })
       .catch(() => {}); // Connection errors are reported by the service controls.
     return () => ctl.abort();
   }, []);

@@ -15,7 +15,7 @@ test("标题页：品牌 + tagline + 见面与设置菜单 + 星云背景", asyn
   await expect(page.locator(".menu-item")).toHaveCount(2);
   await expect(page.locator(".ecg-canvas")).toHaveCount(1);
   expect(await page.locator(".mi-label").allTextContents()).toEqual([
-    "见面",
+    "启动",
     "设置",
   ]);
 

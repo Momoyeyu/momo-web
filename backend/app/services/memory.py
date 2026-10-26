@@ -49,6 +49,37 @@ class MemoryError(Exception):
         self.kind = kind
 
 
+_audience: ContextVar[str] = ContextVar("memory_audience", default="owner")
+
+
+def _audience_schema(conn):
+    conn.execute("CREATE TABLE IF NOT EXISTS memory_audiences(memory_id TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,audience TEXT NOT NULL)")
+
+
+@contextmanager
+def audience_scope(audience="owner"):
+    token = _audience.set(str(audience or "owner"))
+    try:
+        yield
+    finally:
+        _audience.reset(token)
+
+
+def _audience_rows(pinned=None):
+    with db.tx() as conn:
+        _audience_schema(conn)
+    allowed = {r["id"] for r in db.query("SELECT m.id FROM memories m LEFT JOIN memory_audiences a ON a.memory_id=m.id WHERE COALESCE(a.audience,'owner')=?", (_audience.get(),))}
+    return [m for m in memories.all_rows(pinned) if m["id"] in allowed]
+
+
+def _require_audience(mem_id):
+    with db.tx() as conn:
+        _audience_schema(conn)
+    rows = db.query("SELECT COALESCE(a.audience,'owner') AS audience FROM memories m LEFT JOIN memory_audiences a ON a.memory_id=m.id WHERE m.id=?", (mem_id,))
+    if not rows or rows[0]["audience"] != _audience.get():
+        raise MemoryError("记忆不存在", kind="not_found")
+
+
 _sources: ContextVar[tuple[str, ...]] = ContextVar("memory_sources", default=())
 _source_generation: ContextVar[int | None] = ContextVar(
     "memory_source_generation", default=None
@@ -101,13 +132,14 @@ def _suppress_memory_sources(conn, mem_id, protected=()):
             "SELECT event_id FROM memory_sources WHERE memory_id=?", (mem_id,)
         )
     ]
-    # Legacy/manual memories have no proven origin. Conservatively suppress the
-    # existing transcript, rather than accidentally reconstructing a forgotten fact.
+    # Legacy/manual memories have no proven origin. Suppress only this
+    # audience's existing transcript; another contact's data is independent.
+    conn.execute("CREATE TABLE IF NOT EXISTS run_audiences(run_id TEXT PRIMARY KEY,audience TEXT NOT NULL)")
     if not ids:
         ids = [
             r["event_id"]
             for r in conn.execute(
-                "SELECT event_id FROM messages WHERE session_id='live'"
+                "SELECT m.event_id FROM messages m LEFT JOIN run_audiences a ON a.run_id=m.run_id WHERE m.session_id='live' AND COALESCE(a.audience,'owner')=?", (_audience.get(),)
             )
         ]
     for eid in ids:
@@ -117,9 +149,11 @@ def _suppress_memory_sources(conn, mem_id, protected=()):
             "INSERT OR IGNORE INTO suppressed_sources(event_id,forgotten_at) VALUES(?,?)",
             (eid, db.now_iso()),
         )
-    conn.execute(
-        "UPDATE sessions SET summary='',summary_cursor=-1,summary_version=summary_version+1 WHERE id='live'"
-    )
+    if _audience.get() == "owner":
+        conn.execute("UPDATE sessions SET summary='',summary_cursor=-1,summary_version=summary_version+1 WHERE id='live'")
+    else:
+        conn.execute("CREATE TABLE IF NOT EXISTS audience_summaries(audience TEXT PRIMARY KEY,summary TEXT NOT NULL DEFAULT '',cursor INTEGER NOT NULL DEFAULT -1,version INTEGER NOT NULL DEFAULT 0)")
+        conn.execute("UPDATE audience_summaries SET summary='',cursor=-1,version=version+1 WHERE audience=?", (_audience.get(),))
 
 
 def _replace_sources(conn, mem_id, event_ids):
@@ -223,6 +257,8 @@ def add_memory(content: str, pinned: bool = False) -> Memory:
     with db.tx() as conn:
         _check_sources(conn, _sources.get())
         memories.insert(conn, mem)
+        _audience_schema(conn)
+        conn.execute("INSERT INTO memory_audiences VALUES(?,?)", (mem["id"], _audience.get()))
         for eid in _sources.get():
             conn.execute(
                 "INSERT INTO memory_sources(memory_id,event_id) VALUES(?,?)",
@@ -239,7 +275,7 @@ def search_memories(query: str) -> list[MemoryRef]:
     注意 `is not None` 判断：语义分支返回空列表是**有效结果**，不再降级。
     """
     query = (query or "").strip()
-    candidates = memories.all_rows()
+    candidates = _audience_rows()
     if not query or not candidates:
         return []
     ranked = semantic_rank(query, candidates)
@@ -269,6 +305,7 @@ def update_memory(mem_id: str, content: str) -> Memory:
 
 def delete_memory(mem_id: str) -> Memory:
     """删除一条记忆（REST/存储层不区分 pin；能力层另行拦截 pin）。"""
+    _require_audience(mem_id)
     with db.tx() as conn:
         _check_sources(conn, _sources.get())
         row = memories.row_in(conn, mem_id)
@@ -302,15 +339,19 @@ def set_pinned(mem_id: str, pinned: bool) -> Memory:
 
 def list_memories(pinned: bool | None = None) -> list[Memory]:
     """记忆列表；pinned 过滤（None = 全部）。pin 的 id 也是真实行 id。"""
-    return memories.all_rows(pinned)
+    return _audience_rows(pinned)
 
 
 def pins() -> list[str]:
     """初始记忆文本列表（prompt 注入用）。"""
-    return [m["content"] for m in memories.all_rows(pinned=True)]
+    return [m["content"] for m in _audience_rows(pinned=True)]
 
 
 def is_pinned(mem_id: str) -> bool:
+    try:
+        _require_audience(mem_id)
+    except MemoryError:
+        return False
     row = memories.row_by_id(mem_id)
     return bool(row and row["pinned"])
 
@@ -329,7 +370,8 @@ def validate(content: str) -> str:
 
 
 def require(mem_id: str) -> None:
-    """记忆必须存在，否则抛 not_found。"""
+    """记忆必须属于当前受众，否则与不存在相同。"""
+    _require_audience(mem_id)
     if not memories.exists(mem_id):
         raise MemoryError("记忆不存在", kind="not_found")
 
@@ -342,7 +384,7 @@ def reject_duplicate(content: str, exclude_id: str | None = None) -> None:
     """
     normalized = normalize(content)
     grams = bigrams(content)
-    candidates = memories.all_rows()
+    candidates = _audience_rows()
     known = {m["id"] for m in candidates}
     for eid in _sources.get():
         for r in db.query(
@@ -396,7 +438,7 @@ def semantic_rank(query: str, candidates: list[Memory]) -> list[MemoryRef] | Non
                 return None
             missing = bool(vectors.missing(1))
             if not missing:
-                if memories.all_rows() != candidates:
+                if _audience.get() != "owner" or memories.all_rows() != candidates:
                     return None
                 hits = vectors.knn(query_vec, min(COARSE_TOP, len(candidates)))
         # Never enter the scheduler while holding the database lock.

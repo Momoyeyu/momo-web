@@ -369,6 +369,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/meeting/control": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Control */
+        post: operations["control_api_meeting_control_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/meeting/enter": {
         parameters: {
             query?: never;
@@ -414,6 +431,40 @@ export interface paths {
         put?: never;
         /** Leave */
         post: operations["leave_api_meeting_leave_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meeting/presentation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Presentation */
+        post: operations["presentation_api_meeting_presentation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/meeting/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Replay */
+        post: operations["replay_api_meeting_replay_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -527,6 +578,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/social/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accounts */
+        get: operations["accounts_api_social_accounts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Save */
+        put: operations["save_api_social_accounts__provider__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Connect */
+        post: operations["connect_api_social_accounts__provider__connect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disconnect */
+        post: operations["disconnect_api_social_accounts__provider__disconnect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/owner-challenge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Owner Challenge */
+        post: operations["owner_challenge_api_social_accounts__provider__owner_challenge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reconcile */
+        post: operations["reconcile_api_social_accounts__provider__reconcile_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Records */
+        get: operations["records_api_social_accounts__provider__records_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resume */
+        post: operations["resume_api_social_accounts__provider__resume_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/state": {
         parameters: {
             query?: never;
@@ -609,6 +796,24 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountIn */
+        AccountIn: {
+            /** Accountid */
+            accountId?: string | null;
+            /** Allowlist */
+            allowlist?: components["schemas"]["ContactIn"][] | null;
+            /** Allowlistenabled */
+            allowlistEnabled?: boolean | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Endpoint */
+            endpoint?: string | null;
+            /** Expectedselfid */
+            expectedSelfId?: string | null;
+            permissions?: components["schemas"]["PermissionIn"] | null;
+            /** Token */
+            token?: string | null;
+        };
         /** AckIn */
         AckIn: {
             /** Clientid */
@@ -621,6 +826,24 @@ export interface components {
             runId: string;
             /** Text */
             text: string;
+        };
+        /** AttentionIn */
+        AttentionIn: {
+            /** Action */
+            action: string;
+            /** Clientid */
+            clientId: string;
+            /** Leaseid */
+            leaseId?: string | null;
+            /** Requestid */
+            requestId: string;
+            /**
+             * Restore
+             * @default false
+             */
+            restore: boolean;
+            /** Runid */
+            runId?: string | null;
         };
         /** Body_upload_ref_api_tts_ref_post */
         Body_upload_ref_api_tts_ref_post: {
@@ -707,6 +930,16 @@ export interface components {
             /** Updatedat */
             updatedAt: string;
         };
+        /** ContactIn */
+        ContactIn: {
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /** Peerid */
+            peerId: string;
+        };
         /** ControlIn */
         ControlIn: {
             /** Context */
@@ -768,6 +1001,11 @@ export interface components {
             clientId: string;
             /** Leaseid */
             leaseId?: string | null;
+            /**
+             * Restore
+             * @default false
+             */
+            restore: boolean;
         };
         /**
          * LiveTranscript
@@ -825,6 +1063,49 @@ export interface components {
             leaseId?: string | null;
             presentation?: components["schemas"]["PresentationIn"] | null;
         };
+        /** OwnerChallengeIn */
+        OwnerChallengeIn: {
+            /** Peerid */
+            peerId: string;
+        };
+        /** PermissionIn */
+        PermissionIn: {
+            /** Contacts */
+            contacts?: boolean | null;
+            /** History */
+            history?: boolean | null;
+            /** Proactive */
+            proactive?: boolean | null;
+            /** Receive */
+            receive?: boolean | null;
+            /** Reply */
+            reply?: boolean | null;
+        };
+        /** PresentationAckIn */
+        PresentationAckIn: {
+            /** Clientid */
+            clientId: string;
+            /** Generation */
+            generation: number;
+            /** Leaseid */
+            leaseId?: string | null;
+            /** Outcome */
+            outcome: string;
+            /**
+             * Restore
+             * @default false
+             */
+            restore: boolean;
+            /** Runid */
+            runId: string;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /** Token */
+            token: string;
+        };
         /** PresentationIn */
         PresentationIn: {
             /** Avatarid */
@@ -868,6 +1149,32 @@ export interface components {
             ok: boolean;
             /** Tools */
             tools: number;
+        };
+        /** ReconcileIn */
+        ReconcileIn: {
+            /** Commandid */
+            commandId: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "completed" | "failed" | "closed_unknown";
+        };
+        /** ReplayIn */
+        ReplayIn: {
+            /** Clientid */
+            clientId: string;
+            /** Eventid */
+            eventId: string;
+            /** Leaseid */
+            leaseId?: string | null;
+            /**
+             * Restore
+             * @default false
+             */
+            restore: boolean;
+            /** Runid */
+            runId: string;
         };
         /** SpeechIn */
         SpeechIn: {
@@ -1486,6 +1793,39 @@ export interface operations {
             };
         };
     };
+    control_api_meeting_control_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttentionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     enter_api_meeting_enter_post: {
         parameters: {
             query?: never;
@@ -1562,6 +1902,72 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["LeaseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    presentation_api_meeting_presentation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PresentationAckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    replay_api_meeting_replay_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplayIn"];
             };
         };
         responses: {
@@ -1806,6 +2212,255 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    accounts_api_social_accounts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    save_api_social_accounts__provider__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq" | "wechat";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connect_api_social_accounts__provider__connect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq" | "wechat";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disconnect_api_social_accounts__provider__disconnect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq" | "wechat";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    owner_challenge_api_social_accounts__provider__owner_challenge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq" | "wechat";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerChallengeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reconcile_api_social_accounts__provider__reconcile_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq" | "wechat";
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    records_api_social_accounts__provider__records_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq" | "wechat";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_api_social_accounts__provider__resume_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq" | "wechat";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -1,3 +1,4 @@
+import {bootChat} from './helpers';
 import { test, expect } from './fixtures';
 
 for (const lang of ['zh', 'en', 'ja']) {
@@ -8,7 +9,7 @@ for (const lang of ['zh', 'en', 'ja']) {
     await page.route('**/api/life/history**', route => route.fulfill({ json: { summary: '', messages: [] } }));
     const fontErrors: string[] = [];
     page.on('response', r => { if (r.url().includes('/fonts/') && !r.ok()) fontErrors.push(r.url()); });
-    await page.goto('/#/chat');
+    await bootChat(page);
     await page.evaluate(() => document.fonts.ready);
     await expect(page.locator('.dialog-box')).toHaveAttribute('lang', lang);
     const uiFont = await page.locator('.dialog-box').evaluate(el => getComputedStyle(el).fontFamily);

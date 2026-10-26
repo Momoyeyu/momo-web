@@ -1,6 +1,109 @@
 {
   "components": {
     "schemas": {
+      "AccountIn": {
+        "additionalProperties": false,
+        "properties": {
+          "accountId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accountid"
+          },
+          "allowlist": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContactIn"
+                },
+                "maxItems": 200,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowlist"
+          },
+          "allowlistEnabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allowlistenabled"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "endpoint": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
+          "expectedSelfId": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expectedselfid"
+          },
+          "permissions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PermissionIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "token": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Token",
+            "writeOnly": true
+          }
+        },
+        "title": "AccountIn",
+        "type": "object"
+      },
       "AckIn": {
         "properties": {
           "clientId": {
@@ -48,6 +151,63 @@
           "text"
         ],
         "title": "AckIn",
+        "type": "object"
+      },
+      "AttentionIn": {
+        "properties": {
+          "action": {
+            "maxLength": 32,
+            "title": "Action",
+            "type": "string"
+          },
+          "clientId": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Clientid",
+            "type": "string"
+          },
+          "leaseId": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaseid"
+          },
+          "requestId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Requestid",
+            "type": "string"
+          },
+          "restore": {
+            "default": false,
+            "title": "Restore",
+            "type": "boolean"
+          },
+          "runId": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runid"
+          }
+        },
+        "required": [
+          "clientId",
+          "requestId",
+          "action"
+        ],
+        "title": "AttentionIn",
         "type": "object"
       },
       "Body_upload_ref_api_tts_ref_post": {
@@ -292,6 +452,28 @@
         "title": "CheckpointMeta",
         "type": "object"
       },
+      "ContactIn": {
+        "additionalProperties": false,
+        "properties": {
+          "label": {
+            "default": "",
+            "maxLength": 160,
+            "title": "Label",
+            "type": "string"
+          },
+          "peerId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Peerid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "peerId"
+        ],
+        "title": "ContactIn",
+        "type": "object"
+      },
       "ControlIn": {
         "additionalProperties": false,
         "properties": {
@@ -470,6 +652,11 @@
               }
             ],
             "title": "Leaseid"
+          },
+          "restore": {
+            "default": false,
+            "title": "Restore",
+            "type": "boolean"
           }
         },
         "required": [
@@ -631,6 +818,148 @@
         "title": "OpeningIn",
         "type": "object"
       },
+      "OwnerChallengeIn": {
+        "additionalProperties": false,
+        "properties": {
+          "peerId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Peerid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "peerId"
+        ],
+        "title": "OwnerChallengeIn",
+        "type": "object"
+      },
+      "PermissionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "contacts": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contacts"
+          },
+          "history": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "History"
+          },
+          "proactive": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proactive"
+          },
+          "receive": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receive"
+          },
+          "reply": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply"
+          }
+        },
+        "title": "PermissionIn",
+        "type": "object"
+      },
+      "PresentationAckIn": {
+        "properties": {
+          "clientId": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Clientid",
+            "type": "string"
+          },
+          "generation": {
+            "minimum": 0.0,
+            "title": "Generation",
+            "type": "integer"
+          },
+          "leaseId": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaseid"
+          },
+          "outcome": {
+            "pattern": "^(completed|stopped|resume)$",
+            "title": "Outcome",
+            "type": "string"
+          },
+          "restore": {
+            "default": false,
+            "title": "Restore",
+            "type": "boolean"
+          },
+          "runId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Runid",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "maxLength": 128000,
+            "title": "Text",
+            "type": "string"
+          },
+          "token": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "runId",
+          "token",
+          "generation",
+          "outcome"
+        ],
+        "title": "PresentationAckIn",
+        "type": "object"
+      },
       "PresentationIn": {
         "additionalProperties": false,
         "properties": {
@@ -722,6 +1051,78 @@
           "tools"
         ],
         "title": "ProbeResult",
+        "type": "object"
+      },
+      "ReconcileIn": {
+        "additionalProperties": false,
+        "properties": {
+          "commandId": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Commandid",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "completed",
+              "failed",
+              "closed_unknown"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "commandId",
+          "outcome"
+        ],
+        "title": "ReconcileIn",
+        "type": "object"
+      },
+      "ReplayIn": {
+        "properties": {
+          "clientId": {
+            "maxLength": 128,
+            "minLength": 8,
+            "title": "Clientid",
+            "type": "string"
+          },
+          "eventId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Eventid",
+            "type": "string"
+          },
+          "leaseId": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Leaseid"
+          },
+          "restore": {
+            "default": false,
+            "title": "Restore",
+            "type": "boolean"
+          },
+          "runId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Runid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "runId",
+          "eventId"
+        ],
+        "title": "ReplayIn",
         "type": "object"
       },
       "SpeechIn": {
@@ -1458,6 +1859,42 @@
         "summary": "Status"
       }
     },
+    "/api/meeting/control": {
+      "post": {
+        "operationId": "control_api_meeting_control_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttentionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Control"
+      }
+    },
     "/api/meeting/enter": {
       "post": {
         "operationId": "enter_api_meeting_enter_post",
@@ -1564,6 +2001,78 @@
           }
         },
         "summary": "Leave"
+      }
+    },
+    "/api/meeting/presentation": {
+      "post": {
+        "operationId": "presentation_api_meeting_presentation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresentationAckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Presentation"
+      }
+    },
+    "/api/meeting/replay": {
+      "post": {
+        "operationId": "replay_api_meeting_replay_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplayIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Replay"
       }
     },
     "/api/memories": {
@@ -1810,6 +2319,339 @@
           }
         },
         "summary": "Resources Status"
+      }
+    },
+    "/api/social/accounts": {
+      "get": {
+        "operationId": "accounts_api_social_accounts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Accounts"
+      }
+    },
+    "/api/social/accounts/{provider}": {
+      "put": {
+        "operationId": "save_api_social_accounts__provider__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "qq",
+                "wechat"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save"
+      }
+    },
+    "/api/social/accounts/{provider}/connect": {
+      "post": {
+        "operationId": "connect_api_social_accounts__provider__connect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "qq",
+                "wechat"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connect"
+      }
+    },
+    "/api/social/accounts/{provider}/disconnect": {
+      "post": {
+        "operationId": "disconnect_api_social_accounts__provider__disconnect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "qq",
+                "wechat"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disconnect"
+      }
+    },
+    "/api/social/accounts/{provider}/owner-challenge": {
+      "post": {
+        "operationId": "owner_challenge_api_social_accounts__provider__owner_challenge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "qq",
+                "wechat"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerChallengeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Owner Challenge"
+      }
+    },
+    "/api/social/accounts/{provider}/reconcile": {
+      "post": {
+        "operationId": "reconcile_api_social_accounts__provider__reconcile_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "qq",
+                "wechat"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reconcile"
+      }
+    },
+    "/api/social/accounts/{provider}/records": {
+      "get": {
+        "operationId": "records_api_social_accounts__provider__records_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "qq",
+                "wechat"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Records"
+      }
+    },
+    "/api/social/accounts/{provider}/resume": {
+      "post": {
+        "operationId": "resume_api_social_accounts__provider__resume_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "enum": [
+                "qq",
+                "wechat"
+              ],
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume"
       }
     },
     "/api/state": {

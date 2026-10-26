@@ -266,14 +266,8 @@ class McpHub:
         _coordinator = coordinator
 
     def _allowed(self, entry):
-        mode = _runtime().mode
-        scopes = (
-            {"mcp.tools"}
-            if mode == "meeting"
-            else _SCOPES
-            if mode == "daily"
-            else set()
-        )
+        runtime = _runtime()
+        scopes = _SCOPES if runtime.mode == "meeting" and not getattr(runtime, "focus", False) else set()
         return (
             bool(entry["declared"]) and entry["declared"] <= entry["granted"] & scopes
         )
@@ -309,15 +303,7 @@ class McpHub:
             # Dispatch immediately: Node withdraws disabled gates before waiting
             # for its serialized connection lifecycle queue.
             try:
-                host.request(
-                    "plugins.configure",
-                    {
-                        "plugins": configs,
-                        "tolerateErrors": True,
-                        "configurationRevision": revision,
-                    },
-                    timeout=OPEN_TIMEOUT,
-                )
+                _runtime().configure_host_plugins(configs, tolerate_errors=True, revision=revision)
                 return True
             except Exception:
                 return False
@@ -337,15 +323,7 @@ class McpHub:
             with self._lock:
                 configs, revision = self._configs_locked(), self._revision
             try:
-                host.request(
-                    "plugins.configure",
-                    {
-                        "plugins": configs,
-                        "tolerateErrors": True,
-                        "configurationRevision": revision,
-                    },
-                    timeout=OPEN_TIMEOUT,
-                )
+                _runtime().configure_host_plugins(configs, tolerate_errors=True, revision=revision)
                 return host.request("plugins.listTools").get("tools", [])
             except Exception:
                 return []

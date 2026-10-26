@@ -1,3 +1,4 @@
+import {bootChat} from './helpers';
 import {test,expect,type Page,type TestInfo} from './fixtures';
 import {writeFile} from 'node:fs/promises';
 
@@ -69,7 +70,7 @@ function expectSequenced(frames:Frame[]) {
 for(const destination of ['设置','记录']){
   test(`dialog waits for the scene when returning from ${destination}`,async({page},info)=>{
     await fixture(page);
-    await page.goto('/#/chat');
+    await bootChat(page);
     await finishAudit(page,info);
     await page.getByRole('button',{name:destination,exact:true}).click();
     await expect(page.locator('.page-wrap')).toHaveCount(1);
@@ -83,14 +84,14 @@ for(const destination of ['设置','记录']){
 
 test('direct chat waits for startup before its dialog rises',async({page},info)=>{
   await fixture(page);
-  await page.goto('/#/chat');
+  await bootChat(page);
   expectSequenced(await finishAudit(page,info));
 });
 
 test('title ASCII finishes before the dialog rises and input unlocks',async({page},info)=>{
   await fixture(page);
   await page.goto('/');
-  await page.getByRole('button',{name:'见面 meet'}).click();
+  await page.getByRole('button',{name:'启动 boot'}).click();
   const frames=await finishAudit(page,info);
   expectSequenced(frames);
   expect(frames.some(frame=>frame.ink)).toBe(true);
@@ -99,6 +100,7 @@ test('title ASCII finishes before the dialog rises and input unlocks',async({pag
 test('first configuration portal waits for the visible dialog, then leaves cleanly',async({page},info)=>{
   await fixture(page,false);
   await page.goto('/');
+  await page.getByRole('button',{name:'启动 boot'}).click();
   const frames=await finishAudit(page,info);
   expectSequenced(frames);
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -110,7 +112,7 @@ test('first configuration portal waits for the visible dialog, then leaves clean
 test('reduced motion releases dialogue and input without replaying the rise',async({page})=>{
   await page.emulateMedia({reducedMotion:'reduce'});
   await fixture(page);
-  await page.goto('/#/chat');
+  await bootChat(page);
   await expect(page.locator('.input-row input')).toBeEditable();
   expect(await page.locator('.dialog-zone').evaluate(element=>getComputedStyle(element).animationName)).toBe('none');
   await page.getByRole('button',{name:'设置',exact:true}).click();
@@ -122,7 +124,7 @@ test('reduced motion releases dialogue and input without replaying the rise',asy
 
 test('cancelling during the rise cannot unlock a later page or duplicate chat',async({page},info)=>{
   await fixture(page);
-  await page.goto('/#/chat');
+  await bootChat(page);
   await finishAudit(page,info);
   await page.getByRole('button',{name:'设置',exact:true}).click();
   await expect(page.locator('.page-wrap')).toHaveCount(1);
@@ -143,7 +145,7 @@ test('cancelling during the rise cannot unlock a later page or duplicate chat',a
 
 test('input follows a paused or cancelled visual animation instead of a timer',async({page},info)=>{
   await fixture(page);
-  await page.goto('/#/chat');
+  await bootChat(page);
   await finishAudit(page,info);
   await page.getByRole('button',{name:'设置',exact:true}).click();
   await expect(page.locator('.page-wrap')).toHaveCount(1);

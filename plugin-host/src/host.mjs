@@ -1,10 +1,14 @@
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Context } from 'cordis';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema, ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+
+import { QQChannel, WeChatChannel, ChannelError, ChannelCursorStore } from './channels.mjs';
 
 export class HostError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -14,7 +18,7 @@ const opaque = value => typeof value === 'string' && value.length > 0 && value.l
 
 /** Only reviewed built-ins run here. Cordis scopes are lifecycle ownership, not a sandbox. */
 export class PluginHost {
-  constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000 } = {}) {
+  constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000, channelStatePath = join(process.env.MOMO_DATA_DIR ?? fileURLToPath(new URL('../../data', import.meta.url)), 'private', 'channel-cursors.json') } = {}) {
     this.ctx = new Context();
     this.hostInstance = randomUUID();
     this.emit = emit;
@@ -29,6 +33,8 @@ export class PluginHost {
     this.lastHeartbeat = 0;
     this.plugins = new Map();
     this.commands = new Map();
+    this.channelQuarantines = new Map();
+    this.channelCursors = new ChannelCursorStore(channelStatePath);
     this.inflight = new Map();
     this.unresolved = new Map();
     this.receipts = [];
@@ -100,6 +106,7 @@ export class PluginHost {
       }
       case 'grant': {
         if (this.unresolved.size || !this.awaitingGrant || params.activityEpoch !== this.epoch) fail('PAUSED', 'A successful revoke and reconciled command outcomes are required before grant');
+        await Promise.all([...this.plugins.values()].filter(plugin => plugin.enabled && plugin.channel?.grant).map(plugin => plugin.channel.grant()));
         this.awaitingGrant = false;
         this.lastHeartbeat = this.now();
         this.paused = false;
@@ -124,6 +131,9 @@ export class PluginHost {
       case 'plugins.listTools': return this.listTools();
       case 'plugins.callTool': return this.callTool(params);
       case 'commands.reconcile': return this.reconcileCommand(params);
+      case 'channels.health': return this.channelHealth(params);
+      case 'channels.send': return this.sendChannel(params);
+      case 'channels.ack': return this.ackChannel(params);
       case 'virtual.receive': return this.receive(params);
       case 'virtual.deliver': return this.deliver(params);
       case 'virtual.activityStart': return this.startActivity(params);
@@ -170,7 +180,8 @@ export class PluginHost {
     if (!Array.isArray(plugins) || plugins.length > 64) fail('CONFIG', 'Expected at most 64 plugin configurations');
     const desired = new Map();
     for (const config of plugins) {
-      if (!config || !/^[A-Za-z0-9_-]{1,64}$/.test(config.id ?? '') || !['mcp', 'virtual'].includes(config.type) || desired.has(config.id)) fail('CONFIG', 'Invalid or duplicate plugin');
+      if (!config || !/^[A-Za-z0-9_-]{1,64}$/.test(config.id ?? '') || !['mcp', 'virtual', 'qq', 'wechat'].includes(config.type) || desired.has(config.id)) fail('CONFIG', 'Invalid or duplicate plugin');
+      if (['qq', 'wechat'].includes(config.type) && config.id !== `momo-${config.type}`) fail('CONFIG', 'Only reviewed official channel adapters are supported');
       if (config.enabled !== false) desired.set(config.id, config);
     }
     return desired;
@@ -204,6 +215,7 @@ export class PluginHost {
           apply: async ctx => {
             await ctx.effect(async () => {
               if (config.type === 'mcp') await this.connectMcp(plugin);
+              if (['qq', 'wechat'].includes(config.type)) await this.connectChannel(plugin);
               if (this.closed || !plugin.enabled) { await this.closePluginConnection(plugin); fail('CLOSED', 'Plugin was stopped during startup'); }
               plugin.connected = true;
               return () => this.closePluginConnection(plugin);
@@ -222,6 +234,79 @@ export class PluginHost {
       }
     }
     return { ...this.status(), failures };
+  }
+
+  async connectChannel(plugin) {
+    const Channel = plugin.config.type === 'qq' ? QQChannel : WeChatChannel;
+    plugin.channel = new Channel(plugin.config, {
+      now: this.now,
+      active: () => plugin.enabled && this.plugins.get(plugin.id) === plugin,
+      onInbox: data => this.event('inbox', data),
+      onState: data => {
+        if (data.status === 'disconnected' || data.status === 'identity_mismatch') plugin.connected = false;
+        this.event('channel.status', data);
+      },
+      onLateReceipt: ({ commandId, status, ...facts }) => {
+        const command = this.commands.get(commandId);
+        if (!command) return;
+        this.unresolved.delete(commandId);
+        this.receipt(command, status, { ...facts, late: true });
+      },
+      cursorStore: this.channelCursors,
+    });
+    await plugin.channel.connect();
+    if (!this.paused && plugin.channel.grant) await plugin.channel.grant();
+    if (this.channelQuarantines.get(plugin.id) === plugin.fingerprint) plugin.channel.quarantine();
+    else this.channelQuarantines.delete(plugin.id);
+  }
+
+  async channelHealth({ pluginId }) {
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin?.channel) return { pluginId, status: 'disconnected', actualSelfId: null, capabilities: { receive: false, reply: false, proactive: false, contacts: false, history: false, groups: false }, executorQuiescent: true };
+    if (plugin.config.type === 'wechat') {
+      try { await plugin.channel.refreshHealth(); } catch {
+        plugin.channel.remoteQuiescent = false;
+        plugin.channel.state('disconnected', 'BRIDGE_UNAVAILABLE');
+      }
+    }
+    return plugin.channel.health();
+  }
+
+  ackChannel({ pluginId, accountId, inboxId }) {
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin?.channel || plugin.config.accountId !== accountId || !opaque(inboxId)) fail('INPUT', 'Unknown channel inbox acknowledgement');
+    return plugin.channel.ack(inboxId);
+  }
+
+  async sendChannel({ pluginId, accountId, peerId, text, policyRevision, permit }) {
+    this.checkPermit(permit);
+    const plugin = this.plugins.get(pluginId);
+    if (!plugin?.channel || !plugin.enabled || !plugin.connected || plugin.channel.quarantined) fail('PLUGIN_UNAVAILABLE', 'Channel plugin is unavailable');
+    if (accountId !== plugin.config.accountId || policyRevision !== plugin.config.policyRevision) fail('STALE_CONFIG', 'Channel account or permissions have changed');
+    if (!opaque(peerId) || typeof text !== 'string' || !text.trim() || text.length > 32000) fail('INPUT', 'A private recipient and text are required');
+    try { plugin.channel.check(peerId, 'reply'); } catch (error) { throw new HostError(error.code ?? 'CHANNEL', error.message); }
+    const command = { ...this.beginCommand(permit, 'channel.send'), pluginId, accountId, peerId, policyRevision, payloadHash: createHash('sha256').update(text).digest('hex') };
+    this.commands.set(command.commandId, command);
+    const controller = new AbortController(); plugin.controllers.add(controller);
+    const entry = { command, controller, plugin, promise: null };
+    const promise = (async () => {
+      try {
+        const facts = await plugin.channel.send({ peerId, text, commandId: command.commandId, signal: controller.signal, beforeDispatch: () => {
+          this.checkPermit(permit);
+          if (!plugin.enabled || this.plugins.get(pluginId) !== plugin || policyRevision !== plugin.config.policyRevision) throw new ChannelError('STALE_CONFIG', 'Channel permissions changed before dispatch');
+        } });
+        return { receipt: this.receipt(command, 'completed', facts) };
+      } catch (error) {
+        if (error instanceof ChannelError && error.submitted) {
+          this.unresolved.set(command.commandId, command); this.paused = true; this.awaitingGrant = false;
+          this.receipt(command, 'unknown', { deliveryStatus: 'unknown', requiresReconciliation: true });
+          this.event('host.paused', { reason: 'unknown_command_outcome', commandId: command.commandId });
+        } else this.receipt(command, 'failed', { deliveryStatus: 'not_sent' });
+        throw new HostError(error instanceof ChannelError ? error.code : 'CHANNEL', error instanceof ChannelError ? error.message : 'Channel request failed');
+      } finally { plugin.controllers.delete(controller); this.inflight.delete(command.commandId); }
+    })();
+    entry.promise = promise; this.inflight.set(command.commandId, entry);
+    return promise;
   }
 
   async connectMcp(plugin) {
@@ -342,13 +427,19 @@ export class PluginHost {
   }
 
   reconcileCommand({ commandId, status }) {
-    if (!opaque(commandId) || !['completed', 'failed'].includes(status)) fail('INPUT', 'An observed terminal command outcome is required');
+    if (!opaque(commandId) || !['completed', 'failed', 'closed_unknown'].includes(status)) fail('INPUT', 'An observed terminal command outcome is required');
     if (this.inflight.has(commandId)) fail('BUSY', 'Command execution has not settled');
     const command = this.unresolved.get(commandId);
     // A coordinator may reconcile a durable command belonging to a previous host.
     if (!command) return { reconciled: false };
+    if (status === 'closed_unknown') {
+      const plugin = this.plugins.get(command.pluginId);
+      if (!plugin?.channel || plugin.channel.health().executorQuiescent !== true) fail('BUSY', 'Channel executor is not confirmed stopped');
+      this.channelQuarantines.set(plugin.id, plugin.fingerprint);
+      plugin.channel.quarantine();
+    }
     this.unresolved.delete(commandId);
-    return { reconciled: true, receipt: this.receipt(command, status, { reconciled: true }) };
+    return { reconciled: true, receipt: this.receipt(command, status, { reconciled: true, ...(status === 'closed_unknown' ? { deliveryStatus: 'unknown', executorQuiescent: true } : {}) }) };
   }
 
   receive({ messageId, text, accountId = 'virtual' }) {
@@ -402,6 +493,7 @@ export class PluginHost {
 
   async closePluginConnection(plugin) {
     for (const controller of plugin.controllers) controller.abort();
+    await plugin.channel?.close();
     plugin.connected = false;
     plugin.tools = [];
     const client = plugin.client;
@@ -420,10 +512,12 @@ export class PluginHost {
   async stopAll(reason) {
     await this.stopActivity(undefined, reason);
     const active = [...this.inflight.values()];
+    const channels = [...this.plugins.values()].filter(plugin => plugin.enabled && plugin.channel?.stop && plugin.config.type === 'wechat');
     const remoteUnknown = active.some(item => item.plugin.config.transport !== 'stdio');
     for (const item of active) item.controller.abort();
     const closing = [...new Set(active.map(item => item.plugin))].map(plugin => this.closePluginConnection(plugin));
-    const settled = Promise.allSettled([...closing, ...active.map(item => item.promise)]).then(() => true);
+    const channelStops = channels.map(plugin => plugin.channel.stop());
+    const settled = Promise.allSettled([...closing, ...active.map(item => item.promise), ...channelStops]).then(results => results.every(result => result.status === 'fulfilled' && (result.value?.executorQuiescent !== false)));
     let stopTimer;
     const stopped = await Promise.race([settled, new Promise(resolve => { stopTimer = setTimeout(() => resolve(false), this.stopTimeoutMs); })]);
     clearTimeout(stopTimer);
@@ -432,7 +526,7 @@ export class PluginHost {
   }
 
   status() {
-    return { hostInstance: this.hostInstance, coreInstance: this.coreInstance, activityEpoch: this.epoch, paused: this.paused, activity: this.activity ? { commandId: this.activity.command.commandId, ticks: this.activity.ticks } : null, inflight: this.inflight.size, unresolvedCommands: [...this.unresolved.keys()], plugins: [...this.plugins.values()].map(plugin => ({ id: plugin.id, type: plugin.config.type, connected: plugin.connected, enabled: plugin.enabled })), toolVersion: this.toolVersion };
+    return { hostInstance: this.hostInstance, coreInstance: this.coreInstance, activityEpoch: this.epoch, paused: this.paused, activity: this.activity ? { commandId: this.activity.command.commandId, ticks: this.activity.ticks } : null, inflight: this.inflight.size, unresolvedCommands: [...this.unresolved.keys()], plugins: [...this.plugins.values()].map(plugin => ({ id: plugin.id, type: plugin.config.type, connected: plugin.connected, enabled: plugin.enabled, ...(plugin.channel ? { channel: plugin.channel.health() } : {}) })), toolVersion: this.toolVersion };
   }
 
   async close() {

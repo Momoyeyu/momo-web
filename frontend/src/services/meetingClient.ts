@@ -1,12 +1,21 @@
 import {runtimeFetch} from './runtime';
 
 interface Lease {clientId:string;leaseId:string;epoch:number;expiresAt:number}
+export interface AttentionState {
+  activation:'active'|'dormant'|'fault';
+  focus:boolean;
+  phonePaused:boolean;
+  busy:boolean;
+  activity:{runId:string;source:string;accountId?:string;phase:string}|null;
+  presentation:{runId:string;token:string;generation:number}|null;
+}
+const DORMANT:AttentionState={activation:'dormant',focus:false,phonePaused:false,busy:false,activity:null,presentation:null};
 type Failure='owned'|'unavailable';
-type Snapshot = {state:'idle'|'entering'|'active'|'failed';lease:Lease|null;reason?:Failure};
+export type MeetingSnapshot = {state:'idle'|'entering'|'active'|'failed';lease:Lease|null;reason?:Failure;attention:AttentionState};
 class MeetingError extends Error {constructor(public reason:Failure){super('Meeting is unavailable');}}
 const STORAGE='momo.meeting-owner.v1';
 const listeners=new Set<()=>void>();
-let snapshot:Snapshot={state:'idle',lease:null};
+let snapshot:MeetingSnapshot={state:'idle',lease:null,attention:DORMANT};
 let clientId:string|null=null;
 let pending:Promise<Lease>|null=null;
 let departing:Promise<void>|null=null;
@@ -22,20 +31,24 @@ function write(lease:Lease|null):void {
     else sessionStorage.removeItem(STORAGE);
   } catch { /* Restricted browser storage still permits this window's meeting. */ }
 }
-function publish(next:Snapshot):void {snapshot=next;for(const listener of listeners)listener();}
+function publish(next:MeetingSnapshot):void {snapshot=next;for(const listener of listeners)listener();}
+function attentionOf(data:unknown):AttentionState {
+  const value=data as Partial<AttentionState>;
+  return {activation:value.activation??'active',focus:!!value.focus,phonePaused:!!value.phonePaused,busy:!!value.busy,activity:value.activity??null,presentation:value.presentation??null};
+}
 function clearTimers():void {
   if(heartbeatTimer)clearTimeout(heartbeatTimer);
   if(expiryTimer)clearTimeout(expiryTimer);
   heartbeatTimer=null;expiryTimer=null;
 }
-function fail(reason:Failure='unavailable'):void {clearTimers();write(null);publish({state:'failed',lease:null,reason});}
+function fail(reason:Failure='unavailable'):void {clearTimers();write(null);publish({state:'failed',lease:null,reason,attention:{...DORMANT,activation:'fault'}});}
 /** Only an existing owner capability restores a meeting on subpage refresh. */
 export function storedMeetingIdentity():{clientId:string;leaseId:string}|undefined {
   const value=stored();
   return typeof value?.clientId==='string'&&typeof value.leaseId==='string'
     ? {clientId:value.clientId,leaseId:value.leaseId}:undefined;
 }
-export function meetingSnapshot():Snapshot{return snapshot;}
+export function meetingSnapshot():MeetingSnapshot{return snapshot;}
 export function subscribeMeeting(listener:()=>void):()=>void {listeners.add(listener);return()=>listeners.delete(listener);}
 export function meetingIdentity():{clientId:string;leaseId:string}|undefined {
   const lease=snapshot.lease;
@@ -67,25 +80,28 @@ async function heartbeat(version:number):Promise<void>{
   if(!lease||version!==generation)return;
   try {
     const response=await post('heartbeat',{clientId:lease.clientId,leaseId:lease.leaseId});
-    const renewed=parseLease(await response.json(),lease.clientId);
+    const data:unknown=await response.json();
+    const renewed=parseLease(data,lease.clientId);
     if(version!==generation||snapshot.state!=='active')return;
-    write(renewed);publish({state:'active',lease:renewed});schedule(renewed,version);
+    write(renewed);publish({state:'active',lease:renewed,attention:attentionOf(data)});schedule(renewed,version);
   }catch(error){if(version===generation)fail(error instanceof MeetingError?error.reason:'unavailable');}
 }
 /** The App owns one meeting through chat/settings/backlog. Enter is a server gate. */
-export function enterMeeting():Promise<Lease>{
-  if(departing)return departing.then(()=>enterMeeting());
+export function enterMeeting(restore=false):Promise<Lease>{
+  if(departing)return departing.then(()=>enterMeeting(restore));
   const active=snapshot.lease;
   if(snapshot.state==='active'&&active&&active.expiresAt>Date.now())return Promise.resolve(active);
   if(pending)return pending;
   const saved=stored();
+  if(restore && !storedMeetingIdentity())return Promise.reject(new MeetingError('unavailable'));
   clientId??=typeof saved?.clientId==='string'?saved.clientId:crypto.randomUUID();
   const id=clientId,version=++generation;
-  publish({state:'entering',lease:null});
-  const request=post('enter',{clientId:id,...(typeof saved?.leaseId==='string'?{leaseId:saved.leaseId}:{})}).then(async response=>{
-    const lease=parseLease(await response.json(),id);
+  publish({state:'entering',lease:null,attention:DORMANT});
+  const request=post('enter',{clientId:id,...(typeof saved?.leaseId==='string'?{leaseId:saved.leaseId}:{}),...(restore?{restore:true}:{})}).then(async response=>{
+    const data:unknown=await response.json();
+    const lease=parseLease(data,id);
     if(version!==generation){await post('leave',{clientId:lease.clientId,leaseId:lease.leaseId}).catch(()=>undefined);throw new Error('Meeting entry superseded');}
-    write(lease);publish({state:'active',lease});schedule(lease,version);
+    write(lease);publish({state:'active',lease,attention:attentionOf(data)});schedule(lease,version);
     return lease;
   }).catch(error=>{if(version===generation)fail(error instanceof MeetingError?error.reason:'unavailable');throw error;}).finally(()=>{if(pending===request)pending=null;});
   pending=request;return request;
@@ -93,7 +109,7 @@ export function enterMeeting():Promise<Lease>{
 export function leaveMeeting(after:Promise<unknown>=Promise.resolve()):Promise<void>{
   if(departing)return departing;
   const entering=pending,lease=snapshot.lease??storedMeetingIdentity();
-  generation++;pending=null;clearTimers();write(null);publish({state:'idle',lease:null});
+  generation++;pending=null;clearTimers();write(null);publish({state:'idle',lease:null,attention:DORMANT});
   const operation=(async()=>{
     // Keep the old server lease alive long enough to persist the observed prefix.
     await after.catch(()=>undefined);
@@ -104,4 +120,33 @@ export function leaveMeeting(after:Promise<unknown>=Promise.resolve()):Promise<v
   departing=operation;return operation;
 }
 /** Test isolation: the production singleton otherwise lives for one document. */
-export function resetMeetingClient():void {generation++;pending=null;departing=null;clientId=null;clearTimers();write(null);snapshot={state:'idle',lease:null};}
+export function resetMeetingClient():void {generation++;pending=null;departing=null;clientId=null;clearTimers();write(null);snapshot={state:'idle',lease:null,attention:DORMANT};}
+
+/** One App subscription refreshes attention; pages consume its snapshot as props. */
+export async function refreshAttention(signal?:AbortSignal):Promise<void> {
+  const lease=snapshot.lease;
+  if(snapshot.state!=='active'||!lease)return;
+  const version=generation;
+  const response=await runtimeFetch('/api/meeting',{signal});
+  if(!response.ok)throw new MeetingError('unavailable');
+  const data:unknown=await response.json();
+  if(version===generation && snapshot.lease?.leaseId===lease.leaseId)publish({...snapshot,attention:attentionOf(data)});
+}
+export async function controlAttention(action:'focus_on'|'focus_off'|'stop'|'resume_phone'|'use_phone'):Promise<void> {
+  const owner=meetingIdentity();
+  if(!owner)throw new MeetingError('unavailable');
+  await post('control',{...owner,requestId:crypto.randomUUID(),action});
+  await refreshAttention();
+}
+export async function acknowledgePresentation(runId:string,token:string,generation:number,outcome:'completed'|'stopped'|'resume',text:string,owner=meetingIdentity()):Promise<void> {
+  if(!owner)throw new MeetingError('unavailable');
+  await post('presentation',{...owner,runId,token,generation,outcome,text});
+}
+export async function acquireReplay(runId:string,eventId:string):Promise<{runId:string;token:string;generation:number;text:string}> {
+  const owner=meetingIdentity();
+  if(!owner)throw new MeetingError('unavailable');
+  const response=await post('replay',{...owner,runId,eventId});
+  const data=await response.json() as {presentation?:{runId:string;token:string;generation:number;text:string}};
+  if(!data.presentation?.token)throw new MeetingError('unavailable');
+  return data.presentation;
+}

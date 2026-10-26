@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
-import {waitForChatReady} from './helpers';
+import {bootChat,waitForChatReady} from './helpers';
 
 const backend = resolve(process.cwd(), '../backend');
 type Result = {status:number; body:string; contentType:string; headers?:Record<string,string>};
@@ -133,7 +133,7 @@ test('clicking the microphone twice during connection cancels pending activation
     }
     window.WebSocket=PendingSocket as unknown as typeof WebSocket;
   });
-  await page.goto('/#/chat');
+  await bootChat(page);
   const mic=page.locator('.mic-btn');
   await expect(mic).toBeEnabled();
   await mic.click();
@@ -153,7 +153,7 @@ for (const thinking of [false, true]) {
     state.settings.general.sentenceSpeed=100;
     await call('/api/state','PUT',state);
     await page.route('**/api/onboarding',route=>route.fulfill({json:{stage:'completed',generation:0}}));
-    await page.goto('/#/chat');
+    await bootChat(page);
     const input=page.locator('.input-row input');
     await expect(input).toBeVisible();
     await waitForChatReady(page);

@@ -33,8 +33,9 @@ class CredentialStore:
         if self.directory is not None: return self.directory
         # Separate from a life-directory swap and the backup allowlist. The dev
         # location is inside ignored .workbuddy; each profile has a distinct key.
-        profile = hashlib.sha256(str(state.DATA_DIR.resolve()).encode()).hexdigest()[:20]
-        return state.DATA_DIR.parent / '.workbuddy' / 'credentials' / profile
+        root = state.DATA_DIR.resolve()
+        profile = hashlib.sha256(str(root).encode()).hexdigest()[:20]
+        return root.parent / '.workbuddy' / 'credentials' / profile
 
     def _path(self, ref):
         if not isinstance(ref, str) or not re.fullmatch(r'cred_[0-9a-f]{32}', ref):

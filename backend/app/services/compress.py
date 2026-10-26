@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from threading import Lock, Thread
+from contextvars import copy_context
 from typing import Any
 
 from ..core import llm
@@ -48,7 +49,8 @@ def maybe_compress(prompt_tokens: Any) -> bool:
             return False
     if not _lock.acquire(blocking=False):
         return False  # 单飞：已有压缩在跑
-    Thread(target=_worker, daemon=True).start()
+    context = copy_context()
+    Thread(target=lambda: context.run(_worker), daemon=True).start()
     return True
 
 
@@ -99,19 +101,31 @@ def compress_once() -> bool:
         )
     else:
         user = "把下面的对话压缩成摘要：\n" + "\n".join(lines)
-    msg = llm.chat_completion(
-        llm_cfg,
-        [
-            {"role": "system", "content": _PROMPT},
-            {"role": "user", "content": user},
-        ],
-    )
+    from .coordinator import runtime
+    with runtime.reasoning_lock:
+        if runtime.started and runtime.mode != "meeting":
+            return False
+        msg = llm.chat_completion(
+            llm_cfg,
+            [
+                {"role": "system", "content": _PROMPT},
+                {"role": "user", "content": user},
+            ],
+        )
     new_summary = str(msg.get("content") or "").strip()
     if not new_summary or len(new_summary) > 6000:
         return False
 
     max_seq = seg[-1]["seq"]
     with db.tx() as c:
+        if checkpoint.audience() != "owner":
+            row = c.execute("SELECT * FROM audience_summaries WHERE audience=?", (checkpoint.audience(),)).fetchone()
+            version, cursor = (int(row["version"]), int(row["cursor"])) if row else (0, -1)
+            actual_gen = c.execute("SELECT generation FROM sessions WHERE id=?", (LIVE_ID,)).fetchone()[0]
+            if actual_gen != gen_n or version != snapshot["version"] or cursor != snapshot["cursor"]:
+                return False
+            c.execute("INSERT INTO audience_summaries(audience,summary,cursor,version) VALUES(?,?,?,?) ON CONFLICT(audience) DO UPDATE SET summary=excluded.summary,cursor=excluded.cursor,version=excluded.version", (checkpoint.audience(), new_summary, max_seq, version + 1))
+            return True
         cur = c.execute(
             "SELECT generation,summary_version,summary_cursor FROM sessions WHERE id=?",
             (LIVE_ID,),

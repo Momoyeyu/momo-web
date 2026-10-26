@@ -1,4 +1,4 @@
-import {enterMeeting,leaveMeeting,meetingSnapshot,subscribeMeeting,storedMeetingIdentity} from "./services/meetingClient";
+import {enterMeeting,leaveMeeting,meetingSnapshot,subscribeMeeting,storedMeetingIdentity,refreshAttention,type AttentionState} from "./services/meetingClient";
 import {getChatEngine,loadTranscript} from "./chat/engineInstance";
 import {historyPage} from "./services/lifeClient";
 import {useT} from "./i18n";
@@ -37,12 +37,12 @@ interface PageEntry {
   leaving?: boolean;
 }
 
-function renderPage(route: Route, active: boolean) {
+function renderPage(route: Route, active: boolean, attention:AttentionState) {
   switch (route) {
     case "title":
       return <Title />;
     case "chat":
-      return <Chat active={active} />;
+      return <Chat active={active} attention={attention} />;
     case "settings":
       return <Settings />;
     case "backlog":
@@ -59,7 +59,8 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   const [historyRetry,setHistoryRetry]=useState(0);
   const activeLease=meeting.state === "active" ? meeting.lease?.leaseId ?? null : null;
   const historyReady=activeLease!==null && syncedLease===activeLease;
-  const meetingReady = route !== "chat" || meeting.state === "active" && historyReady;
+  const attentionFault=meeting.state==='active' && meeting.attention.activation==='fault';
+  const meetingReady = route !== "chat" || meeting.state === "active" && historyReady && !attentionFault;
   useEffect(()=>{
     if(!activeLease){setSyncedLease(null);setHistoryFailed(false);return;}
     const request=new AbortController();
@@ -76,13 +77,25 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   useEffect(() => {
     if (route === "title") {
       void leaveMeeting(getChatEngine().finishMeeting());
-    } else if (route === "chat" || storedMeetingIdentity()) {
-      void enterMeeting().then(() => {if (location.hash.replace(/^#\/?/,"") === "title") void leaveMeeting(getChatEngine().finishMeeting());}).catch(() => {});
+    } else if (meetingSnapshot().state === "active") {
+      // Settings and history retain an already active brain; they never boot it.
+    } else if (storedMeetingIdentity()) {
+      void enterMeeting(true).then(() => {if (location.hash.replace(/^#\/?/,"") === "title") void leaveMeeting(getChatEngine().finishMeeting());}).catch(() => {});
+    } else if (route === "chat") {
+      location.hash="#/title";
     }
   },[route]);
-  useEffect(() => {
-    if (meeting.state === "failed") {getChatEngine().interrupt();getChatEngine().suspendMic();}
+  useEffect(()=>{
+    if(meeting.state!=='active')return;
+    const request=new AbortController();
+    let timer:ReturnType<typeof setTimeout>;
+    const poll=async()=>{try{await refreshAttention(request.signal);}catch{/* Heartbeat is the authoritative ownership gate. */}if(!request.signal.aborted)timer=setTimeout(()=>void poll(),1000);};
+    void poll();
+    return()=>{request.abort();clearTimeout(timer);};
   },[meeting.state]);
+  useEffect(() => {
+    if (meeting.state === "failed" || attentionFault) {getChatEngine().interrupt();getChatEngine().suspendMic();}
+  },[meeting.state,attentionFault]);
   const [sceneReady, setSceneReady] = useState(false);
   const scenePrepared = useCallback(() => setSceneReady(true), []);
   useEffect(() => {
@@ -228,7 +241,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
             aria-hidden={top ? undefined : true}
             inert={!top || p.route !== route || front || booting || !ready || !meetingReady}
           >
-            {renderPage(p.route, top && p.route === route && !front && !booting && ready && meetingReady)}
+            {renderPage(p.route, top && p.route === route && !front && !booting && ready && meetingReady,meeting.attention)}
           </div>
         );
       })}
@@ -238,10 +251,10 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
         setEntry(null);setBooting(false);setStack(previous => previous.slice(-1));
       }} />}
 
-      {route !== "title" && (meeting.state === "failed" || historyFailed || route === "chat" && (meeting.state !== "active" || !historyReady)) && <div className="meeting-gate" role="status" aria-live="polite">
+      {route === "chat" && (meeting.state === "failed" || historyFailed || meeting.state !== "active" || !historyReady || attentionFault) && <div className="meeting-gate" role="status" aria-live="polite">
         <div className="meeting-gate-panel">
-          <p>{t(meeting.state === "failed" || historyFailed ? (meeting.reason === "owned" ? "meeting.ownerUnavailable" : "meeting.unavailable") : "meeting.entering")}</p>
-          {(meeting.state === "failed" || historyFailed) && <div className="meeting-gate-actions"><Button size="sm" variant="ghost" onClick={() => historyFailed ? setHistoryRetry(value=>value+1) : void enterMeeting().catch(() => {})}>{t("meeting.retry")}</Button><Button size="sm" variant="ghost" onClick={() => {location.hash="#/title";}}>{t("common.backTitle")}</Button></div>}
+          <p>{t(attentionFault?'meeting.attentionFault':meeting.state === "failed" || historyFailed ? (meeting.reason === "owned" ? "meeting.ownerUnavailable" : "meeting.unavailable") : "meeting.entering")}</p>
+          {(meeting.state === "failed" || historyFailed || attentionFault) && <div className="meeting-gate-actions">{attentionFault?<Button size="sm" variant="ghost" onClick={()=>{location.hash='#/settings';}}>{t('settings.title')}</Button>:<Button size="sm" variant="ghost" onClick={() => historyFailed ? setHistoryRetry(value=>value+1) : void enterMeeting().catch(() => {})}>{t("meeting.retry")}</Button>}<Button size="sm" variant="ghost" onClick={() => {location.hash="#/title";}}>{t("common.backTitle")}</Button></div>}
         </div>
       </div>}
       <TooltipLayer />

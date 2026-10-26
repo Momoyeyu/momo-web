@@ -1,5 +1,5 @@
 import {test,expect,type Page} from './fixtures';
-import {settle,waitForChatReady} from './helpers';
+import {bootChat,settle,waitForChatReady} from './helpers';
 
 async function continuousLife(page:Page) {
   const rows=Array.from({length:250},(_,index)=>({eventId:`event-${index+1}`,seq:index+1,runId:`run-${Math.floor(index/2)}`,source:'meeting',externalMessageId:null,role:index%2?'assistant':'user',text:`moment-${index+1}`,at:'2026-10-25T10:00:00Z'}));
@@ -19,14 +19,14 @@ async function continuousLife(page:Page) {
 test('title meets the same momo without save slots or a new-session request',async({page})=>{
   const {forbidden}=await continuousLife(page);
   await page.goto('/#/title');
-  await expect(page.locator('.title-menu .mi-label')).toHaveText(['见面','设置']);
-  await page.getByRole('button',{name:'见面 meet'}).click();
+  await expect(page.locator('.title-menu .mi-label')).toHaveText(['启动','设置']);
+  await page.getByRole('button',{name:'启动 boot'}).click();
   await waitForChatReady(page);
   await expect(page.locator('.subtitle')).toHaveText('moment-250');
   await expect(page.getByRole('button',{name:/^(存档|读档)$/})).toHaveCount(0);
   await page.getByRole('button',{name:'返回标题',exact:true}).click();
   await expect(page.locator('.title-screen')).toBeVisible();
-  await page.getByRole('button',{name:'见面 meet'}).click();
+  await page.getByRole('button',{name:'启动 boot'}).click();
   await waitForChatReady(page);
   await expect(page.locator('.subtitle')).toHaveText('moment-250');
   expect(forbidden).toEqual([]);
@@ -60,10 +60,10 @@ test('an unavailable owner keeps meeting input gated until the player leaves',as
   const chats:string[]=[];
   page.on('request',request=>{if(new URL(request.url()).pathname==='/api/chat')chats.push(request.url());});
   await page.goto('/#/chat');
-  await expect(page.locator('.meeting-gate')).toContainText('请先关闭其他已进入见面的窗口');
-  await expect.poll(()=>page.locator('.chat-page').evaluate(element=>!!element.closest('[inert]'))).toBe(true);
+  await expect(page.locator('.title-screen')).toBeVisible();
+  await page.locator('.title-menu .menu-item').first().click();
+  await expect(page.getByRole('alert')).toContainText('其他窗口正在使用 momo');
   expect(chats).toEqual([]);
-  await page.locator('.meeting-gate').getByRole('button',{name:'返回标题',exact:true}).click();
   await expect(page.locator('.title-screen')).toBeVisible();
   await expect(page.locator('.meeting-gate')).toHaveCount(0);
 });
@@ -89,7 +89,7 @@ test('settings pauses actual presentation and ACK, then resumes that reply witho
   await page.route('**/api/chat/interrupt',route=>route.fulfill({status:204}));
   const text='这是一段会慢慢说完的话。'.repeat(10);
   await page.route('**/api/chat',route=>route.fulfill({contentType:'text/event-stream',body:`data: ${JSON.stringify({t:'sentence',no:0,text,cues:[],at:'t',runId:'pause-run',eventId:'pause-reply',seq:252,userEventId:'pause-user',userSeq:251,generation:3})}\n\ndata: {"t":"done"}\n\n`}));
-  await page.goto('/#/chat');await waitForChatReady(page);
+  await bootChat(page);await waitForChatReady(page);
   await page.locator('.input-row input').fill('慢慢说');await page.locator('.input-row input').press('Enter');
   await expect.poll(()=>seen.length).toBeGreaterThan(0);
   await page.getByRole('button',{name:'设置',exact:true}).click();await settle(page);
@@ -106,7 +106,7 @@ test('fresh meetings synchronize other-entry history while subpage returns keep 
   const {rows}=await continuousLife(page);
   let reads=0;
   page.on('request',request=>{if(new URL(request.url()).pathname==='/api/life/history')reads++;});
-  await page.goto('/#/chat');await waitForChatReady(page);
+  await bootChat(page);await waitForChatReady(page);
   await expect(page.locator('.subtitle')).toHaveText('moment-250');
   const initialReads=reads;
   await page.getByRole('button',{name:'设置',exact:true}).click();await settle(page);
@@ -115,7 +115,7 @@ test('fresh meetings synchronize other-entry history while subpage returns keep 
   await page.getByRole('button',{name:'返回标题',exact:true}).click();
   await expect(page.locator('.title-screen')).toBeVisible();
   rows.push({...rows.at(-1)!,eventId:'other-entry',seq:251,runId:'other-run',source:'virtual',text:'从另一个入口延续的问候。'});
-  await page.getByRole('button',{name:'见面 meet'}).click();await waitForChatReady(page);
+  await page.getByRole('button',{name:'启动 boot'}).click();await waitForChatReady(page);
   await expect(page.locator('.subtitle')).toHaveText('从另一个入口延续的问候。');
   expect(reads).toBe(initialReads+1);
 });

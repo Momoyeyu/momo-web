@@ -1,0 +1,5 @@
+# Mac AX bridge only; no WeChat session or speech resources are distributed.
+pyobjc-framework-Cocoa==12.1
+pyobjc-framework-ApplicationServices==12.1
+pyobjc-framework-Quartz==12.1
+Pillow==12.0.0

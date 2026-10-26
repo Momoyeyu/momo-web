@@ -191,3 +191,4 @@
 @media (prefers-reduced-motion: reduce) {
   .title-presence { animation: none; }
 }
+.title-boot-error { position:absolute;left:12%;bottom:6%;font-size:13px;color:var(--danger); }

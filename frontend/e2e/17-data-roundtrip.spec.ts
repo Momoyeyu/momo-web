@@ -4,7 +4,7 @@ import {readdir, readFile} from 'node:fs/promises';
 import {join, resolve} from 'node:path';
 import JSZip from 'jszip';
 import {presentation} from './helpers/runtime';
-import {openTab, readState, writeState, settle} from './helpers';
+import {bootChat,openTab, readState, writeState, settle} from './helpers';
 
 const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 async function publicModelZip(): Promise<Buffer> {
@@ -78,7 +78,7 @@ test('backup round-trips imported model ZIP, YAML and SQLite through actual cont
   const restored = await (await request.get('/api/memories')).json();
   expect(restored.some((m:any)=>m.id===savedMemory.id && m.content==='three-store preserved memory')).toBe(true);
   expect(restored.some((m:any)=>m.id===after.id)).toBe(false);
-  await page.goto('/#/chat');
+  await bootChat(page);
   await expect(page.locator('.chat-page')).toBeVisible();
   await settle(page);
   await expect.poll(async () => (await presentation(page))?.avatarId).toBe(id);

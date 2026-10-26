@@ -9,6 +9,11 @@ vi.mock("../services/chatClient", () => ({
   interrupt: vi.fn(() => Promise.resolve()),
   acknowledgeDisplay: vi.fn(() => Promise.resolve()),
 }));
+vi.mock("../services/meetingClient", () => ({
+  meetingIdentity: vi.fn<() => {clientId:string;leaseId:string}|undefined>(() => undefined),
+  acknowledgePresentation: vi.fn(() => Promise.resolve()),
+  acquireReplay: vi.fn(),
+}));
 vi.mock("../services/ttsClient", () => ({
   streamSpeech: vi.fn(() => Promise.resolve()),
 }));
@@ -54,6 +59,7 @@ vi.mock("../live2d/stage", () => ({
 import { MicStreamer } from "../audio/capture";
 import { createAsr } from "../services/asrClient";
 import { chat, interrupt, acknowledgeDisplay } from "../services/chatClient";
+import { acknowledgePresentation, meetingIdentity } from "../services/meetingClient";
 import { ChatEngine } from "./chatEngine";
 import { getSettings, update } from "../lib/store";
 import type { ChatMessage } from "../lib/types";
@@ -113,6 +119,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.mocked(meetingIdentity).mockReturnValue(undefined);
 });
 
 describe("打断落账一致性（seenText）", () => {
@@ -409,5 +416,26 @@ it('pauses displayed text and ACK behind subpages, then resumes the same reply',
   eng.setSceneActive(true);internals(eng).displayTick(turn);await tick();
   expect(eng.history.at(-1)).toMatchObject({eventId:'held-event',text:'这一句等你回来。'});
   expect(acknowledgeDisplay).toHaveBeenCalledWith('held-run',8,'这一句等你回来。');
+  eng.dispose();
+});
+
+it('stops each capability delivered while hidden and resumes the newest one',async()=>{
+  vi.mocked(meetingIdentity).mockReturnValue({clientId:'test-client',leaseId:'test-lease'});
+  let releaseSecond:()=>void=()=>{};
+  const second=new Promise<void>(resolve=>{releaseSecond=resolve;});
+  chatMock.mockImplementation(async function*(){
+    yield {t:'sentence' as const,no:0,text:'第一句。',cues:[],at:'t',runId:'held-run',eventId:'first',generation:8,presentationToken:'token-a'};
+    await second;
+    yield {t:'sentence' as const,no:1,text:'第二句。',cues:[],at:'t',runId:'held-run',eventId:'second',generation:8,presentationToken:'token-b'};
+    await new Promise(()=>{});
+  });
+  const {eng}=makeEngine();
+  eng.sendText('hello');eng.setSceneActive(false);await tick();
+  releaseSecond();await tick(5);
+  const stopped=vi.mocked(acknowledgePresentation).mock.calls.filter(call=>call[3]==='stopped');
+  expect(stopped.map(call=>call[1])).toEqual(['token-a','token-b']);
+  eng.setSceneActive(true);
+  await new Promise(resolve=>setTimeout(resolve,400));
+  expect(vi.mocked(acknowledgePresentation).mock.calls.filter(call=>call[3]==='resume').map(call=>call[1])).toEqual(['token-b']);
   eng.dispose();
 });

@@ -61,6 +61,7 @@ def test_activity_start_ack_does_not_replace_the_full_started_receipt():
         core.host.request(
             "plugins.configure", {"plugins": [{"id": "virtual", "type": "virtual"}]}
         )
+        core.enter("client-one")
         with core.run("activity-run", source="virtual"):
             ack = core.command("virtual.activityStart", {"tickMs": 100}, "activity-run")
         row = db.query(
@@ -104,15 +105,74 @@ def test_rejected_mcp_dispatch_does_not_create_an_unknown_effect_barrier():
     core = Coordinator()
     core.start()
     try:
+        lease = core.enter("client-one")
         with core.run("rejected-run", source="virtual"):
             with pytest.raises(HostError, match="TOOL_UNAVAILABLE"):
                 core.command("plugins.callTool", {"name": "missing"}, "rejected-run")
         row = db.query("SELECT status FROM outbox WHERE run_id='rejected-run'")[0]
         assert row["status"] == "failed"
-        assert core.mode == "daily"
-        assert core.enter("client-one")["mode"] == "meeting"
+        assert core.mode == "meeting"
+        assert core.heartbeat("client-one", lease["leaseId"])["mode"] == "meeting"
     finally:
         core.close()
+
+
+@pytest.mark.parametrize("code", ["PLUGIN_UNAVAILABLE", "CAPABILITY_UNAVAILABLE", "FORBIDDEN", "INPUT"])
+def test_rejected_channel_gate_is_known_unsent_not_an_unknown_outcome(monkeypatch, code):
+    from app.services.social import social
+    core = Coordinator()
+    core.schema()
+    core.started = True
+    core.mode = "meeting"
+    core.owner = {"clientId": "client-one", "leaseId": "lease", "expiresAt": float("inf")}
+    core.active = "run"
+    monkeypatch.setattr(social, "authorize_send", lambda *a, **k: None)
+
+    class Host:
+        def permit(self, run_id):
+            return {"commandId": "rejected", "activityEpoch": 0}
+
+        def request(self, method, params, **kwargs):
+            raise HostError(code)
+
+    core.host = Host()
+    with pytest.raises(HostError, match=code):
+        core.command("channels.send", {
+            "pluginId": "momo-qq", "accountId": "account", "peerId": "peer",
+            "policyRevision": 1, "audience": "owner", "text": "hello",
+        }, "run")
+    assert db.query("SELECT status FROM outbox WHERE command_id='rejected'")[0]["status"] == "failed"
+    assert core._unresolved_commands() == []
+    assert core.mode == "meeting"
+
+
+def test_late_unsent_error_code_cannot_downgrade_an_unknown_channel_receipt(monkeypatch):
+    from app.services.social import social
+    core = Coordinator()
+    core.schema()
+    core.started = True
+    core.mode = "meeting"
+    core.owner = {"clientId": "client-one", "leaseId": "lease", "expiresAt": float("inf")}
+    core.active = "run"
+    monkeypatch.setattr(social, "authorize_send", lambda *a, **k: None)
+
+    class Host:
+        def permit(self, run_id):
+            return {"commandId": "uncertain", "activityEpoch": 0}
+
+        def request(self, method, params, **kwargs):
+            core.record_receipt({"commandId": "uncertain", "runId": "run", "status": "unknown", "requiresReconciliation": True})
+            raise HostError("PLUGIN_UNAVAILABLE")
+
+    core.host = Host()
+    with pytest.raises(HostError, match="PLUGIN_UNAVAILABLE"):
+        core.command("channels.send", {
+            "pluginId": "momo-qq", "accountId": "account", "peerId": "peer",
+            "policyRevision": 1, "audience": "owner", "text": "hello",
+        }, "run")
+    assert db.query("SELECT status FROM outbox WHERE command_id='uncertain'")[0]["status"] == "unknown"
+    assert len(core._unresolved_commands()) == 1
+    assert core.mode == "paused"
 
 
 def test_real_mcp_timeout_requires_observed_outcome_before_a_new_meeting():
@@ -125,6 +185,7 @@ def test_real_mcp_timeout_requires_observed_outcome_before_a_new_meeting():
             "args": [str(Path(__file__).resolve().parents[2] / "plugin-host/test/fixtures/mcp-server.mjs")],
             "timeoutMs": 30, "connectTimeoutMs": 1000,
         }]})
+        core.enter("client-one")
         with core.run("unknown-run", source="virtual"):
             with pytest.raises(HostError, match="MCP_CALL"):
                 core.command("plugins.callTool", {"name": "echo__slow"}, "unknown-run")

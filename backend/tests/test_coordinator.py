@@ -67,26 +67,26 @@ def test_whole_turn_queue_is_serial_and_fifo():
     assert order == ["a:start", "a:end", "b"]
 
 
-def test_real_host_meeting_preempts_activity_and_holds_inbox(core):
+def test_real_host_boot_allows_phone_and_focus_holds_inbox(core):
+    with pytest.raises(CoordinationError, match="not activated"):
+        with core.run("dormant", source="virtual"):
+            pass
+    lease = core.enter("client-one")
     with core.run("playing", source="virtual"):
         started = core.command("virtual.activityStart", {"tickMs": 20}, "playing")
     assert started["started"]
-    lease = core.enter("client-one")
-    assert core.host.request("status")["activity"] is None
-    assert core.mode == "meeting"
     with pytest.raises(CoordinationError, match="Another window"):
         core.enter("client-two")
+    core.control("client-one", lease["leaseId"], "focus", "focus_on")
+    assert core.host.request("status")["activity"] is None
     first = core.enqueue("virtual", "account", "same-message", "hello")
     again = core.enqueue("virtual", "account", "same-message", "hello")
     assert first["id"] == again["id"]
-    time.sleep(0.25)
-    assert (
-        db.query("SELECT status FROM inbox WHERE id=?", (first["id"],))[0]["status"]
-        == "queued"
-    )
-    with core.run("meeting-run", client="client-one", lease=lease["leaseId"]):
-        with pytest.raises(CoordinationError, match="unavailable during"):
-            core.command("virtual.deliver", {"text": "bad"}, "meeting-run")
+    time.sleep(.1)
+    assert db.query("SELECT status FROM inbox WHERE id=?", (first["id"],))[0]["status"] == "held_focus"
+    with core.run("local-run", client="client-one", lease=lease["leaseId"]):
+        with pytest.raises(CoordinationError, match="focusing"):
+            core.command("virtual.deliver", {"text": "blocked"}, "local-run")
 
 
 def test_refresh_rotates_lease_and_expiry_pauses(core):
@@ -95,10 +95,13 @@ def test_refresh_rotates_lease_and_expiry_pauses(core):
     assert old["leaseId"] != fresh["leaseId"]
     with pytest.raises(CoordinationError):
         core.heartbeat("client-one", old["leaseId"])
+    core.control("client-one", fresh["leaseId"], "pause-before-expiry", "stop")
+    core.control("client-one", fresh["leaseId"], "focus-before-expiry", "focus_on")
     core.owner["expiresAt"] = time.monotonic() - 1
     with pytest.raises(CoordinationError):
         core.heartbeat("client-one", fresh["leaseId"])
     assert core.mode == "paused" and core.owner is None
+    assert core.focus is False and core.phone_paused is True
 
 
 def test_restore_barrier_revokes_and_never_replays_pending(core):
@@ -144,3 +147,47 @@ def test_second_core_is_refused(core):
     other = Coordinator()
     with pytest.raises(RuntimeError, match="Another momo"):
         other.start()
+
+
+def test_delayed_mcp_configuration_cannot_replace_newer_combined_state(monkeypatch):
+    from app.services.social import social
+
+    instance = Coordinator()
+    entered = threading.Event()
+    release = threading.Event()
+    applied = []
+    social_configs = []
+
+    class Host:
+        def request(self, method, params, **kwargs):
+            assert method == "plugins.configure"
+            if params["configurationRevision"] == 1:
+                entered.set()
+                assert release.wait(3)
+            if not applied or params["configurationRevision"] > applied[-1]["configurationRevision"]:
+                applied.append(params)
+                return {"ok": True}
+            return {"stale": True}
+
+    instance.host = Host()
+    monkeypatch.setattr(social, "host_configs", lambda: list(social_configs))
+    old = [{"id": "old-mcp", "type": "mcp"}]
+    current = [{"id": "current-mcp", "type": "mcp"}]
+    worker = threading.Thread(target=lambda: instance.configure_host_plugins(old, revision=1))
+    worker.start()
+    assert entered.wait(1)
+    try:
+        instance.configure_host_plugins(current, revision=2)
+        social_configs.append({"id": "social", "type": "social"})
+        instance.refresh_social_plugins()
+        # The older MCP revision is rejected before it can overwrite the cache,
+        # even though the first host request is still in flight.
+        assert instance.configure_host_plugins(old, revision=1) == {"stale": True}
+    finally:
+        release.set()
+        worker.join(3)
+    assert not worker.is_alive()
+    assert instance.mcp_configs == current
+    assert instance.mcp_revision == 2
+    assert [item["configurationRevision"] for item in applied] == [2, 3]
+    assert applied[-1]["plugins"] == current + social_configs

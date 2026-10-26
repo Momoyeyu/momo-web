@@ -1,3 +1,4 @@
+import {bootChat} from './helpers';
 import { test, expect } from './fixtures';
 import JSZip from 'jszip';
 import { readFile, readdir } from 'node:fs/promises';
@@ -14,7 +15,7 @@ test.beforeEach(async ({ page, request }) => {
 });
 
 test('resource dialog owns the live canvas and returns it when closed', async ({ page }) => {
-  await page.goto('/#/chat');
+  await bootChat(page);
   await expect(page.getByRole('button', { name: '表演预览', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '全身', exact: true }).click();
   const originalCanvas = await page.locator('.live2d-home canvas').elementHandle();

@@ -3,7 +3,7 @@
 // 打断（SpeechStarted / stop）= 停播放 + abort SSE/TTS。
 // 设置每次回合开始从 store 现读——setting 页改动无需重启即生效。
 
-import {meetingIdentity} from "../services/meetingClient";
+import {meetingIdentity,acknowledgePresentation,acquireReplay} from "../services/meetingClient";
 import { createAsr } from "../services/asrClient";
 import { ttsConfigured } from "../lib/asr";
 import type { AsrEngine } from "../services/asrClient";
@@ -95,6 +95,10 @@ interface Turn {
   ackRunning: boolean;
   ackAt: number;
   ackQueue: Promise<void>;
+  presentationToken:string|null;
+  presentationSuspended:boolean;
+  queuedStopToken:string|null;
+  presentationQueue:Promise<void>;
   opening: boolean;
   generation: number | null;
   /** assistant 已产出全文（打断按此落账）。 */
@@ -114,6 +118,13 @@ interface Turn {
   pushed: number;
   /** 播放 tick（setInterval id；构造期占位 0）。 */
   timer: ReturnType<typeof setInterval> | number;
+}
+interface Replay {
+  runId:string;token:string;generation:number;text:string;
+  owner:{clientId:string;leaseId:string};
+  abort:AbortController;
+  releaseDrain:(()=>void)|null;
+  finalizing:Promise<void>|null;
 }
 
 const INTERRUPT_DEBOUNCE_MS = 300;
@@ -153,7 +164,10 @@ export class ChatEngine {
   private sceneActive=true;
   private presentationPaused=false;
   private presentationPausedAt=0;
-  private readonly visibilityChanged=()=>this.applyPresentationVisibility();
+  private presentationRetry:ReturnType<typeof setTimeout>|null=null;
+  private replay:Replay|null=null;
+  private replayVersion=0;
+  private readonly visibilityChanged=()=>{this.applyPresentationVisibility();if(document.visibilityState==='hidden')void this.stopReplay();};
 
   constructor(ev: ChatEngineEvents) {
     this.events = ev;
@@ -164,6 +178,7 @@ export class ChatEngine {
     this.player.onMouthOpen = (v) =>
       this.tryStage((s) => s.setMouthOpen(v, this.player.playing));
     this.player.onUnavailable = () => {
+      if(this.replay)void this.stopReplay();
       const t = this.turn;
       if (!t) return;
       t.audioAbort.abort();
@@ -173,6 +188,7 @@ export class ChatEngine {
       this.maybeFinish(t);
     };
     this.player.onDrain = () => {
+      this.replay?.releaseDrain?.();
       const t = this.turn;
       if (t) this.maybeFinish(t);
     };
@@ -220,27 +236,62 @@ export class ChatEngine {
    * backlog 语音重播：空闲时把一条 assistant 消息重新合成播放
    * （口型随播放驱动，不进历史、不占回合）。回合进行中调用为空操作。
    */
-  replayMessage(m: ChatMessage): Promise<void> {
+  async replayMessage(m: ChatMessage): Promise<void> {
     if (
       this.disposed ||
       this.phase !== "idle" ||
       m.role !== "assistant" ||
-      !m.text.trim()
+      !m.text.trim() || !m.runId || !m.eventId || this.replay
     ) {
-      return Promise.resolve();
+      return;
     }
     const cfg = getSettings();
-    if (!ttsConfigured(cfg.tts)) return Promise.resolve();
+    if (!ttsConfigured(cfg.tts)) return;
+    const owner=meetingIdentity();
+    if(!owner)return;
+    const version=++this.replayVersion;
+    const permit=await acquireReplay(m.runId,m.eventId);
+    if(this.disposed||version!==this.replayVersion||this.phase!=='idle'){
+      await acknowledgePresentation(permit.runId,permit.token,permit.generation,'stopped','',owner).catch(()=>undefined);
+      return;
+    }
+    const replay:Replay={...permit,owner,abort:new AbortController(),releaseDrain:null,finalizing:null};
+    this.replay=replay;
     this.safe(() => {this.player.stop();this.player.setPaused(false);});
-    return streamSpeech(m.text, {
-      // 回放与实时合成同一口径：语言 = 对话语言
-      lang: resolveChatLang(cfg.general),
-      onSampleRate: (hz) => this.safe(() => this.player.setSampleRate(hz)),
-      onChunk: (pcm) => {
-        if (this.disposed) return;
-        this.safe(() => this.player.push(pcm));
-      },
-    });
+    try{
+      await streamSpeech(permit.text,{
+        lang:resolveChatLang(cfg.general),signal:replay.abort.signal,
+        onSampleRate:hz=>this.safe(()=>this.player.setSampleRate(hz)),
+        onChunk:pcm=>{if(this.replay===replay)this.safe(()=>this.player.push(pcm));},
+      });
+      if(this.replay!==replay)return;
+      if(this.playerPlaying())await new Promise<void>(resolve=>{replay.releaseDrain=resolve;if(!this.playerPlaying())resolve();});
+      if(this.replay===replay){
+        // Keep departure and a concurrent stop behind this terminal ACK. If it
+        // fails, release the permit as stopped before allowing another action.
+        replay.finalizing=acknowledgePresentation(replay.runId,replay.token,replay.generation,'completed',replay.text,replay.owner)
+          .catch(async error=>{
+            await acknowledgePresentation(replay.runId,replay.token,replay.generation,'stopped','',replay.owner).catch(()=>undefined);
+            throw error;
+          });
+        try{await replay.finalizing;}finally{if(this.replay===replay)this.replay=null;}
+      }
+    }catch(error){
+      await this.stopReplay();
+      throw error;
+    }
+  }
+
+  async stopReplay():Promise<void>{
+    this.replayVersion++;
+    const replay=this.replay;
+    if(!replay)return;
+    if(replay.finalizing){await replay.finalizing.catch(()=>undefined);return;}
+    this.replay=null;
+    replay.abort.abort();
+    replay.releaseDrain?.();
+    this.safe(()=>this.player.stop());
+    await acknowledgePresentation(replay.runId,replay.token,replay.generation,'stopped','',replay.owner).catch(()=>undefined);
   }
 
   /** 已落账对话历史（system prompt 组装用）。 */
@@ -291,6 +342,7 @@ export class ChatEngine {
 
   private async doSend(trimmed: string, opening = false): Promise<void> {
     if (this.disposed) return;
+    await this.stopReplay();
     // 新输入隐式打断在途回合（绕过防抖，保证打断一定生效）；
     // await 回传完成：backend 先修正尾对再收新消息，保证消息不乱序。
     if (this.phase !== "idle") await this.interruptNow(true);
@@ -327,6 +379,7 @@ export class ChatEngine {
       ackRunning: false,
       ackAt: 0,
       ackQueue: Promise.resolve(),
+      presentationToken:null,presentationSuspended:false,queuedStopToken:null,presentationQueue:Promise.resolve(),
       opening,
       generation: meetingGeneration(),
       text: "",
@@ -469,6 +522,31 @@ export class ChatEngine {
 
   private applyPresentationVisibility():void {
     const paused=!this.sceneActive||typeof document!=="undefined"&&document.visibilityState==="hidden";
+    const turn=this.turn;
+    if(paused && turn && turn.presentationToken && turn.queuedStopToken!==turn.presentationToken){
+      // Stop audio/cues before releasing the brain's presentation ownership.
+      this.safe(()=>this.player.setPaused(true));
+      this.tryStage(stage=>stage.cancelPerformance());
+      turn.presentationSuspended=true;
+      // SSE can deliver another sentence while this page is hidden. Capture the
+      // capability now: a later token must never rewrite an already queued ACK.
+      const capability={runId:turn.runId,token:turn.presentationToken,generation:turn.generation,owner:turn.owner};
+      turn.queuedStopToken=capability.token;
+      turn.presentationQueue=turn.presentationQueue.then(()=>this.acknowledgeSeen(turn,true)).then(()=>this.presentationAck(turn,'stopped',capability)).catch(error=>{
+        if(this.disposed||this.turn!==turn)return;
+        this.events.onError(toError(error));
+        if(turn.queuedStopToken===capability.token){
+          turn.queuedStopToken=null;
+          setTimeout(()=>{if(this.turn===turn)this.applyPresentationVisibility();},350);
+        }
+      });
+    }else if(!paused && turn?.presentationSuspended){
+      this.resumePresentation(turn);return;
+    }
+    this.setPresentationPaused(paused);
+  }
+
+  private setPresentationPaused(paused:boolean):void {
     if(paused===this.presentationPaused)return;
     const now=Date.now();
     if(paused)this.presentationPausedAt=now;
@@ -481,11 +559,38 @@ export class ChatEngine {
     this.safe(()=>this.player.setPaused(paused));
   }
 
+  private resumePresentation(turn:Turn):void {
+    if(this.presentationRetry)return;
+    // The old capability must reacquire the single brain before buffered speech.
+    this.presentationRetry=setTimeout(()=>{
+      this.presentationRetry=null;
+      void turn.presentationQueue.then(async()=>{
+        if(this.turn!==turn || !this.sceneActive || typeof document!=='undefined'&&document.visibilityState==='hidden')return;
+        try{
+          await this.presentationAck(turn,'resume');
+          if(this.turn!==turn)return;
+          turn.presentationSuspended=false;
+          turn.queuedStopToken=null;
+          this.tryStage(stage=>stage.beginPerformance(turn.id));
+          this.setPresentationPaused(false);
+        }catch{
+          if(this.turn===turn && this.sceneActive)this.resumePresentation(turn);
+        }
+      });
+    },350);
+  }
+
+  private presentationAck(turn:Turn,outcome:'completed'|'stopped'|'resume',capability={runId:turn.runId,token:turn.presentationToken,generation:turn.generation,owner:turn.owner}):Promise<void> {
+    if(!capability.runId||!capability.token||capability.generation==null)return Promise.resolve();
+    return acknowledgePresentation(capability.runId,capability.token,capability.generation,outcome,this.seenText(turn),capability.owner);
+  }
+
   /** Explicit meeting exit flushes observed text before the lease is revoked. */
   finishMeeting(): Promise<void> {
+    const replayStopped=this.stopReplay();
     const done=this.turn?this.interruptNow(true):Promise.resolve();
     if(!this.turn)this.safe(()=>this.player.stop());
-    this.sendQueue=this.sendQueue.then(()=>done);
+    this.sendQueue=this.sendQueue.then(()=>Promise.all([done,replayStopped]).then(()=>undefined));
     this.suspendMic();
     return this.sendQueue;
   }
@@ -493,6 +598,8 @@ export class ChatEngine {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    void this.stopReplay();
+    if(this.presentationRetry)clearTimeout(this.presentationRetry);
     this.unsubVolume?.();
     if(typeof document!=="undefined")document.removeEventListener("visibilitychange",this.visibilityChanged);
     this.interruptNow(false);
@@ -536,7 +643,7 @@ export class ChatEngine {
     const seen = this.seenText(turn);
     this.publishSeen(turn);
     const done = persist
-      ? this.acknowledgeSeen(turn,true).then(() => turn.runId
+      ? this.acknowledgeSeen(turn,true).then(()=>turn.presentationSuspended?undefined:this.presentationAck(turn,'stopped')).catch(()=>undefined).then(() => turn.runId
           ? sendInterrupt(turn.userText,seen,turn.generation ?? undefined,turn.runId,turn.owner)
           : turn.generation == null ? sendInterrupt(turn.userText,seen) : sendInterrupt(turn.userText,seen,turn.generation))
       : Promise.resolve();
@@ -559,6 +666,7 @@ export class ChatEngine {
         if (this.turn !== turn) return; // 已被打断
         if (ev.t === "sentence") {
           if (ev.generation != null) turn.generation = ev.generation;
+          if(ev.presentationToken)turn.presentationToken=ev.presentationToken;
           if (ev.runId) {
             turn.runId = ev.runId;
             if (turn.userMessage) {
@@ -569,6 +677,12 @@ export class ChatEngine {
           }
           turn.text += ev.text;
           this.pushSentence(turn, cfg, ev.text, ev.cues, ev);
+          if(this.presentationPaused)this.applyPresentationVisibility();
+        } else if(ev.t==='done') {
+          if(ev.generation!=null)turn.generation=ev.generation;
+          if(ev.runId)turn.runId=ev.runId;
+          if(ev.presentationToken)turn.presentationToken=ev.presentationToken;
+          if(this.presentationPaused)this.applyPresentationVisibility();
         } else if (ev.t === "error") {
           throw new ServiceError("llm", "http", 0, ev.message);
         }
@@ -797,6 +911,7 @@ export class ChatEngine {
   /** 收尾判定：LLM 流完 + TTS 请求全部完成 + 展示队列播完 + （若有音频）player 播空。 */
   private maybeFinish(turn: Turn): void {
     if (this.turn !== turn || turn.finished) return;
+    if (this.presentationPaused || turn.presentationSuspended) return;
     if (!turn.llmDone || turn.inflight > 0) return;
     if (turn.disp.idx < turn.sentences.length) return; // 还有句没播完
     if (turn.pushedAudio && this.playerPlaying()) return;
@@ -805,19 +920,22 @@ export class ChatEngine {
 
   private completeTurn(turn: Turn): void {
     turn.finished = true;
-    clearInterval(turn.timer);
     this.publishSeen(turn);
-    const acknowledged = this.acknowledgeSeen(turn,true);
-    this.turn = null;
-    this.sendQueue = this.sendQueue.then(() => acknowledged);
-    // 各句已在 pushSentence 里逐句落账，这里只发「回合结束」信号
-    if (turn.text.trim()) {
-      const last = [...this.history].reverse().find((m) => m.role === "assistant");
-      if (last) this.events.onAssistantDone(last);
-    }
-    // 表情持续到本次回复结束：回合完成复位。
-    this.tryStage((st) => st.endPerformance(turn.id));
-    this.setPhase("idle");
+    void this.acknowledgeSeen(turn,true).then(async()=>{
+      if(this.turn!==turn || this.presentationPaused || turn.presentationSuspended)return;
+      await this.presentationAck(turn,'completed');
+      if(this.turn!==turn)return;
+      clearInterval(turn.timer);
+      this.turn=null;
+      // 各句已在 pushSentence 里逐句落账，这里只发「回合结束」信号。
+      if(turn.text.trim()){
+        const last=[...this.history].reverse().find(message=>message.role==='assistant');
+        if(last)this.events.onAssistantDone(last);
+      }
+      this.tryStage(stage=>stage.endPerformance(turn.id));
+      this.setPhase('idle');
+    }).catch(error=>{if(!this.disposed&&this.turn===turn)this.events.onError(toError(error));})
+      .finally(()=>{if(this.turn===turn)turn.finished=false;});
   }
 
   private playerPlaying(): boolean {

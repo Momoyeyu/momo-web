@@ -114,6 +114,7 @@ def test_two_accounts_with_same_platform_message_id_remain_distinct(
     from app.services import turn
 
     core = live_core
+    core.enter("client-one")
     monkeypatch.setattr(
         llm,
         "chat_stream",
@@ -329,8 +330,16 @@ def test_partial_opening_recovery_keeps_seen_prefix_and_emits_only_remainder(
             ).status_code
             == 200
         )
-        fresh = client.post("/api/meeting/enter", json=owner).json()
+        fresh = client.post("/api/meeting/enter", json={**owner, "restore": True}).json()
+        assert fresh["leaseId"] != old["leaseId"]
+        assert fresh["epoch"] > old["epoch"]
+        assert fresh["activation"] == "active"
         owner["leaseId"] = fresh["leaseId"]
+        assert client.post("/api/life/ack", json={
+            "clientId": owner["clientId"], "leaseId": old["leaseId"],
+            "runId": events[0]["runId"], "generation": events[0]["generation"],
+            "text": full,
+        }).status_code == 409
         assert client.get("/api/onboarding").json()["pendingOpening"]
         response = client.post("/api/onboarding/opening", json=owner)
         resumed = [
@@ -362,6 +371,9 @@ def test_partial_opening_recovery_keeps_seen_prefix_and_emits_only_remainder(
             '"t": "sentence"'
             not in client.post("/api/onboarding/opening", json=owner).text
         )
+        # A retired token is never a way to reactivate a later dormant runtime.
+        assert client.post("/api/meeting/leave", json=owner).status_code == 200
+        assert client.post("/api/meeting/enter", json={**owner, "restore": True}).status_code == 409
 
 
 def test_closing_sse_iterator_releases_run_without_a_done_event(monkeypatch):

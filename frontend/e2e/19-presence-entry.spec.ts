@@ -44,7 +44,7 @@ test('approved silhouette turns into visible ASCII, then releases real chat; set
   await expect.poll(() => portrait.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1024);
   await expect.poll(() => page.locator('.title-menu .menu-item').last().evaluate(element=>Number(getComputedStyle(element).opacity))).toBe(1);
   await page.screenshot({path:info.outputPath('title-approved-silhouette.png')});
-  await page.getByRole('button',{name:'见面 meet'}).click();
+  await page.getByRole('button',{name:'启动 boot'}).click();
   const ink = page.locator('.chat-entry-canvas');
   await expect(ink).toBeVisible();
   await expect.poll(() => ink.getAttribute('data-phase')).toBe('glyphs');
@@ -68,7 +68,7 @@ test('approved silhouette turns into visible ASCII, then releases real chat; set
 for (const destination of ['设置', '记录']) {
   test(`returning from ${destination} uses RoPE without replaying the title entry`, async ({page}) => {
     await fixture(page);
-    await page.getByRole('button',{name:'见面 meet'}).click();
+    await page.getByRole('button',{name:'启动 boot'}).click();
     await expect(page.locator('.chat-entry-canvas')).toBeVisible();
     await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
     await page.getByRole('button',{name:destination,exact:true}).click();
@@ -99,7 +99,7 @@ for (const destination of ['设置', '记录']) {
 
 test('rapid navigation cancels ASCII; only a new title-to-chat entry replays it', async ({page}) => {
   await fixture(page);
-  await page.getByRole('button',{name:'见面 meet'}).click();
+  await page.getByRole('button',{name:'启动 boot'}).click();
   await expect(page.locator('.chat-entry-canvas')).toBeVisible();
   await page.evaluate(() => {location.hash='/settings';});
   await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
@@ -111,7 +111,7 @@ test('rapid navigation cancels ASCII; only a new title-to-chat entry replays it'
   await expect(page.locator('.page-wrap.is-front')).toHaveCount(0);
   await page.evaluate(() => {location.hash='/title';});
   await expect(page.locator('.title-screen')).toBeVisible();
-  await page.getByRole('button',{name:'见面 meet'}).click();
+  await page.getByRole('button',{name:'启动 boot'}).click();
   await expect(page.locator('.chat-entry-canvas')).toBeVisible();
   await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
   await expect(page.locator('.page-wrap')).toHaveCount(1);
@@ -120,13 +120,13 @@ test('rapid navigation cancels ASCII; only a new title-to-chat entry replays it'
 test('missing decorative art and reduced motion never hold the dialogue behind a transition', async ({page}) => {
   await page.route('**/brand/momo-presence-v2.webp', route => route.abort());
   await fixture(page);
-  await page.getByRole('button',{name:'见面 meet'}).click();
+  await page.getByRole('button',{name:'启动 boot'}).click();
   await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
   await expect(page.locator('.input-row input')).toBeVisible();
   await page.emulateMedia({reducedMotion:'reduce'});
   await page.evaluate(() => {location.hash='/title';});
   await expect(page.locator('.title-screen')).toBeVisible();
-  await page.getByRole('button',{name:'见面 meet'}).click();
+  await page.getByRole('button',{name:'启动 boot'}).click();
   await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
   await expect(page.locator('.input-row input')).toBeVisible();
 });

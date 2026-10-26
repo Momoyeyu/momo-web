@@ -48,6 +48,7 @@ export interface SentenceIdentity {
   seq?: number;
   userEventId?: string;
   userSeq?: number;
+  presentationToken?:string;
 }
 export function acknowledgeDisplay(runId: string, generation: number, text: string, owner = meetingIdentity()): Promise<void> {
   return runtimeFetch('/api/life/ack', {
@@ -58,7 +59,7 @@ export function acknowledgeDisplay(runId: string, generation: number, text: stri
 
 export type ChatEvent =
   | ({ t: "sentence"; no: number; generation?: number; text: string; cues: PerformanceCue[]; at: string } & SentenceIdentity)
-  | { t: "done" }
+  | { t: "done";runId?:string;generation?:number;presentationToken?:string }
   | { t: "error"; message: string };
 
 function isAbortError(e: unknown): boolean {
@@ -85,6 +86,7 @@ function parseEvent(data: string): ChatEvent | null {
       userSeq?: unknown;
       cues?: unknown;
       at?: unknown;
+      presentationToken?:unknown;
     };
     if (j.t === "sentence" && typeof j.text === "string") {
       return {
@@ -95,13 +97,14 @@ function parseEvent(data: string): ChatEvent | null {
         ...(typeof j.userEventId === "string" ? {userEventId:j.userEventId} : {}),
         ...(typeof j.userSeq === "number" ? {userSeq:j.userSeq} : {}),
         ...(typeof j.generation === "number" ? {generation: j.generation} : {}),
+        ...(typeof j.presentationToken==='string'?{presentationToken:j.presentationToken}:{}),
         no: typeof j.no === "number" ? j.no : 0,
         text: j.text,
         cues: Array.isArray(j.cues) ? (j.cues as PerformanceCue[]) : [],
         at: typeof j.at === "string" ? j.at : "",
       };
     }
-    if (j.t === "done") return { t: "done" };
+    if (j.t === "done") return { t: "done",...(typeof j.runId==='string'?{runId:j.runId}:{}),...(typeof j.generation==='number'?{generation:j.generation}:{}),...(typeof j.presentationToken==='string'?{presentationToken:j.presentationToken}:{}) };
     if (j.t === "error") {
       return {
         t: "error",

@@ -1,6 +1,6 @@
 import { expect, test, type Page } from './fixtures';
 import { presentation } from './helpers/runtime';
-import {waitForChatReady} from './helpers';
+import {bootChat,waitForChatReady} from './helpers';
 
 async function runtime(page: Page, action: string): Promise<any> {
   return page.evaluate(async (action) => {
@@ -86,7 +86,7 @@ test('configured real TTS drives mouth opening and releases the channel after dr
   await page.route('**/api/state',r=>r.fulfill({json:state}));
   await page.route('**/api/life/history**',r=>r.fulfill({json:{summary:'',messages:[]}}));
   await page.route('**/api/chat',r=>r.fulfill({contentType:'text/event-stream',body:'data: '+JSON.stringify({t:'sentence',no:0,text:'欢迎回来，今天有什么开心的事情想和我说呢？',at:'',cues:[{id:'tts:0',offset:0,expression:{name:'happy',intensity:0.8}}]})+'\n\ndata: {"t":"done"}\n\n'}));
-  await page.goto('/#/chat');await expect.poll(()=>presentation(page).then(s=>s?.expressions.length??0)).toBe(4);
+  await bootChat(page);await expect.poll(()=>presentation(page).then(s=>s?.expressions.length??0)).toBe(4);
   await page.evaluate(async()=>{
     const entry=performance.getEntriesByType('resource').find(e=>new URL(e.name).pathname==='/src/live2d/stage.ts')!;
     const stage=(await import(entry.name)).getStage(); (window as any).__audioPeak=0;

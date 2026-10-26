@@ -14,6 +14,7 @@ import Pager from "../../ui/Pager";
 import Switch from "../../ui/Switch";
 import AvatarPanel from "../panels/Avatar";
 import ExtConfigModal from "./ExtConfigModal";
+import OfficialPlugins from "./OfficialPlugins";
 
 export default function ExtensionsTab() {
   const t = useT();
@@ -122,6 +123,7 @@ export default function ExtensionsTab() {
 
   return (
     <>
+      <OfficialPlugins />
       {/* 双栏：左 Live2D（原「形象」tab 唯一剩下的配置）、右 MCP 拓展 */}
       <div className="settings-cols">
         <section className="panel panel-stack">

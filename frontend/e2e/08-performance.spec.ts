@@ -1,6 +1,6 @@
 import { test, expect } from "./fixtures";
 import { presentation } from './helpers/runtime';
-import {waitForChatReady} from './helpers';
+import {bootChat,waitForChatReady} from './helpers';
 
 // Intercept configuration/chat only; exercise the real vendored model and renderer.
 // All writes are intercepted so the user's settings, memory and conversation stay intact.
@@ -45,7 +45,7 @@ test('queued cues follow visible text, while transcript stays plain', async ({ p
     ] };
     await route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify(event)}\n\ndata: {"t":"done"}\n\n` });
   });
-  await page.goto('/#/chat');
+  await bootChat(page);
   await expect.poll(() => presentation(page).then(snapshot => snapshot?.expressions.length ?? 0)).toBe(4);
   await waitForChatReady(page);
   await page.getByPlaceholder(/输入|说点/).fill('你好');
@@ -72,7 +72,7 @@ test('short audio does not rush the remaining text or its late cue', async ({ pa
       { id: '0:1', offset: 15, expression: {name: 'shy', intensity: 1} }
     ]
   }) + '\n\ndata: {"t":"done"}\n\n' }));
-  await page.goto('/#/chat');
+  await bootChat(page);
   await expect.poll(() => presentation(page).then(snapshot => snapshot?.expressions.length ?? 0)).toBe(4);
   await waitForChatReady(page);
   await page.getByPlaceholder(/输入|说点|和 momo/).fill('你好');
