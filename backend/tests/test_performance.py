@@ -132,7 +132,11 @@ def test_performance_reminder_is_after_old_dialogue_without_changing_stored_hist
         "expressionState": {"name": None, "intensity": 0},
     }
     messages = turn.build_messages(normalize_state({}), "now", catalog)
-    assert messages[-2]["role"] == "system" and "<|ACT " in messages[-2]["content"]
+    old_reply = next(i for i, message in enumerate(messages) if message["role"] == "assistant")
+    reminder = next(i for i, message in enumerate(messages) if message["role"] == "system" and "Live performance mode remains active" in message["content"])
+    assert old_reply < reminder < len(messages) - 1
+    assert "<|ACT " in messages[reminder]["content"]
+    assert "Current reply channel: chat" in messages[-2]["content"]
     assert messages[-1] == {"role": "user", "content": "now"}
     assert checkpoint.live_messages()[-1]["text"] == "previous plain reply"
 

@@ -129,6 +129,7 @@ export class PluginHost {
         return this.mutate(() => this.configure(params, revision));
       }
       case 'plugins.listTools': return this.listTools();
+      case 'plugins.promptContext': return this.promptContext(params);
       case 'plugins.callTool': return this.callTool(params);
       case 'commands.reconcile': return this.reconcileCommand(params);
       case 'channels.health': return this.channelHealth(params);
@@ -270,6 +271,23 @@ export class PluginHost {
       }
     }
     return plugin.channel.health();
+  }
+
+  async promptContext({ pluginId, source, accountId, peerId, policyRevision }) {
+    const plugin = this.plugins.get(pluginId);
+    const checkCurrent = () => {
+      if (!plugin?.channel || !['qq', 'wechat'].includes(plugin.config.type) || !plugin.enabled || !plugin.connected || this.plugins.get(pluginId) !== plugin || plugin.channel.quarantined) fail('PLUGIN_UNAVAILABLE', 'Channel prompt context is unavailable');
+      if (source !== plugin.config.type || accountId !== plugin.config.accountId || policyRevision !== plugin.config.policyRevision) fail('STALE_CONFIG', 'Channel prompt scope has changed');
+      try { plugin.channel.checkPromptScope(peerId); }
+      catch (cause) { throw new HostError(cause.code ?? 'CHANNEL', 'Channel prompt scope is not available'); }
+    };
+    checkCurrent();
+    try { await plugin.channel.verifyPromptScope(peerId); }
+    catch (cause) { throw new HostError(cause.code ?? 'CHANNEL', 'Channel prompt identity could not be verified'); }
+    // A permission save may withdraw the plugin while identity verification is
+    // pending. No stale adapter contribution may escape after that withdrawal.
+    checkCurrent();
+    return { pluginId, source, scope: 'current_turn', sections: plugin.channel.promptContext() };
   }
 
   ackChannel({ pluginId, accountId, inboxId }) {

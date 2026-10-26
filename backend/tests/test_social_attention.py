@@ -2,6 +2,7 @@
 
 import threading
 import time
+from contextlib import contextmanager
 
 import pytest
 
@@ -356,6 +357,8 @@ def test_local_interruption_resumes_only_unsent_phone_work_in_one_brain(monkeypa
         yield {"type": "text", "delta": "hello" if prompts[-1] == "local hello" else "remote answer"}
 
     def transport(method, params=None, **kwargs):
+        if method == "plugins.promptContext":
+            return {"pluginId": "momo-qq", "source": "qq", "scope": "current_turn", "sections": [{"id": "qq-private-chat", "content": "Reply through the same QQ private conversation."}]}
         if method == "channels.send":
             sent.set()
             return {"receipt": {**params["permit"], "status": "completed", "accountId": "qq-main", "peerId": "20002", "pluginId": "momo-qq", "evidence": "fixture-accepted"}}
@@ -385,6 +388,300 @@ def test_local_interruption_resumes_only_unsent_phone_work_in_one_brain(monkeypa
         assert db.query("SELECT status FROM inbox WHERE source='qq'")[0]["status"] == "completed"
     finally:
         core.close()
+
+
+@pytest.mark.parametrize("owner", [False, True])
+def test_worker_obtains_current_plugin_context_before_persona_inference(monkeypatch, owner):
+    from app.core import llm
+    from app.services.social import social
+    core = Coordinator()
+    core.start()
+    social.put("qq", {"enabled": True, "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only"})
+    event = {"source": "qq", "pluginId": "momo-qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "one", "text": "which app?"}
+    if owner:
+        proof = social.owner_challenge("qq", "20002")
+        social.authorize_event({**event, "text": proof["challenge"]})
+    event["policyRevision"] = social.get("qq")["policyRevision"]
+    calls, messages, tools = [], [], []
+    original = core.host.request
+    finished = threading.Event()
+
+    def transport(method, params=None, **kwargs):
+        if method == "plugins.promptContext":
+            calls.append((method, params))
+            return {"pluginId": "momo-qq", "source": "qq", "scope": "current_turn", "sections": [{"id": "qq-private-chat", "content": "PLUGIN-QQ-PRIVATE-TEXT"}]}
+        if method == "channels.send":
+            calls.append((method, params))
+            finished.set()
+            return {"receipt": {**params["permit"], "status": "completed", "deliveryStatus": "provider_accepted"}}
+        return original(method, params, **kwargs)
+
+    def provider(_config, current_messages, tools=None, **kwargs):
+        calls.append(("infer", None))
+        messages.extend(current_messages)
+        assert "attention_control" not in {item["function"]["name"] for item in tools}
+        yield {"type": "text", "delta": "QQ private reply."}
+
+    monkeypatch.setattr(core.host, "request", transport)
+    monkeypatch.setattr(llm, "chat_stream", provider)
+    try:
+        core.event("inbox", event)
+        assert not finished.wait(.1)
+        core.enter("client-one")
+        assert finished.wait(3)
+        assert [item[0] for item in calls] == ["plugins.promptContext", "infer", "channels.send"]
+        assert calls[0][1] == {"pluginId": "momo-qq", "source": "qq", "accountId": "qq-main", "peerId": "20002", "policyRevision": event["policyRevision"]}
+        assert "PLUGIN-QQ-PRIVATE-TEXT" in messages[-2]["content"]
+        assert "Current reply channel: QQ" in messages[-2]["content"]
+        assert ("verified player" in messages[-2]["content"]) == owner
+    finally:
+        core.close()
+
+
+@pytest.mark.parametrize("context", [None, {"source": "wechat"}])
+def test_unavailable_plugin_context_holds_input_without_inference_or_send(monkeypatch, context):
+    from app.core import llm
+    from app.core.plugin_host import HostError
+    from app.services.social import social
+    core = Coordinator()
+    core.start()
+    account = social.put("qq", {"enabled": True, "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only"})
+    event = {"source": "qq", "pluginId": "momo-qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "one", "text": "preserve this input", "policyRevision": account["policyRevision"]}
+    original = core.host.request
+    inferred, sent = [], []
+
+    def transport(method, params=None, **kwargs):
+        if method == "plugins.promptContext":
+            if context is None:
+                raise HostError("PLUGIN_UNAVAILABLE")
+            return context
+        if method == "channels.send":
+            sent.append(params)
+        return original(method, params, **kwargs)
+
+    monkeypatch.setattr(core.host, "request", transport)
+    monkeypatch.setattr(llm, "chat_stream", lambda *a, **k: inferred.append(True))
+    try:
+        core.enter("client-one")
+        core.event("inbox", event)
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            row = db.query("SELECT * FROM inbox WHERE source='qq'")[0]
+            if row["status"] == "held_scope":
+                break
+            time.sleep(.01)
+        assert row["status"] == "held_scope"
+        assert row["text"] == "preserve this input"
+        assert not inferred and not sent
+    finally:
+        core.close()
+
+
+@pytest.mark.parametrize("action", ["focus_on", "stop", "leave"])
+def test_delayed_plugin_context_cannot_start_inference_after_attention_revocation(monkeypatch, action):
+    from app.core import llm
+    from app.services.social import social
+    core = Coordinator()
+    core.start()
+    account = social.put("qq", {"enabled": True, "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only"})
+    event = {"source": "qq", "pluginId": "momo-qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "delayed", "text": "preserve interrupted question", "policyRevision": account["policyRevision"]}
+    original = core.host.request
+    waiting, release = threading.Event(), threading.Event()
+    inferred, sent, errors = [], [], []
+
+    def transport(method, params=None, **kwargs):
+        if method == "plugins.promptContext":
+            waiting.set()
+            assert release.wait(3)
+            return {"pluginId": "momo-qq", "source": "qq", "scope": "current_turn", "sections": [{"id": "qq-private-chat", "content": "Reply through QQ private text."}]}
+        if method == "channels.send":
+            sent.append(params)
+        return original(method, params, **kwargs)
+
+    def provider(*args, **kwargs):
+        inferred.append(True)
+        yield {"type": "text", "delta": "cancelled inference must not run"}
+
+    monkeypatch.setattr(core.host, "request", transport)
+    monkeypatch.setattr(llm, "chat_stream", provider)
+    thread = None
+    try:
+        lease = core.enter("client-one")
+        core.event("inbox", event)
+        assert waiting.wait(2)
+        epoch = core.epoch
+
+        def change_attention():
+            try:
+                if action == "leave":
+                    core.leave("client-one", lease["leaseId"])
+                else:
+                    core.control("client-one", lease["leaseId"], "control", action)
+            except Exception as error:
+                errors.append(error)
+
+        thread = threading.Thread(target=change_attention)
+        thread.start()
+        deadline = time.monotonic() + 2
+        while core.epoch == epoch and time.monotonic() < deadline:
+            time.sleep(.01)
+        assert core.epoch > epoch
+        release.set()
+        thread.join(3)
+        assert not thread.is_alive() and not errors
+        deadline = time.monotonic() + 2
+        while core.active and time.monotonic() < deadline:
+            time.sleep(.01)
+        assert not inferred and not sent
+        row = db.query("SELECT * FROM inbox WHERE source='qq'")[0]
+        assert row["status"] in {"held_focus", "held_paused", "held_inactive", "interrupted"}
+        assert row["text"] == event["text"]
+        assert not db.query("SELECT * FROM runs WHERE id=?", (row["run_id"],))
+    finally:
+        release.set()
+        if thread:
+            thread.join(3)
+        core.close()
+
+
+@pytest.mark.parametrize("initial_owner", [False, True])
+def test_delayed_plugin_context_revalidates_owner_binding_before_private_history_or_inference(monkeypatch, initial_owner):
+    from app.core import llm
+    from app.services.social import social
+    core = Coordinator()
+    core.start()
+    social.put("qq", {"enabled": True, "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only"})
+    proof = social.owner_challenge("qq", "20002")
+    if initial_owner:
+        social.authorize_event({"source": "qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "initial-proof", "text": proof["challenge"]})
+    event = {"source": "qq", "pluginId": "momo-qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "delayed-binding", "text": "before verified owner", "policyRevision": social.get("qq")["policyRevision"]}
+    original = core.host.request
+    waiting, release = threading.Event(), threading.Event()
+    inferred, sent, assembled = [], [], []
+
+    def transport(method, params=None, **kwargs):
+        if method == "plugins.promptContext":
+            waiting.set()
+            assert release.wait(3)
+            return {"pluginId": "momo-qq", "source": "qq", "scope": "current_turn", "sections": [{"id": "qq-private-chat", "content": "Reply through QQ private text."}]}
+        if method == "channels.send":
+            sent.append(params)
+        return original(method, params, **kwargs)
+
+    def provider(*args, **kwargs):
+        inferred.append(True)
+        yield {"type": "text", "delta": "must not infer under old audience"}
+
+    monkeypatch.setattr(core.host, "request", transport)
+    monkeypatch.setattr(llm, "chat_stream", provider)
+    original_build = turn.build_messages
+
+    def build(*args, **kwargs):
+        assembled.append(True)
+        return original_build(*args, **kwargs)
+
+    monkeypatch.setattr(turn, "build_messages", build)
+    try:
+        core.enter("client-one")
+        core.event("inbox", event)
+        assert waiting.wait(2)
+        if initial_owner:
+            next_proof = social.owner_challenge("qq", "33333")
+            assert social.authorize_event({**event, "peerId": "33333", "senderId": "33333", "externalMessageId": "next-proof", "text": next_proof["challenge"], "policyRevision": social.get("qq")["policyRevision"]}) is None
+            assert social.authorize_event(event) is None
+        else:
+            assert social.authorize_event({**event, "externalMessageId": "binding-proof", "text": proof["challenge"]}) is None
+            assert social.authorize_event(event)["audience"] == "owner"
+        release.set()
+        deadline = time.monotonic() + 3
+        while core.active and time.monotonic() < deadline:
+            time.sleep(.01)
+        row = db.query("SELECT * FROM inbox WHERE source='qq'")[0]
+        assert row["status"] == "held_scope"
+        assert not assembled and not inferred and not sent
+        assert not db.query("SELECT * FROM runs WHERE id=?", (row["run_id"],))
+    finally:
+        release.set()
+        core.close()
+
+
+def test_turn_does_not_recapture_a_generation_revoked_after_context_validation(monkeypatch):
+    from app.core import llm
+    gen = checkpoint.generation()
+    with db.tx() as connection:
+        connection.execute("UPDATE sessions SET generation=generation+1 WHERE id='live'")
+    inferred = []
+    monkeypatch.setattr(llm, "chat_stream", lambda *args, **kwargs: inferred.append(True))
+    context = {"pluginId": "momo-qq", "source": "qq", "scope": "current_turn", "sections": [{"id": "qq-private-chat", "content": "Reply through QQ private text."}]}
+    assert list(turn.run_turn("stale turn", run_id="stale", source="qq", plugin_context=context, expected_generation=gen)) == []
+    assert not inferred
+    assert not db.query("SELECT * FROM runs WHERE id='stale'")
+
+
+def test_worker_uses_generation_captured_atomically_when_its_run_is_admitted(monkeypatch):
+    from app.core import llm
+    from app.services.social import social
+    core = Coordinator()
+    core.start()
+    account = social.put("qq", {"enabled": True, "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only"})
+    event = {"source": "qq", "pluginId": "momo-qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "admission-race", "text": "do not rebase old admission", "policyRevision": account["policyRevision"]}
+    original_run, original_request = core.run, core.host.request
+    inferred, sent = [], []
+
+    @contextmanager
+    def revoke_after_admission(*args, **kwargs):
+        with original_run(*args, **kwargs) as admission:
+            with core.condition:
+                core.epoch += 1
+                core._cancel_generation()
+            yield admission
+
+    def transport(method, params=None, **kwargs):
+        if method == "plugins.promptContext":
+            return {"pluginId": "momo-qq", "source": "qq", "scope": "current_turn", "sections": [{"id": "qq-private-chat", "content": "Reply through QQ private text."}]}
+        if method == "channels.send":
+            sent.append(params)
+        return original_request(method, params, **kwargs)
+
+    monkeypatch.setattr(core, "run", revoke_after_admission)
+    monkeypatch.setattr(core.host, "request", transport)
+    monkeypatch.setattr(llm, "chat_stream", lambda *args, **kwargs: inferred.append(True))
+    try:
+        core.enter("client-one")
+        core.event("inbox", event)
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            row = db.query("SELECT * FROM inbox WHERE source='qq'")[0]
+            if row["status"] == "interrupted":
+                break
+            time.sleep(.01)
+        assert row["status"] == "interrupted"
+        assert not inferred and not sent
+        assert not db.query("SELECT * FROM runs WHERE id=?", (row["run_id"],))
+    finally:
+        core.close()
+
+
+def test_turn_rechecks_captured_generation_after_waiting_for_the_single_brain(monkeypatch):
+    from app.core import llm
+    from app.services.coordinator import runtime
+    gen = checkpoint.generation()
+    inferred = []
+
+    class RevokedWhileWaiting:
+        def __enter__(self):
+            with db.tx() as connection:
+                connection.execute("UPDATE sessions SET generation=generation+1 WHERE id='live'")
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(runtime, "reasoning_lock", RevokedWhileWaiting())
+    monkeypatch.setattr(llm, "chat_stream", lambda *args, **kwargs: inferred.append(True))
+    context = {"pluginId": "momo-qq", "source": "qq", "scope": "current_turn", "sections": [{"id": "qq-private-chat", "content": "Reply through QQ private text."}]}
+    assert list(turn.run_turn("cancel while queued for brain", run_id="brain-wait", source="qq", plugin_context=context, expected_generation=gen)) == []
+    assert not inferred
+    assert db.query("SELECT status FROM runs WHERE id='brain-wait'")[0]["status"] == "interrupted"
 
 
 def test_user_phone_pause_survives_restart_and_boot_until_explicit_resume(monkeypatch):

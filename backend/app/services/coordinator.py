@@ -531,12 +531,14 @@ class Coordinator:
                 self.queue.remove(run_id)
                 self.active = run_id
                 self.activity = {"runId": run_id, "source": source, "accountId": account_id, "phase": "thinking"}
+                from . import checkpoint
+                admission = (self.epoch, checkpoint.generation())
             except BaseException:
                 if run_id in self.queue: self.queue.remove(run_id)
                 self.condition.notify_all()
                 raise
         try:
-            yield
+            yield admission
         finally:
             with self.condition:
                 if self.active == run_id:
@@ -698,18 +700,45 @@ class Coordinator:
             first = rows[0]
             rid = first["run_id"]
             try:
-                with self.run(rid, first["source"], account_id=first["account_id"]):
+                with self.run(rid, first["source"], account_id=first["account_id"]) as admission:
+                    from . import turn, checkpoint
+                    run_epoch, run_generation = admission
+                    plugin_context = None
                     if first["source"] in {"qq", "wechat"}:
                         from .social import social
-                        normalized = social.authorize_event({"source": first["source"], "accountId": first["account_id"], "peerId": first["peer_id"], "senderId": first["sender_id"], "selfId": first["self_id"], "conversationKind": "private", "externalMessageId": first["raw_external_id"], "text": first["text"], "policyRevision": int(first["policy_revision"] or 0)})
-                        if normalized is None or normalized["audience"] != first["audience"]:
+                        from .turn_context import validate_plugin_context
+                        incoming = {"source": first["source"], "accountId": first["account_id"], "peerId": first["peer_id"], "senderId": first["sender_id"], "selfId": first["self_id"], "conversationKind": "private", "externalMessageId": first["raw_external_id"], "text": first["text"], "policyRevision": int(first["policy_revision"] or 0)}
+                        normalized = social.authorize_event(incoming)
+                        if normalized is None or normalized["audience"] != first["audience"] or not normalized["allowReply"]:
                             self.inbox_status(first["id"], "held_scope")
                             continue
-                    self.inbox_status(first["id"], "processing")
-                    from . import turn, checkpoint
+                        try:
+                            plugin_context = self.host.request("plugins.promptContext", {"pluginId": normalized["pluginId"], "source": first["source"], "accountId": first["account_id"], "peerId": first["peer_id"], "policyRevision": int(first["policy_revision"])}, timeout=3)
+                            validate_plugin_context(plugin_context, first["source"])
+                        except (HostError, ValueError, TypeError):
+                            # Preserve the input without guessing another channel
+                            # or inferring under an unavailable plugin's context.
+                            self.inbox_status(first["id"], "held_scope")
+                            continue
+                    with self.condition:
+                        # Identity verification is an asynchronous host RPC. A
+                        # stop/focus/lease transition while it waits must not
+                        # let this old run capture a newly granted generation.
+                        if (not self.valid_run(rid) or self.mode != "meeting"
+                            or self.focus or self.phone_paused or self.interrupt_hold
+                            or self.epoch != run_epoch or checkpoint.generation() != run_generation):
+                            if not self._hold_unstarted_reply(first):
+                                self.inbox_status(first["id"], "interrupted")
+                            continue
+                        if first["source"] in {"qq", "wechat"}:
+                            normalized = social.authorize_event(incoming)
+                            if normalized is None or normalized["audience"] != first["audience"] or not normalized["allowReply"]:
+                                self.inbox_status(first["id"], "held_scope")
+                                continue
+                        self.inbox_status(first["id"], "processing")
                     token = current_run.set(rid)
                     try:
-                        events = list(turn.run_turn(first["text"], run_id=rid, source=first["source"], external_message_id=json.dumps([first["account_id"], first["peer_id"], first["external_id"]]), audience=first["audience"], retry_of=first["retry_of"] or None))
+                        events = list(turn.run_turn(first["text"], run_id=rid, source=first["source"], external_message_id=json.dumps([first["account_id"], first["peer_id"], first["external_id"]]), audience=first["audience"], retry_of=first["retry_of"] or None, plugin_context=plugin_context, expected_generation=run_generation))
                     finally:
                         current_run.reset(token)
                     reply = "".join(e.get("text", "") for e in events if e["t"] == "sentence")

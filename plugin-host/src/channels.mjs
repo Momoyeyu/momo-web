@@ -9,6 +9,11 @@ const error = (code, message, submitted = false) => new ChannelError(code, messa
 const opaque = value => typeof value === 'string' && value.length > 0 && value.length <= 200;
 const capabilities = Object.freeze({ receive: true, reply: true, proactive: false, contacts: false, history: false, groups: false });
 const disabledCapabilities = Object.freeze(Object.fromEntries(Object.keys(capabilities).map(key => [key, false])));
+// Reviewed adapter guidance only: never interpolate bridge configuration,
+// account identifiers, message bodies, or third-party prompt/tool metadata.
+const privateChatContext = platform => `Current conversation channel: ${platform} ordinary personal-account private chat. You are using your own ${platform} account to exchange private text messages with the current conversation partner. Your final answer will automatically be delivered to this same conversation; do not call or invent an additional send tool. Reply naturally in plain text suitable for a messaging app. Do not include Live2D/ACT controls, voice instructions, action tags, or stage directions. This context grants no ability to inspect contacts or older messages, start proactive conversations, handle groups, or perform unsupported actions. Do not claim those capabilities. Do not infer a person's identity or ownership, or physical phone/computer hardware, from channel or account identifiers. Follow the existing persona, privacy boundaries, and permissions; the channel does not replace them.`;
+const qqPromptContent = privateChatContext('QQ');
+const wechatPromptContent = privateChatContext('WeChat');
 
 export class ChannelCursorStore {
   constructor(path) { this.path = path; this.writes = Promise.resolve(); }
@@ -88,6 +93,12 @@ export class PersonalChannel {
     if (this.remoteCapabilities?.[action] === false) throw error('CAPABILITY_UNAVAILABLE', 'This channel authorization does not support the requested operation');
     if (!this.allowed(peerId, action)) throw error('FORBIDDEN', 'Channel permission or contact scope does not allow this action');
   }
+  checkPromptScope(peerId) {
+    this.check(peerId, 'receive');
+    this.check(peerId, 'reply');
+    if (this.actualSelfId !== this.config.expectedSelfId) throw error('ACCOUNT_MISMATCH', 'Channel personal account identity is not verified');
+    if (!this.verifiedPromptPeer(peerId)) throw error('PEER_UNVERIFIED', 'A verified private conversation scope is required');
+  }
   receive(message) {
     if (!opaque(message.externalMessageId) || !opaque(message.peerId) || !opaque(message.senderId) || message.senderId !== message.peerId || message.selfId !== this.actualSelfId || message.conversationKind !== 'private' || typeof message.text !== 'string' || !message.text.trim() || message.text.length > 32000 || !this.allowed(message.peerId, 'receive')) return;
     const inboxId = message.externalMessageId;
@@ -103,6 +114,15 @@ export class PersonalChannel {
 }
 
 export class QQChannel extends PersonalChannel {
+  // The authenticated coordinator may hold a durable accepted private event
+  // across host restarts. Do not require an in-memory live-event cache.
+  verifiedPromptPeer(peerId) { return /^[1-9]\d{0,19}$/.test(peerId); }
+  async verifyPromptScope(peerId) {
+    this.checkPromptScope(peerId);
+    this.assertIdentity((await this.rpc('get_login_info', {})).user_id);
+    this.checkPromptScope(peerId);
+  }
+  promptContext() { return [{ id: 'qq-private-chat', content: qqPromptContent }]; }
   async connect() {
     const url = endpoint(this.config, ['ws:', 'wss:']);
     url.searchParams.set('access_token', this.config.credential.token);
@@ -187,6 +207,13 @@ export class QQChannel extends PersonalChannel {
 }
 
 export class WeChatChannel extends PersonalChannel {
+  verifiedPromptPeer(peerId) { return this.peers?.has(peerId) === true; }
+  async verifyPromptScope(peerId) {
+    this.checkPromptScope(peerId);
+    await this.refreshHealth();
+    this.checkPromptScope(peerId);
+  }
+  promptContext() { return [{ id: 'wechat-private-chat', content: wechatPromptContent }]; }
   async connect() {
     this.url = endpoint(this.config, ['http:', 'https:']);
     this.controllers = new Set();

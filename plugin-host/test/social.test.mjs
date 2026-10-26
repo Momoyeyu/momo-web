@@ -36,7 +36,7 @@ async function onebot(t, { selfId = '123456', reply = true } = {}) {
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { for (const socket of sockets) socket.destroy(); await new Promise(resolve => server.close(resolve)); });
-  return { endpoint: `ws://127.0.0.1:${server.address().port}`, calls, push: data => { for (const socket of sockets) socket.write(frame(data)); } };
+  return { endpoint: `ws://127.0.0.1:${server.address().port}`, calls, setSelfId: value => { selfId = value; }, push: data => { for (const socket of sockets) socket.write(frame(data)); } };
 }
 async function setup(t, options = {}) {
   const directory = options.channelStatePath ? null : await mkdtemp(join(tmpdir(), 'momo-host-test-'));
@@ -49,6 +49,105 @@ async function setup(t, options = {}) {
 }
 const config = endpoint => ({ id: 'momo-qq', type: 'qq', endpoint, accountId: 'qq-main', expectedSelfId: '123456', credential: { token: 'private-token' }, policyRevision: 1, permissions: { receive: true, reply: true }, allowlistEnabled: false, allowlist: [], timeoutMs: 120 });
 const incoming = extra => ({ post_type: 'message', message_type: 'private', self_id: '123456', user_id: '456789', message_id: 12, time: 1770000000, message: [{ type: 'text', data: { text: '你好' } }], ...extra });
+const promptScope = extra => ({ pluginId: 'momo-qq', source: 'qq', accountId: 'qq-main', peerId: '456789', policyRevision: 1, ...extra });
+
+test('QQ contributes static current-turn context without exposing account or message data, including after fresh-host recovery', async t => {
+  const bot = await onebot(t), { req, events, host } = await setup(t);
+  await req('plugins.configure', { plugins: [{ ...config(bot.endpoint), prompt: 'UNTRUSTED_CONFIG_PROMPT' }] });
+  // The authenticated core can resume a durably accepted private event after a
+  // host restart; no new live event or contacts-list permission is required.
+  const recovered = await req('plugins.promptContext', promptScope());
+  bot.push(incoming({ message: [{ type: 'text', data: { text: 'UNTRUSTED_INBOUND_TEXT' } }] }));
+  await until(() => events.some(e => e.event === 'inbox'));
+  await req('channels.ack', { pluginId: 'momo-qq', accountId: 'qq-main', inboxId: events.find(e => e.event === 'inbox').data.inboxId });
+  const result = await req('plugins.promptContext', promptScope());
+  assert.deepEqual(result, recovered);
+  assert.deepEqual(Object.keys(result).sort(), ['pluginId', 'scope', 'sections', 'source']);
+  assert.equal(result.pluginId, 'momo-qq'); assert.equal(result.source, 'qq'); assert.equal(result.scope, 'current_turn');
+  assert.equal(result.sections.length, 1); assert.equal(result.sections[0].id, 'qq-private-chat');
+  assert.match(result.sections[0].content, /QQ/); assert.match(result.sections[0].content, /automatically/);
+  assert.match(result.sections[0].content, /plain text/i); assert.match(result.sections[0].content, /Live2D/);
+  const serialized = JSON.stringify(result);
+  for (const secret of ['123456', '456789', 'qq-main', 'private-token', bot.endpoint, 'UNTRUSTED_CONFIG_PROMPT', 'UNTRUSTED_INBOUND_TEXT']) assert.ok(!serialized.includes(secret));
+  assert.equal(host.commands.size, 0, 'reading context does not accept an execution command');
+  assert.deepEqual((await req('plugins.listTools')).tools, []);
+});
+
+test('prompt context is authenticated, current, scoped, permitted, and withdrawn immediately with plugin lifecycle', async t => {
+  const bot = await onebot(t), { req, events, host } = await setup(t);
+  await assert.rejects(host.request({ v: 1, id: randomUUID(), token: 'wrong', method: 'plugins.promptContext', params: promptScope() }), { code: 'UNAUTHORIZED' });
+  await assert.rejects(req('plugins.promptContext', promptScope()), { code: 'PLUGIN_UNAVAILABLE' });
+  await req('plugins.configure', { plugins: [config(bot.endpoint)] });
+  await assert.rejects(req('plugins.promptContext', promptScope({ peerId: 'display name' })), { code: 'PEER_UNVERIFIED' });
+  bot.push(incoming()); await until(() => events.some(e => e.event === 'inbox'));
+  for (const change of [{ source: 'wechat' }, { accountId: 'other' }, { policyRevision: 0 }, { policyRevision: '1' }]) await assert.rejects(req('plugins.promptContext', promptScope(change)), { code: 'STALE_CONFIG' });
+  await assert.rejects(req('plugins.promptContext', promptScope({ peerId: '123456' })), { code: 'INPUT' });
+  host.plugins.get('momo-qq').channel.quarantine();
+  await assert.rejects(req('plugins.promptContext', promptScope()), { code: 'PLUGIN_UNAVAILABLE' });
+  await req('plugins.configure', { plugins: [{ ...config(bot.endpoint), policyRevision: 2, permissions: { receive: true, reply: false } }] });
+  bot.push(incoming({ message_id: 13 })); await until(() => events.filter(e => e.event === 'inbox').length > 1);
+  await assert.rejects(req('plugins.promptContext', promptScope({ policyRevision: 2 })), { code: 'FORBIDDEN' });
+  let release; host.mutations = new Promise(resolve => { release = resolve; });
+  const withdrawn = req('plugins.configure', { plugins: [] });
+  await assert.rejects(req('plugins.promptContext', promptScope({ policyRevision: 2 })), { code: 'PLUGIN_UNAVAILABLE' });
+  release(); await withdrawn;
+});
+
+test('QQ prompt context rechecks live identity, receive permission and optional contact scope', async t => {
+  const bot = await onebot(t), { req } = await setup(t);
+  await req('plugins.configure', { plugins: [{ ...config(bot.endpoint), allowlistEnabled: true, allowlist: [] }] });
+  await assert.rejects(req('plugins.promptContext', promptScope()), { code: 'FORBIDDEN' });
+  await req('plugins.configure', { plugins: [{ ...config(bot.endpoint), permissions: { receive: false, reply: true } }] });
+  await assert.rejects(req('plugins.promptContext', promptScope()), { code: 'FORBIDDEN' });
+  await req('plugins.configure', { plugins: [config(bot.endpoint)] });
+  bot.setSelfId('654321');
+  await assert.rejects(req('plugins.promptContext', promptScope()), { code: 'ACCOUNT_MISMATCH' });
+  await assert.rejects(req('plugins.promptContext', promptScope()), { code: 'PLUGIN_UNAVAILABLE' });
+  assert.equal(bot.calls.filter(call => call.action === 'send_private_msg').length, 0);
+});
+
+test('prompt context cannot escape when configuration is withdrawn during asynchronous identity verification', async t => {
+  const bot = await onebot(t), { req, host } = await setup(t);
+  await req('plugins.configure', { plugins: [config(bot.endpoint)] });
+  const channel = host.plugins.get('momo-qq').channel, verify = channel.verifyPromptScope.bind(channel);
+  let entered, release;
+  const started = new Promise(resolve => { entered = resolve; });
+  const pending = new Promise(resolve => { release = resolve; });
+  channel.verifyPromptScope = async peerId => { await verify(peerId); entered(); await pending; };
+  const request = req('plugins.promptContext', promptScope());
+  await started;
+  const withdrawn = req('plugins.configure', { plugins: [] });
+  release();
+  await assert.rejects(request, { code: 'PLUGIN_UNAVAILABLE' });
+  await withdrawn;
+});
+
+test('WeChat context names the private text channel only for verified current peer and effective chat capability', async t => {
+  let health = { status: 'connected', actualSelfId: 'wxid_momo', identityKind: 'personal', identityVerified: true, executorQuiescent: true, capabilities: { receive: true, reply: true }, peers: [{ peerId: 'wxid_player', verified: true }] };
+  let sends = 0;
+  const server = createServer(async (request, response) => {
+    assert.equal(request.headers.authorization, 'Bearer wx-private');
+    for await (const _ of request) { /* consume */ }
+    response.setHeader('Content-Type', 'application/json');
+    if (request.url === '/v1/health') response.end(JSON.stringify(health));
+    else if (request.url.startsWith('/v1/inbox')) response.end('{"events":[],"cursor":"0"}');
+    else if (request.url === '/v1/send') { sends++; response.end('{}'); }
+    else response.end('{"executorQuiescent":true}');
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => server.close(resolve)));
+  const { req } = await setup(t);
+  const endpoint = `http://127.0.0.1:${server.address().port}`;
+  await req('plugins.configure', { plugins: [{ id: 'momo-wechat', type: 'wechat', endpoint, accountId: 'wx-main', expectedSelfId: 'wxid_momo', credential: { token: 'wx-private' }, permissions: { receive: true, reply: true }, policyRevision: 3 }] });
+  const scope = { pluginId: 'momo-wechat', source: 'wechat', accountId: 'wx-main', peerId: 'wxid_player', policyRevision: 3 };
+  const result = await req('plugins.promptContext', scope);
+  assert.equal(result.scope, 'current_turn'); assert.equal(result.sections[0].id, 'wechat-private-chat');
+  assert.match(result.sections[0].content, /WeChat ordinary personal-account private chat/);
+  for (const secret of ['wxid_momo', 'wxid_player', 'wx-main', 'wx-private', endpoint]) assert.ok(!JSON.stringify(result).includes(secret));
+  await assert.rejects(req('plugins.promptContext', { ...scope, peerId: 'display name' }), { code: 'PEER_UNVERIFIED' });
+  health = { ...health, capabilities: { receive: true, reply: false } };
+  await assert.rejects(req('plugins.promptContext', scope), { code: 'CAPABILITY_UNAVAILABLE' });
+  assert.equal(sends, 0);
+});
 
 test('official QQ adapter verifies account, receives private events and sends only fixed text action', async t => {
   const bot = await onebot(t), { req, events, permit } = await setup(t);
