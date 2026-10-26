@@ -49,7 +49,7 @@ node scripts/browser-e2e.mjs
 
 ## 两仓如何协作
 
-共享业务只在这里修改。经浏览器验证、维护者体验后，固定 Git revision 用 `scripts/promote.py` 单向导入 momo 的 `app/`；清单记录来源与哈希，目标漂移时拒绝覆盖。Tauri 壳、官网、发行脚本仍由 momo 维护。
+当前直接在本仓库 `master` 修改、提交和推送，通过当前提交的 GitHub CI 后交维护者体验。整个 v3 阶段只推进 Web；等维护者明确要求时，再以固定 Git revision 用 `scripts/promote.py` 一次性导入 momo 的 `app/`，清单记录来源与哈希，目标漂移时拒绝覆盖。原有 momo 作为将来同步的基线。
 
 旧 Web 实验工作区和它的未提交源码已保全，恢复开发不会覆盖原数据。请勿在两仓分别修改同一份共享代码，或让两个内核共用同一生活目录。
 

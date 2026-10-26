@@ -2,7 +2,7 @@ name: Web application checks
 
 on:
   push:
-    branches: [master, v3/development]
+    branches: [master]
   pull_request:
   workflow_dispatch:
 

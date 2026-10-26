@@ -1,6 +1,6 @@
 {
   "meta": {
-    "title": "V3 001～003：Web / macOS 候选验证通过，等待体验验收"
+    "title": "V3 001～003：仅 Web master 推进，桌面候选已撤回"
   },
   "nodes": [
     {
@@ -30,7 +30,7 @@
     },
     {
       "id": "promotion",
-      "label": "固定Git revision / 哈希 / 漂移拒绝",
+      "label": "最终同步工具 / 待用户明确要求",
       "row": 1,
       "col": 0
     },

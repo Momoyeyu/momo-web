@@ -1,5 +1,7 @@
 # Web → 桌面晋级
 
+当前只在 `momo-web/master` 开发、直接提交与推送，通过 CI 后在 Web 验收。下面的晋级工具留作最终一次性同步：仅用户明确要求后执行；此前不并行维护或保留 v3 桌面候选，也不为 Web 迭代打桌面包。
+
 共享源码在 momo-web：`frontend/`、`backend/`、`plugin-host/`；桌面导入到 `momo/app/` 对应目录。资源清单、Core 校验与示例配置也在显式映射中。Tauri、官网与发行不反向复制。
 
 ```sh

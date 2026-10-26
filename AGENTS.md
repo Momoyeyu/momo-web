@@ -1,6 +1,7 @@
 # momo-web
 
-- frontend/、backend/、plugin-host/ 为共享业务唯一修改源；经固定 Git revision 与 scripts/promote.py 晋级到 momo/app。不要改用户保全的旧检出。
+- 当前只在 momo-web/master 开发、提交和推送，默认直接走 master，不自行建 PR 或并行桌面候选。交付前确认当前 master 的 GitHub CI 实际通过。
+- frontend/、backend/、plugin-host/ 为共享业务唯一修改源；全部 Web 迭代完成后，仅在用户明确要求时通过 scripts/promote.py 一次性同步到 momo/app。此前不修改、打包或保留本轮 v3 桌面候选。不要改用户保全的旧检出。
 - Python 是唯一生活 / 推理 / 记忆协调器；Cordis 只管理插件生命周期与受许可执行。不新增渠道私有推理循环。
 - 只有一段连续生活。永久事件、上下文投影、长期记忆分开；失败 / 未展示内容不得充当已发生对话。删除记忆不得从相同旧来源重新学习。
 - 账号授权、活动模式、soul 不由模型改写。外部副作用前校验许可，真实迟到回执仍按原命令记事实。
