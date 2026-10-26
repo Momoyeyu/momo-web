@@ -210,6 +210,9 @@ def import_data(raw):
                         "UPDATE sessions SET generation=?,summary_version=summary_version+1 WHERE id=?",
                         (max(previous_generation, imported_generation) + 1, db.LIVE_ID),
                     )
+                    from . import onboarding
+
+                    onboarding.rebind_generation(restored)
                     restored.execute(
                         "UPDATE runs SET status='interrupted',updated_at=? WHERE status IN ('processing','generated')",
                         (db.now_iso(),),
@@ -252,6 +255,7 @@ def import_data(raw):
                             db.LIVE_ID,
                         ),
                     )
+                    onboarding.rebind_generation(previous)
                     previous.execute(
                         "UPDATE runs SET status='interrupted',updated_at=? WHERE status IN ('processing','generated')",
                         (db.now_iso(),),

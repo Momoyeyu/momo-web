@@ -26,20 +26,23 @@ Python 是唯一内核：生活记录、推理、记忆、队列和活动决策�
 | --- | --- |
 | `heartbeat` | `{activityEpoch}` → `{hostInstance,activityEpoch,paused}`。首个心跳初始化许可，之后只续租，不解除暂停。 |
 | `revoke` | `{activityEpoch:更大代际}` → `{stopped,unknownExternal,reason,activityEpoch}`。立即关执行 gate，取消活动和在途 MCP 调用，关闭涉及的连接，之后才 ACK。 |
-| `grant` | `{activityEpoch}`。仅成功 revoke 且 `stopped:true` 后允许显式恢复；失联心跳不会自动恢复。 |
+| `grant` | `{activityEpoch}`。仅成功 revoke 且 `stopped:true`、无未核对命令后允许显式恢复；失联心跳不会自动恢复。 |
 | `plugins.configure` | `{plugins:[config],configurationRevision?,tolerateErrors?}`。完整期望集合；相同、健康的配置保留连接；缺失、变更或禁用立即撤下 gate，再释放自己的 scope。较旧配置版本不覆盖新版本；容错模式返回 `failures:[{id,code}]` 并继续启动其他插件。 |
 | `plugins.listTools` | 返回 `{version,tools}`；名称为 `pluginId__originalName`，附原始名称和 JSON schema。服务的 catalog 变更通知会更新版本。 |
-| `plugins.callTool` | `{name,arguments,permit}` → `{result,receipt}`。取消返回 `CANCELLED`，记录 `unknown`，不假定外部副作用回滚。 |
+| `plugins.callTool` | `{name,arguments,permit}` → `{result,receipt}`。已派发后的取消、超时与传输故障记录 `unknown,requiresReconciliation:true` 并暂停；收到明确 `isError` 结果才记为已知 `failed`。 |
+| `commands.reconcile` | `{commandId,status:"completed"或"failed"}`。仅受信任内核在核对外部事实后调用；结清原命令并返回 `{reconciled,receipt?}`，不重发、不解除暂停。在途命令返回 `BUSY`；旧宿主的命令返回 `reconciled:false`，由内核结清持久 outbox。 |
 | `virtual.receive` | `{messageId,accountId,text}` → `{accepted:true}`，发出 inbox 事件，不进行推理或外发。持久去重由内核完成。 |
 | `virtual.deliver` | `{text,permit}` → 回执；只是验证外发 gate 的虚拟入口。 |
 | `virtual.activityStart` | `{permit,tickMs?}` → `{commandId,started:true}`，可观察的虚拟长活动。 |
 | `virtual.activityRenew` | `{permit}`。必须同一 run / command 且仍在活动中，显式续授权，不借心跳扩大权限。 |
 | `virtual.activityStop` | `{commandId?}` → `{stopped,ticks}`，停止完成后返回。 |
 | `receipts.list` | `{after:seq}` → `{receipts,oldest,latest}`；发现序号缺口应核对事实，不能盲目重放。 |
-| `status` | 实例、代际、暂停状态、活动、在途数量和插件连通状态；不包含凭据和配置。 |
+| `status` | 实例、代际、暂停状态、活动、在途数量、`unresolvedCommands` 命令 ID 列表和插件连通状态；不包含凭据和配置。 |
 | `shutdown` | 关闭 scopes 与自有连接；stdin EOF / SIGTERM 同样触发退出。 |
 
 成功为 `{v,id,ok:true,result}`，失败为 `{v,id,ok:false,error:{code,message}}`。事件为 `{v,event,data}`，包括 `inbox`、`receipt`、`activity.tick`、`activity.stopped`、`tools.changed`、`host.paused`。回执固定携带原来的 `coreInstance / hostInstance / activityEpoch / runId / commandId`；过时代际的已知执行结果仍记录 `stale:true` 的事实，不能据此继续规划或改写当前对话。
+
+方法 ACK（例如活动开始的 `{commandId,started:true}`）不含 `status`，不能覆盖之前收到的完整回执。MCP 未知结果持久阻断内核恢复，反复 revoke、重新配置和重启均不能清除；即使已关闭 stdio 子进程，也不推定其已发生副作用被撤销。受信任后端恢复流程通过 `Coordinator.reconcile_command` 记录核对后的终态，再由新的见面转换显式恢复；该流程没有模型工具或 HTTP 入口。无法核对外部事实时保持暂停。
 
 ## 插件配置
 
@@ -50,6 +53,8 @@ Python 是唯一内核：生活记录、推理、记忆、队列和活动决策�
 ```
 
 网络传输使用 `transport:"streamable-http"` 或 `"sse"`，提供 `url` 和可选 `headers`。这些仅通过受信任的内核管道配置，不向 LLM 暴露；stdio 子进程使用 SDK 的最小默认环境，再加该插件的显式 env。开启 / 关闭另一个插件不会重建已有健康连接。
+
+MCP 连接关闭会立即撤下工具目录并推进版本；下一次配置协调可重建连接，不重放旧命令。旧连接的迟到关闭回调不能撤下替换后的连接。
 
 独立 watchdog 默认 5 秒未收到内核心跳就暂停、撤销代际、停止活动。stdio MCP 的自有进程会关闭；网络 MCP 取消无法保证远端副作用停止，存在在途请求时 `revoke` 返回 `stopped:false,unknownExternal:true`，要求内核进入故障暂停并核对外部事实。不要将传输取消视为跨平台事务回滚。
 

@@ -30,6 +30,7 @@ export class PluginHost {
     this.plugins = new Map();
     this.commands = new Map();
     this.inflight = new Map();
+    this.unresolved = new Map();
     this.receipts = [];
     this.receiptSeq = 0;
     this.toolVersion = 0;
@@ -98,7 +99,7 @@ export class PluginHost {
         });
       }
       case 'grant': {
-        if (!this.awaitingGrant || params.activityEpoch !== this.epoch) fail('PAUSED', 'A successful revoke is required before grant');
+        if (this.unresolved.size || !this.awaitingGrant || params.activityEpoch !== this.epoch) fail('PAUSED', 'A successful revoke and reconciled command outcomes are required before grant');
         this.awaitingGrant = false;
         this.lastHeartbeat = this.now();
         this.paused = false;
@@ -122,6 +123,7 @@ export class PluginHost {
       }
       case 'plugins.listTools': return this.listTools();
       case 'plugins.callTool': return this.callTool(params);
+      case 'commands.reconcile': return this.reconcileCommand(params);
       case 'virtual.receive': return this.receive(params);
       case 'virtual.deliver': return this.deliver(params);
       case 'virtual.activityStart': return this.startActivity(params);
@@ -226,6 +228,14 @@ export class PluginHost {
     const config = plugin.config;
     plugin.client = new Client({ name: 'momo-plugin-host', version: '0.1.0' }, { capabilities: {} });
     const client = plugin.client;
+    client.onclose = () => {
+      // A disposed/replaced connection must never withdraw its successor.
+      if (plugin.client !== client || !plugin.connected) return;
+      plugin.connected = false;
+      plugin.tools = [];
+      this.toolVersion++;
+      this.event('tools.changed', { version: this.toolVersion, pluginId: plugin.id });
+    };
     client.setNotificationHandler(ToolListChangedNotificationSchema, async () => {
       if (!plugin.connected || !plugin.enabled || plugin.client !== client) return;
       try {
@@ -295,17 +305,32 @@ export class PluginHost {
     const controller = new AbortController();
     plugin.controllers.add(controller);
     const entry = { command, controller, plugin, promise: null };
+    let dispatched = false;
     const promise = (async () => {
       try {
         // Final gate is adjacent to the actual external dispatch.
         this.checkPermit(permit);
         if (!plugin.enabled || !plugin.connected) fail('TOOL_UNAVAILABLE', 'Tool is disabled or unavailable');
+        dispatched = true;
         const result = await plugin.client.callTool({ name: originalName, arguments: args }, CallToolResultSchema, { signal: controller.signal, timeout: Math.min(Number(plugin.config.timeoutMs) || 15000, 60000) });
         return { result, receipt: this.receipt(command, result.isError ? 'failed' : 'completed', { result }) };
       } catch (error) {
-        const status = controller.signal.aborted ? 'unknown' : 'failed';
-        this.receipt(command, status);
-        throw new HostError(controller.signal.aborted ? 'CANCELLED' : 'MCP_CALL', controller.signal.aborted ? 'Tool call was cancelled; external result may be unknown' : 'MCP tool call failed');
+        const cancelled = controller.signal.aborted;
+        if (dispatched) {
+          // Transport failure says nothing about an already dispatched effect.
+          // Neither another revoke nor a catalog refresh reconciles that fact.
+          this.unresolved.set(command.commandId, command);
+          this.paused = true;
+          this.awaitingGrant = false;
+          this.receipt(command, 'unknown', { requiresReconciliation: true });
+          this.event('host.paused', { reason: 'unknown_command_outcome', commandId: command.commandId });
+          // Keep local work owned until its bounded transport shutdown finishes;
+          // a later revoke can no longer discover it after inflight is retired.
+          if (plugin.config.transport === 'stdio') await this.closePluginConnection(plugin);
+        } else {
+          this.receipt(command, 'failed');
+        }
+        throw new HostError(cancelled ? 'CANCELLED' : 'MCP_CALL', dispatched ? 'Tool outcome is unknown; reconcile external state before continuing' : 'MCP tool call failed');
       } finally {
         plugin.controllers.delete(controller);
         this.inflight.delete(command.commandId);
@@ -314,6 +339,16 @@ export class PluginHost {
     entry.promise = promise;
     this.inflight.set(command.commandId, entry);
     return promise;
+  }
+
+  reconcileCommand({ commandId, status }) {
+    if (!opaque(commandId) || !['completed', 'failed'].includes(status)) fail('INPUT', 'An observed terminal command outcome is required');
+    if (this.inflight.has(commandId)) fail('BUSY', 'Command execution has not settled');
+    const command = this.unresolved.get(commandId);
+    // A coordinator may reconcile a durable command belonging to a previous host.
+    if (!command) return { reconciled: false };
+    this.unresolved.delete(commandId);
+    return { reconciled: true, receipt: this.receipt(command, status, { reconciled: true }) };
   }
 
   receive({ messageId, text, accountId = 'virtual' }) {
@@ -392,11 +427,12 @@ export class PluginHost {
     let stopTimer;
     const stopped = await Promise.race([settled, new Promise(resolve => { stopTimer = setTimeout(() => resolve(false), this.stopTimeoutMs); })]);
     clearTimeout(stopTimer);
-    return { stopped: stopped && !remoteUnknown, unknownExternal: remoteUnknown, reason };
+    const unknownExternal = remoteUnknown || this.unresolved.size > 0;
+    return { stopped: stopped && !unknownExternal, unknownExternal, reason };
   }
 
   status() {
-    return { hostInstance: this.hostInstance, coreInstance: this.coreInstance, activityEpoch: this.epoch, paused: this.paused, activity: this.activity ? { commandId: this.activity.command.commandId, ticks: this.activity.ticks } : null, inflight: this.inflight.size, plugins: [...this.plugins.values()].map(plugin => ({ id: plugin.id, type: plugin.config.type, connected: plugin.connected, enabled: plugin.enabled })), toolVersion: this.toolVersion };
+    return { hostInstance: this.hostInstance, coreInstance: this.coreInstance, activityEpoch: this.epoch, paused: this.paused, activity: this.activity ? { commandId: this.activity.command.commandId, ticks: this.activity.ticks } : null, inflight: this.inflight.size, unresolvedCommands: [...this.unresolved.keys()], plugins: [...this.plugins.values()].map(plugin => ({ id: plugin.id, type: plugin.config.type, connected: plugin.connected, enabled: plugin.enabled })), toolVersion: this.toolVersion };
   }
 
   async close() {

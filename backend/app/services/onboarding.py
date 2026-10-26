@@ -10,6 +10,7 @@ import time
 import uuid
 from ..core import db, llm
 from ..core.state import load
+from ..models import vectors
 from . import checkpoint
 from .prompt import conversation_lang
 
@@ -27,6 +28,81 @@ def _save(c, value):
         "INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)",
         (KEY, json.dumps(value, ensure_ascii=False)),
     )
+
+
+def _discard_reply(c, value):
+    pending = value.pop("pendingReply", None)
+    if pending and pending.get("memoryId"):
+        # An unobserved name is only a tentative, source-bound fact. Retiring its
+        # reply must not leave an invisible duplicate behind for the next attempt.
+        c.execute("DELETE FROM memories WHERE id=?", (pending["memoryId"],))
+        vectors.drop(c, pending["memoryId"])
+
+
+def apply_displayed(c, run_id, *, allow_retired=False):
+    """Commit first-meeting progress in the same transaction as display ACK."""
+    row = c.execute("SELECT value FROM meta WHERE key=?", (KEY,)).fetchone()
+    if not row:
+        return
+    value = json.loads(row["value"])
+    pending = value.get("pendingReply")
+    observed = value.get("observedReply")
+    outcome = next(
+        (item for item in (pending, observed) if item and item["runId"] == run_id),
+        None,
+    )
+    if not outcome:
+        return
+    gen = int(
+        c.execute("SELECT generation FROM sessions WHERE id='live'").fetchone()[0]
+    )
+    expected = outcome["generation"]
+    if expected != gen and not (allow_retired and expected == gen - 1):
+        return
+    shown = bool(
+        c.execute(
+            "SELECT 1 FROM messages WHERE run_id=? AND role='assistant' AND visible=1 LIMIT 1",
+            (run_id,),
+        ).fetchone()
+    )
+    if not shown:
+        if allow_retired:
+            if outcome is pending:
+                _discard_reply(c, value)
+            else:
+                if outcome.get("memoryId"):
+                    c.execute("DELETE FROM memories WHERE id=?", (outcome["memoryId"],))
+                    vectors.drop(c, outcome["memoryId"])
+                    if value.get("memoryId") == outcome["memoryId"]:
+                        value.pop("memoryId", None)
+                value.pop("observedReply", None)
+            value.update(stage=outcome["previousStage"], generation=gen)
+            _save(c, value)
+        return
+    if outcome is pending:
+        value.update(stage=outcome["stage"], generation=gen)
+        if outcome.get("memoryId"):
+            value["memoryId"] = outcome["memoryId"]
+        value["observedReply"] = dict(outcome, generation=gen)
+        value.pop("pendingReply", None)
+        _save(c, value)
+
+
+def rebind_generation(c):
+    """Keep saved onboarding progress while retiring old reply ownership."""
+    row = c.execute("SELECT value FROM meta WHERE key=?", (KEY,)).fetchone()
+    if not row:
+        return
+    value = json.loads(row["value"])
+    gen = int(
+        c.execute("SELECT generation FROM sessions WHERE id='live'").fetchone()[0]
+    )
+    pending = value.get("pendingReply")
+    if pending and pending["generation"] != gen:
+        _discard_reply(c, value)
+    if value["stage"] in {"asking", "clarifying"}:
+        value.update(generation=gen, claim=None, lease=0)
+    _save(c, value)
 
 
 def _get(c):
@@ -207,18 +283,7 @@ def interrupt_opening(seen):
 def rebind_after_interrupt():
     """Interrupt changes generation but does not abandon the first meeting."""
     with db.tx() as c:
-        row = c.execute("SELECT value FROM meta WHERE key=?", (KEY,)).fetchone()
-        if not row:
-            return
-        value = json.loads(row["value"])
-        if value["stage"] in {"asking", "clarifying"}:
-            value["generation"] = int(
-                c.execute("SELECT generation FROM sessions WHERE id='live'").fetchone()[
-                    0
-                ]
-            )
-            value["claim"] = None
-            _save(c, value)
+        rebind_generation(c)
 
 
 TOOL = {
@@ -261,6 +326,9 @@ def resolve(text, gen, at=None, allow_new=False):
             raise llm.LlmError(
                 "First meeting is already processing a reply; please retry shortly"
             )
+        # A new player attempt supersedes an earlier reply that was never seen.
+        # Until this point a delayed ACK may still finish that earlier attempt.
+        _discard_reply(c, value)
         stage = value["stage"]
         value.update(claim=token, lease=time.time() + 120)
         _save(c, value)
@@ -317,6 +385,7 @@ def resolve(text, gen, at=None, allow_new=False):
                 or value["stage"] not in {"asking", "clarifying"}
             ):
                 raise llm.LlmError("First meeting was interrupted; please try again")
+            outcome = {}
             if action == "name":
                 mid = db.new_id()
                 c.execute(
@@ -329,19 +398,25 @@ def resolve(text, gen, at=None, allow_new=False):
                             "INSERT OR IGNORE INTO memory_sources(memory_id,event_id) VALUES(?,?)",
                             (mid, event_id),
                         )
-                value.update(stage="completed", memoryId=mid)
+                outcome.update(stage="completed", memoryId=mid)
                 instruction = (
                     "The preferred name is now durably saved as a normal editable memory: "
                     + json.dumps(name, ensure_ascii=False)
                     + ". Acknowledge warmly using that name, then invite natural conversation. Do not call memory_add for this fact again."
                 )
             elif action == "skip" or stage == "clarifying":
-                value["stage"] = "skipped"
+                outcome["stage"] = "skipped"
                 instruction = "The first meeting is now finished without a name. Respect privacy, do not ask again or guess a name. Respond naturally to the player's actual topic."
             else:
-                value["stage"] = "clarifying"
-                value["clarificationAt"] = at
+                outcome["stage"] = "clarifying"
                 instruction = "Ask one short, gentle clarification of the preferred name. Do not claim to have saved it; no name has been confirmed. If they decline or change topic, accept it."
+            run_id = checkpoint.current_run(gen, at) if at else None
+            if run_id:
+                value["pendingReply"] = dict(
+                    outcome, runId=run_id, generation=gen, at=at, previousStage=stage
+                )
+            else:
+                value.update(outcome)
             value.update(claim=None, lease=0)
             _save(c, value)
         return "First meeting direction for THIS reply only: " + instruction
@@ -375,18 +450,18 @@ def interrupt_player(user, seen, run_id=None):
 
 
 def settle_reply(at):
-    """An unheard/failed response must not consume the sole clarification."""
+    """Discard failed setup; generated replies remain eligible for a late ACK."""
     with db.tx() as c:
         value, _ = _get(c)
-        if value["stage"] != "clarifying" or value.get("clarificationAt") != at:
+        pending = value.get("pendingReply")
+        if not pending or pending["at"] != at:
             return
         if not c.execute(
-            "SELECT 1 FROM messages WHERE session_id='live' AND role='assistant' AND at=? LIMIT 1",
-            (at,),
+            "SELECT 1 FROM messages WHERE run_id=? AND role='assistant' LIMIT 1",
+            (pending["runId"],),
         ).fetchone():
-            value["stage"] = "asking"
-        value.pop("clarificationAt", None)
-        _save(c, value)
+            _discard_reply(c, value)
+            _save(c, value)
 
 
 def interrupt(user, seen, generation=None, run_id=None):

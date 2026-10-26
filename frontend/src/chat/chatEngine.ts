@@ -738,6 +738,8 @@ export class ChatEngine {
       turn.disp.idx += 1;
       turn.disp.reveal = 0;
       turn.disp.doneAt = 0;
+      // Equal words in the next event still need their own history entry / ACK.
+      turn.disp.emitted = "";
     }
     this.flushTts(turn);
     this.maybeFinish(turn);

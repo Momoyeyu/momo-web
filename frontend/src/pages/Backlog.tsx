@@ -63,7 +63,8 @@ export default function Backlog() {
   useEffect(() => () => pageRequest.current?.abort(), []);
   useLayoutEffect(() => {
     const element = listRef.current;
-    if (!element || loading) return;
+    // A failed first page must leave pagination and its scroll anchor uninitialized.
+    if (!element || loading || failed) return;
     if (preserveScroll.current) {
       const anchor = preserveScroll.current;
       element.scrollTop = anchor.top + element.scrollHeight - anchor.height;
@@ -72,7 +73,7 @@ export default function Backlog() {
       element.scrollTop = element.scrollHeight;
       initialized.current = true;
     }
-  }, [saved,loading]);
+  }, [saved,loading,failed]);
   // Keep live additions visible only when already following the bottom.
   const previousHeight = useRef(0);
   useLayoutEffect(() => {

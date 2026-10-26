@@ -304,6 +304,9 @@ def _ack(c, run_id: str, seen: str, *, allow_shrink=False) -> bool:
         from .memory import apply_pending
 
         apply_pending(c, run_id)
+    from .onboarding import apply_displayed
+
+    apply_displayed(c, run_id, allow_retired=allow_shrink)
     return True
 
 

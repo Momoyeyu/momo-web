@@ -77,6 +77,8 @@ test('a failed initial history page can be retried without leaving the backlog',
   await page.locator('.backlog-list').getByRole('button',{name:'重试',exact:true}).click();
   await expect(page.locator('.bl-item')).toHaveCount(100);
   await expect(page.locator('.backlog-list [role=alert]')).toHaveCount(0);
+  await page.getByRole('button',{name:'更早的记录',exact:true}).click();
+  await expect(page.locator('.bl-item')).toHaveCount(200);
 });
 
 test('settings pauses actual presentation and ACK, then resumes that reply without a new title entry',async({page})=>{

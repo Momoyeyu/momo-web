@@ -125,7 +125,7 @@ test('MCP connections persist across turns and config reconciliation never close
   assert.equal(host.inflight.size, 0);
 });
 
-test('revoke cancels an active MCP call and closes its child before granting another epoch', async t => {
+test('revoke closes an active MCP child but keeps its unknown outcome blocked', async t => {
   const { req, permit, host } = await setup(t);
   await req('plugins.configure', { plugins: [{ id: 'echo', type: 'mcp', transport: 'stdio', command: process.execPath, args: [fileURLToPath(new URL('./fixtures/mcp-server.mjs', import.meta.url))] }] });
   const childPid = host.plugins.get('echo').transport.pid;
@@ -135,11 +135,14 @@ test('revoke cancels an active MCP call and closes its child before granting ano
   await wait(30);
   const result = await req('revoke', { activityEpoch: 2 });
   await rejected;
-  assert.equal(result.stopped, true);
+  assert.equal(result.stopped, false);
+  assert.equal(result.unknownExternal, true);
   assert.equal(host.inflight.size, 0);
   assert.equal(host.plugins.get('echo').connected, false);
   assert.throws(() => process.kill(childPid, 0), { code: 'ESRCH' });
   assert.ok(host.receipts.some(item => item.commandId === original.commandId && item.status === 'unknown' && item.stale));
+  assert.equal((await req('revoke', { activityEpoch: 3 })).stopped, false);
+  await assert.rejects(req('grant', { activityEpoch: 3 }), { code: 'PAUSED' });
 });
 
 test('MCP catalog notifications refresh the existing connection and advance its version', async t => {
@@ -253,4 +256,49 @@ test('a stale tool binding cannot execute against a replacement account configur
   assert.equal(host.receipts.length, 0);
   const response = await req('plugins.callTool', { name: 'echo__echo', permit: permit(), configurationFingerprint: 'account-two' });
   assert.equal(JSON.parse(response.result.content[0].text).calls, 1);
+});
+
+test('a dispatched MCP timeout blocks new execution until its outcome is reconciled', async t => {
+  const { req, permit, host } = await setup(t);
+  const config = { id: 'echo', type: 'mcp', transport: 'stdio', command: process.execPath, args: [fileURLToPath(new URL('./fixtures/mcp-server.mjs', import.meta.url))], timeoutMs: 30, connectTimeoutMs: 1000 };
+  await req('plugins.configure', { plugins: [config] });
+  const childPid = host.plugins.get('echo').transport.pid;
+  const original = permit();
+  await assert.rejects(req('plugins.callTool', { name: 'echo__slow', permit: original }), { code: 'MCP_CALL' });
+  const receipt = host.receipts.find(item => item.commandId === original.commandId);
+  assert.equal(receipt.status, 'unknown');
+  assert.equal(receipt.requiresReconciliation, true);
+  assert.equal(host.paused, true);
+  assert.throws(() => process.kill(childPid, 0), { code: 'ESRCH' });
+  assert.equal((await req('revoke', { activityEpoch: 2 })).stopped, false);
+  await req('heartbeat', { activityEpoch: 2 });
+  await assert.rejects(req('grant', { activityEpoch: 2 }), { code: 'PAUSED' });
+  await assert.rejects(req('plugins.callTool', { name: 'echo__echo', permit: permit() }), { code: 'PAUSED' });
+  await assert.rejects(req('commands.reconcile', { commandId: original.commandId, status: 'unknown' }), { code: 'INPUT' });
+  await req('commands.reconcile', { commandId: original.commandId, status: 'completed' });
+  assert.equal(host.paused, true);
+  assert.equal((await req('revoke', { activityEpoch: 3 })).stopped, true);
+  await req('grant', { activityEpoch: 3 });
+  await req('plugins.configure', { plugins: [config] });
+  const result = await req('plugins.callTool', { name: 'echo__echo', permit: permit() });
+  assert.equal(result.receipt.status, 'completed');
+});
+
+test('an exited MCP child withdraws its catalog and can reconnect without toggling settings', async t => {
+  const { req, host, permit } = await setup(t);
+  const config = { id: 'echo', type: 'mcp', transport: 'stdio', command: process.execPath, args: [fileURLToPath(new URL('./fixtures/mcp-server.mjs', import.meta.url))] };
+  await req('plugins.configure', { plugins: [config] });
+  const plugin = host.plugins.get('echo'), oldClient = plugin.client;
+  const before = await req('plugins.listTools');
+  process.kill(plugin.transport.pid, 'SIGKILL');
+  for (let i = 0; i < 100 && plugin.connected; i++) await wait(10);
+  assert.equal(plugin.connected, false);
+  const after = await req('plugins.listTools');
+  assert.deepEqual(after.tools, []);
+  assert.ok(after.version > before.version);
+  await req('plugins.configure', { plugins: [config] });
+  oldClient.onclose?.();
+  assert.equal(host.plugins.get('echo').connected, true);
+  const result = await req('plugins.callTool', { name: 'echo__echo', permit: permit() });
+  assert.equal(result.receipt.status, 'completed');
 });

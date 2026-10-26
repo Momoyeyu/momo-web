@@ -35,3 +35,5 @@ Web 仓路径为 `frontend/`、`backend/`、`plugin-host/`；以下配置在根 
 默认 Web 数据 `.workbuddy/dev-data/`，与桌面正式 profile 隔离；同目录第二内核会被 OS 锁拒绝。Web 代理持有一次性 `MOMO_DESKTOP_TOKEN`，不放入 `VITE_*`、浏览器存储或 URL。生产仍由 Tauri 提供临时 capability。
 
 后端开发环境由 `backend/.python-version` 固定为已验证的 Python 3.14，使用 `uv sync --frozen` 建立；不会随机器默认 Python 自动切换。
+
+`MOMO_RUNTIME_SMOKE=1` 单独启用 `21-runtime-meeting.spec.ts` 的真实 Python / Cordis 浏览器检查，必须连接隔离实例；错误模型拦截用全新未配置资料，子页刷新用已有合成对话的资料。默认浏览器回归会跳过这组场景，不能把跳过视为已验证。

@@ -26,14 +26,14 @@ export function interrupt(user: string, assistant: string, generation?: number, 
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ ...owner, user, assistant, ...(generation == null ? {} : {generation}), ...(runId ? {runId} : {}) }),
       keepalive: true,
+      signal: AbortSignal.timeout(8000),
     }).then(
       (r) => r.arrayBuffer().then(() => {
         if (r.ok && r.headers.has("x-momo-generation")) {
           acknowledgeMeetingGeneration(Number(r.headers.get("x-momo-generation")));
         }
       }),
-      () => undefined,
-    );
+    ).catch(() => undefined);
   } catch {
     // 同步异常（如已 unload）忽略
     return Promise.resolve();

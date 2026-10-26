@@ -73,6 +73,8 @@ class Coordinator:
                 )
             self.host = PluginHost(self.core_id, self.event, lambda: self.epoch)
             self.host.start()
+            if self._unresolved_commands():
+                self.mode = "paused"
             self.started = True
             self.worker_thread = threading.Thread(
                 target=self._worker, name="momo-inbox", daemon=True
@@ -154,7 +156,9 @@ class Coordinator:
             c.execute("UPDATE inbox SET status=? WHERE id=?", (status, inbox_id))
 
     def record_receipt(self, receipt):
-        if not receipt.get("commandId"):
+        if not receipt.get("commandId") or receipt.get("status") not in {
+            "unknown", "started", "stopped", "completed", "delivered", "failed"
+        }:
             return
         self.schema()
         # A late actual receipt is a historical fact, never permission for a new action.
@@ -170,14 +174,58 @@ class Coordinator:
                     db.now_iso(),
                 ),
             )
+
             c.execute(
                 "UPDATE outbox SET status=?,receipt=? WHERE command_id=?",
                 (
-                    receipt.get("status", "unknown"),
+                    receipt["status"],
                     json.dumps(receipt, ensure_ascii=False),
                     receipt["commandId"],
                 ),
             )
+
+    def _unresolved_commands(self):
+        rows = db.query("SELECT * FROM outbox WHERE status='unknown'")
+        unresolved = []
+        for row in rows:
+            payload = json.loads(row["payload"])
+            receipt = json.loads(row["receipt"] or "{}")
+            if payload.get("method") == "plugins.callTool" or receipt.get(
+                "requiresReconciliation"
+            ):
+                unresolved.append(row)
+        return unresolved
+
+    def reconcile_command(self, command_id, outcome):
+        """Trusted backend recovery only, after checking the external outcome.
+
+        This is deliberately unavailable to model tools and HTTP callers. Recording
+        the observation never retries a command or resumes paused execution.
+        """
+        if outcome not in {"completed", "failed"}:
+            raise CoordinationError("An observed terminal command outcome is required")
+        with self.transition:
+            with self.condition:
+                if self.mode != "paused" or self.active:
+                    raise CoordinationError("Pause and settle the active turn before reconciliation")
+            row = next(
+                (item for item in self._unresolved_commands() if item["command_id"] == command_id),
+                None,
+            )
+            if row is None:
+                raise CoordinationError("Unknown command does not require reconciliation")
+            result = self.host.request(
+                "commands.reconcile", {"commandId": command_id, "status": outcome}
+            ) if self.host else {}
+            receipt = result.get("receipt") or {
+                **json.loads(row["receipt"] or "{}"),
+                "commandId": command_id,
+                "runId": row["run_id"],
+                "activityEpoch": row["epoch"],
+                "status": outcome,
+                "reconciled": True,
+            }
+            self.record_receipt(receipt)
 
     def _cancel_generation(self):
         with db.tx() as c:
@@ -217,6 +265,8 @@ class Coordinator:
                 )
 
     def _grant(self):
+        if self._unresolved_commands():
+            raise CoordinationError("Reconcile unknown external command outcomes before continuing")
         if self.host:
             self.host.request("grant", {"activityEpoch": self.epoch})
 
@@ -234,6 +284,8 @@ class Coordinator:
         with self.condition:
             if self.restoring:
                 raise CoordinationError("Data maintenance is in progress")
+            if self._unresolved_commands():
+                raise CoordinationError("Reconcile unknown external command outcomes before continuing")
             self._expire()
             if (
                 self.owner
@@ -413,12 +465,26 @@ class Coordinator:
             if receipt.get("commandId"):
                 self.record_receipt(receipt)
             return result
-        except HostError:
+        except HostError as error:
+            # These host gates reject before accepting any external dispatch.
+            # A transport loss/timeout after sending still remains unknown.
+            status = "failed" if str(error) in {
+                "PAUSED", "STALE_PERMIT", "INVALID_PERMIT", "DUPLICATE_COMMAND",
+                "CAPACITY", "TOOL_UNAVAILABLE", "STALE_CONFIG",
+                "Plugin host is unavailable",
+            } else "unknown"
             with db.tx() as c:
                 c.execute(
-                    "UPDATE outbox SET status='unknown' WHERE command_id=? AND status IN ('pending','executing')",
-                    (permit["commandId"],),
+                    "UPDATE outbox SET status=? WHERE command_id=? AND status IN ('pending','executing')",
+                    (status, permit["commandId"]),
                 )
+            if self.started and method == "plugins.callTool" and self._unresolved_commands():
+                with self.condition:
+                    self.mode = "paused"
+                    self.owner = None
+                    self.epoch += 1
+                    self._cancel_generation()
+                    self.condition.notify_all()
             raise
 
     @contextmanager

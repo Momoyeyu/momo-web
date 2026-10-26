@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getSettings, update } from "../lib/store";
 import { ChatEngine } from "./chatEngine";
+import { enterMeeting, leaveMeeting, resetMeetingClient } from "../services/meetingClient";
 
 const sentence = (no: number, text: string) => ({
   t: "sentence",
@@ -117,4 +118,69 @@ it('text-only conversation is valid without a configured voice service', async (
   await vi.waitFor(() => expect(sentences).toHaveLength(3),{timeout:2000});
   expect(errors).toEqual([]);
   engine.dispose();
+});
+
+it('persists consecutive identical sentences before the pending reply stream finishes', async () => {
+  vi.useFakeTimers();
+  const seen: string[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url) === '/api/life/ack') {
+      seen.push((JSON.parse(String(init?.body)) as {text: string}).text);
+      return Response.json({ok: true});
+    }
+    return new Response(new ReadableStream<Uint8Array>({start(controller) {
+      for (let no = 0; no < 2; no++) controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+        ...sentence(no, '你好。'), runId: 'repeated-run', eventId: `repeated-${no}`, seq: no + 1, generation: 8,
+      })}\n\n`));
+    }}), {headers: {'content-type': 'text/event-stream'}});
+  }));
+  const {engine, sentences} = makeEngine();
+  try {
+    engine.sendText('再说一次');
+    await vi.advanceTimersByTimeAsync(650);
+    expect(engine.status).toBe('speaking');
+    expect(sentences).toEqual(['你好。', '你好。']);
+    expect(engine.history.filter(message => message.role === 'assistant').map(message => message.eventId)).toEqual(['repeated-0', 'repeated-1']);
+    expect(seen.at(-1)).toBe('你好。你好。');
+  } finally {engine.dispose(); vi.useRealTimers();}
+});
+
+it.each(['headers', 'body'])('can enter again after interrupt %s hang during meeting departure', async stage => {
+  vi.useFakeTimers();
+  resetMeetingClient();
+  const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(delay => {
+    const abort = new AbortController();
+    setTimeout(() => abort.abort(new DOMException('Timed out', 'TimeoutError')), delay);
+    return abort.signal;
+  });
+  let entries = 0;
+  vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
+    if (String(url) === '/api/meeting/enter') return Response.json({leaseId: `lease-${++entries}`, epoch: entries, expiresIn: 15});
+    if (String(url) === '/api/chat/interrupt') {
+      if (stage === 'headers') return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal!.reason), {once: true});
+      });
+      return new Response(new ReadableStream({start(controller) {
+        init?.signal?.addEventListener('abort', () => controller.error(init.signal!.reason), {once: true});
+      }}));
+    }
+    if (String(url) === '/api/chat') return new Response(new ReadableStream<Uint8Array>({start(controller) {
+      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+        ...sentence(0, '你好。'), runId: 'departing-run', eventId: 'departing-reply', generation: 8,
+      })}\n\n`));
+    }}), {headers: {'content-type': 'text/event-stream'}});
+    return Response.json({ok: true});
+  }));
+  const {engine} = makeEngine();
+  try {
+    await enterMeeting();
+    engine.sendText('hello');
+    await vi.advanceTimersByTimeAsync(60);
+    const leaving = leaveMeeting(engine.finishMeeting());
+    const entering = enterMeeting();
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(entries).toBe(2);
+    await leaving;
+    expect((await entering).leaseId).toBe('lease-2');
+  } finally {engine.dispose(); resetMeetingClient(); timeout.mockRestore(); vi.useRealTimers();}
 });

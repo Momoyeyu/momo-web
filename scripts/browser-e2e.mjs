@@ -14,7 +14,7 @@ const options = {apiPort:7822, webPort:5174, resources:path.join(app,'resources/
 for(let index=2;index<process.argv.length;index++){
   const flag=process.argv[index];
   if(flag==='--help'){
-    console.log('Usage: node app/scripts/browser-e2e.mjs [--smoke] [--api-port 7822] [--web-port 5174] [--resources-dir PATH] [--evidence-dir PATH]');process.exit(0);
+    console.log('Usage: node scripts/browser-e2e.mjs [--smoke] [--api-port 7822] [--web-port 5174] [--resources-dir PATH] [--evidence-dir PATH]');process.exit(0);
   } else if(flag==='--smoke') options.smoke=true;
   else {
     const key={'--api-port':'apiPort','--web-port':'webPort','--resources-dir':'resources','--evidence-dir':'evidence'}[flag];
