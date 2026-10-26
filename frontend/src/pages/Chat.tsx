@@ -11,6 +11,7 @@ import {
   transcriptVersion,
 } from "../chat/engineInstance";
 import type { EngineHandlers } from "../chat/engineInstance";
+import { lastLocalAssistant } from "../chat/transcript";
 import type { ChatStatus } from "../lib/types";
 import { navigate } from "../router";
 import { useT, resolveChatLang } from "../i18n";
@@ -149,9 +150,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
     setMuted(eng.muted);
   };
 
-  const lastAssistant = [...getChatEngine().history]
-    .reverse()
-    .find((m) => m.role === "assistant");
+  const lastAssistant = lastLocalAssistant(getChatEngine().history);
   const subtitle = streamActive
     ? streamText || "…"
     // 转写已是句级：末条 assistant 就是最后一句，切句全在 backend

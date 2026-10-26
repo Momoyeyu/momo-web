@@ -366,6 +366,49 @@ describe('unanswered request failures', () => {
   });
 });
 
+describe('restored local avatar caption', () => {
+  it.each([
+    {
+      name: 'keeps the last local sentence when newer QQ, WeChat and other plugin replies exist',
+      messages: [
+        {role:'assistant' as const,text:'local last sentence',at:'t',source:'meeting'},
+        {role:'assistant' as const,text:'QQ private reply',at:'t',source:'qq'},
+        {role:'assistant' as const,text:'WeChat private reply',at:'t',source:'wechat'},
+        {role:'assistant' as const,text:'another plugin reply',at:'t',source:'future-channel'},
+      ],
+      caption: 'local last sentence',
+    },
+    {
+      name: 'leaves the avatar caption empty when only remote conversations were restored',
+      messages: [
+        {role:'assistant' as const,text:'QQ private reply',at:'t',source:'qq'},
+        {role:'assistant' as const,text:'WeChat private reply',at:'t',source:'wechat'},
+      ],
+      caption: '',
+    },
+    {
+      name: 'preserves the caption of legacy local history without source metadata',
+      messages: [
+        {role:'assistant' as const,text:'legacy local sentence',at:'t'},
+        {role:'user' as const,text:'new local question',at:'t',source:'meeting'},
+        {role:'assistant' as const,text:'QQ private reply',at:'t',source:'qq'},
+      ],
+      caption: 'legacy local sentence',
+    },
+  ])('$name', ({messages,caption}) => {
+    const {eng} = makeEngine();
+    try {
+      eng.loadHistory(messages);
+      expect(eng.display).toBe(caption);
+      expect(eng.status).toBe('idle');
+      expect(eng.history.map(({role,text,source})=>({role,text,source})))
+        .toEqual(messages.map(({role,text,...metadata})=>({role,text,source:'source' in metadata?metadata.source:undefined})));
+    } finally {
+      eng.dispose();
+    }
+  });
+});
+
 describe('scripted first meeting', () => {
   it('plays an assistant-only opening through the existing sentence queue once', async () => {
     chatMock.mockImplementation(async function* () {

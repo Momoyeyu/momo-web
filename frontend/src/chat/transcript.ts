@@ -3,6 +3,14 @@ import type {ChatMessage, StoredMessage} from '../lib/types';
 export function storedMessage(message: StoredMessage): ChatMessage {
   return {...message, id:message.eventId || (message.seq == null ? `legacy-${crypto.randomUUID()}` : `legacy-${message.seq}`)};
 }
+/** Avatar captions belong to local chat; remote replies remain in shared records. */
+export function lastLocalAssistant(messages: readonly ChatMessage[]): ChatMessage | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (message.role === 'assistant' && (message.source === 'meeting' || message.source === undefined)) return message;
+  }
+  return undefined;
+}
 /** Overlapping pages refer to the same event; repeated words may be separate events. */
 export function mergeHistory(existing: ChatMessage[], incoming: ChatMessage[]): ChatMessage[] {
   const merged = new Map(existing.map(message => [message.eventId || message.id,message]));

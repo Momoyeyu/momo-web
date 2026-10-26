@@ -25,7 +25,7 @@ import { chat, acknowledgeDisplay, interrupt as sendInterrupt } from "../service
 import type { PerformanceCue, PresentationSnapshot } from "../live2d/performanceTypes";
 import { dueCues } from "./cueScheduler";
 import { meetingGeneration } from "../services/onboardingClient";
-import {storedMessage} from "./transcript";
+import {lastLocalAssistant,storedMessage} from "./transcript";
 import type {SentenceIdentity} from "../services/chatClient";
 import { charsPerSec, dwellMs, sentencePauseMs } from "./pacing";
 
@@ -300,7 +300,8 @@ export class ChatEngine {
   /**
    * 启动恢复：用最近记录恢复内存转写（backlog/字幕显示它）。
    * 在途回合先打断（其部分落账随旧转写一起被覆盖）；字幕 = 最后一条
-   * assistant 的末句，无则空。调用方负责 bumpTranscript 通知订阅者。
+   * 本地 assistant 的末句，无则空；渠道记录仍完整保留。
+   * 调用方负责 bumpTranscript 通知订阅者。
    */
   loadHistory(messages: StoredMessage[]): void {
     this.tryStage((st) => st.cancelPerformance());
@@ -313,11 +314,9 @@ export class ChatEngine {
         ...storedMessage(m),
       });
     }
-    const last = [...this.history]
-      .reverse()
-      .find((m) => m.role === "assistant");
+    const last = lastLocalAssistant(this.history);
     // 落库已是句级（一句一行），末条即最后一句，无需再切
-      this.lastDisplay = last ? last.text : "";
+    this.lastDisplay = last ? last.text : "";
     this.events.onDisplay(this.lastDisplay);
   }
 
