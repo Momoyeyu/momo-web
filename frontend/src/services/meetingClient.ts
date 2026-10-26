@@ -41,7 +41,7 @@ function clearTimers():void {
   if(expiryTimer)clearTimeout(expiryTimer);
   heartbeatTimer=null;expiryTimer=null;
 }
-function fail(reason:Failure='unavailable'):void {clearTimers();write(null);publish({state:'failed',lease:null,reason,attention:{...DORMANT,activation:'fault'}});}
+function fail(reason:Failure='unavailable',retainStoredIdentity=false):void {clearTimers();if(!retainStoredIdentity)write(null);publish({state:'failed',lease:null,reason,attention:{...DORMANT,activation:'fault'}});}
 /** Only an existing owner capability restores a meeting on subpage refresh. */
 export function storedMeetingIdentity():{clientId:string;leaseId:string}|undefined {
   const value=stored();
@@ -78,13 +78,21 @@ function schedule(lease:Lease,version:number):void {
 async function heartbeat(version:number):Promise<void>{
   const lease=snapshot.lease;
   if(!lease||version!==generation)return;
+  let data:unknown;
   try {
     const response=await post('heartbeat',{clientId:lease.clientId,leaseId:lease.leaseId});
-    const data:unknown=await response.json();
+    data=await response.json();
+  }catch(error){
+    // Reload can cancel a response body before the old document is destroyed.
+    // Disable local sending, but retain proof for a new server-validated restore.
+    if(version===generation)fail(error instanceof MeetingError?error.reason:'unavailable',!(error instanceof MeetingError));
+    return;
+  }
+  try {
     const renewed=parseLease(data,lease.clientId);
     if(version!==generation||snapshot.state!=='active')return;
     write(renewed);publish({state:'active',lease:renewed,attention:attentionOf(data)});schedule(renewed,version);
-  }catch(error){if(version===generation)fail(error instanceof MeetingError?error.reason:'unavailable');}
+  }catch{if(version===generation)fail();}
 }
 /** The App owns one meeting through chat/settings/backlog. Enter is a server gate. */
 export function enterMeeting(restore=false):Promise<Lease>{

@@ -102,7 +102,7 @@ test('settings pauses actual presentation and ACK, then resumes that reply witho
 });
 
 
-test('fresh meetings synchronize other-entry history while subpage returns keep the current projection',async({page})=>{
+test('fresh meetings synchronize remote history while keeping the local caption and subpage projection',async({page})=>{
   const {rows}=await continuousLife(page);
   let reads=0;
   page.on('request',request=>{if(new URL(request.url()).pathname==='/api/life/history')reads++;});
@@ -116,6 +116,8 @@ test('fresh meetings synchronize other-entry history while subpage returns keep 
   await expect(page.locator('.title-screen')).toBeVisible();
   rows.push({...rows.at(-1)!,eventId:'other-entry',seq:251,runId:'other-run',source:'virtual',text:'从另一个入口延续的问候。'});
   await page.getByRole('button',{name:'启动 boot'}).click();await waitForChatReady(page);
-  await expect(page.locator('.subtitle')).toHaveText('从另一个入口延续的问候。');
+  await expect(page.locator('.subtitle')).toHaveText('moment-250');
   expect(reads).toBe(initialReads+1);
+  await page.getByRole('button',{name:'记录',exact:true}).click();await settle(page);
+  await expect(page.locator('.bl-text').filter({hasText:'从另一个入口延续的问候。'})).toBeVisible();
 });
