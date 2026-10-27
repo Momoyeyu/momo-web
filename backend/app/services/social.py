@@ -208,6 +208,19 @@ class SocialAccounts:
                                "auth": "personal_native", "oauthMessaging": False,
                                "capabilities": dict(CAPABILITIES)} for p in PROVIDERS]}
 
+    def native_restore_binding(self):
+        """Restore only an eligible stored identity, never its previous grants."""
+        with self.lock:
+            if not self._path().is_file():
+                return None
+            account = self._account("qq")
+            identity = account.get("expectedSelfId")
+            if (account.get("transport") != "managed" or account.get("enabled") is not True
+                or account.get("quarantined") or not isinstance(identity, str)
+                or not re.fullmatch(r"[1-9][0-9]{0,19}", identity)):
+                return None
+            return {key: account.get(key) for key in ("id", "accountId", "expectedSelfId", "transport")}
+
     def managed_qq_runtime(self, action="status"):
         """Local-user login management is independent of Boot and message grants.
 

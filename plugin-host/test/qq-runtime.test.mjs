@@ -126,6 +126,150 @@ test('an idle runtime requires an explicit owner login action and never scans or
   assert.equal(children.length, 0);
 });
 
+const restoreInput = (runtime, overrides = {}) => {
+  const snapshot = runtime.status({ restoreDetail: true });
+  return { ownerAction: true, expectedSelfId: '123456', expectedAttemptId: snapshot.attemptId, expectedLoginRevision: snapshot.loginRevision, ...overrides };
+};
+
+test('background restore uses a private revision snapshot and starts one bound cached-login attempt', async t => {
+  const { runtime, children, states } = manager(t);
+  assert.equal(runtime.status({ restoreDetail: true }).loginRevision, 0);
+  assert.equal(runtime.status().loginRevision, undefined);
+  assert.equal(runtime.status({ authenticatedDetail: true }).loginRevision, undefined);
+  const restored = await runtime.restore(restoreInput(runtime));
+  assert.equal(restored.loginRevision, 1);
+  assert.equal(restored.attemptId, runtime.status().attemptId);
+  assert.equal(restored.status, 'qr_pending');
+  assert.deepEqual(children[0].commands[0].params, { attemptId: restored.attemptId, expectedSelfId: '123456', restoreSession: true });
+  assert.ok(states.every(state => state.loginRevision === undefined));
+});
+
+test('background restore validates owner intent, identity, attempt and revision without side effects', async t => {
+  const { runtime, children } = manager(t);
+  const initial = restoreInput(runtime);
+  await assert.rejects(async () => runtime.restore({ ...initial, ownerAction: false }), { code: 'OWNER_ACTION_REQUIRED' });
+  for (const invalid of [
+    { expectedSelfId: undefined }, { expectedSelfId: null }, { expectedSelfId: '' }, { expectedSelfId: 'not-qq' },
+    { expectedAttemptId: undefined }, { expectedAttemptId: '' }, { expectedAttemptId: 'old-attempt' },
+    { expectedLoginRevision: undefined }, { expectedLoginRevision: -1 }, { expectedLoginRevision: 0.5 },
+    { expectedLoginRevision: '0' }, { expectedLoginRevision: Number.MAX_SAFE_INTEGER + 1 },
+  ]) await assert.rejects(async () => runtime.restore({ ...initial, ...invalid }), { code: 'INPUT' });
+  assert.deepEqual(restoreInput(runtime), initial);
+  assert.equal(children.length, 0);
+});
+
+for (const action of ['cancel', 'stop']) {
+  test(`an owner ${action} invalidates a background snapshot even when both attempt IDs are null`, async t => {
+    const { runtime, children } = manager(t);
+    const initial = restoreInput(runtime);
+    await runtime[action]();
+    const afterControl = runtime.status({ restoreDetail: true });
+    assert.equal(afterControl.attemptId, null);
+    assert.equal(afterControl.loginRevision, 1);
+    await assert.rejects(async () => runtime.restore(initial), { code: 'ATTEMPT_CANCELLED' });
+    assert.deepEqual(runtime.status({ restoreDetail: true }), afterControl);
+    assert.equal(children.length, 0);
+  });
+}
+
+test('a stale restore cannot cancel or replace a fresh owner QR attempt', async t => {
+  const { runtime, children } = manager(t);
+  await runtime.begin({ ownerAction: true });
+  const snapshot = restoreInput(runtime);
+  await runtime.refreshQR({ ownerAction: true });
+  const current = runtime.status({ authenticatedDetail: true, restoreDetail: true });
+  const commandCount = children[1].commands.length;
+  await assert.rejects(async () => runtime.restore(snapshot), { code: 'ATTEMPT_CANCELLED' });
+  assert.deepEqual(runtime.status({ authenticatedDetail: true, restoreDetail: true }), current);
+  assert.equal(children[1].commands.length, commandCount);
+  assert.equal(children.length, 2);
+});
+
+test('background restore refuses a current pending QR or verification without revoking its ownership', async t => {
+  const { runtime, children } = manager(t);
+  const attempt = await runtime.begin({ ownerAction: true });
+  for (const status of ['qr_pending', 'awaiting_confirmation', 'verifying']) {
+    children[0].ipc({ event: 'state', data: { attemptId: attempt.attemptId, status } });
+    const current = runtime.status({ authenticatedDetail: true, restoreDetail: true });
+    const commandCount = children[0].commands.length;
+    await assert.rejects(async () => runtime.restore(restoreInput(runtime)), { code: 'RUNTIME_NOT_QUIESCENT' });
+    assert.deepEqual(runtime.status({ authenticatedDetail: true, restoreDetail: true }), current);
+    assert.equal(children[0].commands.length, commandCount);
+  }
+});
+
+test('simultaneous background restores reserve one revision before asynchronous resource preparation', async t => {
+  let finishTransport;
+  const transport = new Promise(resolve => { finishTransport = resolve; });
+  const { runtime } = manager(t, { createTransport: () => transport });
+  const snapshot = restoreInput(runtime);
+  const first = runtime.restore(snapshot);
+  await assert.rejects(async () => runtime.restore(snapshot), { code: 'ATTEMPT_CANCELLED' });
+  const pending = runtime.status({ restoreDetail: true });
+  assert.equal(pending.status, 'preparing');
+  assert.equal(pending.loginRevision, 1);
+  await assert.rejects(async () => runtime.restore(restoreInput(runtime)), { code: 'RUNTIME_NOT_QUIESCENT' });
+  assert.deepEqual(runtime.status({ restoreDetail: true }), pending);
+  finishTransport(childTransport());
+  const restored = await first;
+  assert.equal(restored.loginRevision, 1);
+  assert.equal(restored.attemptId, pending.attemptId);
+});
+
+test('owner stop during accepted background restoration fences and reaps its late child', async t => {
+  let finishTransport;
+  const transport = new Promise(resolve => { finishTransport = resolve; });
+  const { runtime } = manager(t, { createTransport: () => transport });
+  const restoring = runtime.restore(restoreInput(runtime));
+  const rejected = assert.rejects(restoring, { code: 'RUNTIME_STOPPED' });
+  await runtime.stop();
+  const stoppedRevision = runtime.status({ restoreDetail: true }).loginRevision;
+  const child = childTransport();
+  finishTransport(child);
+  await rejected;
+  for (let index = 0; index < 20 && runtime.status().running; index++) await tick();
+  assert.equal(runtime.status().running, false);
+  assert.equal(runtime.status().attemptId, null);
+  assert.ok(runtime.status({ restoreDetail: true }).loginRevision >= stoppedRevision, 'late-child cleanup never restores the cancelled revision');
+  assert.equal(child.exitCode, 0);
+  assert.deepEqual(child.commands.map(command => command.method), ['stop']);
+});
+
+test('background restore does not interrupt forgetting or an unquiescent native process', async t => {
+  let finishForget;
+  const forgetting = new Promise(resolve => { finishForget = resolve; });
+  const { runtime, children } = manager(t, { forgetSession: () => forgetting });
+  const forgotten = runtime.forget({ ownerAction: true });
+  await tick();
+  const snapshot = restoreInput(runtime);
+  await assert.rejects(async () => runtime.restore(snapshot), { code: 'RUNTIME_NOT_QUIESCENT' });
+  assert.deepEqual(restoreInput(runtime), snapshot);
+  assert.equal(children.length, 0);
+  finishForget(); await forgotten;
+
+  const other = manager(t, {}, { stubborn: true, exitOnStop: false });
+  await other.runtime.begin({ ownerAction: true });
+  await other.runtime.stop();
+  const stopped = other.runtime.status({ restoreDetail: true });
+  await assert.rejects(async () => other.runtime.restore(restoreInput(other.runtime)), { code: 'RUNTIME_NOT_QUIESCENT' });
+  assert.deepEqual(other.runtime.status({ restoreDetail: true }), stopped);
+  assert.equal(other.children.length, 1);
+  other.children[0].finish();
+});
+
+test('background restore can acknowledge an exact connected identity without changing the session', async t => {
+  const { runtime, children } = manager(t);
+  const attempt = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  children[0].ipc({ event: 'connected', data: { attemptId: attempt.attemptId, selfId: '123456' } });
+  const snapshot = restoreInput(runtime);
+  const commandCount = children[0].commands.length;
+  assert.equal((await runtime.restore(snapshot)).attemptId, attempt.attemptId);
+  assert.equal((await runtime.restore(snapshot)).loginRevision, snapshot.expectedLoginRevision);
+  await assert.rejects(async () => runtime.restore({ ...snapshot, expectedSelfId: '654321' }), { code: 'ACCOUNT_MISMATCH' });
+  assert.equal(children[0].commands.length, commandCount);
+  assert.equal(children.length, 1);
+});
+
 test('a prepared child uses correlated commands and exposes QR only in authenticated detail until expiry', async t => {
   let now = Date.now();
   const { runtime, children, states } = manager(t, { now: () => now });

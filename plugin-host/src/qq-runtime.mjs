@@ -93,11 +93,13 @@ export class QQRuntimeManager {
     this.#maxFrameBytes = Math.max(1024, Math.min(Number(maxFrameBytes) || 512 * 1024, 1024 * 1024));
   }
 
-  status({ authenticatedDetail = false } = {}) {
+  status({ authenticatedDetail = false, restoreDetail = false } = {}) {
     this.#expireQR();
     const state = { provider: 'qq', status: this.#state, running: this.#child !== null, connected: this.#state === 'connected', actualSelfId: this.#actualSelfId, attemptId: this.#attempt, error: this.#error, executorQuiescent: this.#child === null && this.#starting === null };
     // The authenticated API explicitly opts in after authorizing the caller.
     if (authenticatedDetail === true) state.qr = this.#qr ? { ...this.#qr } : null;
+    // Only the trusted coordinator requests the compare-and-swap snapshot.
+    if (restoreDetail === true) state.loginRevision = this.#loginRevision;
     return state;
   }
 
@@ -142,6 +144,27 @@ export class QQRuntimeManager {
 
   async begin({ ownerAction = false, expectedSelfId } = {}) {
     return this.#begin({ ownerAction, expectedSelfId }, true);
+  }
+
+  async restore({ ownerAction = false, expectedSelfId, expectedAttemptId, expectedLoginRevision } = {}) {
+    this.#owner(ownerAction);
+    const validAttempt = expectedAttemptId === null || (typeof expectedAttemptId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(expectedAttemptId));
+    if (!safeId(expectedSelfId) || !validAttempt || !Number.isSafeInteger(expectedLoginRevision) || expectedLoginRevision < 0) throw failure('INPUT');
+    // Check both fields before #begin can revoke anything. A stop/cancel while
+    // idle still changes the revision even though the attempt remains null.
+    if (expectedAttemptId !== this.#attempt || expectedLoginRevision !== this.#loginRevision) throw failure('ATTEMPT_CANCELLED');
+    if (this.#unquiescent || this.#starting || this.#stopping || this.#forgetting) throw failure('RUNTIME_NOT_QUIESCENT');
+    if (this.#state === 'connected') {
+      if (expectedSelfId !== this.#actualSelfId) throw failure('ACCOUNT_MISMATCH');
+      return this.status({ restoreDetail: true });
+    }
+    // Background restoration never tears down an owner-controlled process.
+    if (this.#child || ['preparing', 'connecting', 'qr_pending', 'awaiting_confirmation', 'verifying'].includes(this.#state)) throw failure('RUNTIME_NOT_QUIESCENT');
+    // #begin reserves the next revision synchronously, before its first await.
+    const revision = expectedLoginRevision + 1;
+    const result = await this.#begin({ ownerAction, expectedSelfId }, true);
+    if (revision !== this.#loginRevision) throw failure('ATTEMPT_CANCELLED');
+    return { ...result, loginRevision: revision };
   }
 
   async #begin({ ownerAction, expectedSelfId }, restoreSession) {

@@ -16,6 +16,8 @@ from ..core.plugin_host import PluginHost, HostError
 
 LEASE_SECONDS = 15
 STOP_SECONDS = 5
+QQ_RESTORE_SECONDS = 35
+QQ_RESTORE_POLL_SECONDS = .2
 RETIRED_CHANNEL_PLUGINS = {"momo-wechat": "wechat"}
 current_run: ContextVar[str] = ContextVar("coordinator_run", default="")
 
@@ -56,6 +58,9 @@ class Coordinator:
         self.mcp_revision = -1
         self.host_config_revision = 0
         self.configuration_lock = threading.Lock()
+        self.qq_restore_thread = None
+        self.qq_restore_pending = None
+        self.qq_restore_owner = None
 
     def schema(self):
         with db.tx() as c:
@@ -119,6 +124,8 @@ class Coordinator:
     def close(self):
         self.closed.set()
         with self.condition:
+            self.qq_restore_pending = None
+            self.qq_restore_owner = None
             self.mode = "paused"
             self.owner = None
             self.presentation = None
@@ -127,6 +134,9 @@ class Coordinator:
             self.condition.notify_all()
         if self.host:
             self.host.close()
+        restore_thread = self.qq_restore_thread
+        if restore_thread and restore_thread is not threading.current_thread():
+            restore_thread.join(timeout=STOP_SECONDS)
         if self.worker_thread and self.worker_thread is not threading.current_thread():
             self.worker_thread.join(timeout=STOP_SECONDS)
         with self.condition:
@@ -139,9 +149,11 @@ class Coordinator:
         with db.tx() as c:
             c.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('attention_policy',?)", (json.dumps({"focus": self.focus, "phonePaused": self.phone_paused}),))
 
-    def configure_host_plugins(self, configs, *, tolerate_errors=True, revision=None):
+    def configure_host_plugins(self, configs, *, tolerate_errors=True, revision=None, guard=None, timeout=35):
         from .social import social
         with self.configuration_lock:
+            if guard and not guard():
+                return {"stale": True}
             if revision is not None and revision < self.mcp_revision:
                 return {"stale": True}
             if configs is not None:
@@ -154,12 +166,137 @@ class Coordinator:
             plugins = self.mcp_configs + social.host_configs()
             self.host_config_revision += 1
             params = {"plugins": plugins, "tolerateErrors": tolerate_errors, "configurationRevision": self.host_config_revision}
-        if self.host:
-            return self.host.request("plugins.configure", params, timeout=35)
+            host = self.host
+        if host and (not guard or guard()):
+            return host.request("plugins.configure", params, timeout=timeout)
         return {}
 
     def refresh_social_plugins(self):
         return self.configure_host_plugins(None)
+
+    def _schedule_qq_restore(self):
+        """Coalesce explicit Boot intents into one bounded, owned restore task."""
+        from .social import social
+        try:
+            binding = social.native_restore_binding()
+        except Exception:
+            return
+        with self.condition:
+            host_instance = getattr(self.host, "host_instance", None)
+            if (not self.started or self.closed.is_set() or not self.host
+                or not isinstance(host_instance, str) or not host_instance):
+                return
+            self.qq_restore_pending = ({"binding": binding, "host": self.host,
+                "hostInstance": host_instance, "coreId": self.core_id,
+                "closed": self.closed, "deadline": time.monotonic() + QQ_RESTORE_SECONDS}
+                if binding else None)
+            if not self.qq_restore_pending:
+                return
+            if (self.qq_restore_thread and self.qq_restore_thread.is_alive()
+                and self._qq_restore_owner_current(self.qq_restore_owner)):
+                return
+            owner = {"closed": self.closed, "coreId": self.core_id,
+                     "host": self.host, "hostInstance": host_instance}
+            self.qq_restore_owner = owner
+            self.qq_restore_thread = threading.Thread(target=self._restore_qq_worker,
+                                                     args=(owner,), name="momo-qq-restore", daemon=True)
+            self.qq_restore_thread.start()
+
+    def _qq_restore_owner_current(self, owner):
+        return bool(owner and self.qq_restore_owner is owner
+            and self.closed is owner["closed"] and not owner["closed"].is_set()
+            and self.core_id == owner["coreId"] and self.host is owner["host"]
+            and getattr(self.host, "host_instance", None) == owner["hostInstance"])
+
+    def _restore_qq_worker(self, owner):
+        while True:
+            with self.condition:
+                # An old RPC may unwind after this Coordinator/host is reused.
+                # It owns neither the new lifetime's intent nor its thread slot.
+                if not self._qq_restore_owner_current(owner):
+                    return
+                pending, self.qq_restore_pending = self.qq_restore_pending, None
+                if pending is None:
+                    if self.qq_restore_thread is threading.current_thread():
+                        self.qq_restore_thread = None
+                        self.qq_restore_owner = None
+                    return
+            try:
+                self._restore_qq_account(pending)
+            except Exception:
+                # Authentication failures are explained in plugin settings;
+                # they cannot block chat, grant authority or restart a loop.
+                pass
+
+    def _restore_qq_account(self, pending):
+        from .social import social, _public_qq_runtime_status
+        host, binding, closed = pending["host"], pending["binding"], pending["closed"]
+
+        def current():
+            with self.condition:
+                if (not self.started or closed.is_set() or self.closed is not closed
+                    or self.host is not host or self.core_id != pending["coreId"]
+                    or host.host_instance != pending["hostInstance"]
+                    or self.restoring or time.monotonic() >= pending["deadline"]
+                    or self._unresolved_commands()):
+                    return False
+            return social.native_restore_binding() == binding
+
+        def request(method, params):
+            remaining = pending["deadline"] - time.monotonic()
+            if remaining <= 0 or not current():
+                raise CoordinationError("QQ restoration was withdrawn")
+            raw = host.request(method, params, timeout=min(3, remaining))
+            if not current():
+                raise CoordinationError("QQ restoration was withdrawn")
+            status = _public_qq_runtime_status(raw)
+            revision = raw.get("loginRevision")
+            if type(revision) is not int or revision < 0:
+                raise CoordinationError("QQ restoration status is unavailable")
+            return {**status, "loginRevision": revision}
+
+        status = request("qq.runtime.status", {"restoreDetail": True})
+        if not status["connected"]:
+            # Do not replace a login/QR chosen by the account owner.
+            if status["running"] or not status["executorQuiescent"]:
+                return
+            initial_revision = status["loginRevision"]
+            try:
+                status = request("qq.runtime.restore", {"ownerAction": True,
+                    "expectedSelfId": binding["expectedSelfId"],
+                    "expectedAttemptId": status["attemptId"],
+                    "expectedLoginRevision": initial_revision})
+            except HostError as error:
+                if str(error) != "Plugin host timed out":
+                    return
+                # A bounded control timeout does not replay the request. The
+                # private revision identifies only the one reserved attempt.
+                status = request("qq.runtime.status", {"restoreDetail": True})
+            if status["loginRevision"] != initial_revision + 1:
+                return
+        attempt, revision = status["attemptId"], status["loginRevision"]
+        if not attempt:
+            return
+        while current() and time.monotonic() < pending["deadline"]:
+            if status["attemptId"] != attempt or status["loginRevision"] != revision:
+                return
+            if status["connected"]:
+                if status["actualSelfId"] != binding["expectedSelfId"]:
+                    return
+                # Recheck the private attempt immediately before rebuilding
+                # business bindings. Existing policy is never enabled/rewritten.
+                fresh = request("qq.runtime.status", {"restoreDetail": True})
+                if (not fresh["connected"] or fresh["actualSelfId"] != binding["expectedSelfId"]
+                    or fresh["attemptId"] != attempt or fresh["loginRevision"] != revision):
+                    return
+                self.configure_host_plugins(None, guard=current,
+                    timeout=max(.01, min(3, pending["deadline"] - time.monotonic())))
+                return
+            if status["status"] not in {"preparing", "connecting", "verifying"}:
+                return
+            if closed.wait(min(QQ_RESTORE_POLL_SECONDS, max(0, pending["deadline"] - time.monotonic()))):
+                return
+            status = request("qq.runtime.status", {"restoreDetail": True})
 
     def configure_extensions(self, extensions):
         from ..core.mcp import hub
@@ -403,6 +540,8 @@ class Coordinator:
                     self.owner = {"clientId": client, "leaseId": uuid.uuid4().hex, "expiresAt": time.monotonic() + LEASE_SECONDS}
                     self._release_held()
                     self.condition.notify_all()
+                    if not restore:
+                        self._schedule_qq_restore()
                     return self._lease()
             except (HostError, CoordinationError) as error:
                 with self.condition:

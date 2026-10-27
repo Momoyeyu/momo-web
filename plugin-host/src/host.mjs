@@ -142,8 +142,9 @@ export class PluginHost {
       case 'channels.health': return this.channelHealth(params);
       case 'channels.send': return this.sendChannel(params);
       case 'channels.ack': return this.ackChannel(params);
-      case 'qq.runtime.status': return this.qqRuntime.status({ authenticatedDetail: params.authenticatedDetail === true });
+      case 'qq.runtime.status': return this.qqRuntime.status({ authenticatedDetail: params.authenticatedDetail === true, restoreDetail: params.restoreDetail === true });
       case 'qq.runtime.begin': return this.qqRuntimeAction('begin', { ownerAction: params.ownerAction === true, expectedSelfId: params.expectedSelfId });
+      case 'qq.runtime.restore': return this.qqRuntimeAction('restore', { ownerAction: params.ownerAction === true, expectedSelfId: params.expectedSelfId, expectedAttemptId: params.expectedAttemptId, expectedLoginRevision: params.expectedLoginRevision });
       case 'qq.runtime.refresh': return this.qqRuntimeAction('refreshQR', { ownerAction: params.ownerAction === true });
       case 'qq.runtime.cancel': return this.qqRuntimeAction('cancel');
       case 'qq.runtime.stop': return this.qqRuntimeAction('stop');

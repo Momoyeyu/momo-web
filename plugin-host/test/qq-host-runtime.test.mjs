@@ -8,8 +8,8 @@ const token = 'managed-runtime-host-test-'.repeat(2);
 function fixture() {
   const calls = [];
   const runtime = {
-    status: params => { calls.push(['status', params]); return { provider: 'qq', status: 'qr_pending', connected: false, running: true, ...(params?.authenticatedDetail ? { qr: { dataUrl: 'private-qr' } } : {}) }; },
-    ...Object.fromEntries(['begin', 'refreshQR', 'cancel', 'stop', 'forget'].map(method => [method, async params => { calls.push([method, params]); return { provider: 'qq', status: method === 'stop' ? 'stopped' : 'qr_pending', executorQuiescent: method === 'stop' }; }])),
+    status: params => { calls.push(['status', params]); return { provider: 'qq', status: 'qr_pending', connected: false, running: true, ...(params?.authenticatedDetail ? { qr: { dataUrl: 'private-qr' } } : {}), ...(params?.restoreDetail ? { loginRevision: 7 } : {}) }; },
+    ...Object.fromEntries(['begin', 'restore', 'refreshQR', 'cancel', 'stop', 'forget'].map(method => [method, async params => { calls.push([method, params]); return { provider: 'qq', status: method === 'stop' ? 'stopped' : 'qr_pending', executorQuiescent: method === 'stop' }; }])),
   };
   return { calls, runtime };
 }
@@ -31,6 +31,20 @@ test('managed QQ login can run while dormant but still requires coordinator auth
   assert.deepEqual(calls, [['begin', { ownerAction: true, expectedSelfId: '123456' }]]);
   assert.equal(host.paused, true);
   assert.equal(host.inflight.size, 0);
+});
+
+test('background restoration is an authenticated private RPC with a whitelisted ownership snapshot', async t => {
+  const { calls, runtime } = fixture();
+  const { request } = await hostFixture(t, { qqRuntime: runtime });
+  const snapshot = { ownerAction: true, expectedSelfId: '123456', expectedAttemptId: randomUUID(), expectedLoginRevision: 7 };
+  await assert.rejects(request('qq.runtime.restore', snapshot, 'wrong'), { code: 'UNAUTHORIZED' });
+  assert.equal(calls.length, 0);
+  assert.equal((await request('qq.runtime.status')).loginRevision, undefined);
+  assert.equal((await request('qq.runtime.status', { restoreDetail: true })).loginRevision, 7);
+  await request('qq.runtime.restore', { ...snapshot, command: '/untrusted', env: { HOME: '/untrusted' }, restoreSession: false });
+  assert.deepEqual(calls.at(-1), ['restore', snapshot]);
+  runtime.restore = async () => { throw new QQRuntimeError('ATTEMPT_CANCELLED'); };
+  await assert.rejects(request('qq.runtime.restore', snapshot), error => error instanceof HostError && error.code === 'ATTEMPT_CANCELLED');
 });
 
 test('runtime survives plugin policy rebuilds and only explicit authenticated status exposes the QR', async t => {
