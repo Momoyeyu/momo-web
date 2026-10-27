@@ -26,6 +26,7 @@ test('native QQ login stays inside settings and does not enable messaging or Boo
   const original=(await (await request.get('/api/social/accounts')).json()).accounts;
   let dialog=await openQQ(page);
   await expect(dialog.getByText('让 momo 登录自己的 QQ 账号。',{exact:true})).toBeVisible();
+  await expect(dialog.getByRole('button',{name:'重新扫码',exact:true})).toHaveCount(0);
   await expect(dialog.getByText('桥接地址',{exact:true})).not.toBeVisible();
   await dialog.getByRole('button',{name:'扫码登录',exact:true}).click();
   await expect(dialog.getByRole('img',{name:'用手机 QQ 扫描此二维码登录 momo 的账号',exact:true})).toBeVisible();
@@ -82,6 +83,7 @@ test('forgetting QQ sign-in requires explicit confirmation and is independent of
   const original=(await (await request.get('/api/social/accounts')).json()).accounts;
   const dialog=await openQQ(page);
   await expect(dialog.getByText('QQ 已登录',{exact:true})).toBeVisible();
+  await expect(dialog.getByRole('button',{name:'重新扫码',exact:true})).toHaveCount(0);
   await expect(dialog.getByText('已核验账号：123456',{exact:true})).toBeVisible();
   await dialog.locator('.qq-login-session summary').click();
   await dialog.getByRole('button',{name:'忘记登录',exact:true}).click();
@@ -159,4 +161,59 @@ test('managed QQ can be disabled and explicitly re-enabled without changing gran
   expect(account.permissions).toEqual(initial.permissions);
   expect(account.allowlistEnabled).toBe(initial.allowlistEnabled);
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
+});
+
+for(const status of ['error','verifying']){
+  test(`an existing ${status} login can explicitly start a fresh QR instead of restoring the cached session`,async({page})=>{
+    let runtime={...state(status),running:status==='verifying',executorQuiescent:status!=='verifying',attemptId:status==='verifying'?'cached-attempt':null,error:status==='error'?'RUNTIME_TIMEOUT':null};
+    const actions:string[]=[];
+    await page.route(/\/api\/social\/accounts\/qq\/runtime(?:\/[^/?]+)?$/,async route=>{
+      if(route.request().method()==='POST'){
+        actions.push(route.request().url().split('/').at(-1)!);
+        runtime={...pending('fresh-attempt'),error:null};
+      }
+      await route.fulfill({json:runtime});
+    });
+    const dialog=await openQQ(page);
+    const fresh=dialog.getByRole('button',{name:'重新扫码',exact:true});
+    await expect(fresh).toBeEnabled();
+    await expect(fresh).toHaveClass('ghost small');
+    await fresh.click();
+    await expect(dialog.locator('.qq-login img')).toBeVisible();
+    expect(actions).toEqual(['refresh']);
+  });
+}
+
+test('fresh QR respects dirty identity, pending action, account save and stopping guards',async({page,request})=>{
+  let runtime={...state('verifying'),running:true,executorQuiescent:false,attemptId:'cached-attempt'};
+  let releaseRefresh:()=>void=()=>{};
+  let releaseSave:()=>void=()=>{};
+  const original=(await (await request.get('/api/social/accounts')).json()).accounts[0];
+  await page.route(/\/api\/social\/accounts\/qq\/runtime(?:\/[^/?]+)?$/,async route=>{
+    if(route.request().method()==='POST')await new Promise<void>(resolve=>{releaseRefresh=resolve;});
+    await route.fulfill({json:runtime});
+  });
+  await page.route(/\/api\/social\/accounts\/qq$/,async route=>{
+    await new Promise<void>(resolve=>{releaseSave=resolve;});
+    await route.fulfill({json:original});
+  });
+  let dialog=await openQQ(page);
+  const fresh=()=>dialog.getByRole('button',{name:'重新扫码',exact:true});
+  const identity=dialog.locator('#social-panel-account > .opt-row').filter({hasText:'momo 的账号 ID'}).locator('input');
+  await expect(fresh()).toBeEnabled();
+  await identity.fill('654321');
+  await expect(fresh()).toBeDisabled();
+  await identity.fill(original.expectedSelfId);
+  await expect(fresh()).toBeEnabled();
+  await fresh().click();
+  await expect(fresh()).toHaveCount(0);
+  releaseRefresh();
+  await expect(fresh()).toBeEnabled();
+  await dialog.getByRole('button',{name:'保存',exact:true}).click();
+  await expect(fresh()).toBeDisabled();
+  releaseSave();
+  await expect(dialog).toHaveCount(0);
+  runtime={...runtime,status:'stopping'};
+  dialog=await openQQ(page);
+  await expect(fresh()).toBeDisabled();
 });

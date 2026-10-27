@@ -18,6 +18,7 @@ export const en: Dict = {
     "verified": "Account verified",
     "begin": "Sign in with QR",
     "refresh": "Refresh QR code",
+    "fresh": "Scan a new QR code",
     "preparing": "Preparing…",
     "cancel": "Cancel sign-in",
     "stop": "Disconnect account",

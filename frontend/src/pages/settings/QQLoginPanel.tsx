@@ -42,9 +42,11 @@ export default function QQLoginPanel({active,identityDirty,onAuthenticated,chann
   const code=error??state?.error;
   const isPending=state?PENDING.has(state.status):busy&&pendingAction!=='stop'&&pendingAction!=='forget'&&pendingAction!=='cancel';
   const canBegin=!identityDirty&&!busy&&!connectionBusy&&!isPending&&!state?.connected&&state?.status!=='stopping';
+  const canRefresh=!identityDirty&&!busy&&!connectionBusy&&!state?.connected&&state?.status!=='stopping';
   const run=(action:QQRuntimeAction)=>{if(connectionBusy)return;setConfirmForget(false);setPendingAction(action);void observer.current?.act(action);};
   const message=code?t(`social.login.errors.${code}`):busy?t(pendingAction==='stop'?'social.login.states.stopping':pendingAction==='forget'?'social.login.forgetting':'social.login.states.preparing'):t(`social.login.states.${state?.status??'loading'}`);
   const qr=state?.qr;
+  const showFresh=state&&!qr&&!state.connected&&state.status!=='expired'&&(state.attemptId!==null||state.status!=='idle');
   const managed=channel.transport==='managed'&&channel.enabled;
   const chatConnected=managed&&channel.status==='connected'&&channel.actualSelfId===state?.actualSelfId;
   return <div className="qq-login" aria-label={t('social.login.title')}>
@@ -59,7 +61,8 @@ export default function QQLoginPanel({active,identityDirty,onAuthenticated,chann
       {qr?<p className="qq-login-instruction">{t('social.login.scan')}</p>:null}
       <div className="qq-login-actions">
         {!state?.connected&&!qr?<Button size="sm" disabled={!canBegin} onClick={()=>run(state?.status==='expired'?'refresh':'begin')}>{t(busy||isPending?'social.login.preparing':state?.status==='expired'?'social.login.refresh':'social.login.begin')}</Button>:null}
-        {qr?<Button size="sm" variant="ghost" disabled={busy||connectionBusy||identityDirty} onClick={()=>run('refresh')}>{t('social.login.refresh')}</Button>:null}
+        {qr?<Button size="sm" variant="ghost" disabled={!canRefresh} onClick={()=>run('refresh')}>{t('social.login.refresh')}</Button>:null}
+        {showFresh?<Button size="sm" variant="ghost" disabled={!canRefresh} onClick={()=>run('refresh')}>{t('social.login.fresh')}</Button>:null}
         {isPending?<Button size="sm" variant="ghost" disabled={connectionBusy} onClick={()=>run('cancel')}>{t('social.login.cancel')}</Button>:null}
         {state?.connected&&!chatConnected?<Button size="sm" disabled={busy||connectionBusy||channel.status==='quarantined'} onClick={onConnect}>{t(connectionBusy?'social.saving':'social.login.enableChat')}</Button>:null}
         {state?.connected?<Button size="sm" variant="ghost" disabled={busy||connectionBusy} onClick={()=>run('stop')}>{t('social.login.stop')}</Button>:null}

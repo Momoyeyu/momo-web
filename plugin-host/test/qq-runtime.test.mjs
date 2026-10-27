@@ -42,6 +42,67 @@ function manager(t, options = {}, childOptions = {}) {
   return { runtime, children, states };
 }
 
+test('diagnostics contain only bounded current-attempt phases and never enter public status', async t => {
+  const diagnostics = [];
+  let now = Date.now();
+  const { runtime, children, states } = manager(t, { onDiagnostic: value => diagnostics.push(value), now: () => now });
+  const attempt = await runtime.begin({ ownerAction: true });
+  const child = children[0];
+  assert.deepEqual(diagnostics.map(value => value.phase), ['resource_begin', 'resource_ready', 'process_started']);
+  assert.ok(diagnostics.every(value => value.attemptId === attempt.attemptId && value.elapsedMs === 0));
+  const emit = data => child.ipc({ event: 'diagnostic', data: { attemptId: attempt.attemptId, phase: 'qr_scanned', elapsedMs: 12, ...data } });
+  for (const invalid of [
+    { phase: 'secret-session-value' }, { code: 'account-secret' }, { elapsedMs: -1 },
+    { elapsedMs: 86400001 }, { elapsedMs: '12' }, { elapsedMs: null },
+    { phase: 'qr_scanned', secret: 'private-account-or-qr' }, { attemptId: 'stale-attempt' },
+  ]) emit(invalid);
+  assert.equal(diagnostics.length, 3);
+  emit({ code: 140022 });
+  assert.deepEqual(diagnostics.at(-1), { attemptId: attempt.attemptId, phase: 'qr_scanned', elapsedMs: 12, code: 140022 });
+  assert.ok(Object.isFrozen(diagnostics.at(-1)));
+  for (let index = 0; index < 100; index++) emit({ elapsedMs: index });
+  assert.equal(diagnostics.length, 64);
+  assert.ok(!JSON.stringify(runtime.status({ authenticatedDetail: true })).includes('elapsedMs'));
+  assert.ok(!JSON.stringify(states).includes('elapsedMs'));
+  await runtime.cancel();
+  emit({ elapsedMs: 200 });
+  assert.equal(diagnostics.length, 64);
+  now += 10;
+  const next = await runtime.refreshQR({ ownerAction: true });
+  assert.notEqual(next.attemptId, attempt.attemptId);
+  const count = diagnostics.length;
+  child.ipc({ event: 'diagnostic', data: { attemptId: next.attemptId, phase: 'qr_authenticated', elapsedMs: 20 } });
+  children[1].ipc({ event: 'diagnostic', data: { attemptId: attempt.attemptId, phase: 'qr_authenticated', elapsedMs: 20 } });
+  assert.equal(diagnostics.length, count, 'neither a stale generation nor a stale attempt is observable');
+  children[1].ipc({ event: 'diagnostic', data: { attemptId: next.attemptId, phase: 'login_failure', elapsedMs: 20, code: -1 } });
+  assert.equal(diagnostics.length, count + 1, 'a new attempt has its own finite diagnostic budget');
+});
+
+test('throwing or asynchronously failing diagnostic observers cannot change authentication ownership', async t => {
+  let callbacks = 0;
+  const { runtime, children } = manager(t, { onDiagnostic: () => {
+    callbacks++;
+    if (callbacks % 2) throw new Error('private observer failure');
+    return Promise.reject(new Error('private asynchronous observer failure'));
+  } });
+  const attempt = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  children[0].ipc({ event: 'diagnostic', data: { attemptId: attempt.attemptId, phase: 'qr_authenticated', elapsedMs: 10 } });
+  children[0].ipc({ event: 'connected', data: { attemptId: attempt.attemptId, selfId: '123456' } });
+  await tick();
+  assert.equal(runtime.status().connected, true);
+  assert.equal(runtime.status().actualSelfId, '123456');
+  assert.equal(callbacks, 4);
+});
+
+test('a stalled request records only the finite timeout phase before revoking the attempt', async t => {
+  const diagnostics = [];
+  const { runtime } = manager(t, { onDiagnostic: value => diagnostics.push(value), requestTimeoutMs: 10 }, { handle(command) { return command.method === 'connect'; } });
+  await assert.rejects(runtime.begin({ ownerAction: true }), { code: 'RUNTIME_TIMEOUT' });
+  assert.equal(diagnostics.at(-1).phase, 'request_timeout');
+  assert.equal(Object.keys(diagnostics.at(-1)).sort().join(','), 'attemptId,elapsedMs,phase');
+  assert.equal(runtime.status().attemptId, null);
+});
+
 test('an idle runtime requires an explicit owner login action and never scans or launches at construction', async t => {
   const { runtime, children } = manager(t);
   assert.equal(runtime.status().status, 'idle');
@@ -56,7 +117,7 @@ test('a prepared child uses correlated commands and exposes QR only in authentic
   const detail = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
   const child = children[0];
   assert.deepEqual(child.commands.map(command => command.method), ['prepare', 'connect', 'requestQr']);
-  assert.deepEqual(child.commands[0].params, { attemptId: detail.attemptId, expectedSelfId: '123456' });
+  assert.deepEqual(child.commands[0].params, { attemptId: detail.attemptId, expectedSelfId: '123456', restoreSession: true });
   assert.ok(child.commands.every(command => command.params.attemptId === detail.attemptId));
   assert.equal(runtime.status().status, 'qr_pending');
   assert.equal(runtime.status({ authenticatedDetail: true }).qr.dataUrl, QR);
@@ -74,6 +135,39 @@ test('private cached-login verification is not overwritten by an artificial QR-p
   } });
   await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
   assert.equal(runtime.status().status, 'verifying');
+});
+
+test('cached restore can explicitly fall back to a visible QR without retaining its verification timeout', async t => {
+  const { runtime, children } = manager(t, { phaseTimeoutMs: 20 }, { handle(command, child) {
+    if (command.method === 'connect') child.ipc({ event: 'state', data: { attemptId: command.params.attemptId, status: 'verifying' } });
+    if (command.method === 'requestQr') { child.reply(command); return true; }
+  } });
+  const attempt = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  assert.equal(runtime.status().status, 'verifying');
+  children[0].ipc({ event: 'state', data: { attemptId: attempt.attemptId, status: 'qr_pending' } });
+  children[0].ipc({ event: 'qr', data: { attemptId: attempt.attemptId, dataUrl: QR, expiresAt: Date.now() + 60000 } });
+  assert.equal(runtime.status().status, 'qr_pending');
+  assert.equal(runtime.status({ authenticatedDetail: true }).qr.dataUrl, QR);
+  await new Promise(resolve => setTimeout(resolve, 35));
+  assert.equal(runtime.status().status, 'qr_pending');
+  assert.equal(runtime.status().running, true);
+});
+
+test('native authentication is monotonic within an attempt and does not leak into a replacement attempt', async t => {
+  const { runtime, children } = manager(t);
+  const first = await runtime.begin({ ownerAction: true });
+  const child = children[0];
+  child.ipc({ event: 'state', data: { attemptId: first.attemptId, status: 'verifying', authenticated: true } });
+  child.ipc({ event: 'state', data: { attemptId: first.attemptId, status: 'verifying', authenticated: false } });
+  child.ipc({ event: 'state', data: { attemptId: first.attemptId, status: 'qr_pending' } });
+  assert.equal(runtime.status().status, 'verifying');
+  assert.ok(!JSON.stringify(runtime.status({ authenticatedDetail: true })).includes('authenticated'));
+  const second = await runtime.refreshQR({ ownerAction: true });
+  children[1].ipc({ event: 'state', data: { attemptId: second.attemptId, status: 'verifying' } });
+  children[1].ipc({ event: 'state', data: { attemptId: second.attemptId, status: 'qr_pending' } });
+  children[1].ipc({ event: 'qr', data: { attemptId: second.attemptId, dataUrl: QR, expiresAt: Date.now() + 60000 } });
+  assert.equal(runtime.status().status, 'qr_pending');
+  assert.ok(runtime.status({ authenticatedDetail: true }).qr);
 });
 
 test('an acknowledged QR request without a callback times out and reaps the unauthenticated process', async t => {
@@ -103,7 +197,7 @@ test('verification has a deadline while an available unexpired QR remains availa
   await new Promise(resolve => setTimeout(resolve, 35));
   assert.equal(runtime.status().status, 'qr_pending');
   assert.ok(runtime.status({ authenticatedDetail: true }).qr);
-  children[0].ipc({ event: 'state', data: { attemptId: attempt.attemptId, status: 'verifying' } });
+  children[0].ipc({ event: 'state', data: { attemptId: attempt.attemptId, status: 'verifying', authenticated: true } });
   assert.equal(runtime.status({ authenticatedDetail: true }).qr, null);
   children[0].ipc({ event: 'qr', data: { attemptId: attempt.attemptId, dataUrl: QR, expiresAt: Date.now() + 60000 } });
   assert.equal(runtime.status().status, 'verifying', 'a delayed QR callback cannot reset session verification');
@@ -111,6 +205,22 @@ test('verification has a deadline while an available unexpired QR remains availa
   assert.equal(runtime.status().error, 'RUNTIME_TIMEOUT');
   assert.equal(runtime.status().running, false);
 });
+
+for (const delayedStatus of ['qr_pending', 'awaiting_confirmation']) {
+  test(`a delayed ${delayedStatus} callback cannot demote verification or remove its deadline`, async t => {
+    const { runtime, children } = manager(t, { phaseTimeoutMs: 20 });
+    const attempt = await runtime.begin({ ownerAction: true });
+    const child = children[0];
+    child.ipc({ event: 'state', data: { attemptId: attempt.attemptId, status: 'verifying', authenticated: true } });
+    child.ipc({ event: 'state', data: { attemptId: attempt.attemptId, status: delayedStatus } });
+    child.ipc({ event: 'qr', data: { attemptId: attempt.attemptId, dataUrl: QR, expiresAt: Date.now() + 60000 } });
+    assert.equal(runtime.status().status, 'verifying');
+    assert.equal(runtime.status({ authenticatedDetail: true }).qr, null);
+    for (let index = 0; index < 100 && (runtime.status().running || !runtime.status().error); index++) await new Promise(resolve => setTimeout(resolve, 5));
+    assert.equal(runtime.status().error, 'RUNTIME_TIMEOUT');
+    assert.equal(runtime.status().running, false, 'the original verification deadline still reaps a stalled session');
+  });
+}
 
 test('refresh reaps the previous native callback source before creating a new attempt', async t => {
   const { runtime, children } = manager(t);
@@ -130,6 +240,18 @@ test('refresh reaps the previous native callback source before creating a new at
   children[1].ipc({ event: 'connected', data: { attemptId: second.attemptId, selfId: '999999' } });
   assert.equal(runtime.status().status, 'cancelled');
   assert.equal(runtime.status({ authenticatedDetail: true }).qr, null);
+});
+
+test('a QR refresh skips cached restore in a new owned process and preserves the pinned identity', async t => {
+  const { runtime, children } = manager(t);
+  const first = await runtime.begin({ ownerAction: true, expectedSelfId: '123456', restoreSession: false });
+  assert.deepEqual(children[0].commands[0].params, { attemptId: first.attemptId, expectedSelfId: '123456', restoreSession: true }, 'public callers cannot disable ordinary cached session restoration');
+  const second = await runtime.refreshQR({ ownerAction: true, expectedSelfId: '654321', restoreSession: true });
+  assert.notEqual(second.attemptId, first.attemptId);
+  assert.equal(children.length, 2);
+  assert.equal(children[0].exitCode, 0, 'the previous native callback generation must be reaped first');
+  assert.deepEqual(children[1].commands[0].params, { attemptId: second.attemptId, expectedSelfId: '123456', restoreSession: false }, 'refresh bypasses a stalled cached restore without changing the pinned account');
+  assert.deepEqual(children[1].commands.map(command => command.method), ['prepare', 'connect', 'requestQr']);
 });
 
 test('a concurrent refresh withdraws an in-flight attempt before its delayed response', async t => {
@@ -484,3 +606,11 @@ for (const [kind, malformedError] of [['array', []], ['string', 'RESOURCE_INVALI
     assert.equal(runtime.status({ authenticatedDetail: true }).qr, null);
   });
 }
+
+test('process exit diagnostics retain only the numeric cause before the attempt is revoked', async t => {
+  const diagnostics=[];const {runtime,children}=manager(t,{onDiagnostic:value=>diagnostics.push(value)});
+  const attempt=await runtime.begin({ownerAction:true});
+  children[0].emit('exit',null,'SIGABRT');await tick();
+  assert.deepEqual(diagnostics.at(-1),{attemptId:attempt.attemptId,phase:'process_exit',elapsedMs:diagnostics.at(-1).elapsedMs,code:-6});
+  assert.equal(runtime.status().connected,false);
+});

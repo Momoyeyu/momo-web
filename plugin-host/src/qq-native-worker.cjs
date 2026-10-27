@@ -11,14 +11,19 @@ const issue = code => Object.assign(new Error(code), { code });
 const safeAttempt = value => typeof value === 'string' && /^[A-Za-z0-9-]{1,100}$/.test(value);
 
 function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = () => {} }) {
+  const startedAt=now();
   let attemptId = null, expectedSelfId = null, active = false, prepared = false, nativeOnline = false, sessionReady = false;
   let engine, login, startup, session, self, connected = false, connectResolve;
   let connectPromise, stopped = false, identityCheck = null;
+  let restoreSession = true, transportReady = false, restoring = false, qrRequested = false;
   const seen = new Set(), outgoing = new Map();
   const emit = (event, data) => send({ event, data: { attemptId, ...data } });
   const state = (status, code) => { if (active) emit('state', { status, ...(code ? { code } : {}) }); };
   const bound = callback => (...args) => { if (active && !stopped) return callback(...args); };
   const notify = () => {};
+  // Original, finite milestones only. Never include a native callback payload,
+  // account identifier, QR code, path, ticket or arbitrary error message.
+  const diagnostic = (phase, code) => { try { send({event:'diagnostic',data:{attemptId,phase,elapsedMs:Math.min(86400000,Math.max(0,now()-startedAt)),...(Number.isSafeInteger(code)?{code}:{})}}); } catch {} };
   const requireAttempt = value => { if (!active || stopped || value !== attemptId) throw issue('ATTEMPT_CANCELLED'); };
   const wire = data => send({ event: 'onebot', data });
   const isFriend = uid => { try { return session.getBuddyService().isBuddy(uid) === true; } catch { return false; } };
@@ -49,27 +54,40 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     }
   }
   async function verifyIdentity() {
-    // Depending on startup timing the online notification may precede the
-    // listener. Read the native session status as well; transport alone is not
-    // proof that an account logged in.
-    if (active && self && sessionReady && session.getMSFService().getMsfStatus?.() === 2) nativeOnline = true;
+    // Only the typed onMSFStatusChange callback establishes connectivity. The
+    // similarly named getter has a different, undocumented numeric contract;
+    // a stale getter must never override an explicit offline notification.
     if (!active || !self || !nativeOnline || !sessionReady || connected || identityCheck) return;
     identityCheck = (async () => {
+      diagnostic('identity_begin');
       const mapped = await session.getProfileService().getUinByUid('momo-self-verification', [self.uid]);
       if (!active || !nativeOnline || !sessionReady) return;
       if (!(mapped instanceof Map) || String(mapped.get(self.uid) ?? '') !== self.uin) { fail('IDENTITY_UNVERIFIED'); return; }
       session.getMsgService().addKernelMsgListener({ onRecvMsg: incoming, onMsgInfoListUpdate: messageStatus, onAddSendMsg: notify, onMsgSendError: notify, onKickedOffLine: bound(() => { connected = false; state('disconnected'); active = false; }) });
       await onIdentity({ selfId: self.uin, uid: self.uid });
       if (!active || !nativeOnline || !sessionReady) return;
+      diagnostic('identity_end');
       connected = true; emit('connected', { selfId: self.uin });
     })().catch(() => fail('IDENTITY_UNVERIFIED')).finally(() => { identityCheck = null; });
     await identityCheck;
   }
   function authenticate(result) {
+    restoring = false;
+    diagnostic('qr_authenticated');
     if (!isId(result?.uin) || !isUid(result?.uid)) { fail('IDENTITY_UNVERIFIED'); return; }
     if (expectedSelfId && result.uin !== expectedSelfId) { fail('ACCOUNT_MISMATCH'); return; }
     if (self) { if (self.uin !== result.uin || self.uid !== result.uid) fail('IDENTITY_UNVERIFIED'); return; }
-    self = { uin: result.uin, uid: result.uid }; state('verifying');
+    self = { uin: result.uin, uid: result.uid };
+    emit('state', { status: 'verifying', authenticated: true });
+    const authenticatedSelf = self;
+    // Native success callbacks only report login. Initialize on the next event
+    // loop turn, after the native login callback has fully unwound.
+    setImmediate(() => {
+      if (!active || stopped || self !== authenticatedSelf) return;
+      try { initializeSession(); } catch { fail('NATIVE_SESSION_FAILED'); }
+    });
+  }
+  function initializeSession() {
     const guidRaw = login.getMachineGuid();
     if (typeof guidRaw !== 'string' || !/^[a-fA-F0-9]{32}$/.test(guidRaw)) { fail('IDENTITY_UNVERIFIED'); return; }
     const guid = [guidRaw.slice(0, 8), guidRaw.slice(8, 12), guidRaw.slice(12, 16), guidRaw.slice(16, 20), guidRaw.slice(20)].join('-');
@@ -81,19 +99,27 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
       deviceInfo: { guid, buildVer: PIN.fullVersion, localId: 2052, devName: os.hostname(), devType: 'Mac', vendorName: '', osVer: os.release(), vendorOsName: 'macOS', setMute: false, vendorType: 0 },
       deviceConfig: '{"appearance":{"isSplitViewMode":true},"msg":{}}',
     };
+    diagnostic('session_init');
     session.init(sessionConfig,
-      { onMSFStatusChange: bound(status => { nativeOnline = status === 2; if (!nativeOnline && connected) { connected = false; state('disconnected'); } void verifyIdentity(); }), onMSFSsoError: bound(() => fail('NATIVE_NETWORK_FAILED')), getGroupCode: notify },
+      { onMSFStatusChange: bound(status => { diagnostic('msf_notification',status); nativeOnline = status === 2; if (!nativeOnline && connected) { connected = false; state('disconnected'); } void verifyIdentity(); }), onMSFSsoError: bound(code => {diagnostic('native_failure',code);fail('NATIVE_NETWORK_FAILED');}), getGroupCode: notify },
       // Optional UI notifications only. No synthetic signing or success reply.
       { dispatchRequest: notify, dispatchCall: notify, dispatchCallWithJson: notify },
-      { onNTSessionCreate: notify, onGProSessionCreate: notify, onSessionInitComplete: bound(() => { sessionReady = true; void verifyIdentity(); }), onOpentelemetryInit: bound(info => { if (info?.is_init !== true) { fail('NATIVE_SESSION_FAILED'); return; } sessionReady = true; void verifyIdentity(); }), onUserOnlineResult: notify, onGetSelfTinyId: notify });
-    startup.start();
+      { onNTSessionCreate: notify, onGProSessionCreate: notify, onSessionInitComplete: bound(() => { diagnostic('session_ready');sessionReady = true; void verifyIdentity(); }), onOpentelemetryInit: bound(info => { diagnostic('telemetry_ready',info?.is_init===true?1:0);if (info?.is_init !== true) { fail('NATIVE_SESSION_FAILED'); return; } sessionReady = true; void verifyIdentity(); }), onUserOnlineResult: notify, onGetSelfTinyId: notify });
+    diagnostic('session_configured');
+    startup.start(); diagnostic('startup_started');
   }
-  function prepare(value, expected) {
-    if (!safeAttempt(value)) throw issue('INPUT');
+  function requestQr() {
+    if (!active || self || restoring || qrRequested) return;
+    qrRequested = true; state('qr_pending'); diagnostic('qr_request');
+    if (login.getQRCodePicture() !== true) throw issue('NATIVE_QR_FAILED');
+  }
+  function prepare(value, expected, restore = true) {
+    if (!safeAttempt(value) || typeof restore !== 'boolean') throw issue('INPUT');
     if (expected !== undefined && expected !== null && !isId(expected)) throw issue('INPUT');
     if (attemptId && value !== attemptId) throw issue('FRESH_PROCESS_REQUIRED');
     if (prepared) { requireAttempt(value); return { attemptId }; }
-    attemptId = value; expectedSelfId = expected ?? null; active = true; prepared = true;
+    attemptId = value; expectedSelfId = expected ?? null; restoreSession = restore; active = true; prepared = true;
+    diagnostic('prepare');
     engine = api.NodeIQQNTWrapperEngine.get(); login = api.NodeIKernelLoginService.get();
     startup = api.NodeIQQNTStartupSessionWrapper.create(); session = api.NodeIQQNTWrapperSession.getNTWrapperSession('nt_1');
     const dataGlobal = path.join(dataRoot, 'global');
@@ -102,30 +128,49 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     login.initConfig({ machineId: '', appid: PIN.appid, platVer: os.release(), commonPath: dataGlobal, clientVer: PIN.fullVersion, hostName: os.hostname(), externalVersion: false });
     const listener = Object.fromEntries(['onLoginConnecting', 'onQRCodeLoginPollingStarted', 'onLogoutFailed', 'onLoginRecordUpdate', 'onLoginState'].map(name => [name, notify]));
     listener.onLoginConnected = bound(() => {
-      // Resume only the explicitly bound account, using this plugin's private
-      // credential store. A missing/revoked ticket falls back to the QR flow.
+      if (transportReady) return;
+      transportReady = true;
+      diagnostic('transport_connected');
+      restoring = restoreSession && !!expectedSelfId && typeof login.getLoginList === 'function' && typeof login.quickLoginWithUin === 'function';
+      if (restoring) state('verifying');
+      // This ACK proves transport only. Cached native APIs may settle after
+      // authentication, or never settle; neither may hold a control request.
+      connectResolve?.({ attemptId }); connectResolve = null;
+      if (!restoring) return;
       void (async () => {
-        if (!expectedSelfId || typeof login.getLoginList !== 'function') return;
+        diagnostic('cached_list_begin');
         const records = await login.getLoginList();
-        if (!active) return;
+        if (!active || self) return;
+        diagnostic('cached_list_end');
         const account = records?.LocalLoginInfoList?.find(item => item.uin === expectedSelfId && item.isQuickLogin === true && isUid(item.uid));
-        if (!account) return;
+        if (!account) { restoring = false; requestQr(); return; }
+        diagnostic('cached_login_begin');
         const result = await login.quickLoginWithUin(expectedSelfId);
-        if (active && result?.result === '0') authenticate(account);
-      })().catch(() => {}).finally(() => { connectResolve?.({ attemptId }); connectResolve = null; });
+        if (!active) return;
+        diagnostic('cached_login_end', typeof result?.result === 'string' && /^-?\d{1,10}$/.test(result.result) ? Number(result.result) : undefined);
+        // Only onQRCodeLoginSucceed can establish the actual identity. Cached
+        // metadata plus an accepted quick-login call is not authentication.
+        if (!self && (result?.result !== '0' || result?.loginErrorInfo?.errMsg)) { restoring = false; requestQr(); }
+      })().catch(() => {
+        if (!active || self) return;
+        diagnostic('cached_login_failure'); restoring = false;
+        try { requestQr(); } catch { fail('NATIVE_QR_FAILED'); }
+      });
     });
     listener.onLoginDisConnected = bound(() => { connected = false; state('disconnected'); active = false; });
     listener.onQRCodeGetPicture = bound(value => {
+      if (self) return;
+      diagnostic('qr_received');
       const base64 = typeof value?.pngBase64QrcodeData === 'string' ? value.pngBase64QrcodeData.replace(/^data:image\/png;base64,/, '') : '';
       if (!/^[A-Za-z0-9+/]+={0,2}$/.test(base64) || base64.length > 384 * 1024) { fail('QR_INVALID'); return; }
       const bytes = Buffer.from(base64, 'base64');
       if (bytes.length <= 8 || !bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) { fail('QR_INVALID'); return; }
       emit('qr', { dataUrl: 'data:image/png;base64,' + base64, expiresAt: now() + 90_000 });
     });
-    listener.onQRCodeSessionUserScaned = bound(() => state('awaiting_confirmation'));
+    listener.onQRCodeSessionUserScaned = bound(() => {if (self) return;diagnostic('qr_scanned');state('awaiting_confirmation');});
     listener.onQRCodeLoginSucceed = bound(result => { try { authenticate(result); } catch { fail('NATIVE_SESSION_FAILED'); } });
-    listener.onQRCodeSessionFailed = bound(() => { if (!self) { state('expired'); active = false; } });
-    for (const name of ['onLoginFailed', 'onLogoutSucceed', 'onUserLoggedIn', 'onQRCodeSessionQuickLoginFailed', 'onPasswordLoginFailed', 'OnConfirmUnusualDeviceFailed', 'onQQLoginNumLimited']) listener[name] = bound(() => fail('NATIVE_LOGIN_FAILED'));
+    listener.onQRCodeSessionFailed = bound((_type,code) => {diagnostic('qr_failure',code);if (!self) { state('expired'); active = false; } });
+    for (const name of ['onLoginFailed', 'onLogoutSucceed', 'onUserLoggedIn', 'onQRCodeSessionQuickLoginFailed', 'onPasswordLoginFailed', 'OnConfirmUnusualDeviceFailed', 'onQQLoginNumLimited']) listener[name] = bound(code => {diagnostic('login_failure',code);fail('NATIVE_LOGIN_FAILED');});
     login.addKernelLoginListener(listener);
     return { attemptId };
   }
@@ -164,7 +209,7 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
   }
   return {
     async request(method, params = {}) {
-      if (method === 'prepare') return prepare(params.attemptId, params.expectedSelfId);
+      if (method === 'prepare') return prepare(params.attemptId, params.expectedSelfId, params.restoreSession);
       if (method === 'onebot') return onebot(params);
       if (method === 'status') return { attemptId, connected, selfId: connected ? self.uin : null };
       if (method === 'cancel' || method === 'stop') {
@@ -179,10 +224,11 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
       if (method === 'connect') {
         if (connectPromise) return connectPromise;
         connectPromise = new Promise(resolve => { connectResolve = resolve; });
+        diagnostic('transport_connect');
         if (login.connect() !== true) throw issue('NATIVE_CONNECT_FAILED');
         return connectPromise;
       }
-      if (method === 'requestQr') { if (!self && login.getQRCodePicture() !== true) throw issue('NATIVE_QR_FAILED'); return { attemptId }; }
+      if (method === 'requestQr') { requestQr(); return { attemptId }; }
       throw issue('METHOD');
     },
   };

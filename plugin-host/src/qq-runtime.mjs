@@ -6,6 +6,24 @@ const PREFIX = 'MOMO_QQ_IPC ';
 const safeId = value => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value);
 const bounded = (value, maximum = 4096) => typeof value === 'string' && value.length <= maximum && !value.includes('\0');
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+const workerDiagnosticPhases = new Set([
+  'prepare', 'transport_connect', 'transport_connected', 'cached_list_begin', 'cached_list_end',
+  'cached_login_begin', 'cached_login_end', 'qr_request', 'qr_received', 'qr_scanned',
+  'qr_authenticated', 'session_init', 'session_configured', 'startup_started', 'session_ready', 'telemetry_ready', 'msf_status', 'msf_notification', 'msf_snapshot',
+  'identity_begin', 'identity_end', 'native_failure', 'login_failure', 'qr_failure', 'cached_login_failure',
+]);
+const diagnosticPhases = new Set([...workerDiagnosticPhases, 'resource_begin', 'resource_ready', 'process_started', 'process_exit', 'request_timeout']);
+const diagnosticFields = new Set(['attemptId', 'phase', 'elapsedMs', 'code']);
+const diagnosticLimit = 64;
+
+/** An internal timing record deliberately has no slot for native text or data. */
+export function sanitizeQQDiagnostic(value) {
+  if (!object(value) || Object.keys(value).some(key => !diagnosticFields.has(key))) return null;
+  const { attemptId, phase, elapsedMs } = value;
+  if (typeof attemptId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(attemptId) || !diagnosticPhases.has(phase) || !Number.isFinite(elapsedMs) || elapsedMs < 0 || elapsedMs > 86400000) return null;
+  if (Object.hasOwn(value, 'code') && !Number.isSafeInteger(value.code)) return null;
+  return Object.freeze({ attemptId, phase, elapsedMs, ...(Object.hasOwn(value, 'code') ? { code: value.code } : {}) });
+}
 const messages = Object.freeze({
   OWNER_ACTION_REQUIRED: 'QQ login requires an explicit local owner action',
   RESOURCE_UNAVAILABLE: 'Managed QQ resources are not available',
@@ -52,7 +70,7 @@ function preparedTransport(invocation) {
 
 /** Owns one QQ engine independently of channel policy and message adapters. */
 export class QQRuntimeManager {
-  #createTransport; #prepareInvocation; #forgetSession; #onState; #now;
+  #createTransport; #prepareInvocation; #forgetSession; #onState; #onDiagnostic; #now;
   #requestTimeout; #stopTimeout; #phaseTimeout; #maxFrameBytes;
   #child = null; #starting = null; #stopping = null; #forgetting = false;
   #state = 'idle'; #error = null; #attempt = null; #expectedSelfId = null; #actualSelfId = null; #qr = null; #qrTimer = null;
@@ -60,12 +78,14 @@ export class QQRuntimeManager {
   #killTree = null; #treeStopped = null; #parentExited = false;
   #nativeObservers = new Set(); #channelEchoes = new Map();
   #phaseTimer = null; #phaseStatus = null; #phaseAttempt = null;
+  #diagnosticCount = 0; #attemptStartedAt = 0;
+  #nativeAuthenticated = false;
 
-  constructor({ createTransport, prepareInvocation, forgetSession, onState = () => {}, now = Date.now, requestTimeoutMs = 10000, stopTimeoutMs = 1000, phaseTimeoutMs = 30000, maxFrameBytes = 512 * 1024 } = {}) {
+  constructor({ createTransport, prepareInvocation, forgetSession, onState = () => {}, onDiagnostic = () => {}, now = Date.now, requestTimeoutMs = 10000, stopTimeoutMs = 1000, phaseTimeoutMs = 30000, maxFrameBytes = 512 * 1024 } = {}) {
     this.#createTransport = createTransport;
     this.#prepareInvocation = prepareInvocation;
     this.#forgetSession = forgetSession;
-    this.#onState = onState; this.#now = now;
+    this.#onState = onState; this.#onDiagnostic = onDiagnostic; this.#now = now;
     this.#requestTimeout = Math.max(10, Math.min(Number(requestTimeoutMs) || 10000, 30000));
     this.#stopTimeout = Math.max(10, Math.min(Number(stopTimeoutMs) || 1000, 5000));
     this.#phaseTimeout = Math.max(10, Math.min(Number(phaseTimeoutMs) || 30000, 90000));
@@ -120,6 +140,10 @@ export class QQRuntimeManager {
   }
 
   async begin({ ownerAction = false, expectedSelfId } = {}) {
+    return this.#begin({ ownerAction, expectedSelfId }, true);
+  }
+
+  async #begin({ ownerAction, expectedSelfId }, restoreSession) {
     this.#owner(ownerAction);
     if (expectedSelfId !== undefined && expectedSelfId !== null && !safeId(expectedSelfId)) throw failure('INPUT');
     if (this.#state === 'connected') {
@@ -136,11 +160,12 @@ export class QQRuntimeManager {
     if (revision !== this.#loginRevision) throw failure('ATTEMPT_CANCELLED');
     if (this.#unquiescent || this.#child || this.#starting || this.#forgetting) throw failure('RUNTIME_NOT_QUIESCENT');
     if (expectedSelfId !== undefined) this.#expectedSelfId = expectedSelfId;
-    const attemptId = randomUUID(); this.#attempt = attemptId; this.#actualSelfId = null;
+    const attemptId = randomUUID(); this.#attempt = attemptId; this.#actualSelfId = null; this.#nativeAuthenticated = false;
+    this.#diagnosticCount = 0; this.#attemptStartedAt = this.#now();
     this.#transition('preparing');
     try {
       await this.#ensureStarted(); this.#assertAttempt(attemptId);
-      await this.#request('prepare', { attemptId, expectedSelfId: this.#expectedSelfId }); this.#assertAttempt(attemptId);
+      await this.#request('prepare', { attemptId, expectedSelfId: this.#expectedSelfId, restoreSession }); this.#assertAttempt(attemptId);
       this.#transition('connecting');
       this.#applyResult(await this.#request('connect', { attemptId }), attemptId); this.#assertAttempt(attemptId);
       if (this.#state !== 'connected') {
@@ -155,7 +180,7 @@ export class QQRuntimeManager {
     }
   }
 
-  async refreshQR({ ownerAction = false } = {}) { return this.begin({ ownerAction, expectedSelfId: this.#expectedSelfId }); }
+  async refreshQR({ ownerAction = false } = {}) { return this.#begin({ ownerAction, expectedSelfId: this.#expectedSelfId }, false); }
 
   async cancel() {
     this.#loginRevision++;
@@ -212,6 +237,7 @@ export class QQRuntimeManager {
     this.#phaseTimer = setTimeout(() => {
       if (this.#attempt !== attemptId) return;
       const revision = this.#loginRevision;
+      this.#diagnostic('request_timeout', attemptId);
       this.#fail('RUNTIME_TIMEOUT');
       // No business command can have been admitted before authentication.
       // Stop a late background authentication rather than only hiding its QR.
@@ -222,12 +248,23 @@ export class QQRuntimeManager {
     this.#phaseTimer.unref?.();
   }
   #notify() { try { this.#onState(this.status()); } catch { /* Observers cannot alter ownership. */ } }
+  #acceptDiagnostic(value) {
+    const record = sanitizeQQDiagnostic(value);
+    if (!record || record.attemptId !== this.#attempt || this.#unquiescent || this.#stopping || this.#diagnosticCount >= diagnosticLimit) return;
+    this.#diagnosticCount++;
+    try { Promise.resolve(this.#onDiagnostic(record)).catch(() => {}); }
+    catch { /* A diagnostic sink cannot alter authentication or child ownership. */ }
+  }
+  #diagnostic(phase, attemptId, generation = this.#generation, code) {
+    if (generation !== this.#generation || attemptId !== this.#attempt) return;
+    this.#acceptDiagnostic({ attemptId, phase, elapsedMs: Math.max(0, Math.min(this.#now() - this.#attemptStartedAt, 86400000)), ...(Number.isSafeInteger(code) ? { code } : {}) });
+  }
   #clearQR() { this.#qr = null; clearTimeout(this.#qrTimer); this.#qrTimer = null; }
   #expireQR() {
     if (this.#qr && this.#qr.expiresAt <= this.#now()) { this.#revoke('ATTEMPT_CANCELLED'); if (this.#state !== 'connected') this.#state = 'expired'; }
   }
   #revoke(code) {
-    const previous = this.#attempt; this.#attempt = null; this.#clearQR(); this.#clearPhase();
+    const previous = this.#attempt; this.#attempt = null; this.#nativeAuthenticated = false; this.#clearQR(); this.#clearPhase();
     for (const [id, pending] of this.#pending) if (pending.attemptId === previous && pending.method !== 'stop') { this.#pending.delete(id); clearTimeout(pending.timer); pending.reject(failure(code)); }
   }
   #fail(code) {
@@ -238,13 +275,16 @@ export class QQRuntimeManager {
     if (this.#child) return;
     if (this.#starting) return this.#starting;
     const generation = ++this.#generation; this.#cancelStart = false;
+    const attemptId = this.#attempt;
     const starting = (async () => {
       let invocation;
+      this.#diagnostic('resource_begin', attemptId, generation);
       if (this.#prepareInvocation) {
         try { invocation = await this.#prepareInvocation(); }
         catch (cause) { throw sanitizedError(cause); }
       } else if (!this.#createTransport) throw failure('RESOURCE_UNAVAILABLE');
       if (this.#cancelStart) throw failure('RUNTIME_STOPPED');
+      this.#diagnostic('resource_ready', attemptId, generation);
       const transport = await (this.#createTransport ? this.#createTransport(invocation) : preparedTransport(invocation));
       const child = transport?.child ?? transport;
       if (!child || !child.stdin?.write || !child.stdout?.on || !child.stderr?.on || !child.on || !child.kill) { try { child?.kill?.('SIGKILL'); } catch {} throw failure('RUNTIME_FAILED'); }
@@ -255,6 +295,7 @@ export class QQRuntimeManager {
       this.#killTree = transport?.killTree ?? (signal => child.kill(signal));
       this.#treeStopped = transport?.isTreeStopped ?? (() => this.#parentExited);
       this.#observe(child, generation);
+      this.#diagnostic('process_started', attemptId, generation);
       if (this.#cancelStart) { void this.stop(); throw failure('RUNTIME_STOPPED'); }
     })();
     this.#starting = starting;
@@ -295,8 +336,10 @@ export class QQRuntimeManager {
     child.stdout.on('error', () => { if (current()) this.#fail('RUNTIME_FAILED'); });
     child.stderr.on('error', () => { if (current()) this.#fail('RUNTIME_FAILED'); });
     child.on('error', () => { if (current()) this.#fail('RUNTIME_FAILED'); });
-    const close = () => {
+    const close = (code, signal) => {
       if (!current()) return;
+      const exitCode = Number.isSafeInteger(code) ? code : ({ SIGABRT: -6, SIGSEGV: -11, SIGILL: -4, SIGTRAP: -5, SIGTERM: -15, SIGKILL: -9 })[signal];
+      this.#diagnostic('process_exit', this.#attempt, generation, exitCode);
       this.#parentExited = true; line = Buffer.alloc(0);
       for (const [id, pending] of this.#pending) { this.#pending.delete(id); clearTimeout(pending.timer); pending.reject(failure('RUNTIME_STOPPED')); }
       this.#revoke('RUNTIME_STOPPED'); this.#actualSelfId = null;
@@ -314,7 +357,10 @@ export class QQRuntimeManager {
     if (!child || this.#pending.size >= 32) return Promise.reject(failure('RUNTIME_FAILED'));
     const id = randomUUID();
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { this.#pending.delete(id); reject(failure('RUNTIME_TIMEOUT')); }, this.#requestTimeout);
+      const timer = setTimeout(() => {
+        this.#diagnostic('request_timeout', params.attemptId);
+        this.#pending.delete(id); reject(failure('RUNTIME_TIMEOUT'));
+      }, this.#requestTimeout);
       this.#pending.set(id, { method, attemptId: params.attemptId, resolve, reject, timer });
       try {
         onDispatch();
@@ -331,6 +377,10 @@ export class QQRuntimeManager {
     if (child !== this.#child || !raw.startsWith(PREFIX)) return;
     let message; try { message = JSON.parse(raw.slice(PREFIX.length)); } catch { return; }
     if (!object(message)) return;
+    if (message.event === 'diagnostic') {
+      if (workerDiagnosticPhases.has(message.data?.phase)) this.#acceptDiagnostic(message.data);
+      return;
+    }
     if (message.event === 'onebot') { this.#onebot(message.data); return; }
     if (typeof message.id === 'string') {
       const pending = this.#pending.get(message.id); if (!pending) return;
@@ -349,6 +399,10 @@ export class QQRuntimeManager {
     else if (message.event === 'connected') this.#acceptIdentity(data);
     else if (message.event === 'state') {
       if (this.#state === 'connected' && !['disconnected', 'error'].includes(data.status)) return;
+      if (data.status === 'verifying' && data.authenticated === true) this.#nativeAuthenticated = true;
+      // Cached recovery may explicitly fall back to QR. Only genuine native
+      // authentication makes verification monotonic for this owned attempt.
+      if (this.#nativeAuthenticated && this.#state === 'verifying' && ['qr_pending', 'awaiting_confirmation'].includes(data.status)) return;
       if (['qr_pending', 'awaiting_confirmation', 'verifying'].includes(data.status)) this.#transition(data.status);
       else if (data.status === 'expired') { this.#revoke('ATTEMPT_CANCELLED'); this.#transition('expired'); }
       else if (data.status === 'error') this.#fail(knownErrorCode(data.code));

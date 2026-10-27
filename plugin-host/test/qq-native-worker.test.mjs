@@ -13,8 +13,8 @@ function fixture() {
   const login = { initConfig: config => calls.push(['login', config]), addKernelLoginListener: listener => { loginListener=listener; }, connect: () => { calls.push(['connect']); queueMicrotask(() => loginListener.onLoginConnected()); return true; }, getQRCodePicture: () => { calls.push(['qr']); return true; }, abortPolling: () => {}, cancel: () => {}, getMachineGuid: () => '0123456789abcdef0123456789abcdef' };
   const api = { NodeIQQNTWrapperEngine: { get: () => ({ initWithDeskTopConfig: config => calls.push(['engine', config]) }) }, NodeIKernelLoginService: { get: () => login }, NodeIQQNTStartupSessionWrapper: { create: () => ({ start: () => calls.push(['start']) }) }, NodeIQQNTWrapperSession: { getNTWrapperSession: () => session } };
   const worker = createNativeWorker({ api, dataRoot: '/private/tmp/momo-worker-test', send: frame => frames.push(frame), now: () => 1000 });
-  const auth = async () => { await worker.request('prepare', { attemptId: 'a' }); await worker.request('connect', { attemptId: 'a' }); loginListener.onQRCodeLoginSucceed({ uin: '123456', uid: 'u_self' }); await Promise.resolve(); sessionListener.onOpentelemetryInit({ is_init: true }); depends.onMSFStatusChange(2, 1); await new Promise(resolve => setImmediate(resolve)); };
-  return { worker, frames, calls, profile, buddy, msg, nativeLogin:login, login: () => loginListener, session: () => sessionListener, depends: () => depends, messages: () => msgListener, auth };
+  const auth = async () => { await worker.request('prepare', { attemptId: 'a' }); await worker.request('connect', { attemptId: 'a' }); loginListener.onQRCodeLoginSucceed({ uin: '123456', uid: 'u_self' }); await new Promise(r=>setImmediate(r)); sessionListener.onOpentelemetryInit({ is_init: true }); depends.onMSFStatusChange(2, 1); await new Promise(resolve => setImmediate(resolve)); };
+  return { worker, frames, calls, profile, buddy, msg, nativeLogin:login, nativeSession:session, login: () => loginListener, session: () => sessionListener, depends: () => depends, messages: () => msgListener, auth };
 }
 test('prepare initializes only explicit private paths and does not connect or request a QR', async () => {
   const f=fixture(); await f.worker.request('prepare',{attemptId:'a'});
@@ -40,7 +40,7 @@ test('one native process cannot reassign callback ownership to another attempt',
 });
 test('authentication requires session readiness, native online state and mapped self identity', async () => {
   const f=fixture(); await f.worker.request('prepare',{attemptId:'a'}); await f.worker.request('connect',{attemptId:'a'});
-  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'}); await Promise.resolve();
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'}); await new Promise(r=>setImmediate(r));
   assert.equal(f.frames.some(f=>f.event==='connected'),false);
   f.session().onOpentelemetryInit({is_init:true}); await Promise.resolve(); assert.equal(f.frames.some(f=>f.event==='connected'),false);
   f.depends().onMSFStatusChange(2,1); await new Promise(r=>setImmediate(r));
@@ -89,6 +89,7 @@ test('private cached login resumes only an explicitly pinned matching account', 
   await f.worker.request('requestQr',{attemptId:'a'});
   assert.equal(attempted,1); assert.equal(f.calls.some(c=>c[0]==='qr'),false);
   assert.equal(f.frames.some(frame=>frame.event==='connected'),false);
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});await new Promise(r=>setImmediate(r));
   f.session().onOpentelemetryInit({is_init:true});f.depends().onMSFStatusChange(2,1);await new Promise(r=>setImmediate(r));
   assert.equal(f.frames.at(-1).data.selfId,'123456');
 });
@@ -123,4 +124,100 @@ test('removing a friend during native correlation allocation prevents submission
   await new Promise(r=>setImmediate(r));f.buddy.isBuddy=()=>false;resolve('90001');
   await assert.rejects(pending,e=>e.code==='PEER_UNVERIFIED');
   assert.equal(f.calls.some(call=>call[0]==='send'),false);
+});
+test('phase diagnostics contain no native payload, account identity or QR material', async () => {
+  const f=fixture();await f.auth();f.login().onLoginFailed({ticket:'private-test-ticket',message:'private-native-detail'});
+  const events=f.frames.filter(frame=>frame.event==='diagnostic');
+  assert.ok(events.some(frame=>frame.data.phase==='session_init'));
+  assert.ok(events.some(frame=>frame.data.phase==='identity_end'));
+  assert.ok(events.every(frame=>Object.keys(frame.data).every(key=>['attemptId','phase','elapsedMs','code'].includes(key))));
+  assert.ok(!/private-test-ticket|private-native-detail|123456|u_self|base64/.test(JSON.stringify(events)));
+});
+
+const withinControlDeadline = promise => Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('transport ACK waited for cached login')), 30))]);
+test('cached-list recovery cannot hold the transport ACK or start a QR beside pending recovery', async () => {
+  const f=fixture();let resolve;
+  f.nativeLogin.getLoginList=()=>new Promise(r=>{resolve=r;});
+  f.nativeLogin.quickLoginWithUin=()=>{throw new Error('cancelled recovery must not run');};
+  await f.worker.request('prepare',{attemptId:'a',expectedSelfId:'123456'});
+  await withinControlDeadline(f.worker.request('connect',{attemptId:'a'}));
+  await f.worker.request('requestQr',{attemptId:'a'});
+  assert.equal(f.calls.some(c=>c[0]==='qr'),false);
+  await f.worker.request('cancel',{attemptId:'a'});
+  resolve({LocalLoginInfoList:[{uin:'123456',uid:'u_self',isQuickLogin:true}]});
+  await new Promise(r=>setImmediate(r));
+  assert.equal(f.frames.some(frame=>frame.event==='connected'),false);
+});
+test('a pending quick-login promise cannot block a genuine native authentication callback', async () => {
+  const f=fixture();
+  f.nativeLogin.getLoginList=async()=>({LocalLoginInfoList:[{uin:'123456',uid:'u_self',isQuickLogin:true}]});
+  f.nativeLogin.quickLoginWithUin=()=>new Promise(()=>{});
+  await f.worker.request('prepare',{attemptId:'a',expectedSelfId:'123456'});
+  await withinControlDeadline(f.worker.request('connect',{attemptId:'a'}));
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});await new Promise(r=>setImmediate(r));
+  f.session().onOpentelemetryInit({is_init:true});f.depends().onMSFStatusChange(2,1);
+  await new Promise(r=>setImmediate(r));
+  assert.equal((await f.worker.request('status')).connected,true);
+});
+test('explicit fresh QR never starts cached login and duplicate transport callbacks do not re-request it', async () => {
+  const f=fixture();let cacheCalls=0;
+  f.nativeLogin.getLoginList=()=>{cacheCalls++;return new Promise(()=>{});};
+  await f.worker.request('prepare',{attemptId:'a',expectedSelfId:'123456',restoreSession:false});
+  await withinControlDeadline(f.worker.request('connect',{attemptId:'a'}));
+  await f.worker.request('requestQr',{attemptId:'a'});f.login().onLoginConnected();
+  await f.worker.request('requestQr',{attemptId:'a'});
+  assert.equal(cacheCalls,0);assert.equal(f.calls.filter(c=>c[0]==='qr').length,1);
+});
+test('cached acceptance alone does not prove the authenticated account identity', async () => {
+  const f=fixture();
+  f.nativeLogin.getLoginList=async()=>({LocalLoginInfoList:[{uin:'123456',uid:'u_self',isQuickLogin:true}]});
+  f.nativeLogin.quickLoginWithUin=async()=>({result:'0'});
+  await f.worker.request('prepare',{attemptId:'a',expectedSelfId:'123456'});
+  await f.worker.request('connect',{attemptId:'a'});await new Promise(r=>setImmediate(r));
+  assert.equal(f.calls.some(c=>c[0]==='session'),false);
+});
+test('an explicit offline notification wins over a stale native status getter', async () => {
+  const f=fixture();let resolve;
+  f.nativeSession.getMSFService=()=>({getMsfStatus:()=>2});
+  f.profile.getUinByUid=()=>new Promise(r=>{resolve=r;});
+  await f.auth();f.depends().onMSFStatusChange(1,2);
+  resolve(new Map([['u_self','123456']]));await new Promise(r=>setImmediate(r));
+  assert.equal((await f.worker.request('status')).connected,false);
+});
+test('native success callback unwinds before session initialization and cancellation can withdraw it', async () => {
+  const f=fixture();
+  await f.worker.request('prepare',{attemptId:'a'});await f.worker.request('connect',{attemptId:'a'});
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});
+  assert.equal(f.calls.some(c=>c[0]==='session'),false);
+  await f.worker.request('cancel',{attemptId:'a'});await new Promise(r=>setImmediate(r));
+  assert.equal(f.calls.some(c=>c[0]==='session'),false);
+});
+test('late QR and scan callbacks cannot demote an authenticated initialization', async () => {
+  const f=fixture();await f.worker.request('prepare',{attemptId:'a'});await f.worker.request('connect',{attemptId:'a'});
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});
+  const count=f.frames.length;
+  f.login().onQRCodeSessionUserScaned();
+  f.login().onQRCodeGetPicture({pngBase64QrcodeData:Buffer.from([137,80,78,71,13,10,26,10,1]).toString('base64')});
+  assert.equal(f.frames.length,count);
+  await f.worker.request('cancel',{attemptId:'a'});
+});
+test('a quick-login error accompanying result zero falls back to a fresh QR without exposing the error', async () => {
+  const f=fixture();
+  f.nativeLogin.getLoginList=async()=>({LocalLoginInfoList:[{uin:'123456',uid:'u_self',isQuickLogin:true}]});
+  f.nativeLogin.quickLoginWithUin=async()=>({result:'0',loginErrorInfo:{errMsg:'private native explanation'}});
+  await f.worker.request('prepare',{attemptId:'a',expectedSelfId:'123456'});
+  await f.worker.request('connect',{attemptId:'a'});await new Promise(r=>setImmediate(r));
+  assert.equal(f.calls.filter(c=>c[0]==='qr').length,1);
+  assert.equal(JSON.stringify(f.frames).includes('private native explanation'),false);
+});
+test('genuine native authentication wins over a late cached-login error result', async () => {
+  const f=fixture();let resolve;
+  f.nativeLogin.getLoginList=async()=>({LocalLoginInfoList:[{uin:'123456',uid:'u_self',isQuickLogin:true}]});
+  f.nativeLogin.quickLoginWithUin=()=>new Promise(r=>{resolve=r;});
+  await f.worker.request('prepare',{attemptId:'a',expectedSelfId:'123456'});
+  await f.worker.request('connect',{attemptId:'a'});
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});
+  resolve({result:'0',loginErrorInfo:{errMsg:'private late explanation'}});await new Promise(r=>setImmediate(r));
+  assert.equal(f.calls.some(c=>c[0]==='qr'),false);
+  await f.worker.request('cancel',{attemptId:'a'});
 });

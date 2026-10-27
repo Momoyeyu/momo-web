@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, writeFile, readFile, chmod, realpath, rm, symlink } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
+import { mkdtemp, mkdir, writeFile, readFile, chmod, realpath, rm, symlink, lstat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -21,6 +21,47 @@ async function fixture(t) {
   return { privateRoot, resourceRoot, dataRoot, controlRoot, canaryPath, manifestPath };
 }
 async function prepare(config) { assert.equal(typeof module.prepareQQInvocation, 'function'); return module.prepareQQInvocation(config); }
+
+test('private diagnostics persist only the latest 64 sanitized phases across attempts', async t => {
+  assert.equal(typeof module.createQQDiagnosticRecorder, 'function');
+  const config = await fixture(t), record = module.createQQDiagnosticRecorder(config);
+  const first = randomUUID(), second = randomUUID();
+  const writes = [];
+  for (let index = 0; index < 100; index++) writes.push(record({ attemptId: index < 50 ? first : second, phase: 'msf_status', elapsedMs: index, code: 0 }));
+  assert.ok((await Promise.all(writes)).every(Boolean));
+  const path = join(config.controlRoot, 'diagnostics.json');
+  const entries = JSON.parse(await readFile(path, 'utf8'));
+  assert.equal(entries.length, 64);
+  assert.deepEqual(entries[0], { attemptId: first, phase: 'msf_status', elapsedMs: 36, code: 0 });
+  assert.deepEqual(entries.at(-1), { attemptId: second, phase: 'msf_status', elapsedMs: 99, code: 0 });
+  assert.equal((await lstat(path)).mode & 0o777, 0o600);
+  const before = await readFile(path, 'utf8');
+  for (const data of [
+    { attemptId: first, phase: 'qr_received', elapsedMs: 1, dataUrl: 'private-qr' },
+    { attemptId: first, phase: 'arbitrary-secret', elapsedMs: 1 },
+    { attemptId: first, phase: 'qr_received', elapsedMs: 1, code: 'secret-account' },
+    { attemptId: '123456', phase: 'qr_received', elapsedMs: 1 },
+    { attemptId: first, phase: 'qr_received', elapsedMs: Infinity },
+  ]) assert.equal(await record(data), false);
+  assert.equal(await readFile(path, 'utf8'), before);
+});
+
+test('private diagnostics refuse aliased or insecure files without following the target', async t => {
+  assert.equal(typeof module.createQQDiagnosticRecorder, 'function');
+  const config = await fixture(t), path = join(config.controlRoot, 'diagnostics.json');
+  const original = await readFile(config.canaryPath, 'utf8');
+  await symlink(config.canaryPath, path);
+  const record = module.createQQDiagnosticRecorder(config);
+  const entry = { attemptId: randomUUID(), phase: 'transport_connect', elapsedMs: 0 };
+  assert.equal(await record(entry), false);
+  assert.equal(await readFile(config.canaryPath, 'utf8'), original);
+  assert.equal((await lstat(path)).isSymbolicLink(), true);
+  await rm(path);
+  await writeFile(path, 'untrusted diagnostics', { mode: 0o666 });
+  await chmod(path, 0o666);
+  assert.equal(await record(entry), false);
+  assert.equal(await readFile(path, 'utf8'), 'untrusted diagnostics');
+});
 
 test('trusted installed assets produce only the fixed isolated native invocation', async t => {
   const config = await fixture(t), invocation = await prepare(config);

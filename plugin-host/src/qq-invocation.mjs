@@ -4,7 +4,7 @@ import { lstat, mkdir, open, realpath, rename, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, normalize, relative, sep } from 'node:path';
 import { qualifyQQResources } from './qq-resources.mjs';
-import { QQRuntimeManager, QQRuntimeError } from './qq-runtime.mjs';
+import { QQRuntimeManager, QQRuntimeError, sanitizeQQDiagnostic } from './qq-runtime.mjs';
 
 const fields = ['privateRoot', 'resourceRoot', 'manifestPath', 'dataRoot', 'controlRoot', 'canaryPath'];
 const valid = condition => { if (!condition) throw new QQRuntimeError('RESOURCE_INVALID'); };
@@ -80,10 +80,42 @@ export async function prepareQQInvocation(input) {
   } catch (cause) { throw new QQRuntimeError(cause?.code === 'ENOENT' ? 'RESOURCE_UNAVAILABLE' : 'RESOURCE_INVALID'); }
 }
 
+/** Internal-only, bounded timing evidence; never an account or native log sink. */
+export function createQQDiagnosticRecorder(input) {
+  const config = trustedConfig(input), path = join(config.controlRoot, 'diagnostics.json');
+  let records = [], dirty = false, writing = null;
+  return value => {
+    const record = sanitizeQQDiagnostic(value);
+    if (!record) return Promise.resolve(false);
+    records.push(record);
+    if (records.length > 64) records = records.slice(-64);
+    dirty = true;
+    if (!writing) {
+      // Coalesce callbacks while disk IO is pending instead of accumulating a
+      // promise or file write for each native notification.
+      writing = (async () => {
+        try {
+          while (dirty) {
+            dirty = false;
+            const snapshot = [...records];
+            await privateDirectory(config.privateRoot);
+            await privateDirectory(config.controlRoot);
+            await writeRunConfig(path, snapshot);
+          }
+          return true;
+        } catch { return false; }
+        finally { writing = null; }
+      })();
+    }
+    return writing;
+  };
+}
+
 export function createManagedQQRuntime(input) {
   const config = trustedConfig(input);
   return new QQRuntimeManager({
     prepareInvocation: () => prepareQQInvocation(config),
+    onDiagnostic: createQQDiagnosticRecorder(config),
     forgetSession: async () => {
       await privateDirectory(config.privateRoot);
       await privateDirectory(config.dataRoot);

@@ -18,6 +18,7 @@ export const ja: Dict = {
     "verified": "アカウント確認済み",
     "begin": "QR コードでログイン",
     "refresh": "QR コードを更新",
+    "fresh": "QR コードを再発行",
     "preparing": "準備中…",
     "cancel": "ログインを中止",
     "stop": "アカウントを切断",

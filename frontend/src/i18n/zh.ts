@@ -18,6 +18,7 @@ export const zh = {
     "verified": "账号已核验",
     "begin": "扫码登录",
     "refresh": "刷新二维码",
+    "fresh": "重新扫码",
     "preparing": "正在准备…",
     "cancel": "取消登录",
     "stop": "断开账号",
