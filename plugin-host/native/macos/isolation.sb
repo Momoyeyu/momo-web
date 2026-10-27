@@ -1,0 +1,24 @@
+(version 1)
+(allow default)
+; Only this dedicated QQ directory is reachable inside the real Home.
+(deny file-read* file-write*
+  (require-all (subpath (param "USER_HOME"))
+    (require-not (subpath (param "PRIVATE_ROOT")))
+    (require-not (require-any
+      (literal (param "ANCESTOR_0")) (literal (param "ANCESTOR_1"))
+      (literal (param "ANCESTOR_2")) (literal (param "ANCESTOR_3"))
+      (literal (param "ANCESTOR_4")) (literal (param "ANCESTOR_5"))
+      (literal (param "ANCESTOR_6")) (literal (param "ANCESTOR_7"))
+      (literal (param "ANCESTOR_8")) (literal (param "ANCESTOR_9"))
+      (literal (param "ANCESTOR_10")) (literal (param "ANCESTOR_11"))
+      (literal (param "ANCESTOR_12")) (literal (param "ANCESTOR_13"))
+      (literal (param "ANCESTOR_14")) (literal (param "ANCESTOR_15"))))))
+; Ancestors receive metadata only, never directory listing or file contents.
+(deny file-read-data file-write*
+  (require-all (subpath (param "USER_HOME"))
+    (require-not (subpath (param "PRIVATE_ROOT")))))
+(deny file-read* file-write* (subpath "/Applications/QQ.app"))
+(deny file-read* file-write* (literal (param "CANARY_PATH")))
+(deny network*)
+; QQ platform client only; the control transport uses inherited stdio, no listener.
+(allow network-outbound (remote tcp) (remote udp))

@@ -49,6 +49,7 @@ test('settings overlays and resource controls remain reachable in a small window
   await insideStage(page.getByRole('dialog'));
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '拓展', exact: true }).click();
+  await page.getByRole('tab', { name: 'MCP', exact: true }).click();
   await page.locator('.ext-panel .list-toolbar .icon-btn').click();
   await insideStage(page.getByRole('dialog'));
   await page.getByRole('button', { name: /从 JSON 填入/ }).click();
@@ -62,7 +63,8 @@ test('settings overlays and resource controls remain reachable in a small window
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByRole('listbox')).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await page.locator('.settings-pane:not([aria-hidden]) .panel').first().locator('.list-toolbar .icon-btn').click();
+  await page.getByRole('tab', { name: 'Live2D', exact: true }).click();
+  await page.getByRole('tabpanel', { name: 'Live2D', exact: true }).locator('.list-toolbar .icon-btn').click();
   await insideStage(page.getByRole('dialog'));
   await page.keyboard.press('Escape');
   await page.locator('.avatar-row').first().click();

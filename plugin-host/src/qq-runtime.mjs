@@ -53,19 +53,22 @@ function preparedTransport(invocation) {
 /** Owns one QQ engine independently of channel policy and message adapters. */
 export class QQRuntimeManager {
   #createTransport; #prepareInvocation; #forgetSession; #onState; #now;
-  #requestTimeout; #stopTimeout; #maxFrameBytes;
+  #requestTimeout; #stopTimeout; #phaseTimeout; #maxFrameBytes;
   #child = null; #starting = null; #stopping = null; #forgetting = false;
   #state = 'idle'; #error = null; #attempt = null; #expectedSelfId = null; #actualSelfId = null; #qr = null; #qrTimer = null;
-  #pending = new Map(); #generation = 0; #unquiescent = false; #cancelStart = false;
+  #pending = new Map(); #generation = 0; #loginRevision = 0; #unquiescent = false; #cancelStart = false;
   #killTree = null; #treeStopped = null; #parentExited = false;
+  #nativeObservers = new Set(); #channelEchoes = new Map();
+  #phaseTimer = null; #phaseStatus = null; #phaseAttempt = null;
 
-  constructor({ createTransport, prepareInvocation, forgetSession, onState = () => {}, now = Date.now, requestTimeoutMs = 10000, stopTimeoutMs = 1000, maxFrameBytes = 512 * 1024 } = {}) {
+  constructor({ createTransport, prepareInvocation, forgetSession, onState = () => {}, now = Date.now, requestTimeoutMs = 10000, stopTimeoutMs = 1000, phaseTimeoutMs = 30000, maxFrameBytes = 512 * 1024 } = {}) {
     this.#createTransport = createTransport;
     this.#prepareInvocation = prepareInvocation;
     this.#forgetSession = forgetSession;
     this.#onState = onState; this.#now = now;
     this.#requestTimeout = Math.max(10, Math.min(Number(requestTimeoutMs) || 10000, 30000));
     this.#stopTimeout = Math.max(10, Math.min(Number(stopTimeoutMs) || 1000, 5000));
+    this.#phaseTimeout = Math.max(10, Math.min(Number(phaseTimeoutMs) || 30000, 90000));
     this.#maxFrameBytes = Math.max(1024, Math.min(Number(maxFrameBytes) || 512 * 1024, 1024 * 1024));
   }
 
@@ -77,24 +80,71 @@ export class QQRuntimeManager {
     return state;
   }
 
+  onNativeEvent(callback) {
+    if (typeof callback !== 'function') throw failure('INPUT');
+    this.#nativeObservers.add(callback);
+    return () => this.#nativeObservers.delete(callback);
+  }
+
+  channelQuiescent() { return ![...this.#channelEchoes.values()].some(entry => entry.action === 'send_private_msg'); }
+
+  async requestChannel(action, params, echo) {
+    let submitted = false;
+    try {
+      if (this.#state !== 'connected' || !this.#actualSelfId || !this.#attempt || !this.#child || this.#parentExited || this.#unquiescent || this.#stopping) throw failure('RUNTIME_STOPPED');
+      if (!bounded(echo, 200) || !echo || this.#channelEchoes.has(echo) || this.#channelEchoes.size >= 1024 || !object(params)) throw failure('INPUT');
+      let arguments_;
+      if (action === 'get_login_info') arguments_ = {};
+      else if (action === 'send_private_msg' && safeId(params.user_id) && params.user_id !== this.#actualSelfId && bounded(params.message, 32000) && params.message.trim()) arguments_ = { user_id: params.user_id, message: params.message };
+      else throw failure('INPUT');
+      this.#channelEchoes.set(echo, { action, selfId: this.#actualSelfId, generation: this.#generation });
+      try {
+        // This is only a control acceptance. The channel adapter independently
+        // waits for the matching native OneBot delivery response below.
+        return await this.#request('onebot', { attemptId: this.#attempt, action, params: arguments_, echo }, () => { submitted = action === 'send_private_msg'; });
+      } catch (cause) { if (!submitted) this.#channelEchoes.delete(echo); throw cause; }
+    } catch (cause) { throw Object.assign(sanitizedError(cause), { submitted }); }
+  }
+
+  #onebot(data) {
+    if (!object(data)) return;
+    if (typeof data.echo === 'string') {
+      const pending = this.#channelEchoes.get(data.echo);
+      if (!pending || pending.generation !== this.#generation || !['ok', 'failed'].includes(data.status) || !Number.isInteger(data.retcode) || !object(data.data)) return;
+      if (pending.action === 'get_login_info' && data.status === 'ok' && String(data.data.user_id ?? '') !== pending.selfId) return;
+      this.#channelEchoes.delete(data.echo);
+    } else if (data.post_type !== 'message' || this.#state !== 'connected' || !this.#actualSelfId || String(data.self_id ?? '') !== this.#actualSelfId) return;
+    // Original operation correlation survives cancellation/disconnection while
+    // its owned child remains alive. New inbound messages require live auth.
+    for (const observer of this.#nativeObservers) { try { observer(structuredClone(data)); } catch {} }
+  }
+
   async begin({ ownerAction = false, expectedSelfId } = {}) {
     this.#owner(ownerAction);
     if (expectedSelfId !== undefined && expectedSelfId !== null && !safeId(expectedSelfId)) throw failure('INPUT');
-    if (this.#unquiescent || this.#stopping || this.#forgetting) throw failure('RUNTIME_NOT_QUIESCENT');
-    if (expectedSelfId !== undefined) this.#expectedSelfId = expectedSelfId;
-    const previous = this.#attempt;
+    if (this.#state === 'connected') {
+      if (expectedSelfId && expectedSelfId !== this.#actualSelfId) throw failure('ACCOUNT_MISMATCH');
+      return this.status();
+    }
+    if (this.#unquiescent || this.#forgetting) throw failure('RUNTIME_NOT_QUIESCENT');
+    const revision = ++this.#loginRevision;
     this.#revoke('ATTEMPT_CANCELLED');
+    // The native SDK's callbacks have no request ID. A worker therefore owns
+    // exactly one login attempt, and must be fully reaped before replacement.
+    if (this.#stopping) await this.#stopping;
+    else if (this.#child || this.#starting) await this.#stopRuntime();
+    if (revision !== this.#loginRevision) throw failure('ATTEMPT_CANCELLED');
+    if (this.#unquiescent || this.#child || this.#starting || this.#forgetting) throw failure('RUNTIME_NOT_QUIESCENT');
+    if (expectedSelfId !== undefined) this.#expectedSelfId = expectedSelfId;
     const attemptId = randomUUID(); this.#attempt = attemptId; this.#actualSelfId = null;
     this.#transition('preparing');
     try {
       await this.#ensureStarted(); this.#assertAttempt(attemptId);
-      if (previous) await this.#request('cancel', { attemptId: previous });
-      this.#assertAttempt(attemptId);
-      await this.#request('prepare', { attemptId }); this.#assertAttempt(attemptId);
+      await this.#request('prepare', { attemptId, expectedSelfId: this.#expectedSelfId }); this.#assertAttempt(attemptId);
       this.#transition('connecting');
       this.#applyResult(await this.#request('connect', { attemptId }), attemptId); this.#assertAttempt(attemptId);
       if (this.#state !== 'connected') {
-        this.#transition('qr_pending');
+        if (this.#state === 'connecting') this.#transition('qr_pending');
         this.#applyResult(await this.#request('requestQr', { attemptId }), attemptId); this.#assertAttempt(attemptId);
       }
       return this.status();
@@ -108,6 +158,7 @@ export class QQRuntimeManager {
   async refreshQR({ ownerAction = false } = {}) { return this.begin({ ownerAction, expectedSelfId: this.#expectedSelfId }); }
 
   async cancel() {
+    this.#loginRevision++;
     const attemptId = this.#attempt;
     this.#revoke('ATTEMPT_CANCELLED'); this.#actualSelfId = null; this.#transition('cancelled');
     if (attemptId && this.#child && !this.#stopping) {
@@ -118,6 +169,11 @@ export class QQRuntimeManager {
   }
 
   async stop() {
+    this.#loginRevision++;
+    return this.#stopRuntime();
+  }
+
+  async #stopRuntime() {
     this.#cancelStart = true; this.#revoke('RUNTIME_STOPPED'); this.#actualSelfId = null;
     if (this.#stopping) return this.#stopping;
     const stopping = this.#stopOwned(); this.#stopping = stopping;
@@ -141,14 +197,37 @@ export class QQRuntimeManager {
 
   #owner(allowed) { if (allowed !== true) throw failure('OWNER_ACTION_REQUIRED'); }
   #assertAttempt(attemptId) { if (attemptId !== this.#attempt || !this.#child || this.#unquiescent) throw failure('ATTEMPT_CANCELLED'); }
-  #transition(status, code = null) { this.#state = status; this.#error = code; this.#notify(); }
+  #transition(status, code = null) {
+    this.#state = status; this.#error = code;
+    if (status === 'verifying') this.#clearQR();
+    this.#watchPhase(); this.#notify();
+  }
+  #clearPhase() { clearTimeout(this.#phaseTimer); this.#phaseTimer = null; this.#phaseStatus = null; this.#phaseAttempt = null; }
+  #watchPhase() {
+    const pending = this.#attempt && (this.#state === 'verifying' || (this.#state === 'qr_pending' && !this.#qr));
+    if (!pending) { this.#clearPhase(); return; }
+    if (this.#phaseTimer && this.#phaseStatus === this.#state && this.#phaseAttempt === this.#attempt) return;
+    this.#clearPhase(); const attemptId = this.#attempt;
+    this.#phaseStatus = this.#state; this.#phaseAttempt = attemptId;
+    this.#phaseTimer = setTimeout(() => {
+      if (this.#attempt !== attemptId) return;
+      const revision = this.#loginRevision;
+      this.#fail('RUNTIME_TIMEOUT');
+      // No business command can have been admitted before authentication.
+      // Stop a late background authentication rather than only hiding its QR.
+      void this.#stopRuntime().then(result => {
+        if (this.#loginRevision === revision && !this.#attempt && result.executorQuiescent) this.#transition('error', 'RUNTIME_TIMEOUT');
+      });
+    }, this.#phaseTimeout);
+    this.#phaseTimer.unref?.();
+  }
   #notify() { try { this.#onState(this.status()); } catch { /* Observers cannot alter ownership. */ } }
   #clearQR() { this.#qr = null; clearTimeout(this.#qrTimer); this.#qrTimer = null; }
   #expireQR() {
-    if (this.#qr && this.#qr.expiresAt <= this.#now()) { this.#clearQR(); if (this.#state !== 'connected') this.#state = 'expired'; }
+    if (this.#qr && this.#qr.expiresAt <= this.#now()) { this.#revoke('ATTEMPT_CANCELLED'); if (this.#state !== 'connected') this.#state = 'expired'; }
   }
   #revoke(code) {
-    const previous = this.#attempt; this.#attempt = null; this.#clearQR();
+    const previous = this.#attempt; this.#attempt = null; this.#clearQR(); this.#clearPhase();
     for (const [id, pending] of this.#pending) if (pending.attemptId === previous && pending.method !== 'stop') { this.#pending.delete(id); clearTimeout(pending.timer); pending.reject(failure(code)); }
   }
   #fail(code) {
@@ -230,7 +309,7 @@ export class QQRuntimeManager {
     child.once('exit', close);
   }
 
-  #request(method, params) {
+  #request(method, params, onDispatch = () => {}) {
     const child = this.#child;
     if (!child || this.#pending.size >= 32) return Promise.reject(failure('RUNTIME_FAILED'));
     const id = randomUUID();
@@ -238,6 +317,7 @@ export class QQRuntimeManager {
       const timer = setTimeout(() => { this.#pending.delete(id); reject(failure('RUNTIME_TIMEOUT')); }, this.#requestTimeout);
       this.#pending.set(id, { method, attemptId: params.attemptId, resolve, reject, timer });
       try {
+        onDispatch();
         child.stdin.write(JSON.stringify({ id, method, params }) + '\n', error => {
           if (!error) return;
           const pending = this.#pending.get(id); if (!pending) return;
@@ -251,6 +331,7 @@ export class QQRuntimeManager {
     if (child !== this.#child || !raw.startsWith(PREFIX)) return;
     let message; try { message = JSON.parse(raw.slice(PREFIX.length)); } catch { return; }
     if (!object(message)) return;
+    if (message.event === 'onebot') { this.#onebot(message.data); return; }
     if (typeof message.id === 'string') {
       const pending = this.#pending.get(message.id); if (!pending) return;
       const hasError = Object.hasOwn(message, 'error');
@@ -269,8 +350,8 @@ export class QQRuntimeManager {
     else if (message.event === 'state') {
       if (this.#state === 'connected' && !['disconnected', 'error'].includes(data.status)) return;
       if (['qr_pending', 'awaiting_confirmation', 'verifying'].includes(data.status)) this.#transition(data.status);
-      else if (data.status === 'expired') { this.#clearQR(); this.#transition('expired'); }
-      else if (data.status === 'error') this.#fail('RUNTIME_FAILED');
+      else if (data.status === 'expired') { this.#revoke('ATTEMPT_CANCELLED'); this.#transition('expired'); }
+      else if (data.status === 'error') this.#fail(knownErrorCode(data.code));
       else if (data.status === 'disconnected') { this.#revoke('RUNTIME_STOPPED'); this.#actualSelfId = null; this.#transition('disconnected'); }
     }
     // Message execution and receipts remain owned by the existing QQChannel.
@@ -284,7 +365,7 @@ export class QQRuntimeManager {
     else if (result.dataUrl !== undefined) this.#acceptQR(result);
   }
   #acceptQR(data) {
-    if (this.#state === 'connected') return;
+    if (this.#state === 'connected' || this.#state === 'verifying') return;
     if (!bounded(data.dataUrl, Math.min(this.#maxFrameBytes - 256, 384 * 1024)) || !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(data.dataUrl) || !Number.isSafeInteger(data.expiresAt) || data.expiresAt <= this.#now() || data.expiresAt > this.#now() + 10 * 60 * 1000) return;
     this.#clearQR(); this.#qr = { dataUrl: data.dataUrl, expiresAt: data.expiresAt };
     const attemptId = this.#attempt;
@@ -303,6 +384,7 @@ export class QQRuntimeManager {
     let stopped = false; try { stopped = this.#treeStopped?.() === true; } catch {}
     if (!stopped) return false;
     this.#child = null; this.#killTree = null; this.#treeStopped = null; this.#unquiescent = false;
+    this.#channelEchoes.clear();
     return true;
   }
   async #waitStopped(child, duration) {

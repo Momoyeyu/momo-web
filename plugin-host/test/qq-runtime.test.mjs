@@ -56,6 +56,7 @@ test('a prepared child uses correlated commands and exposes QR only in authentic
   const detail = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
   const child = children[0];
   assert.deepEqual(child.commands.map(command => command.method), ['prepare', 'connect', 'requestQr']);
+  assert.deepEqual(child.commands[0].params, { attemptId: detail.attemptId, expectedSelfId: '123456' });
   assert.ok(child.commands.every(command => command.params.attemptId === detail.attemptId));
   assert.equal(runtime.status().status, 'qr_pending');
   assert.equal(runtime.status({ authenticatedDetail: true }).qr.dataUrl, QR);
@@ -66,12 +67,59 @@ test('a prepared child uses correlated commands and exposes QR only in authentic
   assert.equal(runtime.status({ authenticatedDetail: true }).qr, null);
 });
 
-test('refresh preserves the engine but fences cancelled and late attempt events', async t => {
+test('private cached-login verification is not overwritten by an artificial QR-pending state', async t => {
+  const { runtime } = manager(t, {}, { handle(command, child) {
+    if (command.method === 'connect') child.ipc({ event: 'state', data: { attemptId: command.params.attemptId, status: 'verifying' } });
+    if (command.method === 'requestQr') { child.reply(command); return true; }
+  } });
+  await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  assert.equal(runtime.status().status, 'verifying');
+});
+
+test('an acknowledged QR request without a callback times out and reaps the unauthenticated process', async t => {
+  const { runtime, children } = manager(t, { phaseTimeoutMs: 20 }, { handle(command, child) {
+    if (command.method === 'requestQr') { child.reply(command); return true; }
+  } });
+  const attempt = await runtime.begin({ ownerAction: true });
+  for (let i = 0; i < 100 && (runtime.status().running || !runtime.status().error); i++) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(runtime.status().error, 'RUNTIME_TIMEOUT');
+  assert.equal(runtime.status().running, false);
+  children[0].ipc({ event: 'connected', data: { attemptId: attempt.attemptId, selfId: '123456' } });
+  assert.equal(runtime.status().connected, false);
+});
+
+test('a worker account mismatch retains its safe actionable identity state', async t => {
+  const {runtime,children}=manager(t);
+  const attempt=await runtime.begin({ownerAction:true,expectedSelfId:'123456'});
+  children[0].ipc({event:'state',data:{attemptId:attempt.attemptId,status:'error',code:'ACCOUNT_MISMATCH'}});
+  assert.equal(runtime.status().status,'identity_mismatch');
+  assert.equal(runtime.status().error,'ACCOUNT_MISMATCH');
+  assert.equal(runtime.status({authenticatedDetail:true}).qr,null);
+});
+
+test('verification has a deadline while an available unexpired QR remains available for user scanning', async t => {
+  const { runtime, children } = manager(t, { phaseTimeoutMs: 20 });
+  const attempt = await runtime.begin({ ownerAction: true });
+  await new Promise(resolve => setTimeout(resolve, 35));
+  assert.equal(runtime.status().status, 'qr_pending');
+  assert.ok(runtime.status({ authenticatedDetail: true }).qr);
+  children[0].ipc({ event: 'state', data: { attemptId: attempt.attemptId, status: 'verifying' } });
+  assert.equal(runtime.status({ authenticatedDetail: true }).qr, null);
+  children[0].ipc({ event: 'qr', data: { attemptId: attempt.attemptId, dataUrl: QR, expiresAt: Date.now() + 60000 } });
+  assert.equal(runtime.status().status, 'verifying', 'a delayed QR callback cannot reset session verification');
+  for (let i = 0; i < 100 && (runtime.status().running || !runtime.status().error); i++) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.equal(runtime.status().error, 'RUNTIME_TIMEOUT');
+  assert.equal(runtime.status().running, false);
+});
+
+test('refresh reaps the previous native callback source before creating a new attempt', async t => {
   const { runtime, children } = manager(t);
   const first = await runtime.begin({ ownerAction: true });
   const second = await runtime.refreshQR({ ownerAction: true });
   assert.notEqual(second.attemptId, first.attemptId);
-  assert.equal(children.length, 1);
+  assert.equal(children.length, 2);
+  assert.ok(children[0].commands.some(command => command.method === 'stop'));
+  assert.equal(children[0].exitCode, 0);
   const child = children[0];
   child.ipc({ event: 'connected', data: { attemptId: first.attemptId, selfId: '999999' } });
   child.ipc({ event: 'qr', data: { attemptId: first.attemptId, dataUrl: QR, expiresAt: Date.now() + 60000 } });
@@ -79,7 +127,7 @@ test('refresh preserves the engine but fences cancelled and late attempt events'
   assert.equal(runtime.status().attemptId, second.attemptId);
   assert.equal(runtime.status().connected, false);
   await runtime.cancel();
-  child.ipc({ event: 'connected', data: { attemptId: second.attemptId, selfId: '999999' } });
+  children[1].ipc({ event: 'connected', data: { attemptId: second.attemptId, selfId: '999999' } });
   assert.equal(runtime.status().status, 'cancelled');
   assert.equal(runtime.status({ authenticatedDetail: true }).qr, null);
 });
@@ -97,7 +145,61 @@ test('a concurrent refresh withdraws an in-flight attempt before its delayed res
   held.child.reply(held.command);
   await firstRejected;
   assert.equal(runtime.status().attemptId, latest.attemptId);
+  assert.equal(children.length, 2);
+});
+
+test('an already verified login is idempotent and cannot silently switch accounts', async t => {
+  const { runtime, children } = manager(t);
+  const first = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  children[0].ipc({ event: 'connected', data: { attemptId: first.attemptId, selfId: '123456' } });
+  assert.equal((await runtime.begin({ ownerAction: true, expectedSelfId: '123456' })).attemptId, first.attemptId);
+  assert.equal((await runtime.refreshQR({ ownerAction: true })).connected, true);
+  await assert.rejects(runtime.begin({ ownerAction: true, expectedSelfId: '654321' }), { code: 'ACCOUNT_MISMATCH' });
   assert.equal(children.length, 1);
+  assert.equal(runtime.status().actualSelfId, '123456');
+});
+
+test('native channel dispatch requires verified identity and supports only fixed private-text actions', async t => {
+  const { runtime, children } = manager(t);
+  await assert.rejects(runtime.requestChannel('send_private_msg', { user_id: '654321', message: 'hello' }, 'send-1'), error => error.code === 'RUNTIME_STOPPED' && error.submitted === false);
+  const attempt = await runtime.begin({ ownerAction: true });
+  children[0].ipc({ event: 'connected', data: { attemptId: attempt.attemptId, selfId: '123456' } });
+  await assert.rejects(runtime.requestChannel('delete_msg', {}, 'bad-1'), { code: 'INPUT' });
+  await assert.rejects(runtime.requestChannel('send_private_msg', { user_id: '123456', message: 'self' }, 'bad-2'), { code: 'INPUT' });
+  await runtime.requestChannel('send_private_msg', { user_id: '654321', message: 'hello', token: 'ignore' }, 'send-1');
+  assert.deepEqual(children[0].commands.at(-1).params, { attemptId: attempt.attemptId, action: 'send_private_msg', params: { user_id: '654321', message: 'hello' }, echo: 'send-1' });
+});
+
+test('native channel receipts retain admitted echo correlation after cancellation without accepting new ingress', async t => {
+  const { runtime, children } = manager(t), events = [];
+  const unsubscribe = runtime.onNativeEvent(event => events.push(event));
+  const attempt = await runtime.begin({ ownerAction: true });
+  const child = children[0];
+  child.ipc({ event: 'onebot', data: { echo: 'never-admitted', status: 'ok', retcode: 0, data: { message_id: 'fake' } } });
+  child.ipc({ event: 'connected', data: { attemptId: attempt.attemptId, selfId: '123456' } });
+  await runtime.requestChannel('send_private_msg', { user_id: '654321', message: 'hello' }, 'original-send');
+  assert.equal(runtime.channelQuiescent(), false, 'a control ACK is not native send quiescence');
+  await runtime.cancel();
+  assert.equal(runtime.channelQuiescent(), false, 'cancel cannot retract an admitted native send');
+  child.ipc({ event: 'onebot', data: { post_type: 'message', self_id: '123456', raw_message: 'blocked' } });
+  child.ipc({ event: 'onebot', data: { echo: 'original-send', status: 'ok', retcode: 0, data: { message_id: 'actual' } } });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].data.message_id, 'actual');
+  assert.equal(runtime.channelQuiescent(), true);
+  child.ipc({ event: 'onebot', data: { echo: 'original-send', status: 'ok', retcode: 0, data: { message_id: 'duplicate' } } });
+  assert.equal(events.length, 1);
+  unsubscribe();
+});
+
+test('native process loss marks a dispatched send unknown and never invents a delivery fact', async t => {
+  const { runtime, children } = manager(t, {}, { handle(command) { return command.method === 'onebot'; } }), events = [];
+  runtime.onNativeEvent(event => events.push(event));
+  const attempt = await runtime.begin({ ownerAction: true });
+  children[0].ipc({ event: 'connected', data: { attemptId: attempt.attemptId, selfId: '123456' } });
+  const sending = runtime.requestChannel('send_private_msg', { user_id: '654321', message: 'hello' }, 'lost-send');
+  const rejected = assert.rejects(sending, error => error.submitted === true && error.code === 'RUNTIME_STOPPED');
+  children[0].finish(); await rejected;
+  assert.equal(events.length, 0);
 });
 
 test('connected requires the current attempt and expected QQ identity, never merely scanned state', async t => {

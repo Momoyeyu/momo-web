@@ -16,6 +16,7 @@ import secrets
 import tempfile
 import threading
 import time
+import uuid
 from urllib.parse import urlsplit
 
 from ..core import db, state
@@ -24,6 +25,78 @@ from ..core.credentials import credentials, CredentialError
 
 class SocialError(ValueError):
     pass
+
+
+QQ_RUNTIME_ERRORS = {
+    "OWNER_ACTION_REQUIRED": "QQ login requires an explicit local owner action",
+    "RESOURCE_UNAVAILABLE": "Managed QQ resources are not available",
+    "RESOURCE_INVALID": "Managed QQ resources are not qualified",
+    "INPUT": "Invalid QQ login action",
+    "ATTEMPT_CANCELLED": "QQ login attempt was cancelled or replaced",
+    "RUNTIME_FAILED": "Managed QQ runtime failed",
+    "RUNTIME_TIMEOUT": "Managed QQ runtime did not respond",
+    "RUNTIME_NOT_QUIESCENT": "Managed QQ runtime has not stopped",
+    "RUNTIME_STOPPED": "Managed QQ runtime stopped",
+    "RUNTIME_UNAVAILABLE": "Managed QQ runtime is unavailable",
+    "IPC_LIMIT": "Managed QQ runtime exceeded its communication limit",
+    "IPC_PROTOCOL": "Managed QQ runtime returned an invalid response",
+    "ACCOUNT_MISMATCH": "The logged-in QQ account does not match the bound account",
+    "FORGET_UNAVAILABLE": "Managed QQ session removal is unavailable",
+    "FORGET_FAILED": "Managed QQ session could not be removed",
+}
+QQ_RUNTIME_STATES = {
+    "idle", "preparing", "connecting", "qr_pending", "awaiting_confirmation", "verifying",
+    "expired", "connected", "identity_mismatch", "cancelled", "stopping", "stopped",
+    "disconnected", "error",
+}
+
+
+class QQRuntimeError(SocialError):
+    def __init__(self, code):
+        self.code = code if code in QQ_RUNTIME_ERRORS else "RUNTIME_UNAVAILABLE"
+        super().__init__(QQ_RUNTIME_ERRORS[self.code])
+
+
+def _public_qq_runtime_status(value):
+    """Whitelist the private host reply; native diagnostics never enter HTTP."""
+    if (not isinstance(value, dict) or value.get("provider") != "qq"
+        or not isinstance(value.get("status"), str) or value["status"] not in QQ_RUNTIME_STATES
+        or any(type(value.get(key)) is not bool for key in ("running", "connected", "executorQuiescent"))):
+        raise QQRuntimeError("IPC_PROTOCOL")
+    identity = value.get("actualSelfId")
+    if identity is not None and (not isinstance(identity, str) or not re.fullmatch(r"[1-9][0-9]{0,19}", identity)):
+        raise QQRuntimeError("IPC_PROTOCOL")
+    attempt = value.get("attemptId")
+    if attempt is not None:
+        try:
+            if not isinstance(attempt, str) or str(uuid.UUID(attempt)) != attempt:
+                raise ValueError
+        except (ValueError, AttributeError):
+            raise QQRuntimeError("IPC_PROTOCOL") from None
+    if (value["connected"] != (value["status"] == "connected")
+        or value["connected"] and (not value["running"] or not identity)
+        or value["running"] and value["executorQuiescent"]):
+        raise QQRuntimeError("IPC_PROTOCOL")
+    result = {key: value[key] for key in ("provider", "status", "running", "connected", "executorQuiescent")}
+    error = value.get("error")
+    result.update({"actualSelfId": identity, "attemptId": attempt,
+                   "error": error if isinstance(error, str) and error in QQ_RUNTIME_ERRORS else "RUNTIME_FAILED" if error is not None else None,
+                   "qr": None})
+    qr = value.get("qr")
+    if qr is not None:
+        if (not isinstance(qr, dict) or not isinstance(qr.get("dataUrl"), str)
+            or len(qr["dataUrl"]) > 384 * 1024
+            or not re.fullmatch(r"data:image/png;base64,[A-Za-z0-9+/]+={0,2}", qr["dataUrl"])
+            or type(qr.get("expiresAt")) is not int):
+            raise QQRuntimeError("IPC_PROTOCOL")
+        now = int(time.time() * 1000)
+        if qr["expiresAt"] > now + 10 * 60 * 1000:
+            raise QQRuntimeError("IPC_PROTOCOL")
+        if not value["connected"] and qr["expiresAt"] > now:
+            result["qr"] = {"dataUrl": qr["dataUrl"], "expiresAt": qr["expiresAt"]}
+        elif not value["connected"] and result["status"] == "qr_pending":
+            result["status"] = "expired"
+    return result
 
 
 PROVIDERS = ("qq",)
@@ -90,6 +163,7 @@ class SocialAccounts:
             raise SocialError("Unsupported personal-account provider")
         return {"provider": provider, "id": "momo-" + provider,
                 "accountId": provider + "-main", "expectedSelfId": "", "endpoint": "",
+                "transport": "external",
                 "enabled": False, "permissions": dict(PERMISSIONS), "allowlistEnabled": False,
                 "allowlist": [], "ownerPeerId": None, "policyRevision": 0, "quarantined": False}
 
@@ -100,6 +174,7 @@ class SocialAccounts:
         with self.lock:
             account = copy.deepcopy(self._account(provider))
         value = {key: copy.deepcopy(account.get(key)) for key in self._default(provider)}
+        value["transport"] = account.get("transport", "external")
         value["hasCredential"] = bool(account.get("credentialRef"))
         value["capabilities"] = dict(CAPABILITIES)
         value["status"] = "quarantined" if account.get("quarantined") else "disconnected" if account["enabled"] else "disabled"
@@ -125,6 +200,34 @@ class SocialAccounts:
                                "auth": "personal_bridge", "oauthMessaging": False,
                                "capabilities": dict(CAPABILITIES)} for p in PROVIDERS]}
 
+    def managed_qq_runtime(self, action="status"):
+        """Local-user login management is independent of Boot and message grants.
+
+        The host owns engine/session lifecycle. Polling or successful login never
+        changes the account's transport, owner binding, policy, or credentials.
+        """
+        from .coordinator import runtime
+        if action not in {"status", "begin", "refresh", "cancel", "stop", "forget"}:
+            raise QQRuntimeError("INPUT")
+        if not runtime.started or not runtime.host:
+            raise QQRuntimeError("RUNTIME_UNAVAILABLE")
+        params = {"authenticatedDetail": True} if action == "status" else {"ownerAction": True}
+        if action == "begin":
+            with self.lock:
+                expected = self._account("qq").get("expectedSelfId") or None
+            if expected is not None and not re.fullmatch(r"[1-9][0-9]{0,19}", expected):
+                raise QQRuntimeError("INPUT")
+            params["expectedSelfId"] = expected
+        timeout = 3 if action == "status" else 35 if action in {"begin", "refresh"} else 20
+        try:
+            value = runtime.host.request("qq.runtime." + action, params, timeout=timeout)
+        except Exception as error:
+            # HostError already strips native diagnostics. Preserve only the
+            # finite public codes even if a future transport regresses that rule.
+            code = str(error)
+            raise QQRuntimeError(code if code in QQ_RUNTIME_ERRORS else "RUNTIME_UNAVAILABLE") from None
+        return _public_qq_runtime_status(value)
+
     def _health(self, provider):
         from .coordinator import runtime
         if not runtime.started or not runtime.host:
@@ -149,6 +252,8 @@ class SocialAccounts:
             data = self._read()
             old = data.get(provider, self._default(provider))
             account = copy.deepcopy(old)
+            if old.get("transport") == "managed" and not old["enabled"] and values.get("enabled") is True:
+                raise SocialError("Use the verified QQ connection action to enable managed chat")
             for flag in ("enabled", "allowlistEnabled"):
                 if flag in values:
                     if not isinstance(values[flag], bool):
@@ -191,7 +296,8 @@ class SocialAccounts:
                         raise SocialError("Invalid contact label")
                     normalized[peer] = {"peerId": peer, "label": label}
                 account["allowlist"] = list(normalized.values())
-            if account["enabled"] and not all(account[k] for k in ("accountId", "expectedSelfId", "endpoint")):
+            required = ("accountId", "expectedSelfId") if account.get("transport") == "managed" else ("accountId", "expectedSelfId", "endpoint")
+            if account["enabled"] and not all(account[k] for k in required):
                 raise SocialError("Configure the account identity and connection address first")
             if any(p != provider and row.get("accountId") == account["accountId"] for p, row in data.items()):
                 raise SocialError("Each channel account needs a distinct identity")
@@ -227,6 +333,12 @@ class SocialAccounts:
             result = []
             for provider, row in self._read().items():
                 if provider not in PROVIDERS or not row.get("enabled") or row.get("quarantined"):
+                    continue
+                if row.get("transport") == "managed":
+                    result.append({"id": row["id"], "type": provider, "transport": "managed", "enabled": True,
+                        "accountId": row["accountId"], "expectedSelfId": row["expectedSelfId"], "permissions": row["permissions"],
+                        "policyRevision": row["policyRevision"], "allowlistEnabled": row["allowlistEnabled"],
+                        "allowlist": [p["peerId"] for p in row["allowlist"]]})
                     continue
                 secret = {}
                 if row.get("credentialRef"):
@@ -323,13 +435,75 @@ class SocialAccounts:
             self._write(data)
         self._refresh()
 
-    def connect(self, provider):
+    def connect(self, provider, *, transport=None):
+        from .coordinator import runtime
         with self.lock:
             data = self._read()
-            account = data.get(provider, self._default(provider))
-            if account.get("quarantined"):
+            original = copy.deepcopy(data.get(provider, self._default(provider)))
+            if original.get("quarantined"):
                 raise SocialError("Reconcile pending operations before resuming this account")
-        return self.put(provider, {"enabled": True})
+        selected = transport if transport is not None else original.get("transport", "external")
+        if selected not in {"managed", "external"}:
+            raise SocialError("Unsupported QQ transport")
+        account = copy.deepcopy(original)
+        if selected == "managed":
+            # No account lock is held while the RPC reader may admit messages.
+            native = self.managed_qq_runtime()
+            if not native["connected"] or not native.get("actualSelfId"):
+                raise SocialError("Log in to the managed QQ account before enabling chat")
+            if account["expectedSelfId"] and native["actualSelfId"] != account["expectedSelfId"]:
+                raise SocialError("The logged-in QQ account does not match the bound account")
+            if not account["expectedSelfId"]:
+                account["expectedSelfId"] = native["actualSelfId"]
+                account["ownerPeerId"] = None
+                account.pop("ownerChallenge", None)
+        elif not all(account[k] for k in ("accountId", "expectedSelfId", "endpoint")):
+            raise SocialError("Configure the account identity and connection address first")
+        if runtime.started:
+            for row in runtime._unresolved_commands():
+                try:
+                    payload = json.loads(row["payload"])
+                    params = payload.get("params", payload)
+                    blocked = params.get("accountId") == account["accountId"]
+                except (ValueError, TypeError, AttributeError):
+                    blocked = True
+                if blocked:
+                    raise SocialError("Reconcile this account's pending operation before changing its connection")
+        with self.lock:
+            data = self._read()
+            current = data.get(provider, self._default(provider))
+            if current != original:
+                raise SocialError("QQ settings changed while verifying the account; try connecting again")
+            account.update({"transport": selected, "enabled": True, "policyRevision": int(original["policyRevision"]) + 1})
+            data[provider] = account
+            self._write(data)
+        if selected == "external":
+            self._refresh()
+            return self.get(provider)
+        try:
+            self._refresh()
+            result = self.get(provider)
+            if (result["status"] == "connected" and result.get("actualSelfId") == account["expectedSelfId"]
+                and result["policyRevision"] == account["policyRevision"] and result["transport"] == "managed"):
+                return result
+        except Exception:
+            pass
+        # Authentication and transport health are distinct. Preserve private
+        # legacy settings and proof, but never fall back to them after a failed
+        # native business connection or leave the failed connection enabled.
+        with self.lock:
+            data = self._read()
+            current = data.get(provider, self._default(provider))
+            if current["policyRevision"] == account["policyRevision"]:
+                current["enabled"] = False
+                current["policyRevision"] += 1
+                data[provider] = current
+                self._write(data)
+        try:
+            self._refresh()
+        except Exception:
+            pass
+        raise SocialError("Managed QQ chat connection could not be verified; it remains disabled")
 
     def disconnect(self, provider):
         return self.put(provider, {"enabled": False})

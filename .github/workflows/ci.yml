@@ -42,8 +42,8 @@ jobs:
       - name: Check backend and live host integration
         run: uv run --frozen pytest -q
         working-directory: backend
-      - name: Check snapshot promotion and drift rejection
-        run: uv run --project backend --frozen python -m pytest scripts/test_promote.py -q
+      - name: Check developer resource staging and snapshot promotion
+        run: uv run --project backend --frozen python -m pytest scripts/test_promote.py scripts/test_prepare_qq_runtime.py -q
       - name: Install the locked frontend
         run: pnpm install --frozen-lockfile --ignore-workspace
         working-directory: frontend

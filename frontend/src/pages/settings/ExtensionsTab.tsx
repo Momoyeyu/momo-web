@@ -1,6 +1,5 @@
-// 「拓展」tab：左 Live2D 模型、右 MCP 拓展（搜索 + 加号 + 卡片 + 翻页），
-// 以及 MCP 配置弹窗。这些原先都挤在 Settings.tsx 里，状态与辅助一并搬过来。
-import { useEffect, useState, useSyncExternalStore } from "react";
+// Live2D、MCP 与官方插件各自使用完整宽度；二级滑块与内容同步横移。
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 
 import { useT } from "../../i18n";
 import { CARD_PAGE_SIZE, clampPage } from "../../lib/paging";
@@ -16,9 +15,26 @@ import AvatarPanel from "../panels/Avatar";
 import ExtConfigModal from "./ExtConfigModal";
 import OfficialPlugins from "./OfficialPlugins";
 
-export default function ExtensionsTab() {
+const SECTIONS = ["avatar", "mcp", "plugins"] as const;
+type ExtensionSection = (typeof SECTIONS)[number];
+
+export default function ExtensionsTab({ active = true }: { active?: boolean }) {
   const t = useT();
   const settings = useSyncExternalStore(subscribe, getState).settings;
+  const [section, setSection] = useState<ExtensionSection>("avatar");
+  const sectionButtons = useRef<(HTMLButtonElement | null)[]>([]);
+  const sectionIndex = SECTIONS.indexOf(section);
+  const navigateSection = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let next = index;
+    if (event.key === "ArrowRight") next = (index + 1) % SECTIONS.length;
+    else if (event.key === "ArrowLeft") next = (index + SECTIONS.length - 1) % SECTIONS.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = SECTIONS.length - 1;
+    else return;
+    event.preventDefault();
+    setSection(SECTIONS[next]!);
+    sectionButtons.current[next]?.focus();
+  };
 
   const [extEditing, setExtEditing] = useState<number | null>(null);
   const [extQuery, setExtQuery] = useState("");
@@ -34,6 +50,7 @@ export default function ExtensionsTab() {
 
   // 连接状态：清单变化时对 enabled 记录各探测一次，结果只影响状态点、失败不阻塞 UI。
   useEffect(() => {
+    if (!active || section !== "mcp") return;
     let alive = true;
     setExtProbes({});
     settings.extensions.forEach((ext, i) => {
@@ -46,7 +63,7 @@ export default function ExtensionsTab() {
     return () => {
       alive = false;
     };
-  }, [settings.extensions]);
+  }, [active, section, settings.extensions]);
 
   // 检索 + 分页（与 Live2D 面板同构：过滤命中集分页，索引映射回原清单）
   const extHits = settings.extensions
@@ -122,18 +139,36 @@ export default function ExtensionsTab() {
   };
 
   return (
-    <>
-      <OfficialPlugins />
-      {/* 双栏：左 Live2D（原「形象」tab 唯一剩下的配置）、右 MCP 拓展 */}
-      <div className="settings-cols">
-        <section className="panel panel-stack">
+    <div className="extension-settings">
+      <nav className="extension-tabs" role="tablist" aria-label={t("settings.extensionTabsLabel")}>
+        <span className="extension-tab-thumb" aria-hidden="true" style={{ transform: `translateX(${sectionIndex * 100}%)` }} />
+        {SECTIONS.map((id, index) => <button
+          key={id}
+          type="button"
+          ref={element => { sectionButtons.current[index] = element; }}
+          id={`extension-tab-${id}`}
+          role="tab"
+          aria-selected={section === id}
+          aria-controls={`extension-panel-${id}`}
+          tabIndex={section === id ? 0 : -1}
+          className={section === id ? "active" : ""}
+          onClick={() => setSection(id)}
+          onKeyDown={event => navigateSection(event, index)}
+        >{t(`settings.extensionTabs.${id}`)}</button>)}
+      </nav>
+      <div className="extension-viewport">
+        <div className="extension-track" style={{ transform: `translateX(${-sectionIndex * 100}%)` }}>
+          <section className="extension-pane" id="extension-panel-avatar" role="tabpanel" aria-labelledby="extension-tab-avatar" aria-hidden={section !== "avatar"} inert={!active || section !== "avatar"}>
+        <section className="panel panel-stack extension-panel">
           <h3 className="opt-group">
             {t("settings.groups.avatar")}
             <span className="req">*</span>
           </h3>
           <AvatarPanel />
         </section>
-        <section className="panel panel-stack settings-col ext-panel">
+          </section>
+          <section className="extension-pane" id="extension-panel-mcp" role="tabpanel" aria-labelledby="extension-tab-mcp" aria-hidden={section !== "mcp"} inert={!active || section !== "mcp"}>
+        <section className="panel panel-stack settings-col ext-panel extension-panel">
           <div className="panel-title-row">
             <h3 className="opt-group">{t("settings.groups.extensions")}</h3>
             <Hint text={t("settings.extHint")} side="down" />
@@ -204,9 +239,14 @@ export default function ExtensionsTab() {
             </div>
           </div>
         </section>
+          </section>
+          <section className="extension-pane" id="extension-panel-plugins" role="tabpanel" aria-labelledby="extension-tab-plugins" aria-hidden={section !== "plugins"} inert={!active || section !== "plugins"}>
+            <OfficialPlugins active={active && section === "plugins"} />
+          </section>
+        </div>
       </div>
       {/* 拓展配置弹窗：背景变暗，点背景/取消丢弃未保存内容 */}
-      {extEditing !== null && (
+      {active && section === "mcp" && extEditing !== null && (
         <ExtConfigModal
           initial={
             extEditing >= 0 ? settings.extensions[extEditing] : blankExt()
@@ -216,6 +256,6 @@ export default function ExtensionsTab() {
           onClose={() => setExtEditing(null)}
         />
       )}
-    </>
+    </div>
   );
 }

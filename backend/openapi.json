@@ -452,6 +452,28 @@
         "title": "CheckpointMeta",
         "type": "object"
       },
+      "ConnectIn": {
+        "additionalProperties": false,
+        "properties": {
+          "transport": {
+            "anyOf": [
+              {
+                "enum": [
+                  "managed",
+                  "external"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transport"
+          }
+        },
+        "title": "ConnectIn",
+        "type": "object"
+      },
       "ContactIn": {
         "additionalProperties": false,
         "properties": {
@@ -1144,6 +1166,128 @@
           "executorStopped"
         ],
         "title": "RetiredWaitIn",
+        "type": "object"
+      },
+      "RuntimeActionIn": {
+        "additionalProperties": false,
+        "description": "Actions accept no executable, path, identity, or transport input.",
+        "properties": {},
+        "title": "RuntimeActionIn",
+        "type": "object"
+      },
+      "RuntimeQROut": {
+        "properties": {
+          "dataUrl": {
+            "maxLength": 393216,
+            "title": "Dataurl",
+            "type": "string"
+          },
+          "expiresAt": {
+            "title": "Expiresat",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dataUrl",
+          "expiresAt"
+        ],
+        "title": "RuntimeQROut",
+        "type": "object"
+      },
+      "RuntimeStatusOut": {
+        "properties": {
+          "actualSelfId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actualselfid"
+          },
+          "attemptId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attemptid"
+          },
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "executorQuiescent": {
+            "title": "Executorquiescent",
+            "type": "boolean"
+          },
+          "provider": {
+            "const": "qq",
+            "title": "Provider",
+            "type": "string"
+          },
+          "qr": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RuntimeQROut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "running": {
+            "title": "Running",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "idle",
+              "preparing",
+              "connecting",
+              "qr_pending",
+              "awaiting_confirmation",
+              "verifying",
+              "expired",
+              "connected",
+              "identity_mismatch",
+              "cancelled",
+              "stopping",
+              "stopped",
+              "disconnected",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "status",
+          "running",
+          "connected",
+          "actualSelfId",
+          "attemptId",
+          "error",
+          "executorQuiescent"
+        ],
+        "title": "RuntimeStatusOut",
         "type": "object"
       },
       "SpeechIn": {
@@ -2473,6 +2617,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ConnectIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
@@ -2704,6 +2865,331 @@
           }
         },
         "summary": "Resume"
+      }
+    },
+    "/api/social/accounts/{provider}/runtime": {
+      "get": {
+        "operationId": "managed_runtime_status_api_social_accounts__provider__runtime_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "const": "qq",
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Managed Runtime Status"
+      }
+    },
+    "/api/social/accounts/{provider}/runtime/begin": {
+      "post": {
+        "operationId": "begin_runtime_login_api_social_accounts__provider__runtime_begin_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "const": "qq",
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RuntimeActionIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Begin Runtime Login"
+      }
+    },
+    "/api/social/accounts/{provider}/runtime/cancel": {
+      "post": {
+        "operationId": "cancel_runtime_login_api_social_accounts__provider__runtime_cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "const": "qq",
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RuntimeActionIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Runtime Login"
+      }
+    },
+    "/api/social/accounts/{provider}/runtime/forget": {
+      "post": {
+        "operationId": "forget_runtime_session_api_social_accounts__provider__runtime_forget_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "const": "qq",
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RuntimeActionIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forget Runtime Session"
+      }
+    },
+    "/api/social/accounts/{provider}/runtime/refresh": {
+      "post": {
+        "operationId": "refresh_runtime_login_api_social_accounts__provider__runtime_refresh_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "const": "qq",
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RuntimeActionIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refresh Runtime Login"
+      }
+    },
+    "/api/social/accounts/{provider}/runtime/stop": {
+      "post": {
+        "operationId": "stop_runtime_api_social_accounts__provider__runtime_stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "const": "qq",
+              "title": "Provider",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/RuntimeActionIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuntimeStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Runtime"
       }
     },
     "/api/state": {

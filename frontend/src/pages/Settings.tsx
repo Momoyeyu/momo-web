@@ -107,7 +107,7 @@ export default function Settings() {
           >
             <div className="settings-content">
               <div className="settings-body">
-                <ExtensionsTab />
+                <ExtensionsTab active={tab === "extend"} />
               </div>
             </div>
           </section>

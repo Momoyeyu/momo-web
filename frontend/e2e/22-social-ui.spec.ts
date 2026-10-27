@@ -1,11 +1,11 @@
 import {test,expect} from './fixtures';
-import {bootChat,openTab,waitForChatReady} from './helpers';
+import {bootChat,openExtensionTab,waitForChatReady} from './helpers';
 
 test('cold routes stay dormant until Boot, including settings and a direct chat URL',async({page,request})=>{
   await page.goto('/#/chat');
   await expect(page.locator('.title-screen')).toBeVisible();
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
-  await openTab(page,'拓展');
+  await openExtensionTab(page,'插件');
   await expect(page.locator('.official-plugins .social-card')).toHaveCount(1);
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
   await page.getByRole('button',{name:'返回标题',exact:true}).click();
@@ -27,7 +27,7 @@ test('QQ account settings preserve credentials and enforce an empty allowlist',a
   expect(original.map(account=>account.provider)).toEqual(['qq']);
   expect(original.every(account=>account.allowlistEnabled===false)).toBe(true);
   try{
-    await openTab(page,'拓展');
+    await openExtensionTab(page,'插件');
     const cards=page.locator('.official-plugins .social-card');
     await expect(cards).toHaveCount(1);
     await expect(cards.getByRole('heading',{name:'QQ',exact:true})).toBeVisible();
@@ -93,12 +93,12 @@ test('retired unknown operations require confirming the old executor stopped bef
     await route.fulfill({json:{ok:true,records,attention:{activation:'dormant',focus:false,phonePaused:false,busy:false,activity:null,presentation:null}}});
   });
   await page.route('**/api/social/accounts/wechat/**',route=>{retiredProviderRequests.push(route.request().url());return route.abort();});
-  await openTab(page,'拓展');
+  await openExtensionTab(page,'插件');
   const archive=page.locator('.social-retired-records');
   await expect(archive).toHaveCount(0);
   records=[record];
   await page.reload();
-  await openTab(page,'拓展');
+  await openExtensionTab(page,'插件');
   await expect(archive).toBeVisible();
   await archive.locator('summary').click();
   await expect(archive.getByText('archived-account',{exact:true})).toBeVisible();

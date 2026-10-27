@@ -1,7 +1,8 @@
 import {lazy,Suspense,useEffect,useState} from 'react';
 import {useT} from '../../i18n';
-import {accountDraft,retiredSocialRecords,saveSocialAccount,socialAccounts,SOCIAL_PROVIDERS,type RetiredSocialRecord,type SocialAccount,type SocialProvider} from '../../services/socialClient';
+import {accountDraft,connectSocialAccount,retiredSocialRecords,saveSocialAccount,socialAccounts,SOCIAL_PROVIDERS,type RetiredSocialRecord,type SocialAccount,type SocialProvider} from '../../services/socialClient';
 import RetiredSocialRecords from './RetiredSocialRecords';
+import {qqRuntimeStatus} from '../../services/qqRuntimeClient';
 import Button from '../../ui/Button';
 import Hint from '../../ui/Hint';
 import Switch from '../../ui/Switch';
@@ -9,7 +10,7 @@ import Icon from '../../ui/Icon';
 import '../../styles/social.css';
 
 const SocialConfigModal=lazy(()=>import('./SocialConfigModal'));
-export default function OfficialPlugins(){
+export default function OfficialPlugins({active=true}:{active?:boolean}){
   const t=useT();
   const [accounts,setAccounts]=useState<SocialAccount[]>([]);
   const [retired,setRetired]=useState<RetiredSocialRecord[]>([]);
@@ -18,19 +19,27 @@ export default function OfficialPlugins(){
   const [pending,setPending]=useState<SocialProvider|null>(null);
   const [revision,setRevision]=useState(0);
   useEffect(()=>{
+    if(!active)return;
     const request=new AbortController();setError(false);
     void Promise.all([
       socialAccounts(request.signal).then(result=>{if(!request.signal.aborted)setAccounts(result.accounts);}),
       retiredSocialRecords(request.signal).then(records=>{if(!request.signal.aborted)setRetired(records);}),
     ]).catch(()=>{if(!request.signal.aborted)setError(true);});
     return()=>request.abort();
-  },[revision]);
+  },[active,revision]);
   const refresh=()=>setRevision(value=>value+1);
   const toggle=async(account:SocialAccount,enabled:boolean)=>{
     setPending(account.provider);setError(false);
     try{
-      const draft=accountDraft(account);draft.enabled=enabled;
-      await saveSocialAccount(account.provider,draft);refresh();
+      if(enabled&&account.transport==='managed'){
+        const native=await qqRuntimeStatus().catch(()=>null);
+        if(!native?.connected||(account.expectedSelfId&&native.actualSelfId!==account.expectedSelfId)){setEditing(account.provider);return;}
+        await connectSocialAccount(account.provider,true,'managed');
+      }else{
+        const draft=accountDraft(account);draft.enabled=enabled;
+        await saveSocialAccount(account.provider,draft);
+      }
+      refresh();
     }catch{setError(true);}finally{setPending(null);}
   };
   return <section className="official-plugins" aria-label={t('social.official')}>
@@ -45,6 +54,6 @@ export default function OfficialPlugins(){
       </article>;
     })}</div>
     {retired.length>0 && <RetiredSocialRecords records={retired} onChanged={setRetired}/>}
-    {editing && accounts.find(item=>item.provider===editing) && <Suspense fallback={<div role="status" className="social-loading">{t('social.loading')}</div>}><SocialConfigModal initial={accounts.find(item=>item.provider===editing)!} onClose={()=>setEditing(null)} onChanged={refresh}/></Suspense>}
+    {active && editing && accounts.find(item=>item.provider===editing) && <Suspense fallback={<div role="status" className="social-loading">{t('social.loading')}</div>}><SocialConfigModal initial={accounts.find(item=>item.provider===editing)!} onClose={()=>setEditing(null)} onChanged={refresh}/></Suspense>}
   </section>;
 }

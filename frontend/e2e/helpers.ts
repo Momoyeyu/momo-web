@@ -61,6 +61,12 @@ export async function openTab(page: Page, label: string): Promise<void> {
   await page.locator(".stab", { hasText: label }).click();
 }
 
+/** 拓展内部的同级配置页，各自使用完整宽度。 */
+export async function openExtensionTab(page: Page, label: string): Promise<void> {
+  await openTab(page, "拓展");
+  await page.getByRole("tab", { name: label, exact: true }).click();
+}
+
 /** 收集控制台错误与未捕获异常，供「无错误」断言使用。 */
 export function collectErrors(page: Page): string[] {
   const errors: string[] = [];

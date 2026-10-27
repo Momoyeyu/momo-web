@@ -1,6 +1,10 @@
 # QQ 受管运行时：当前边界
 
-004 的目标是由 momo 管理 QQ 个人号运行资源、独立会话与设置内登录。玩家不需要维护 Docker、外部网关或签名服务。当前在线聊天仍使用既有 QQ 适配器；下面的基础模块尚未接入宿主、账号 API 或界面，不能作为完整 QQ 插件已交付的依据。
+004 由 momo 管理 QQ 个人号运行资源、独立会话与设置内登录。新的原生链路不依赖 Docker、外部网关或签名服务；设置 → 拓展 → 插件 → QQ 提供账号、权限、记录。登录管理器、固定启动工厂、原生 worker、Cordis / Python API 与设置界面已接入；真实二维码已验证，扫码后账号与收发正在联调，不能作为完整 QQ 插件已交付的依据。
+
+登录与聊天分开：`qq.runtime.*` 只管理私有认证，`connect {transport: "managed"}` 才在核验实际身份后启用渠道。QQChannel 通过相同管理器的私有 IPC 复用现有消息准入、渠道上下文和回执账本。Python 继续是唯一推理 / 记忆 / 注意力协调器。旧外部传输仅作明确选择的兼容模式，内置通路失败不会自动回退。
+
+当前原生 worker 只初始化受测 QQ 原生接口，不加载完整 NapCat Shell 或厂商应用入口，不修改厂商文件、签名和 RunAsNode fuse。平台连接回调不当作账号认证；必须完成会话、原生在线状态和实际身份映射。二维码及核验阶段有截止时间；刷新使用全新自有进程以避免原生回调串到另一尝试。退出首先收束 QQ 自有进程树，其他插件慢关闭不能拖延它。
 
 ## 原生候选
 
@@ -50,6 +54,34 @@ QQNT 框架原有的 `Versions/Current` 等内部链接保留原状。未声明�
 可信启动工厂缺失时明确返回 `RESOURCE_UNAVAILABLE`，不自动猜路径、下载资源或使用旧 QQ 登录。生产 transport 只启动服务端准备的固定 `sandbox-exec` 调用，不接受账号请求中的 argv、环境或任意管理命令，也不改写 `HOME`。它拥有独立进程组；直接父进程退出不等于后代已停止，忘记会话前须确认进程组静止。
 
 worker 的控制通信使用有界的 `MOMO_QQ_IPC ` JSON 帧。原生日志不转发到用户错误、模型或状态。每次认证消息关联 attempt；到期二维码撤下，账号不匹配时拒绝连接。当前模块不转发 `inbox` / `receipt`，避免把无发送关联的事件当成真实业务事实；消息与迟到回执仍由现有渠道适配器负责。
+
+## 开发者离线准备资源
+
+`scripts/prepare-qq-runtime.py` 将**已整理且经过审核的资源包**转换成当前源码对应的受管运行目录。它不是 QQ 下载器或安装器，也不从 `/Applications/QQ.app`、日常账号目录或热更新目录寻找资源。输入是符合上方 `schemaVersion: 1` 合同的私有资源包，以及独立审核过的固定清单；不能把未知包自己提供的摘要当成可信来源。
+
+```sh
+python3 scripts/prepare-qq-runtime.py \
+  --source-package /absolute/private/reviewed-qq-package \
+  --source-manifest /absolute/private/reviewed-qq-manifest.json \
+  --destination /absolute/private/new-momo-qq-runtime \
+  --sdk-path /Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk
+```
+
+路径必须是绝对、规范路径。目标的父目录须已存在、属于当前用户且不可被其他用户写入；目标自身必须尚不存在，并位于 Git 检出之外。SDK 路径按本机已安装的版本明确选择。可用 `--node`、`--clang` 选择资源包之外的开发工具；工具只运行离线校验器和原创启动器的编译，不运行资源包中的厂商二进制，也不重新签署厂商文件。
+
+准备过程先用生产环境的 `qualifyQQResources` 校验完整源清单，再复制并重新核验相同的资源闭包。复制文件时逐层使用不跟随符号链接的目录句柄，防止校验后的路径替换使复制越界。随后仅保留厂商的 Frameworks / Resources 子树，替换旧控制代码、生成原创 `Info.plist`、复制当前 worker 和隔离 profile，并使用指定 SDK 编译原创 launcher。最后生成全部文件摘要和固定元数据，再次执行完整校验。
+
+成功后输出 `runtime-config.json` 的路径，不启动引擎。配置严格包含 `privateRoot`、`resourceRoot`、`manifestPath`、`dataRoot`、`controlRoot`、`canaryPath` 六个字段；会话与控制目录为 `0700`，配置、清单和 canary 为 `0600`。新目录内不带任何旧账号会话。已有目标即使为空也拒绝覆盖，资源升级与现有会话迁移须另行设计，不借准备工具删除账号资料。
+
+目前只准备已验证的 QQ `6.9.95-48517` / Electron `37.1.0` / Node `22.16.0` / ABI `136` / N-API `10` 组合。校验通过仍不等于平台允许登录或聊天。第三方资源的使用与分发条件须分别核对；本工具不把项目代码许可扩展到 QQ、运行时或其他厂商素材，资源文件不提交到本仓库。
+
+运行合成资源测试：
+
+```sh
+uv run --project backend --frozen python -m pytest scripts/test_prepare_qq_runtime.py -q
+```
+
+测试核对错误摘要、现有目标保护、符号链接拒绝、Git 目录拒绝和失败清理。编译步骤使用惰性测试替身；测试不会加载 QQ、联网或建立账号会话。
 
 ## 验证与下一步
 

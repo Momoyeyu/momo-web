@@ -26,6 +26,31 @@
 .social-modal .opt-row { min-height:54px; }
 .social-modal .opt-label { width:160px; font-size:13px; }
 .social-modal input { min-width:0; width:100%; font-size:13px; }
+.qq-login { display:grid;grid-template-columns:190px minmax(0,1fr);gap:24px;margin-bottom:20px;padding:4px 0 20px;border-bottom:1px solid var(--line); }
+.qq-login-visual { position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;min-height:214px;padding:14px 7px 30px;border:1px solid var(--line);border-radius:13px;background:rgba(231,190,119,.025);overflow:hidden; }
+.qq-login-symbol { width:70px;height:70px;color:var(--text-faint); }
+.qq-login-visual.is-connected .qq-login-symbol { color:var(--accent); }
+.qq-login-visual-label,.qq-login-expiry { position:absolute;bottom:12px;left:4px;right:4px;text-align:center;font-size:11px;color:var(--text-dim); }
+.qq-login-visual.has-qr { background:#fff;border-color:#fff; }
+.qq-login-visual img { display:block;max-width:100%;height:auto;image-rendering:pixelated; }
+.qq-login-expiry { color:#615a69;font-variant-numeric:tabular-nums; }
+.qq-login-content { min-width:0;padding:6px 0; }
+.qq-login-heading { display:flex;align-items:center;gap:8px; }
+.qq-login-heading h3 { margin:0;font-size:16px;font-weight:600; }
+.qq-login-state { margin:14px 0 8px;font-size:13px;line-height:1.7;overflow-wrap:anywhere; }
+.qq-login-state.is-error { color:var(--danger); }
+.qq-login-instruction,.qq-login-identity { font-size:12px;line-height:1.7;color:var(--text-dim);margin:6px 0; }
+.qq-login-identity { color:var(--accent);font-variant-numeric:tabular-nums; }
+.qq-login-chat-state { color:var(--accent);font-size:12px;line-height:1.7;margin:10px 0 0; }
+.qq-login-actions { display:flex;flex-wrap:wrap;gap:8px;margin-top:14px; }
+.qq-login-actions > button { min-width:0; }
+.qq-login-footnote { font-size:11px;line-height:1.7;color:var(--text-faint);margin:12px 0 0; }
+.qq-login-session { margin-top:14px;font-size:11px;color:var(--text-dim);line-height:1.7; }
+.qq-login-session summary { width:fit-content;cursor:pointer; }
+.qq-login-session > p { margin:8px 0; }
+.qq-login-forget-confirm { padding:10px 12px;margin-top:10px;border:1px solid var(--line);border-radius:8px; }
+.qq-login-forget-confirm p { margin:0 0 10px; }
+.qq-login-forget-confirm button { margin:0 8px 4px 0; }
 .social-connection-state { display:flex; align-items:center; gap:12px; margin-bottom:18px;padding:12px 14px;background:rgba(231,190,119,.035);border:1px solid var(--line);border-radius:10px; }
 .social-connection-state > div { display:flex; flex-direction:column;gap:5px; }
 .social-connection-state strong { font-size:14px; }
@@ -68,4 +93,5 @@
 .social-retired-confirm { display:flex;align-items:flex-start;gap:8px;max-width:70ch;margin:14px 0;color:var(--text-dim);font-size:12px;line-height:1.7;cursor:pointer; }
 .social-retired-confirm > .check-control { flex:none;margin-top:2px; }
 @media(max-width:900px) { .social-modal .opt-label { width:125px; }.social-allowlist-editor{padding-left:125px;}.social-card{padding:16px;} }
+@media(max-width:620px) { .qq-login { grid-template-columns:158px minmax(0,1fr);gap:16px; }.qq-login-visual { min-height:190px; }.social-modal { width:calc(100% - 32px);padding:22px 20px; } }
 @media(prefers-reduced-motion:reduce) { .social-track,.social-tab-thumb { transition:none; } }

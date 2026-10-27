@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import stat
 import subprocess
 import threading
 import uuid
@@ -14,6 +15,61 @@ import uuid
 
 class HostError(RuntimeError):
     pass
+
+
+def managed_qq_runtime_config():
+    """Read a fixed private startup binding, never an account request or model tool."""
+    configured = os.environ.get("MOMO_QQ_RUNTIME_CONFIG")
+    if not configured:
+        return None
+    try:
+        path = Path(configured)
+        if not path.is_absolute() or str(path) != configured or path.resolve() != path:
+            raise ValueError()
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(descriptor, "rb") as source:
+            before = os.fstat(source.fileno())
+            if (
+                not stat.S_ISREG(before.st_mode)
+                or before.st_uid != os.getuid()
+                or before.st_nlink != 1
+                or before.st_mode & 0o077
+                or before.st_size > 16 * 1024
+            ):
+                raise ValueError()
+            content = source.read(16 * 1024 + 1)
+            after = os.fstat(source.fileno())
+        current = path.lstat()
+        snapshot = lambda value: (
+            value.st_dev, value.st_ino, value.st_size,
+            value.st_mtime_ns, value.st_ctime_ns, value.st_mode,
+        )
+        if snapshot(before) != snapshot(after) or snapshot(after) != snapshot(current):
+            raise ValueError()
+        value = json.loads(content)
+        fields = {
+            "privateRoot", "resourceRoot", "manifestPath",
+            "dataRoot", "controlRoot", "canaryPath",
+        }
+        if not isinstance(value, dict) or set(value) != fields:
+            raise ValueError()
+        for entry in value.values():
+            if (
+                not isinstance(entry, str) or not entry or len(entry) > 4096
+                or any(ord(character) < 32 or ord(character) == 127 for character in entry)
+                or not Path(entry).is_absolute() or str(Path(entry)) != entry
+            ):
+                raise ValueError()
+        private = Path(value["privateRoot"])
+        if path == private or not path.is_relative_to(private):
+            raise ValueError()
+        for field in fields - {"privateRoot"}:
+            child = Path(value[field])
+            if child == private or not child.is_relative_to(private):
+                raise ValueError()
+        return value
+    except (OSError, ValueError, TypeError, AttributeError):
+        raise HostError("Managed QQ startup configuration is invalid") from None
 
 
 class PluginHost:
@@ -30,6 +86,7 @@ class PluginHost:
         self.control = threading.RLock()
 
     def start(self):
+        qq_runtime = managed_qq_runtime_config()
         root = Path(__file__).resolve().parents[3]
         resources = Path(
             os.environ.get("MOMO_RESOURCES_DIR", root / "resources/models")
@@ -68,6 +125,7 @@ class PluginHost:
                 "coreInstance": self.core_instance,
                 "token": self.token,
                 "heartbeatMs": 5000,
+                **({"qqRuntime": qq_runtime} if qq_runtime is not None else {}),
             },
         )
         self.host_instance = result["hostInstance"]

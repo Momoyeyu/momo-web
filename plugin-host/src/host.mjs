@@ -7,6 +7,8 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema, ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 
 import { QQChannel, ChannelError } from './channels.mjs';
+import { QQRuntimeManager, QQRuntimeError } from './qq-runtime.mjs';
+import { createManagedQQRuntime } from './qq-invocation.mjs';
 
 export class HostError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -16,7 +18,7 @@ const opaque = value => typeof value === 'string' && value.length > 0 && value.l
 
 /** Only reviewed built-ins run here. Cordis scopes are lifecycle ownership, not a sandbox. */
 export class PluginHost {
-  constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000 } = {}) {
+  constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000, qqRuntime } = {}) {
     this.ctx = new Context();
     this.hostInstance = randomUUID();
     this.emit = emit;
@@ -41,6 +43,10 @@ export class PluginHost {
     this.mutations = Promise.resolve();
     this.configRevision = 0;
     this.callerConfigRevision = -1;
+    // Authentication owns an engine independently of business adapter scopes.
+    // Only trusted host startup code supplies this facade; plugin settings and
+    // model tool arguments cannot replace a process factory or its resources.
+    this.qqRuntime = qqRuntime ?? new QQRuntimeManager({ now });
     this.ctx.provide('momoCapabilities', Object.freeze({ checkPermit: permit => this.checkPermit(permit) }));
     this.ctx.provide('momoChannels', Object.freeze({ receive: data => this.receive(data) }));
     // Brain services are deliberately unavailable to host plugins in this first slice.
@@ -72,6 +78,10 @@ export class PluginHost {
     if (message.method === 'hello') {
       if (this.coreInstance) fail('ALREADY_BOUND', 'Host already belongs to a coordinator');
       if (!opaque(params.coreInstance) || typeof params.token !== 'string' || params.token.length < 32 || params.token.length > 512) fail('PROTOCOL', 'Invalid coordinator binding');
+      if (params.qqRuntime !== undefined) {
+        try { this.qqRuntime = createManagedQQRuntime(params.qqRuntime); }
+        catch { fail('RESOURCE_INVALID', 'Managed QQ resources are not qualified'); }
+      }
       this.coreInstance = params.coreInstance;
       this.token = params.token;
       this.heartbeatMs = Math.max(300, Math.min(Number(params.heartbeatMs) || 5000, 30000));
@@ -132,6 +142,12 @@ export class PluginHost {
       case 'channels.health': return this.channelHealth(params);
       case 'channels.send': return this.sendChannel(params);
       case 'channels.ack': return this.ackChannel(params);
+      case 'qq.runtime.status': return this.qqRuntime.status({ authenticatedDetail: params.authenticatedDetail === true });
+      case 'qq.runtime.begin': return this.qqRuntimeAction('begin', { ownerAction: params.ownerAction === true, expectedSelfId: params.expectedSelfId });
+      case 'qq.runtime.refresh': return this.qqRuntimeAction('refreshQR', { ownerAction: params.ownerAction === true });
+      case 'qq.runtime.cancel': return this.qqRuntimeAction('cancel');
+      case 'qq.runtime.stop': return this.qqRuntimeAction('stop');
+      case 'qq.runtime.forget': return this.qqRuntimeAction('forget', { ownerAction: params.ownerAction === true });
       case 'virtual.receive': return this.receive(params);
       case 'virtual.deliver': return this.deliver(params);
       case 'virtual.activityStart': return this.startActivity(params);
@@ -139,7 +155,7 @@ export class PluginHost {
       case 'virtual.activityStop': return this.stopActivity(params.commandId, 'requested');
       case 'receipts.list': return { receipts: this.receipts.filter(item => item.seq > (Number(params.after) || 0)), oldest: this.receipts[0]?.seq ?? this.receiptSeq + 1, latest: this.receiptSeq };
       case 'status': return this.status();
-      case 'shutdown': await this.close(); return { stopped: true };
+      case 'shutdown': return this.close();
       default: fail('METHOD', 'Unknown host method');
     }
   }
@@ -148,6 +164,14 @@ export class PluginHost {
     const next = this.mutations.then(fn, fn);
     this.mutations = next.catch(() => {});
     return next;
+  }
+
+  async qqRuntimeAction(method, params) {
+    try { return await this.qqRuntime[method](params); }
+    catch (cause) {
+      const safe = cause instanceof QQRuntimeError ? cause : new QQRuntimeError('RUNTIME_FAILED');
+      throw new HostError(safe.code, safe.message);
+    }
   }
 
   checkPermit(permit) {
@@ -236,6 +260,7 @@ export class PluginHost {
 
   async connectChannel(plugin) {
     plugin.channel = new QQChannel(plugin.config, {
+      nativeRuntime: this.qqRuntime,
       now: this.now,
       active: () => plugin.enabled && this.plugins.get(plugin.id) === plugin,
       onInbox: data => this.event('inbox', data),
@@ -537,15 +562,37 @@ export class PluginHost {
   }
 
   async close() {
-    if (this.closed) return;
+    if (this.closePromise) return this.closePromise;
+    if (this.closed) return this.closeResult ?? { stopped: false };
     this.closed = true;
     this.paused = true;
     this.epoch++;
     clearInterval(this.watchdog);
-    await this.stopAll('shutdown');
-    const plugins = [...this.plugins.values()];
-    this.plugins.clear();
-    await Promise.allSettled(plugins.map(plugin => this.disposePlugin(plugin)));
-    await this.ctx.fiber.dispose();
+    // QQ owns a detached process group. Reclaim it immediately: an unrelated
+    // provider's close() must not keep it alive until Python kills this host.
+    const nativeStopped = this.qqRuntimeAction('stop')
+      .then(result => result.executorQuiescent === true, () => false);
+    const pluginsStopped = (async () => {
+      const operations = await this.stopAll('shutdown');
+      const plugins = [...this.plugins.values()];
+      this.plugins.clear();
+      const disposed = await Promise.allSettled(plugins.map(plugin => this.disposePlugin(plugin)));
+      await this.ctx.fiber.dispose();
+      return operations.stopped && disposed.every(result => result.status === 'fulfilled');
+    })().catch(() => false);
+    this.closePromise = (async () => {
+      let timer;
+      try {
+        // The coordinator allows three seconds for the RPC and three more for
+        // host exit. One five-second ceiling includes every shutdown phase.
+        const budget = Math.max(10, Math.min(Number(this.stopTimeoutMs) || 5000, 5000));
+        this.closeResult = await Promise.race([
+          Promise.all([nativeStopped, pluginsStopped]).then(results => ({ stopped: results.every(Boolean) })),
+          new Promise(resolve => { timer = setTimeout(() => resolve({ stopped: false }), budget); }),
+        ]);
+        return this.closeResult;
+      } finally { clearTimeout(timer); }
+    })();
+    return this.closePromise;
   }
 }

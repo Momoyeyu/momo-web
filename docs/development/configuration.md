@@ -30,10 +30,13 @@ Web 仓路径为 `frontend/`、`backend/`、`plugin-host/`；以下配置在根 
 | MOMO_WEB_ORIGIN | 启动器生成的精确 127.0.0.1 源，用于鉴权 / CORS；不开放任意公网来源 |
 | MOMO_NODE | 仅开发覆盖 Node 可执行文件；正式包强制使用随包 runtime，不依赖系统 PATH |
 | MOMO_PLUGIN_HOST | 仅开发覆盖私有宿主入口；正式包固定随包代码 |
+| MOMO_QQ_RUNTIME_CONFIG | 安装 / 开发准备阶段生成的私有 QQ 运行绑定 JSON；只由后端启动读取并绑定一次，不是用户账号配置，不传浏览器或模型 |
 | MOMO_TEST_VIRTUAL | 仅隔离测试为 1 时启用虚拟入口 / 活动；正式应用默认不启用 |
 
 默认 Web 数据 `.workbuddy/dev-data/`，与桌面正式 profile 隔离；同目录第二内核会被 OS 锁拒绝。Web 代理持有一次性 `MOMO_DESKTOP_TOKEN`，不放入 `VITE_*`、浏览器存储或 URL。生产仍由 Tauri 提供临时 capability。
 
 后端开发环境由 `backend/.python-version` 固定为已验证的 Python 3.14，使用 `uv sync --frozen` 建立；不会随机器默认 Python 自动切换。
+
+受管 QQ 的运行绑定文件位于专用私有目录中，文件权限为 `0600`。它只包含 `privateRoot`、`resourceRoot`、`manifestPath`、`dataRoot`、`controlRoot`、`canaryPath` 六个绝对路径，所有内容都属于同一 QQ 私有根目录；不包含 LLM 密钥、外部桥凭据或日常 QQ 登录资料。账号界面的请求不能提供进程路径、参数、运行清单或环境变量。资源在安装 / 开发准备阶段固定并校验，点击登录不会下载资源、扫描系统 QQ 或运行厂商应用入口。未准备运行绑定时，QQ 登录明确显示资源不可用，其余功能仍可使用。
 
 `MOMO_RUNTIME_SMOKE=1` 单独启用 `21-runtime-meeting.spec.ts` 的真实 Python / Cordis 浏览器检查，必须连接隔离实例；错误模型拦截用全新未配置资料，子页刷新用已有合成对话的资料。默认浏览器回归会跳过这组场景，不能把跳过视为已验证。

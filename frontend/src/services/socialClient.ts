@@ -9,6 +9,7 @@ export interface SocialAccount {
   endpoint:string;hasCredential:boolean;permissions:SocialPermissions;
   allowlistEnabled:boolean;allowlist:SocialPeer[];ownerPeerId?:string;
   status:string;actualSelfId?:string;policyRevision:number;error?:string;
+  transport?:'managed'|'external';
   capabilities:Partial<Record<SocialPermission|'ownerBinding',boolean>>;
 }
 export interface SocialDraft {
@@ -40,12 +41,12 @@ export async function socialAccounts(signal?:AbortSignal):Promise<{accounts:Soci
   if(!Array.isArray(response?.accounts)||!Array.isArray(response.providers))throw new Error('Invalid social accounts response');
   return response;
 }
-export function saveSocialAccount(provider:SocialProvider,draft:SocialDraft):Promise<SocialAccount> {
+export function saveSocialAccount(provider:SocialProvider,draft:Partial<SocialDraft>):Promise<SocialAccount> {
   const body={...draft,token:draft.token?.trim()||undefined};
   return apiJson(`/api/social/accounts/${provider}`,jsonInit('PUT',body));
 }
-export function connectSocialAccount(provider:SocialProvider,connect:boolean):Promise<SocialAccount> {
-  return apiJson(`/api/social/accounts/${provider}/${connect?'connect':'disconnect'}`,jsonInit('POST',{}));
+export function connectSocialAccount(provider:SocialProvider,connect:boolean,transport?:'managed'|'external'):Promise<SocialAccount> {
+  return apiJson(`/api/social/accounts/${provider}/${connect?'connect':'disconnect'}`,jsonInit('POST',connect&&transport?{transport}:{}));
 }
 export function resumeSocialAccount(provider:SocialProvider):Promise<SocialAccount> {
   return apiJson(`/api/social/accounts/${provider}/resume`,jsonInit('POST',{}));

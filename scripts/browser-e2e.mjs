@@ -97,7 +97,7 @@ try{
   await new Promise((resolve,reject)=>{provider.once('error',reject);provider.listen(0,'127.0.0.1',resolve);});
   const providerUrl=`http://127.0.0.1:${provider.address().port}`;
   const env={...process.env,MOMO_DATA_DIR:data,MOMO_RESOURCES_DIR:options.resources};
-  for(const key of ['MOMO_DESKTOP_TOKEN','MOMO_DESKTOP_NONCE','MOMO_REAL_LLM_E2E','MOMO_REAL_TTS_E2E','MOMO_REAL_ONBOARDING_E2E','MOMO_BROWSER_LLM_CONFIG','MOMO_E2E_LLM_CONFIG','MOMO_ASR_MODELS'])delete env[key];
+  for(const key of ['MOMO_DESKTOP_TOKEN','MOMO_DESKTOP_NONCE','MOMO_REAL_LLM_E2E','MOMO_REAL_TTS_E2E','MOMO_REAL_ONBOARDING_E2E','MOMO_BROWSER_LLM_CONFIG','MOMO_E2E_LLM_CONFIG','MOMO_ASR_MODELS','MOMO_QQ_RUNTIME_CONFIG'])delete env[key];
   const seed=`import sys\nfrom app.core import state,db\nfrom app.services import checkpoint\nstate.write_state({'settings':{'llm':{'url':sys.argv[1],'model':'deterministic','key':''},'general':{'lang':'zh','voiceInput':False,'textSpeed':100,'sentenceSpeed':100}}})\nat=db.now_iso();gen=checkpoint.generation()\ncheckpoint.begin_turn('隔离测试会话',gen,at)\ncheckpoint.append_sentence('欢迎回来。',gen,at)\ncheckpoint.acknowledge(checkpoint.current_run(gen,at),'欢迎回来。',gen)\ndb.reset()`;
   if(await start(python,['-c',seed,providerUrl],path.join(app,'backend'),env,path.join(evidence,'seed.log')).done!==0)throw new Error('Could not seed synthetic test profile');
   const backend=start(python,['-m','uvicorn','app.main:app','--host','127.0.0.1','--port',String(options.apiPort)],path.join(app,'backend'),env,path.join(evidence,'backend.log'));

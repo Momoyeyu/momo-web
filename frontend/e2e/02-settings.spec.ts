@@ -8,6 +8,7 @@ import {
   fieldRow,
   openApp,
   openTab,
+  openExtensionTab,
   pickSelect,
   readState,
   useStateRestore,
@@ -18,7 +19,7 @@ import {
 const restore = useStateRestore();
 test.afterEach(restore);
 
-test("五个 tab 齐全，可逐个切换", async ({ page }) => {
+test("四个 tab 齐全，可逐个切换", async ({ page }) => {
   await openApp(page, "settings");
   expect(await page.locator(".stab-label").allTextContents()).toEqual([
     "通用",
@@ -31,7 +32,7 @@ test("五个 tab 齐全，可逐个切换", async ({ page }) => {
     ["通用", ".settings-cols"],
     ["模型", ".settings-cols"],
     ["记忆", ".mem-panel"],
-    ["拓展", ".ext-panel"],
+    ["拓展", ".extension-settings"],
   ];
   for (const [label, sel] of tabs) {
     await page.locator(".stab", { hasText: label }).click();
@@ -93,7 +94,7 @@ test("端点探测：可点、出结果、2.5s 后自动复原", async ({ page }
 });
 
 test("拓展 tab：登记 stdio MCP server → 出现在列表 → 删除", async ({ page }) => {
-  await openTab(page, "拓展");
+  await openExtensionTab(page, "MCP");
   // 「说明书」性质的说明收进了问号浮窗：正文里不该再有那段长句，
   // 但说明本身要能在浮窗里拿到（鼠标走 data-tip，读屏走 aria-label）。
   // 直接查内容而不是类名：以后就算换了类名，只要长句又排回版面上就会红
@@ -121,7 +122,7 @@ test("拓展 tab：登记 stdio MCP server → 出现在列表 → 删除", asyn
 });
 
 test('adapter permission policy survives JSON import, metadata edit and document reload',async({page,request})=>{
-  await openTab(page,'拓展');
+  await openExtensionTab(page,'MCP');
   await page.locator('.ext-panel .list-toolbar .icon-btn').click();
   await page.locator('.ext-modal-head').getByRole('button',{name:'⇩ 从 JSON 填入',exact:true}).click();
   const policy={declaredPermissions:['mcp.tools','activities.game'],grantedPermissions:['mcp.tools','activities.game']};
@@ -199,20 +200,39 @@ test("通用 tab：语言/语音是与对话框设置同级的两个面板，语
   await expect(page.locator(".dialog-preview .chat-status")).toHaveCount(0);
 });
 
-test("拓展 tab：Live2D 与 MCP 左右并排且等宽", async ({ page }) => {
+test("拓展二级滑块：三种配置各占完整宽度并支持键盘导航", async ({ page }, info) => {
   await openTab(page, "拓展");
-
-  const cols = page.locator(":is(.settings-pane:not([aria-hidden])) .settings-cols > .panel");
-  await expect(cols).toHaveCount(2);
-  await expect(cols.nth(0)).toContainText("Live2D 模型");
-  await expect(cols.nth(1)).toContainText("MCP");
-
-  const [a, b] = await Promise.all([
-    cols.nth(0).boundingBox(),
-    cols.nth(1).boundingBox(),
-  ]);
-  expect(Math.abs((a?.width ?? 0) - (b?.width ?? 0))).toBeLessThan(2);
-  expect(Math.abs((a?.height ?? 0) - (b?.height ?? 0))).toBeLessThan(2);
+  const tabs = page.getByRole("tablist", { name: "拓展分类" });
+  const avatar = page.getByRole("tab", { name: "Live2D", exact: true });
+  const mcp = page.getByRole("tab", { name: "MCP", exact: true });
+  const plugins = page.getByRole("tab", { name: "插件", exact: true });
+  await expect(tabs.getByRole("tab")).toHaveCount(3);
+  await expect(avatar).toHaveAttribute("aria-selected", "true");
+  for (const viewport of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {
+    await page.setViewportSize(viewport);
+    const width = (await page.locator(".extension-viewport").boundingBox())!.width;
+    for (const [tab, panel] of [[avatar, "avatar"], [mcp, "mcp"], [plugins, "plugins"]] as const) {
+      await tab.click();
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+      const active = page.locator(`#extension-panel-${panel}`);
+      await expect(active).toHaveAttribute("aria-hidden", "false");
+      await expect.poll(async () => Math.abs((await active.boundingBox())!.width - width)).toBeLessThan(2);
+      await expect.poll(async () => Math.abs((await active.boundingBox())!.x - (await page.locator(".extension-viewport").boundingBox())!.x)).toBeLessThan(2);
+      await expect(page.locator(".extension-pane[inert]")).toHaveCount(2);
+    }
+    await page.screenshot({ path: info.outputPath(`extension-plugins-${viewport.width}.png`) });
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect.poll(() => page.locator('.extension-track').evaluate(element => getComputedStyle(element).transitionDuration)).toBe('0s');
+  await plugins.press("Home");
+  await expect(avatar).toBeFocused();
+  await expect(avatar).toHaveAttribute("aria-selected", "true");
+  await avatar.press("ArrowRight");
+  await expect(mcp).toBeFocused();
+  await expect(mcp).toHaveAttribute("aria-selected", "true");
+  await page.getByRole("button", { name: "通用", exact: true }).click();
+  await page.getByRole("button", { name: "拓展", exact: true }).click();
+  await expect(mcp).toHaveAttribute("aria-selected", "true");
 });
 
 test("探测按钮定宽：出结果不变宽，且与同列「显示」同宽", async ({ page }) => {

@@ -748,6 +748,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/social/accounts/{provider}/runtime": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Managed Runtime Status */
+        get: operations["managed_runtime_status_api_social_accounts__provider__runtime_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/runtime/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Begin Runtime Login */
+        post: operations["begin_runtime_login_api_social_accounts__provider__runtime_begin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/runtime/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Runtime Login */
+        post: operations["cancel_runtime_login_api_social_accounts__provider__runtime_cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/runtime/forget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Forget Runtime Session */
+        post: operations["forget_runtime_session_api_social_accounts__provider__runtime_forget_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/runtime/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Runtime Login */
+        post: operations["refresh_runtime_login_api_social_accounts__provider__runtime_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/{provider}/runtime/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop Runtime */
+        post: operations["stop_runtime_api_social_accounts__provider__runtime_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/state": {
         parameters: {
             query?: never;
@@ -963,6 +1065,11 @@ export interface components {
             title: string;
             /** Updatedat */
             updatedAt: string;
+        };
+        /** ConnectIn */
+        ConnectIn: {
+            /** Transport */
+            transport?: ("managed" | "external") | null;
         };
         /** ContactIn */
         ContactIn: {
@@ -1216,6 +1323,44 @@ export interface components {
             commandId: string;
             /** Executorstopped */
             executorStopped: boolean;
+        };
+        /**
+         * RuntimeActionIn
+         * @description Actions accept no executable, path, identity, or transport input.
+         */
+        RuntimeActionIn: Record<string, never>;
+        /** RuntimeQROut */
+        RuntimeQROut: {
+            /** Dataurl */
+            dataUrl: string;
+            /** Expiresat */
+            expiresAt: number;
+        };
+        /** RuntimeStatusOut */
+        RuntimeStatusOut: {
+            /** Actualselfid */
+            actualSelfId: string | null;
+            /** Attemptid */
+            attemptId: string | null;
+            /** Connected */
+            connected: boolean;
+            /** Error */
+            error: string | null;
+            /** Executorquiescent */
+            executorQuiescent: boolean;
+            /**
+             * Provider
+             * @constant
+             */
+            provider: "qq";
+            qr?: components["schemas"]["RuntimeQROut"] | null;
+            /** Running */
+            running: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "idle" | "preparing" | "connecting" | "qr_pending" | "awaiting_confirmation" | "verifying" | "expired" | "connected" | "identity_mismatch" | "cancelled" | "stopping" | "stopped" | "disconnected" | "error";
         };
         /** SpeechIn */
         SpeechIn: {
@@ -2374,7 +2519,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ConnectIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -2546,6 +2695,212 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    managed_runtime_status_api_social_accounts__provider__runtime_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    begin_runtime_login_api_social_accounts__provider__runtime_begin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq";
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RuntimeActionIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_runtime_login_api_social_accounts__provider__runtime_cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq";
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RuntimeActionIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_runtime_session_api_social_accounts__provider__runtime_forget_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq";
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RuntimeActionIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_runtime_login_api_social_accounts__provider__runtime_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq";
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RuntimeActionIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_runtime_api_social_accounts__provider__runtime_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: "qq";
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RuntimeActionIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuntimeStatusOut"];
                 };
             };
             /** @description Validation Error */
