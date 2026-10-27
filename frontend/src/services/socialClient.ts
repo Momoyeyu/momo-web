@@ -6,14 +6,14 @@ export type SocialPermissions=Record<SocialPermission,boolean>;
 export interface SocialPeer {peerId:string;label?:string}
 export interface SocialAccount {
   provider:SocialProvider;id:string;enabled:boolean;accountId:string;expectedSelfId:string;
-  endpoint:string;hasCredential:boolean;permissions:SocialPermissions;
+  permissions:SocialPermissions;
   allowlistEnabled:boolean;allowlist:SocialPeer[];ownerPeerId?:string;
   status:string;actualSelfId?:string;policyRevision:number;error?:string;
-  transport?:'managed'|'external';
+  transport:'managed';
   capabilities:Partial<Record<SocialPermission|'ownerBinding',boolean>>;
 }
 export interface SocialDraft {
-  enabled:boolean;accountId:string;expectedSelfId:string;endpoint:string;token?:string;
+  enabled:boolean;expectedSelfId:string;
   permissions:SocialPermissions;allowlistEnabled:boolean;allowlist:SocialPeer[];
 }
 export interface SocialRecord {
@@ -26,8 +26,8 @@ export interface RetiredSocialRecord {
 }
 export const SOCIAL_PROVIDERS:readonly SocialProvider[]=['qq'];
 export function accountDraft(account:SocialAccount):SocialDraft {
-  // Credential values and verified owner bindings never enter editable drafts.
-  return {enabled:account.enabled,accountId:account.accountId,expectedSelfId:account.expectedSelfId,endpoint:account.endpoint,permissions:{...account.permissions},allowlistEnabled:account.allowlistEnabled,allowlist:account.allowlist.map(peer=>({...peer}))};
+  // Login identity and verified owner bindings are not editable policy fields.
+  return {enabled:account.enabled,expectedSelfId:account.expectedSelfId,permissions:{...account.permissions},allowlistEnabled:account.allowlistEnabled,allowlist:account.allowlist.map(peer=>({...peer}))};
 }
 export function parseAllowlist(text:string):SocialPeer[] {
   const unique=new Map<string,SocialPeer>();
@@ -42,11 +42,12 @@ export async function socialAccounts(signal?:AbortSignal):Promise<{accounts:Soci
   return response;
 }
 export function saveSocialAccount(provider:SocialProvider,draft:Partial<SocialDraft>):Promise<SocialAccount> {
-  const body={...draft,token:draft.token?.trim()||undefined};
+  const {enabled,expectedSelfId,permissions,allowlistEnabled,allowlist}=draft;
+  const body={enabled,expectedSelfId,permissions,allowlistEnabled,allowlist};
   return apiJson(`/api/social/accounts/${provider}`,jsonInit('PUT',body));
 }
-export function connectSocialAccount(provider:SocialProvider,connect:boolean,transport?:'managed'|'external'):Promise<SocialAccount> {
-  return apiJson(`/api/social/accounts/${provider}/${connect?'connect':'disconnect'}`,jsonInit('POST',connect&&transport?{transport}:{}));
+export function connectSocialAccount(provider:SocialProvider,connect:boolean):Promise<SocialAccount> {
+  return apiJson(`/api/social/accounts/${provider}/${connect?'connect':'disconnect'}`,jsonInit('POST',{}));
 }
 export function resumeSocialAccount(provider:SocialProvider):Promise<SocialAccount> {
   return apiJson(`/api/social/accounts/${provider}/resume`,jsonInit('POST',{}));

@@ -8,25 +8,26 @@ describe('social configuration boundary',()=>{
     expect(parseAllowlist(' 000123\n\npeer_alpha\n000123 ')).toEqual([{peerId:'000123'},{peerId:'peer_alpha'}]);
     expect(parseAllowlist(' \n')).toEqual([]);
   });
-  it('never includes a credential or owner verification in editable account drafts',()=>{
+  it('edits only managed QQ policy, without bridge fields or internal account identity',()=>{
     const account={enabled:true,accountId:'a',expectedSelfId:'123',endpoint:'ws://127.0.0.1:3001',permissions:{receive:true,reply:true,proactive:false,contacts:false,history:false},allowlistEnabled:true,allowlist:[],ownerPeerId:'owner',hasCredential:true} as unknown as SocialAccount;
     const draft=accountDraft(account);
-    expect(draft).not.toHaveProperty('ownerPeerId');expect(draft).not.toHaveProperty('token');
+    for(const key of ['ownerPeerId','token','endpoint','transport','accountId','hasCredential'])expect(draft).not.toHaveProperty(key);
     expect(draft.allowlistEnabled).toBe(true);expect(draft.allowlist).toEqual([]);
   });
-  it('an empty token input preserves the existing backend secret',async()=>{
-    await saveSocialAccount('qq',{token:'',enabled:false,accountId:'a',expectedSelfId:'123',endpoint:'ws://127.0.0.1:3001',permissions:{receive:false,reply:false,proactive:false,contacts:false,history:false},allowlistEnabled:false,allowlist:[]});
+  it('never sends obsolete bridge fields from a stale runtime draft',async()=>{
+    const staleDraft={token:'obsolete-secret',enabled:false,accountId:'a',expectedSelfId:'123',endpoint:'ws://127.0.0.1:3001',transport:'external',permissions:{receive:false,reply:false,proactive:false,contacts:false,history:false},allowlistEnabled:false,allowlist:[]};
+    await saveSocialAccount('qq',staleDraft);
     const body=JSON.parse(String(vi.mocked(apiJson).mock.calls[0]?.[1]?.body));
-    expect(body).not.toHaveProperty('token');expect(body.allowlistEnabled).toBe(false);
+    expect(body).toEqual({enabled:false,expectedSelfId:'123',permissions:staleDraft.permissions,allowlistEnabled:false,allowlist:[]});
   });
   it('rejects an incomplete accounts response so Settings can show its retry state',async()=>{
     vi.mocked(apiJson).mockResolvedValueOnce({});
     await expect(socialAccounts()).rejects.toThrow('Invalid social accounts response');
   });
-  it('selects managed transport only on explicit chat connection and does not send it on disconnect',async()=>{
-    await connectSocialAccount('qq',true,'managed');
-    await connectSocialAccount('qq',false,'managed');
-    expect(apiJson).toHaveBeenNthCalledWith(1,'/api/social/accounts/qq/connect',{method:'POST',body:'{"transport":"managed"}'});
+  it('connects the managed account without a transport choice',async()=>{
+    await connectSocialAccount('qq',true);
+    await connectSocialAccount('qq',false);
+    expect(apiJson).toHaveBeenNthCalledWith(1,'/api/social/accounts/qq/connect',{method:'POST',body:'{}'});
     expect(apiJson).toHaveBeenNthCalledWith(2,'/api/social/accounts/qq/disconnect',{method:'POST',body:'{}'});
   });
   it('can save displayed policy without enabling a first-time managed account before verified connect',async()=>{

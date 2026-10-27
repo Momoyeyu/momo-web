@@ -1,4 +1,7 @@
 import {test, expect, type Page} from './fixtures';
+import {writeFile} from 'node:fs/promises';
+
+type GlyphFrame={cells:number;painted:boolean;png:string};
 
 async function fixture(page: Page, lang = 'zh') {
   await page.route('**/api/**', async route => {
@@ -38,22 +41,45 @@ for (const lang of ['zh','en','ja']) {
 }
 
 test('approved silhouette turns into visible ASCII, then releases real chat; settings retain RoPE', async ({page},info) => {
+  await page.clock.install();
   await fixture(page);
   const portrait = page.locator('.title-presence');
   await expect(portrait).toHaveAttribute('src','/brand/momo-presence-v2.webp');
   await expect.poll(() => portrait.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(1024);
   await expect.poll(() => page.locator('.title-menu .menu-item').last().evaluate(element=>Number(getComputedStyle(element).opacity))).toBe(1);
   await page.screenshot({path:info.outputPath('title-approved-silhouette.png')});
+  await page.clock.pauseAt(await page.evaluate(()=>Date.now())+100);
+  // Capture the transient phase in the page, atomically with its pixels. Trace
+  // snapshots can outlive the animation between separate Playwright requests.
+  // Drive only this visual phase with a clock; real image decoding still runs,
+  // and the separate fallback/reduced-motion tests keep their real clocks.
+  await page.evaluate(()=>{
+    const observed=window as Window&{entryGlyphFrame?:GlyphFrame};
+    const sample=()=>{
+      const canvas=document.querySelector<HTMLCanvasElement>('.chat-entry-canvas');
+      if(canvas?.dataset.phase==='glyphs'&&canvas.width>0&&canvas.height>0&&canvas.getBoundingClientRect().width>0){
+        const context=canvas.getContext('2d');
+        if(context){
+          const painted=context.getImageData(0,0,canvas.width,canvas.height).data.some((value,index)=>index%4===3&&value>0);
+          observed.entryGlyphFrame={cells:Number(canvas.dataset.cells),painted,png:canvas.toDataURL('image/png')};
+          return;
+        }
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
   await page.getByRole('button',{name:'启动 boot'}).click();
   const ink = page.locator('.chat-entry-canvas');
   await expect(ink).toBeVisible();
-  await expect.poll(() => ink.getAttribute('data-phase')).toBe('glyphs');
-  expect(Number(await ink.getAttribute('data-cells'))).toBeGreaterThan(1000);
-  expect(await ink.evaluate(canvas => {
-    const context = (canvas as HTMLCanvasElement).getContext('2d')!;
-    return context.getImageData(0,0,canvas.width,canvas.height).data.some((value,index) => index % 4 === 3 && value > 0);
-  })).toBe(true);
-  await page.screenshot({path:info.outputPath('ascii-entry.png')});
+  await expect(ink).toHaveAttribute('width',/^\d+$/); // Assigned after real image decode and atlas preparation.
+  await page.clock.runFor(550);
+  await expect.poll(()=>page.evaluate(()=>(window as Window&{entryGlyphFrame?:GlyphFrame}).entryGlyphFrame?.cells??0)).toBeGreaterThan(1000);
+  const frame=await page.evaluate(()=>(window as Window&{entryGlyphFrame?:GlyphFrame}).entryGlyphFrame!);
+  expect(frame.painted).toBe(true);
+  await writeFile(info.outputPath('ascii-entry.png'),Buffer.from(frame.png.split(',')[1]!,'base64'));
+  await page.clock.runFor(1500);
+  await page.clock.resume();
   await expect(ink).toHaveCount(0);
   await expect(page.locator('.page-wrap.is-booting')).toHaveCount(0);
   await expect(page.locator('.input-row input')).toBeVisible();

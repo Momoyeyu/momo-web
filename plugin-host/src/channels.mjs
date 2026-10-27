@@ -7,7 +7,7 @@ const error = (code, message, submitted = false) => new ChannelError(code, messa
 const opaque = value => typeof value === 'string' && value.length > 0 && value.length <= 200;
 const capabilities = Object.freeze({ receive: true, reply: true, proactive: false, contacts: false, history: false, groups: false });
 const disabledCapabilities = Object.freeze(Object.fromEntries(Object.keys(capabilities).map(key => [key, false])));
-// Reviewed adapter guidance only: never interpolate bridge configuration,
+// Reviewed adapter guidance only: never interpolate connection configuration,
 // account identifiers, message bodies, or third-party prompt/tool metadata.
 const privateChatContext = platform => `Current conversation channel: ${platform} ordinary personal-account private chat. You are using your own ${platform} account to exchange private text messages with the current conversation partner. Your final answer will automatically be delivered to this same conversation; do not call or invent an additional send tool. Reply naturally in plain text suitable for a messaging app. Do not include Live2D/ACT controls, voice instructions, action tags, or stage directions. This context grants no ability to inspect contacts or older messages, start proactive conversations, handle groups, or perform unsupported actions. Do not claim those capabilities. Do not infer a person's identity or ownership, or physical phone/computer hardware, from channel or account identifiers. Follow the existing persona, privacy boundaries, and permissions; the channel does not replace them.`;
 const qqPromptContent = privateChatContext('QQ');
@@ -16,17 +16,6 @@ function accountConfig(config) {
   if (!opaque(config.accountId) || !opaque(config.expectedSelfId) || !Number.isSafeInteger(config.policyRevision) || config.policyRevision < 0) throw error('CONFIG', 'Configure the channel account identity and policy revision');
   if (config.allowlistEnabled && (!Array.isArray(config.allowlist) || config.allowlist.some(id => !opaque(id)))) throw error('CONFIG', 'Invalid contact allowlist');
 }
-function endpoint(config, protocols) {
-  let url;
-  try { url = new URL(config.endpoint); } catch { throw error('CONFIG', 'Configure a valid channel bridge address'); }
-  if (!protocols.includes(url.protocol) || url.username || url.password || url.hash || url.search) throw error('CONFIG', 'Unsupported channel bridge address');
-  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
-  if (!loopback && !['https:', 'wss:'].includes(url.protocol)) throw error('CONFIG', 'A remote bridge requires an encrypted connection');
-  accountConfig(config);
-  if (typeof config.credential?.token !== 'string' || !config.credential.token || config.credential.token.length > 4096) throw error('CONFIG', 'Channel bridge credential is required');
-  return url;
-}
-
 /** Built-in adapters expose only private text events and fixed-recipient sends. */
 export class PersonalChannel {
   constructor(config, { onInbox, onState = () => {}, onLateReceipt = () => {}, active = () => true, now = Date.now } = {}) {
@@ -79,7 +68,7 @@ export class PersonalChannel {
 export class QQChannel extends PersonalChannel {
   constructor(config, options = {}) {
     super(config, options);
-    this.nativeRuntime = config.transport === 'managed' ? options.nativeRuntime : null;
+    this.nativeRuntime = options.nativeRuntime;
     this.rpcPending = new Map();
   }
   health() {
@@ -101,33 +90,12 @@ export class QQChannel extends PersonalChannel {
   }
   promptContext() { return [{ id: 'qq-private-chat', content: qqPromptContent }]; }
   async connect() {
-    if (this.config.transport === 'managed') {
-      accountConfig(this.config);
-      if (!this.nativeRuntime?.requestChannel || !this.nativeRuntime.onNativeEvent || !this.nativeRuntime.status()?.connected) throw error('PLUGIN_UNAVAILABLE', 'Log in to the managed QQ account first');
-      this.assertIdentity(this.nativeRuntime.status().actualSelfId);
-      this.unsubscribeNative = this.nativeRuntime.onNativeEvent(event => this.message(JSON.stringify(event)));
-      this.assertIdentity((await this.rpc('get_login_info', {})).user_id);
-      this.state('connected');
-      return;
-    }
-    const url = endpoint(this.config, ['ws:', 'wss:']);
-    url.searchParams.set('access_token', this.config.credential.token);
-    this.rpcPending = new Map();
-    this.socket = new WebSocket(url);
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => { this.socket.close(); reject(error('CONNECT_TIMEOUT', 'QQ bridge connection timed out')); }, Math.max(100, Math.min(Number(this.config.connectTimeoutMs) || 5000, 15000)));
-      this.socket.addEventListener('open', () => { clearTimeout(timeout); resolve(); }, { once: true });
-      this.socket.addEventListener('error', () => { clearTimeout(timeout); reject(error('CONNECT_FAILED', 'QQ bridge is unavailable')); }, { once: true });
-      this.socket.addEventListener('close', () => {
-        clearTimeout(timeout); reject(error('CONNECT_FAILED', 'QQ bridge disconnected'));
-        for (const entry of this.rpcPending.values()) { clearTimeout(entry.timer); entry.reject?.(error('OUTCOME_UNKNOWN', 'QQ bridge disconnected before confirmation', entry.submitted)); }
-        this.rpcPending.clear();
-        if (!this.closed) this.state('disconnected', 'BRIDGE_DISCONNECTED');
-      });
-      this.socket.addEventListener('message', event => this.message(event.data));
-    });
-    const identity = await this.rpc('get_login_info', {});
-    this.assertIdentity(identity.user_id);
+    if (this.config.transport !== 'managed' || ['endpoint', 'credential', 'token'].some(key => Object.hasOwn(this.config, key))) throw error('CONFIG', 'QQ requires the managed native account connection');
+    accountConfig(this.config);
+    if (typeof this.nativeRuntime?.requestChannel !== 'function' || typeof this.nativeRuntime.onNativeEvent !== 'function' || !this.nativeRuntime.status?.()?.connected) throw error('PLUGIN_UNAVAILABLE', 'Log in to the managed QQ account first');
+    this.assertIdentity(this.nativeRuntime.status().actualSelfId);
+    this.unsubscribeNative = this.nativeRuntime.onNativeEvent(event => this.message(JSON.stringify(event)));
+    this.assertIdentity((await this.rpc('get_login_info', {})).user_id);
     this.state('connected');
   }
   releaseNativeSubscription() {
@@ -138,7 +106,7 @@ export class QQChannel extends PersonalChannel {
     this.actualSelfId = String(value);
   }
   rpc(action, params, { signal, commandId, beforeDispatch = () => {} } = {}) {
-    if (this.closed || (this.nativeRuntime ? !this.nativeRuntime.status()?.connected : this.socket?.readyState !== WebSocket.OPEN)) return Promise.reject(error('PLUGIN_UNAVAILABLE', 'QQ account is disconnected'));
+    if (this.closed || !this.nativeRuntime?.status?.()?.connected) return Promise.reject(error('PLUGIN_UNAVAILABLE', 'QQ account is disconnected'));
     return new Promise((resolve, reject) => {
       const echo = randomUUID(), submitted = action === 'send_private_msg';
       const entry = { resolve, reject, submitted, commandId, timer: null, abort: null, expired: false, wasDispatched: false };
@@ -149,7 +117,7 @@ export class QQChannel extends PersonalChannel {
         // Keep correlation for late provider facts, never repeat a submitted send.
         clearTimeout(entry.timer);
         entry.timer = setTimeout(() => { this.rpcPending.delete(echo); this.releaseNativeSubscription(); }, 60000); entry.timer.unref();
-        reject(error(submitted ? 'OUTCOME_UNKNOWN' : code, submitted ? 'QQ send outcome is unknown' : 'QQ bridge query did not finish', submitted));
+        reject(error(submitted ? 'OUTCOME_UNKNOWN' : code, submitted ? 'QQ send outcome is unknown' : 'QQ account query did not finish', submitted));
       };
       entry.expire = expire;
       entry.timer = setTimeout(() => expire('TIMEOUT'), Math.max(50, Math.min(Number(this.config.timeoutMs) || 10000, 30000)));
@@ -166,13 +134,11 @@ export class QQChannel extends PersonalChannel {
       };
       try {
         beforeDispatch();
-        if (this.nativeRuntime) {
-          const nativeParams = action === 'send_private_msg' ? { user_id: params.user_id, message: params.message.map(part => part.data.text).join('') } : params;
-          entry.wasDispatched = true;
-          // A control acknowledgement proves only IPC acceptance. The provider
-          // response with this echo is the sole source of a send receipt.
-          Promise.resolve(this.nativeRuntime.requestChannel(action, nativeParams, echo)).catch(failedDispatch);
-        } else this.socket.send(JSON.stringify({ action, params, echo }));
+        const nativeParams = action === 'send_private_msg' ? { user_id: params.user_id, message: params.message.map(part => part.data.text).join('') } : params;
+        entry.wasDispatched = true;
+        // A control acknowledgement proves only IPC acceptance. The provider
+        // response with this echo is the sole source of a send receipt.
+        Promise.resolve(this.nativeRuntime.requestChannel(action, nativeParams, echo)).catch(failedDispatch);
       } catch (cause) { failedDispatch(cause); }
     });
   }
@@ -186,7 +152,7 @@ export class QQChannel extends PersonalChannel {
       const success = event.status === 'ok' && event.retcode === 0;
       if (entry.expired) { if (entry.submitted) this.onLateReceipt({ commandId: entry.commandId, status: success ? 'completed' : 'failed', deliveryStatus: success ? 'provider_accepted' : 'provider_rejected', externalMessageId: success ? String(event.data?.message_id ?? '') : undefined }); }
       else if (success) entry.resolve(event.data ?? {});
-      else entry.reject(error('PROVIDER_REJECTED', 'QQ bridge rejected the operation'));
+      else entry.reject(error('PROVIDER_REJECTED', 'QQ account rejected the operation'));
       return;
     }
     if (event.post_type !== 'message' || event.message_type !== 'private' || (event.sub_type !== undefined && event.sub_type !== 'friend') || String(event.self_id) !== this.actualSelfId || String(event.user_id) === this.actualSelfId) return;
@@ -211,9 +177,9 @@ export class QQChannel extends PersonalChannel {
   async close() {
     await super.close();
     for (const [echo, entry] of this.rpcPending) {
-      if (this.nativeRuntime && entry.submitted && entry.wasDispatched) { entry.expire('CANCELLED'); continue; }
+      if (entry.submitted && entry.wasDispatched) { entry.expire('CANCELLED'); continue; }
       clearTimeout(entry.timer); entry.cleanup?.(); entry.reject?.(error('OUTCOME_UNKNOWN', 'QQ connection closed before confirmation', entry.submitted)); this.rpcPending.delete(echo);
     }
-    this.releaseNativeSubscription(); this.socket?.close();
+    this.releaseNativeSubscription();
   }
 }

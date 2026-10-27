@@ -1,23 +1,42 @@
 import io
-import json
 import zipfile
 
 import pytest
 
 from app.services.social import SocialAccounts, SocialError
+from conftest import configured_native_social
+
+
+def test_qq_defaults_to_native_without_bridge_configuration():
+    store = SocialAccounts()
+    account = store.get("qq")
+    assert account["transport"] == "managed"
+    assert not {"endpoint", "token", "hasCredential", "credentialRef"}.intersection(account)
+    for field in ("endpoint", "token"):
+        with pytest.raises(SocialError, match="Unknown account field"):
+            store.put("qq", {field: "removed"})
+    with pytest.raises(SocialError, match="Unsupported QQ transport"):
+        store.connect("qq", transport="external")
+
+
+@pytest.mark.parametrize("stored_transport", ["external", None])
+def test_disposable_external_configuration_cannot_reach_native_business_or_resolve_credentials(stored_transport):
+    store = SocialAccounts()
+    old = {**store._default("qq"), "transport": "external", "enabled": True,
+           "endpoint": "ws://127.0.0.1:3001", "token": "unused-old-secret", "credentialRef": "old-ref"}
+    if stored_transport is None:
+        old.pop("transport")
+    store._write({"qq": old})
+    account = store.get("qq")
+    assert account["transport"] == "managed"
+    assert account["enabled"] is False
+    assert not {"endpoint", "token", "hasCredential", "credentialRef"}.intersection(account)
+    assert store.host_configs() == []
 
 
 def configured(store, provider="qq", **changes):
-    values = {
-        "enabled": True,
-        "accountId": provider + "-main",
-        "expectedSelfId": "10001",
-        "endpoint": "ws://127.0.0.1:3001",
-        "token": "private-bridge-token",
-        "permissions": {"receive": True, "reply": True},
-        **changes,
-    }
-    return store.put(provider, values)
+    assert provider == "qq"
+    return configured_native_social(store, **{"permissions": {"receive": True, "reply": True}, **changes})
 
 
 def event(**changes):
@@ -76,18 +95,16 @@ def test_identity_permissions_revision_and_echo_are_rechecked():
         store.authorize_send("qq-main", "20002", rev + 1, audience=store.authorize_event(event())["audience"])
 
 
-def test_tokens_are_write_only_and_outside_default_export():
+def test_native_account_configuration_is_outside_default_export():
     from app.services.archive import export_data
     store = SocialAccounts()
-    account = configured(store)
-    assert account["hasCredential"] is True
-    assert "private-bridge-token" not in json.dumps(account)
-    assert "private-bridge-token" not in json.dumps(store.list_accounts())
-    assert store.host_configs()[0]["credential"]["token"] == "private-bridge-token"
+    account = configured(store, accountId="private-social-account")
+    assert not {"endpoint", "token", "hasCredential", "credentialRef"}.intersection(account)
+    assert "credential" not in store.host_configs()[0]
     store.put("qq", {"permissions": {"receive": True, "reply": True}})
-    assert store.host_configs()[0]["credential"]["token"] == "private-bridge-token"
+    assert store.host_configs()[0]["transport"] == "managed"
     with zipfile.ZipFile(io.BytesIO(export_data())) as archive:
-        assert all("private-bridge-token".encode() not in archive.read(name) for name in archive.namelist())
+        assert all(b"private-social-account" not in archive.read(name) for name in archive.namelist())
 
 
 def test_owner_binding_requires_one_time_proof_from_exact_peer():
@@ -130,7 +147,7 @@ def test_profile_isolation_keeps_social_accounts_separate(tmp_path, monkeypatch)
     configured(store)
     monkeypatch.setattr(state, "DATA_DIR", tmp_path / "another-profile")
     assert store.get("qq")["enabled"] is False
-    assert store.get("qq")["hasCredential"] is False
+    assert "hasCredential" not in store.get("qq")
 
 
 def test_canonical_profile_alias_can_read_private_account_storage(tmp_path, monkeypatch):
@@ -145,14 +162,6 @@ def test_canonical_profile_alias_can_read_private_account_storage(tmp_path, monk
     configured(store)
     monkeypatch.setattr(state, "DATA_DIR", parent / "life")
     assert store.get("qq")["enabled"] is True
-
-
-def test_changed_account_does_not_inherit_previous_credential():
-    store = SocialAccounts()
-    configured(store)
-    store.put("qq", {"accountId": "qq-another", "expectedSelfId": "30003"})
-    assert store.get("qq")["hasCredential"] is False
-    assert store.host_configs()[0]["credential"] == {}
 
 
 def test_owner_relink_cannot_authorize_old_owners_inflight_private_reply():

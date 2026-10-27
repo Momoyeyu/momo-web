@@ -9,6 +9,7 @@ import pytest
 from app.core import db
 from app.services import checkpoint, memory, turn
 from app.services.coordinator import Coordinator, CoordinationError
+from conftest import configured_native_social
 
 
 @pytest.mark.parametrize("source", ["wechat", "unrecognized"])
@@ -410,7 +411,7 @@ def test_local_interruption_resumes_only_unsent_phone_work_in_one_brain(monkeypa
     from app.services.social import social
     core = Coordinator()
     core.start()
-    account = social.put("qq", {"enabled": True, "accountId": "qq-main", "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only", "permissions": {"receive": True, "reply": True}})
+    account = configured_native_social(social, **{'accountId': 'qq-main', 'expectedSelfId': '10001', 'permissions': {'receive': True, 'reply': True}})
     started, sent = threading.Event(), threading.Event()
     prompts = []
     original_request = core.host.request
@@ -465,7 +466,7 @@ def test_worker_obtains_current_plugin_context_before_persona_inference(monkeypa
     from app.services.social import social
     core = Coordinator()
     core.start()
-    social.put("qq", {"enabled": True, "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only"})
+    configured_native_social(social, **{'expectedSelfId': '10001'})
     event = {"source": "qq", "pluginId": "momo-qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "one", "text": "which app?"}
     if owner:
         proof = social.owner_challenge("qq", "20002")
@@ -514,7 +515,7 @@ def test_unavailable_plugin_context_holds_input_without_inference_or_send(monkey
     from app.services.social import social
     core = Coordinator()
     core.start()
-    account = social.put("qq", {"enabled": True, "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only"})
+    account = configured_native_social(social, **{'expectedSelfId': '10001'})
     event = {"source": "qq", "pluginId": "momo-qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "one", "text": "preserve this input", "policyRevision": account["policyRevision"]}
     original = core.host.request
     inferred, sent = [], []
@@ -552,7 +553,7 @@ def test_delayed_plugin_context_cannot_start_inference_after_attention_revocatio
     from app.services.social import social
     core = Coordinator()
     core.start()
-    account = social.put("qq", {"enabled": True, "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only"})
+    account = configured_native_social(social, **{'expectedSelfId': '10001'})
     event = {"source": "qq", "pluginId": "momo-qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "delayed", "text": "preserve interrupted question", "policyRevision": account["policyRevision"]}
     original = core.host.request
     waiting, release = threading.Event(), threading.Event()
@@ -619,7 +620,7 @@ def test_delayed_plugin_context_revalidates_owner_binding_before_private_history
     from app.services.social import social
     core = Coordinator()
     core.start()
-    social.put("qq", {"enabled": True, "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only"})
+    configured_native_social(social, **{'expectedSelfId': '10001'})
     proof = social.owner_challenge("qq", "20002")
     if initial_owner:
         social.authorize_event({"source": "qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "initial-proof", "text": proof["challenge"]})
@@ -692,7 +693,7 @@ def test_worker_uses_generation_captured_atomically_when_its_run_is_admitted(mon
     from app.services.social import social
     core = Coordinator()
     core.start()
-    account = social.put("qq", {"enabled": True, "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "fixture-only"})
+    account = configured_native_social(social, **{'expectedSelfId': '10001'})
     event = {"source": "qq", "pluginId": "momo-qq", "accountId": "qq-main", "selfId": "10001", "peerId": "20002", "senderId": "20002", "conversationKind": "private", "externalMessageId": "admission-race", "text": "do not rebase old admission", "policyRevision": account["policyRevision"]}
     original_run, original_request = core.run, core.host.request
     inferred, sent = [], []

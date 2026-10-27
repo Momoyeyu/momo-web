@@ -52,34 +52,34 @@ def test_explicit_managed_connection_binds_first_native_identity_without_grantin
     assert "credential" not in config
 
 
-def test_managed_transport_preserves_existing_credentials_owner_proof_and_private_scope(native_host):
+def test_native_connection_preserves_owner_proof_and_private_scope(native_host):
     store = SocialAccounts()
-    store.put("qq", {"enabled": True, "accountId": "legacy-qq", "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "private-legacy-token", "allowlist": [{"peerId": "20002"}], "allowlistEnabled": True})
+    store.put("qq", {"accountId": "qq-main", "expectedSelfId": "10001", "allowlist": [{"peerId": "20002"}], "allowlistEnabled": True})
     data = store._read()
     data["qq"].update({"ownerPeerId": "20002", "ownerChallenge": {"peerId": "20002", "hash": "opaque-proof", "expiresAt": 9999999999}})
     store._write(data)
     old = copy.deepcopy(data["qq"])
     account = store.connect("qq", transport="managed")
     saved = store._read()["qq"]
-    for key in ("accountId", "expectedSelfId", "endpoint", "credentialRef", "ownerPeerId", "ownerChallenge", "permissions", "allowlist", "allowlistEnabled"):
+    for key in ("accountId", "expectedSelfId", "ownerPeerId", "ownerChallenge", "permissions", "allowlist", "allowlistEnabled"):
         assert saved[key] == old[key]
     assert account["transport"] == "managed"
     assert account["policyRevision"] > old["policyRevision"]
-    assert "private-legacy-token" not in str(account)
+    assert not {"endpoint", "token", "credentialRef", "hasCredential"}.intersection(account)
     assert "endpoint" not in store.host_configs()[0]
     assert "credential" not in store.host_configs()[0]
 
 
 @pytest.mark.parametrize("native_change", [{"actualSelfId": "99999"}, {"connected": False, "status": "qr_pending", "actualSelfId": None}])
-def test_native_mismatch_or_incomplete_auth_cannot_switch_a_working_legacy_account(native_host, native_change):
+def test_native_mismatch_or_incomplete_auth_cannot_enable_the_account(native_host, native_change):
     native_host[0].update(native_change)
     store = SocialAccounts()
-    store.put("qq", {"enabled": True, "accountId": "legacy-qq", "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "private-legacy-token"})
+    store.put("qq", {"accountId": "qq-main", "expectedSelfId": "10001"})
     before = store._path().read_bytes()
     with pytest.raises(SocialError):
         store.connect("qq", transport="managed")
     assert store._path().read_bytes() == before
-    assert store.get("qq")["transport"] == "external"
+    assert store.get("qq")["enabled"] is False
 
 
 def test_native_enable_checks_settings_again_after_the_async_identity_query(native_host, monkeypatch):
@@ -100,9 +100,10 @@ def test_native_enable_checks_settings_again_after_the_async_identity_query(nati
     assert store.get("qq")["enabled"] is False
 
 
-def test_explicit_api_transport_cannot_be_replaced_by_arbitrary_process_configuration(native_host):
+@pytest.mark.parametrize("body", [{}, {"transport": "managed"}])
+def test_native_api_connection_cannot_be_replaced_by_arbitrary_process_configuration(native_host, body):
     client = TestClient(app)
-    response = client.post("/api/social/accounts/qq/connect", json={"transport": "managed"})
+    response = client.post("/api/social/accounts/qq/connect", json=body)
     assert response.status_code == 200
     assert response.json()["transport"] == "managed"
     assert response.json()["expectedSelfId"] == "10001"
@@ -118,14 +119,14 @@ def test_managed_permission_save_needs_no_legacy_endpoint_and_disable_is_immedia
     account = store.put("qq", {"permissions": {"reply": False}, "allowlistEnabled": True})
     assert account["transport"] == "managed"
     assert account["enabled"] is True
-    assert account["endpoint"] == ""
+    assert "endpoint" not in account
     assert store.disconnect("qq")["enabled"] is False
     assert not store.host_configs()
 
 
 def test_unresolved_old_send_cannot_be_bypassed_by_managed_transport_switch(native_host, monkeypatch):
     store = SocialAccounts()
-    store.put("qq", {"accountId": "qq-main", "expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001"})
+    store.put("qq", {"accountId": "qq-main", "expectedSelfId": "10001"})
     monkeypatch.setattr(runtime, "_unresolved_commands", lambda: [{"payload": '{"params":{"accountId":"qq-main"}}'}])
     before = store._path().read_bytes()
     with pytest.raises(SocialError):
@@ -133,9 +134,9 @@ def test_unresolved_old_send_cannot_be_bypassed_by_managed_transport_switch(nati
     assert store._path().read_bytes() == before
 
 
-def test_failed_native_business_verification_disables_without_falling_back_to_legacy(native_host, monkeypatch):
+def test_failed_native_business_verification_disables_the_account(native_host, monkeypatch):
     store = SocialAccounts()
-    store.put("qq", {"expectedSelfId": "10001", "endpoint": "ws://127.0.0.1:3001", "token": "retained-legacy-token"})
+    store.put("qq", {"expectedSelfId": "10001"})
     original = runtime.host.request
 
     def failed_transport(method, params, timeout=None):
@@ -149,8 +150,7 @@ def test_failed_native_business_verification_disables_without_falling_back_to_le
     account = store.get("qq")
     assert account["transport"] == "managed"
     assert account["enabled"] is False
-    assert account["endpoint"] == "ws://127.0.0.1:3001"
-    assert account["hasCredential"] is True
+    assert not {"endpoint", "token", "credentialRef", "hasCredential"}.intersection(account)
     assert not store.host_configs()
 
 

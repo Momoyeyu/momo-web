@@ -1,7 +1,7 @@
 """Reviewed personal-account channels: private configuration and final policy gates.
 
-The account file and secret references live outside the life archive. Transport
-events are trusted only after host authentication; platform identity, recipient,
+The account file lives outside the life archive; native login is runtime-owned.
+Events are trusted only after host authentication; platform identity, recipient,
 permissions and their revision are still checked here before inference or send.
 """
 from __future__ import annotations
@@ -17,10 +17,8 @@ import tempfile
 import threading
 import time
 import uuid
-from urllib.parse import urlsplit
 
 from ..core import db, state
-from ..core.credentials import credentials, CredentialError
 
 
 class SocialError(ValueError):
@@ -133,6 +131,18 @@ class SocialAccounts:
             content = json.loads(path.read_text())
             if not isinstance(content, dict):
                 raise SocialError("Private account storage is invalid")
+            account = content.get("qq")
+            if isinstance(account, dict):
+                # Disposable bridge configuration cannot enable the native
+                # account or carry an old gateway credential into the host.
+                managed = account.get("transport") == "managed"
+                account = {**self._default("qq"), **account}
+                if not managed:
+                    account["enabled"] = False
+                account["transport"] = "managed"
+                for key in ("endpoint", "token", "credentialRef"):
+                    account.pop(key, None)
+                content["qq"] = account
             return content
         except FileNotFoundError:
             return {}
@@ -162,8 +172,8 @@ class SocialAccounts:
         if provider not in PROVIDERS:
             raise SocialError("Unsupported personal-account provider")
         return {"provider": provider, "id": "momo-" + provider,
-                "accountId": provider + "-main", "expectedSelfId": "", "endpoint": "",
-                "transport": "external",
+                "accountId": provider + "-main", "expectedSelfId": "",
+                "transport": "managed",
                 "enabled": False, "permissions": dict(PERMISSIONS), "allowlistEnabled": False,
                 "allowlist": [], "ownerPeerId": None, "policyRevision": 0, "quarantined": False}
 
@@ -174,8 +184,6 @@ class SocialAccounts:
         with self.lock:
             account = copy.deepcopy(self._account(provider))
         value = {key: copy.deepcopy(account.get(key)) for key in self._default(provider)}
-        value["transport"] = account.get("transport", "external")
-        value["hasCredential"] = bool(account.get("credentialRef"))
         value["capabilities"] = dict(CAPABILITIES)
         value["status"] = "quarantined" if account.get("quarantined") else "disconnected" if account["enabled"] else "disabled"
         value["actualSelfId"] = None
@@ -197,14 +205,14 @@ class SocialAccounts:
     def list_accounts(self):
         return {"accounts": [self.get(p) for p in PROVIDERS],
                 "providers": [{"id": p, "name": "QQ",
-                               "auth": "personal_bridge", "oauthMessaging": False,
+                               "auth": "personal_native", "oauthMessaging": False,
                                "capabilities": dict(CAPABILITIES)} for p in PROVIDERS]}
 
     def managed_qq_runtime(self, action="status"):
         """Local-user login management is independent of Boot and message grants.
 
         The host owns engine/session lifecycle. Polling or successful login never
-        changes the account's transport, owner binding, policy, or credentials.
+        changes the account's owner binding, enabled state, or message policy.
         """
         from .coordinator import runtime
         if action not in {"status", "begin", "refresh", "cancel", "stop", "forget"}:
@@ -245,14 +253,14 @@ class SocialAccounts:
     def put(self, provider, values):
         if not isinstance(values, dict):
             raise SocialError("Account configuration must be an object")
-        allowed = {"enabled", "accountId", "expectedSelfId", "endpoint", "token", "permissions", "allowlistEnabled", "allowlist"}
+        allowed = {"enabled", "accountId", "expectedSelfId", "permissions", "allowlistEnabled", "allowlist"}
         if set(values) - allowed:
             raise SocialError("Unknown account field; owner identity requires a verified challenge")
         with self.lock:
             data = self._read()
             old = data.get(provider, self._default(provider))
             account = copy.deepcopy(old)
-            if old.get("transport") == "managed" and not old["enabled"] and values.get("enabled") is True:
+            if not old["enabled"] and values.get("enabled") is True:
                 raise SocialError("Use the verified QQ connection action to enable managed chat")
             for flag in ("enabled", "allowlistEnabled"):
                 if flag in values:
@@ -262,19 +270,6 @@ class SocialAccounts:
             for key in ("accountId", "expectedSelfId"):
                 if key in values:
                     account[key] = _identifier(values[key], key) if values[key] else ""
-            if "endpoint" in values:
-                endpoint = values["endpoint"]
-                if not isinstance(endpoint, str) or len(endpoint) > 2048:
-                    raise SocialError("Invalid connection address")
-                try:
-                    parsed = urlsplit(endpoint)
-                    schemes = {"ws", "wss"}
-                    valid = not endpoint or parsed.scheme in schemes and bool(parsed.hostname) and not any((parsed.username, parsed.password, parsed.query, parsed.fragment))
-                except ValueError:
-                    valid = False
-                if not valid:
-                    raise SocialError("Use a channel address without credentials, query or fragment")
-                account["endpoint"] = endpoint.strip()
             if "permissions" in values:
                 grants = values["permissions"]
                 if not isinstance(grants, dict) or set(grants) - set(PERMISSIONS):
@@ -296,35 +291,18 @@ class SocialAccounts:
                         raise SocialError("Invalid contact label")
                     normalized[peer] = {"peerId": peer, "label": label}
                 account["allowlist"] = list(normalized.values())
-            required = ("accountId", "expectedSelfId") if account.get("transport") == "managed" else ("accountId", "expectedSelfId", "endpoint")
+            required = ("accountId", "expectedSelfId")
             if account["enabled"] and not all(account[k] for k in required):
-                raise SocialError("Configure the account identity and connection address first")
+                raise SocialError("Configure the account identity first")
             if any(p != provider and row.get("accountId") == account["accountId"] for p, row in data.items()):
                 raise SocialError("Each channel account needs a distinct identity")
-            rebound = any(account[k] != old[k] for k in ("accountId", "expectedSelfId", "endpoint"))
+            rebound = any(account[k] != old[k] for k in ("accountId", "expectedSelfId"))
             if rebound:
                 account["ownerPeerId"] = None
                 account.pop("ownerChallenge", None)
-            if account["accountId"] != old["accountId"]:
-                account.pop("credentialRef", None)
-            token = values.get("token")
-            if token is not None:
-                if not isinstance(token, str) or len(token) > 4096 or any(ord(c) < 32 for c in token):
-                    raise SocialError("Invalid connection credential")
-                if token:
-                    account["credentialRef"] = credentials.put(provider=provider, account_key=account["accountId"],
-                        plugin_id=account["id"], secret={"token": token}, declared_scopes=["connect"], granted_scopes=["connect"])
-                elif not old.get("credentialRef"):
-                    account.pop("credentialRef", None)
             account["policyRevision"] = int(old["policyRevision"]) + 1
             data[provider] = account
             self._write(data)
-            old_ref = old.get("credentialRef")
-            if old_ref and old_ref != account.get("credentialRef"):
-                try:
-                    credentials.revoke(old_ref)
-                except CredentialError:
-                    pass
         self._refresh()
         return self.get(provider)
 
@@ -334,24 +312,9 @@ class SocialAccounts:
             for provider, row in self._read().items():
                 if provider not in PROVIDERS or not row.get("enabled") or row.get("quarantined"):
                     continue
-                if row.get("transport") == "managed":
-                    result.append({"id": row["id"], "type": provider, "transport": "managed", "enabled": True,
-                        "accountId": row["accountId"], "expectedSelfId": row["expectedSelfId"], "permissions": row["permissions"],
-                        "policyRevision": row["policyRevision"], "allowlistEnabled": row["allowlistEnabled"],
-                        "allowlist": [p["peerId"] for p in row["allowlist"]]})
-                    continue
-                secret = {}
-                if row.get("credentialRef"):
-                    try:
-                        secret = credentials.resolve(row["credentialRef"], plugin_id=row["id"],
-                            required_scopes=["connect"], activity_scopes=["connect"])
-                        if credentials.metadata(row["credentialRef"])["accountKey"] != row["accountId"]:
-                            continue
-                    except CredentialError:
-                        continue
-                result.append({"id": row["id"], "type": provider, "enabled": True,
+                result.append({"id": row["id"], "type": provider, "transport": "managed", "enabled": True,
                     "accountId": row["accountId"], "expectedSelfId": row["expectedSelfId"],
-                    "endpoint": row["endpoint"], "credential": secret, "permissions": row["permissions"],
+                    "permissions": row["permissions"],
                     "policyRevision": row["policyRevision"], "allowlistEnabled": row["allowlistEnabled"],
                     "allowlist": [p["peerId"] for p in row["allowlist"]]})
             return result
@@ -442,23 +405,19 @@ class SocialAccounts:
             original = copy.deepcopy(data.get(provider, self._default(provider)))
             if original.get("quarantined"):
                 raise SocialError("Reconcile pending operations before resuming this account")
-        selected = transport if transport is not None else original.get("transport", "external")
-        if selected not in {"managed", "external"}:
+        if transport not in {None, "managed"}:
             raise SocialError("Unsupported QQ transport")
         account = copy.deepcopy(original)
-        if selected == "managed":
-            # No account lock is held while the RPC reader may admit messages.
-            native = self.managed_qq_runtime()
-            if not native["connected"] or not native.get("actualSelfId"):
-                raise SocialError("Log in to the managed QQ account before enabling chat")
-            if account["expectedSelfId"] and native["actualSelfId"] != account["expectedSelfId"]:
-                raise SocialError("The logged-in QQ account does not match the bound account")
-            if not account["expectedSelfId"]:
-                account["expectedSelfId"] = native["actualSelfId"]
-                account["ownerPeerId"] = None
-                account.pop("ownerChallenge", None)
-        elif not all(account[k] for k in ("accountId", "expectedSelfId", "endpoint")):
-            raise SocialError("Configure the account identity and connection address first")
+        # No account lock is held while the RPC reader may admit messages.
+        native = self.managed_qq_runtime()
+        if not native["connected"] or not native.get("actualSelfId"):
+            raise SocialError("Log in to the managed QQ account before enabling chat")
+        if account["expectedSelfId"] and native["actualSelfId"] != account["expectedSelfId"]:
+            raise SocialError("The logged-in QQ account does not match the bound account")
+        if not account["expectedSelfId"]:
+            account["expectedSelfId"] = native["actualSelfId"]
+            account["ownerPeerId"] = None
+            account.pop("ownerChallenge", None)
         if runtime.started:
             for row in runtime._unresolved_commands():
                 try:
@@ -474,12 +433,9 @@ class SocialAccounts:
             current = data.get(provider, self._default(provider))
             if current != original:
                 raise SocialError("QQ settings changed while verifying the account; try connecting again")
-            account.update({"transport": selected, "enabled": True, "policyRevision": int(original["policyRevision"]) + 1})
+            account.update({"transport": "managed", "enabled": True, "policyRevision": int(original["policyRevision"]) + 1})
             data[provider] = account
             self._write(data)
-        if selected == "external":
-            self._refresh()
-            return self.get(provider)
         try:
             self._refresh()
             result = self.get(provider)
@@ -488,9 +444,8 @@ class SocialAccounts:
                 return result
         except Exception:
             pass
-        # Authentication and transport health are distinct. Preserve private
-        # legacy settings and proof, but never fall back to them after a failed
-        # native business connection or leave the failed connection enabled.
+        # Authentication and transport health are distinct. Preserve the bound
+        # account and policy, but never leave a failed business connection enabled.
         with self.lock:
             data = self._read()
             current = data.get(provider, self._default(provider))

@@ -11,6 +11,7 @@ const workerDiagnosticPhases = new Set([
   'cached_login_begin', 'cached_login_end', 'qr_request', 'qr_received', 'qr_scanned',
   'qr_authenticated', 'session_init', 'session_configured', 'startup_started', 'session_ready', 'telemetry_ready', 'msf_status', 'msf_notification', 'msf_snapshot',
   'identity_begin', 'identity_end', 'native_failure', 'login_failure', 'qr_failure', 'cached_login_failure',
+  'inbound_batch', 'inbound_rejected', 'inbound_accepted', 'outbound_update',
 ]);
 const diagnosticPhases = new Set([...workerDiagnosticPhases, 'resource_begin', 'resource_ready', 'process_started', 'process_exit', 'request_timeout']);
 const diagnosticFields = new Set(['attemptId', 'phase', 'elapsedMs', 'code']);

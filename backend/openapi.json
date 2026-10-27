@@ -53,18 +53,6 @@
             ],
             "title": "Enabled"
           },
-          "endpoint": {
-            "anyOf": [
-              {
-                "maxLength": 2048,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Endpoint"
-          },
           "expectedSelfId": {
             "anyOf": [
               {
@@ -86,19 +74,6 @@
                 "type": "null"
               }
             ]
-          },
-          "token": {
-            "anyOf": [
-              {
-                "maxLength": 4096,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Token",
-            "writeOnly": true
           }
         },
         "title": "AccountIn",
@@ -458,10 +433,7 @@
           "transport": {
             "anyOf": [
               {
-                "enum": [
-                  "managed",
-                  "external"
-                ],
+                "const": "managed",
                 "type": "string"
               },
               {

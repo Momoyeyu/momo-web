@@ -20,7 +20,7 @@ test('cold routes stay dormant until Boot, including settings and a direct chat 
   await expect.poll(async()=> (await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
 });
 
-test('QQ account settings preserve credentials and enforce an empty allowlist',async({page,request},info)=>{
+test('QQ account settings offer managed sign-in only and enforce an empty allowlist',async({page,request},info)=>{
   const accountsResponse=await request.get('/api/social/accounts');
   expect(accountsResponse.ok(),await accountsResponse.text()).toBe(true);
   const original=(await accountsResponse.json()).accounts as Array<{provider:string;allowlistEnabled:boolean;allowlist:Array<{peerId:string}>}>;
@@ -34,10 +34,13 @@ test('QQ account settings preserve credentials and enforce an empty allowlist',a
     await cards.first().getByRole('button',{name:'配置'}).click();
     const dialog=page.getByRole('dialog',{name:'QQ 账号设置'});
     await expect(dialog).toBeVisible();
-    await expect(dialog.locator('input[type="password"]')).toHaveCount(1);
+    await expect(dialog.locator('input[type="password"]')).toHaveCount(0);
+    await expect(dialog.locator('input[placeholder^="ws:"]')).toHaveCount(0);
+    await expect(dialog.getByText('高级连接（兼容旧桥接）',{exact:true})).toHaveCount(0);
+    await expect(dialog.getByText('连接标识',{exact:true})).toHaveCount(0);
+    await expect(dialog.locator('.social-connection-state')).toBeVisible();
+    await expect(dialog.locator('.social-connection-state').locator('xpath=ancestor::details')).toHaveCount(0);
     await page.screenshot({path:info.outputPath('qq-account.png')});
-    await dialog.locator('details.social-disclosure').first().locator('summary').click();
-    await dialog.locator('input[type="password"]').fill('e2e-write-only-credential');
     await dialog.getByRole('tab',{name:'权限'}).click();
     await page.mouse.move(20,20);
     await page.waitForTimeout(450); // Let the horizontal tab transition finish for visual evidence.
@@ -52,9 +55,7 @@ test('QQ account settings preserve credentials and enforce an empty allowlist',a
     const saved=(await (await request.get('/api/social/accounts')).json()).accounts;
     expect(saved.find((item:{provider:string})=>item.provider==='qq').allowlistEnabled).toBe(true);
     expect(saved.find((item:{provider:string})=>item.provider==='qq').allowlist).toEqual([]);
-    expect(saved.find((item:{provider:string})=>item.provider==='qq').hasCredential).toBe(true);
-    expect(JSON.stringify(saved)).not.toMatch(/"token"\s*:/);
-    expect(JSON.stringify(saved)).not.toContain('e2e-write-only-credential');
+    for(const key of ['endpoint','token','hasCredential'])expect(saved[0]).not.toHaveProperty(key);
     await cards.last().getByRole('button',{name:'配置'}).click();
     await expect(dialog).toBeVisible();
     await page.getByRole('dialog').getByRole('tab',{name:'记录'}).click();
@@ -64,6 +65,30 @@ test('QQ account settings preserve credentials and enforce an empty allowlist',a
       await request.put(`/api/social/accounts/${account.provider}`,{data:{allowlistEnabled:account.allowlistEnabled,allowlist:account.allowlist}});
     }
   }
+});
+
+test('managed channel quarantine and disconnect controls remain visible without a legacy panel',async({page,request})=>{
+  const initial=(await (await request.get('/api/social/accounts')).json()).accounts[0];
+  let account={...initial,enabled:true,transport:'managed',expectedSelfId:'123456',actualSelfId:'123456',status:'quarantined'};
+  const actions:string[]=[];
+  await page.route(/\/api\/social\/accounts$/,route=>route.fulfill({json:{accounts:[account],providers:[]}}));
+  await page.route(/\/api\/social\/accounts\/qq\/(?:resume|disconnect)$/,async route=>{
+    const action=route.request().url().split('/').at(-1)!;actions.push(action);
+    expect(route.request().postDataJSON()).toEqual({});
+    account={...account,status:action==='resume'?'connected':'disconnected'};
+    await route.fulfill({json:account});
+  });
+  await openExtensionTab(page,'插件');
+  await page.locator('.official-plugins .social-card').getByRole('button',{name:'配置',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'QQ 账号设置'});
+  await expect(dialog.locator('.social-connection-state')).toContainText('待核对');
+  await expect(dialog.getByRole('button',{name:'核对后恢复新消息',exact:true})).toBeVisible();
+  await dialog.getByRole('button',{name:'核对后恢复新消息',exact:true}).click();
+  await expect(dialog.locator('.social-connection-state')).toContainText('已连接');
+  await expect(dialog.getByRole('button',{name:'核对后恢复新消息',exact:true})).toHaveCount(0);
+  await dialog.getByRole('button',{name:'断开连接',exact:true}).click();
+  await expect(dialog.locator('.social-connection-state')).toContainText('未连接');
+  expect(actions).toEqual(['resume','disconnect']);
 });
 
 test('chat focus can be changed while text input remains available',async({page,request})=>{

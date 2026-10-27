@@ -77,9 +77,9 @@ export async function prepareQQInvocation(input) {
       command: '/usr/bin/sandbox-exec',
       args: [...Object.entries(parameters).flatMap(([key, value]) => ['-D', `${key}=${value}`]), '-f', qualified.paths.profile, qualified.paths.bootstrap, config.canaryPath, qualified.paths.worker, configPath],
       cwd: config.dataRoot,
-      // Native QQ also reads NSProcessInfo.environment, beyond os.homedir().
-      // This child-only home never changes the real-home Seatbelt boundary.
-      env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'en_US.UTF-8', TMPDIR: temporaryRoot, HOME: nativeHome, ELECTRON_RUN_AS_NODE: '1' },
+      // Foundation resolves NSHomeDirectory separately from the HOME variable.
+      // Both child-only homes retain the real-parent-home Seatbelt boundary.
+      env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'en_US.UTF-8', TMPDIR: temporaryRoot, HOME: nativeHome, CFFIXED_USER_HOME: nativeHome, ELECTRON_RUN_AS_NODE: '1' },
     };
   } catch (cause) { throw new QQRuntimeError(cause?.code === 'ENOENT' ? 'RESOURCE_UNAVAILABLE' : 'RESOURCE_INVALID'); }
 }

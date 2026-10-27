@@ -56,8 +56,7 @@ def test_qr_is_authenticated_noncacheable_and_never_in_general_account_state(pri
 
 def test_begin_pins_stored_identity_without_overwriting_account_or_boot(private_host, monkeypatch):
     monkeypatch.setattr(social, "_refresh", lambda: None)
-    social.put("qq", {"accountId": "legacy-qq", "expectedSelfId": "10001",
-                      "endpoint": "ws://127.0.0.1:3001", "token": "private-legacy-token",
+    social.put("qq", {"accountId": "qq-main", "expectedSelfId": "10001",
                       "permissions": {"receive": False, "reply": False}})
     before = social._path().read_bytes()
     response = TestClient(app).post("/api/social/accounts/qq/runtime/begin", json={})

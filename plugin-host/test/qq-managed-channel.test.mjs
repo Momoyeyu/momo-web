@@ -48,6 +48,26 @@ test('managed QQ uses authenticated native identity and fixed private text IPC w
   assert.deepEqual(native.calls.filter(call => call.action === 'send_private_msg').map(({ params }) => params), [{ user_id: '456789', message: '[CQ:at,qq=all] remains plain text' }]);
 });
 
+test('QQ refuses legacy external connection settings before creating a socket or using native IPC', async t => {
+  let socketAttempts = 0;
+  t.mock.method(globalThis, 'WebSocket', class { constructor() { socketAttempts++; throw new Error('legacy socket must never be created'); } });
+  const cases = [
+    { transport: undefined, endpoint: 'ws://127.0.0.1:3001', credential: { token: 'retired-secret' } },
+    { transport: 'onebot', endpoint: 'ws://127.0.0.1:3001', credential: { token: 'retired-secret' } },
+    { endpoint: 'ws://127.0.0.1:3001' },
+    { credential: { token: 'retired-secret' } },
+    { token: 'retired-secret' },
+  ];
+  for (const settings of cases) {
+    const native = new NativeFixture(), adapter = new QQChannel(config(settings), { nativeRuntime: native });
+    t.after(() => adapter.close());
+    await assert.rejects(adapter.connect(), { code: 'CONFIG' });
+    assert.equal(native.calls.length, 0);
+    assert.equal(native.listeners.size, 0);
+  }
+  assert.equal(socketAttempts, 0);
+});
+
 test('managed private ingress preserves text-only scope, identity and the optional empty allowlist', async t => {
   const { native, adapter, inbox } = await channel(t);
   const event = { post_type: 'message', message_type: 'private', sub_type: 'friend', self_id: '123456', user_id: '456789', message_id: 'native-message', time: 1770000000, message: [{ type: 'text', data: { text: 'hello momo' } }, { type: 'image', data: { file: 'ignored' } }] };

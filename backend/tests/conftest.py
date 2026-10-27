@@ -30,3 +30,18 @@ def add_turn(user: str, assistant: str, at: str = "2025-01-01T00:00:00+00:00"):
     checkpoint.append_sentence(assistant, gen, at)
     checkpoint.acknowledge(checkpoint.current_run(gen, at), assistant, gen)
     checkpoint.finish_turn(gen, at)
+
+
+def configured_native_social(store, **changes):
+    """Seed an authenticated account for policy tests, without any QQ login.
+
+    Real connection admission is covered in test_qq_managed_connection; these
+    tests start from its persisted enabled-account state and exercise policy.
+    """
+    values = {"accountId": "qq-main", "expectedSelfId": "10001", **changes}
+    enabled = values.pop("enabled", True)
+    store.put("qq", {**values, "enabled": False})
+    data = store._read()
+    data["qq"]["enabled"] = enabled
+    store._write(data)
+    return store.get("qq")

@@ -942,13 +942,9 @@ export interface components {
             allowlistEnabled?: boolean | null;
             /** Enabled */
             enabled?: boolean | null;
-            /** Endpoint */
-            endpoint?: string | null;
             /** Expectedselfid */
             expectedSelfId?: string | null;
             permissions?: components["schemas"]["PermissionIn"] | null;
-            /** Token */
-            token?: string | null;
         };
         /** AckIn */
         AckIn: {
@@ -1069,7 +1065,7 @@ export interface components {
         /** ConnectIn */
         ConnectIn: {
             /** Transport */
-            transport?: ("managed" | "external") | null;
+            transport?: "managed" | null;
         };
         /** ContactIn */
         ContactIn: {

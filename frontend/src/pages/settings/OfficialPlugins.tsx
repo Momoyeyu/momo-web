@@ -31,10 +31,10 @@ export default function OfficialPlugins({active=true}:{active?:boolean}){
   const toggle=async(account:SocialAccount,enabled:boolean)=>{
     setPending(account.provider);setError(false);
     try{
-      if(enabled&&account.transport==='managed'){
+      if(enabled){
         const native=await qqRuntimeStatus().catch(()=>null);
         if(!native?.connected||(account.expectedSelfId&&native.actualSelfId!==account.expectedSelfId)){setEditing(account.provider);return;}
-        await connectSocialAccount(account.provider,true,'managed');
+        await connectSocialAccount(account.provider,true);
       }else{
         const draft=accountDraft(account);draft.enabled=enabled;
         await saveSocialAccount(account.provider,draft);

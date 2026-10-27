@@ -19,7 +19,7 @@ test('native QQ login stays inside settings and does not enable messaging or Boo
     else{
       const action=route.request().url().split('/').at(-1)!;actions.push(action);
       expect(route.request().postDataJSON()).toEqual({});
-      runtime=action==='cancel'?state('cancelled'):pending(action==='refresh'?'attempt-2':'attempt-1',Date.now()+1500);
+      runtime=action==='cancel'?state('cancelled'):pending(action==='refresh'?'attempt-2':'attempt-1');
     }
     await route.fulfill({json:runtime,headers:{'cache-control':'no-store'}});
   });
@@ -34,6 +34,9 @@ test('native QQ login stays inside settings and does not enable messaging or Boo
   await dialog.getByRole('tab',{name:'权限',exact:true}).click();
   const pausedReads=reads;await page.waitForTimeout(1500);expect(reads).toBe(pausedReads);
   await expect(dialog.locator('.qq-login img')).toHaveCount(0);
+  // Expire the first QR deliberately; tracing and close/reopen latency must not
+  // consume the lifetime of the fresh QR used in the later persistence check.
+  runtime={...runtime,qr:runtime.qr?{...runtime.qr,expiresAt:Date.now()-1}:null};
   await dialog.getByRole('tab',{name:'账号',exact:true}).click();
   await expect(dialog.getByText('二维码已过期，请刷新。',{exact:true})).toBeVisible();
   await dialog.getByRole('button',{name:'刷新二维码',exact:true}).click();
@@ -99,7 +102,7 @@ test('forgetting QQ sign-in requires explicit confirmation and is independent of
 
 test('verified native login enables QQ chat only after explicitly saving the displayed grants',async({page,request},info)=>{
   const initial=(await (await request.get('/api/social/accounts')).json()).accounts[0];
-  let account={...initial,enabled:false,transport:'external',endpoint:'',expectedSelfId:'',actualSelfId:null,status:'disabled'};
+  let account={...initial,enabled:false,transport:'managed',expectedSelfId:'',actualSelfId:null,status:'disabled'};
   const saved:Record<string,unknown>[]=[];const connections:unknown[]=[];
   await page.route(/\/api\/social\/accounts$/,route=>route.fulfill({json:{accounts:[account],providers:[]}}));
   await page.route(/\/api\/social\/accounts\/qq$/,async route=>{
@@ -109,7 +112,7 @@ test('verified native login enables QQ chat only after explicitly saving the dis
   });
   await page.route(/\/api\/social\/accounts\/qq\/connect$/,async route=>{
     const body=route.request().postDataJSON();connections.push(body);
-    expect(body).toEqual({transport:'managed'});
+    expect(body).toEqual({});
     account={...account,transport:'managed',enabled:true,expectedSelfId:'123456',actualSelfId:'123456',status:'connected'};
     await route.fulfill({json:account});
   });
@@ -124,7 +127,7 @@ test('verified native login enables QQ chat only after explicitly saving the dis
   await dialog.getByRole('tab',{name:'账号',exact:true}).click();
   await dialog.getByRole('button',{name:'保存并启用 QQ 聊天',exact:true}).click();
   await expect(dialog.getByText('QQ 聊天已连接',{exact:true})).toBeVisible();
-  expect(saved).toHaveLength(1);expect(connections).toEqual([{transport:'managed'}]);
+  expect(saved).toHaveLength(1);expect(connections).toEqual([{}]);
   expect(saved[0]).toMatchObject({permissions:{receive:true,reply:false},allowlistEnabled:true,allowlist:[]});
   await expect(dialog.getByRole('switch',{name:'启用插件',exact:true})).toHaveAttribute('aria-checked','true');
   await expect(dialog.locator('#social-panel-account > .opt-row').filter({hasText:'momo 的账号 ID'}).locator('input')).toHaveValue('123456');
@@ -142,7 +145,7 @@ test('managed QQ can be disabled and explicitly re-enabled without changing gran
     account.status=account.enabled?'connected':'disabled';await route.fulfill({json:account});
   });
   await page.route(/\/api\/social\/accounts\/qq\/connect$/,async route=>{
-    expect(route.request().postDataJSON()).toEqual({transport:'managed'});connects++;
+    expect(route.request().postDataJSON()).toEqual({});connects++;
     account={...account,enabled:true,status:'connected'};await route.fulfill({json:account});
   });
   await page.route(/\/api\/social\/accounts\/qq\/runtime$/,route=>route.fulfill({json:{...state('connected'),connected:true,running:true,executorQuiescent:false,actualSelfId:'123456',attemptId:'authenticated'}}));
@@ -160,6 +163,40 @@ test('managed QQ can be disabled and explicitly re-enabled without changing gran
   expect(connects).toBe(2);expect(writes.at(-1)).not.toHaveProperty('enabled');
   expect(account.permissions).toEqual(initial.permissions);
   expect(account.allowlistEnabled).toBe(initial.allowlistEnabled);
+  expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
+});
+
+test('disconnecting QQ chat keeps it disabled when saving other unsaved policy edits',async({page,request})=>{
+  const initial=(await (await request.get('/api/social/accounts')).json()).accounts[0];
+  let account={...initial,enabled:true,transport:'managed',expectedSelfId:'123456',actualSelfId:'123456',status:'connected'};
+  const writes:Record<string,unknown>[]=[];let connects=0;let disconnects=0;
+  await page.route(/\/api\/social\/accounts$/,route=>route.fulfill({json:{accounts:[account],providers:[]}}));
+  await page.route(/\/api\/social\/accounts\/qq$/,async route=>{
+    const body=route.request().postDataJSON();writes.push(body);account={...account,...body};
+    await route.fulfill({json:account});
+  });
+  await page.route(/\/api\/social\/accounts\/qq\/connect$/,async route=>{
+    connects++;account={...account,enabled:true,status:'connected'};
+    await route.fulfill({json:account});
+  });
+  await page.route(/\/api\/social\/accounts\/qq\/disconnect$/,async route=>{
+    disconnects++;account={...account,enabled:false,status:'disabled'};
+    await route.fulfill({json:account});
+  });
+  await page.route(/\/api\/social\/accounts\/qq\/runtime$/,route=>route.fulfill({json:{...state('connected'),connected:true,running:true,executorQuiescent:false,actualSelfId:'123456',attemptId:'authenticated'}}));
+  const dialog=await openQQ(page);
+  await dialog.getByRole('tab',{name:'权限',exact:true}).click();
+  const reply=dialog.getByRole('switch',{name:'回复文字',exact:true});
+  await expect(reply).toHaveAttribute('aria-checked','true');await reply.click();
+  await dialog.getByRole('tab',{name:'账号',exact:true}).click();
+  await dialog.getByRole('button',{name:'断开连接',exact:true}).click();
+  await expect(dialog.getByRole('switch',{name:'启用插件',exact:true})).toHaveAttribute('aria-checked','false');
+  await dialog.getByRole('button',{name:'保存',exact:true}).click();
+  await expect(dialog).toHaveCount(0);
+  expect(disconnects).toBe(1);expect(connects).toBe(0);
+  expect(writes).toHaveLength(1);
+  expect(writes[0]).toMatchObject({enabled:false,permissions:{reply:false}});
+  expect(account.enabled).toBe(false);
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
 });
 

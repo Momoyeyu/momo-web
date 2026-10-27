@@ -47,8 +47,7 @@ export default function QQLoginPanel({active,identityDirty,onAuthenticated,chann
   const message=code?t(`social.login.errors.${code}`):busy?t(pendingAction==='stop'?'social.login.states.stopping':pendingAction==='forget'?'social.login.forgetting':'social.login.states.preparing'):t(`social.login.states.${state?.status??'loading'}`);
   const qr=state?.qr;
   const showFresh=state&&!qr&&!state.connected&&state.status!=='expired'&&(state.attemptId!==null||state.status!=='idle');
-  const managed=channel.transport==='managed'&&channel.enabled;
-  const chatConnected=managed&&channel.status==='connected'&&channel.actualSelfId===state?.actualSelfId;
+  const chatConnected=channel.enabled&&channel.status==='connected'&&channel.actualSelfId===state?.actualSelfId;
   return <div className="qq-login" aria-label={t('social.login.title')}>
     <div className={`qq-login-visual${qr?' has-qr':''}${state?.connected?' is-connected':''}`}>
       {qr?<img src={qr.dataUrl} width={176} height={176} alt={t('social.login.qrAlt')} draggable={false}/>:<svg className="qq-login-symbol" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">{state?.connected?<><circle cx="32" cy="32" r="23"/><path d="m21 32 7 7 15-16"/></>:<><path d="M23 12H12v11m29-11h11v11M12 41v11h11m29-11v11H41"/><rect x="23" y="18" width="18" height="28" rx="4"/><path d="M29 40h6"/></>}</svg>}
@@ -67,7 +66,7 @@ export default function QQLoginPanel({active,identityDirty,onAuthenticated,chann
         {state?.connected&&!chatConnected?<Button size="sm" disabled={busy||connectionBusy||channel.status==='quarantined'} onClick={onConnect}>{t(connectionBusy?'social.saving':'social.login.enableChat')}</Button>:null}
         {state?.connected?<Button size="sm" variant="ghost" disabled={busy||connectionBusy} onClick={()=>run('stop')}>{t('social.login.stop')}</Button>:null}
       </div>
-      {state?.connected&&managed?<p className="qq-login-chat-state" role="status">{t(channel.status==='quarantined'?'social.login.chatQuarantined':chatConnected?'social.login.chatConnected':'social.login.chatConnecting')}</p>:null}
+      {state?.connected&&channel.enabled?<p className="qq-login-chat-state" role="status">{t(channel.status==='quarantined'?'social.login.chatQuarantined':chatConnected?'social.login.chatConnected':'social.login.chatConnecting')}</p>:null}
       {identityDirty?<p className="qq-login-footnote">{t('social.login.saveIdentity')}</p>:<p className="qq-login-footnote">{t('social.login.permissionNote')}</p>}
       <details className="qq-login-session"><summary>{t('social.login.session')}</summary>
         <p>{t('social.login.sessionHint')}</p>

@@ -42,13 +42,13 @@ export default function SocialConfigModal({initial,onClose,onChanged}:{initial:S
     catch(error){if(alive.current)setError(t(error instanceof Error&&error.message==='QQ_LOGIN_REQUIRED'?'social.login.loginFirst':'social.actionError'));}finally{if(alive.current)setBusy(false);}
   };
   const save=()=>{
-    const reconnect=account.transport==='managed'&&draft.enabled&&!account.enabled;
+    const reconnect=draft.enabled&&!account.enabled;
     if(!reconnect){void perform(()=>saveSocialAccount(provider,{...draft,allowlist:parseAllowlist(allowlist)}),true);return;}
     void perform(async()=>{
       const native=await qqRuntimeStatus();
       if(!native.connected){setTab('account');throw new Error('QQ_LOGIN_REQUIRED');}
       await saveSocialAccount(provider,{...draft,enabled:undefined,allowlist:parseAllowlist(allowlist)});
-      await connectSocialAccount(provider,true,'managed');
+      await connectSocialAccount(provider,true);
     },true);
   };
   const navigateTab=(event:KeyboardEvent<HTMLButtonElement>,index:number)=>{
@@ -70,20 +70,17 @@ export default function SocialConfigModal({initial,onClose,onChanged}:{initial:S
           // The explicit action saves the visible grants; /connect alone enables
           // and binds the verified native account. Authentication never does.
           await saveSocialAccount(provider,{...draft,enabled:undefined,allowlist:parseAllowlist(allowlist)});
-          const connected=await connectSocialAccount(provider,true,'managed');
+          const connected=await connectSocialAccount(provider,true);
           if(alive.current){setAccount(connected);setDraft(accountDraft(connected));setAllowlist(connected.allowlist.map(peer=>peer.peerId).join('\n'));}
         })}/>
+        <div className="social-connection-state"><i className={account.status==='connected'?'is-connected':''}/><div><strong>{t(`social.status.${account.status}`)===`social.status.${account.status}`?t('social.status.disconnected'):t(`social.status.${account.status}`)}</strong><span>{account.actualSelfId?t('social.verifiedIdentity',{id:account.actualSelfId}):t('social.identityPending')}</span></div></div>
+        {account.error && <p className="social-error">{account.error}</p>}
+        <div className="social-connection-actions"><Button size="sm" variant="ghost" disabled={busy||!account.enabled||account.status==='disconnected'} onClick={()=>void perform(async()=>{
+          await connectSocialAccount(provider,false);
+          if(alive.current)setDraft(current=>({...current,enabled:false}));
+        })}>{t('social.disconnect')}</Button>{account.status==='quarantined' && <Button size="sm" variant="ghost" disabled={busy} onClick={()=>void perform(()=>resumeSocialAccount(provider))}>{t('social.resume')}</Button>}</div>
         <FieldRow label={t('social.enabled')}><Switch title={t('social.enabled')} on={draft.enabled} onChange={enabled=>setDraft(current=>({...current,enabled}))}/></FieldRow>
         <FieldRow label={t('social.expectedIdentity')} hint={t('social.identityHint')}><input value={draft.expectedSelfId} autoComplete="off" onChange={event=>setDraft(current=>({...current,expectedSelfId:event.target.value}))}/></FieldRow>
-        <details className="social-disclosure"><summary>{t('social.connectionSettings')}</summary>
-          <p className="muted social-help">{t('social.qqConnectionHint')}</p>
-          <div className="social-connection-state"><i className={account.status==='connected'?'is-connected':''}/><div><strong>{t(`social.status.${account.status}`)===`social.status.${account.status}`?t('social.status.disconnected'):t(`social.status.${account.status}`)}</strong><span>{account.actualSelfId?t('social.verifiedIdentity',{id:account.actualSelfId}):t('social.identityPending')}</span></div></div>
-          {account.error && <p className="social-error">{account.error}</p>}
-          <FieldRow label={t('social.accountId')} hint={t('social.accountIdHint')}><input value={draft.accountId} autoComplete="off" onChange={event=>setDraft(current=>({...current,accountId:event.target.value}))}/></FieldRow>
-          <FieldRow label={t('social.endpoint')}><input value={draft.endpoint} placeholder="ws://127.0.0.1:3001" autoComplete="off" spellCheck={false} onChange={event=>setDraft(current=>({...current,endpoint:event.target.value}))}/></FieldRow>
-          <FieldRow label={t('social.token')} hint={t('social.tokenHint')}><input type="password" value={draft.token??''} autoComplete="new-password" placeholder={account.hasCredential?t('social.tokenSaved'):''} onChange={event=>setDraft(current=>({...current,token:event.target.value}))}/></FieldRow>
-          <div className="social-connection-actions"><Button size="sm" variant="ghost" disabled={busy} onClick={()=>void perform(async()=>{await saveSocialAccount(provider,{...draft,allowlist:parseAllowlist(allowlist)});await connectSocialAccount(provider,true,'external');})}>{t('social.connect')}</Button><Button size="sm" variant="ghost" disabled={busy||account.status==='disconnected'} onClick={()=>void perform(()=>connectSocialAccount(provider,false))}>{t('social.disconnect')}</Button>{account.status==='quarantined' && <Button size="sm" variant="ghost" disabled={busy} onClick={()=>void perform(()=>resumeSocialAccount(provider))}>{t('social.resume')}</Button>}</div>
-        </details>
         <details className="social-disclosure"><summary>{t('social.ownerBinding')}<Hint text={t('social.ownerHint')} side="down"/></summary>
           {account.ownerPeerId?<p className="social-help">{t('social.ownerVerified',{id:account.ownerPeerId})}</p>:<><FieldRow label={t('social.peerId')}><input value={peerId} autoComplete="off" onChange={event=>setPeerId(event.target.value)}/></FieldRow><Button size="sm" variant="ghost" disabled={busy||!peerId.trim()||!account.capabilities.ownerBinding} onClick={()=>void perform(async()=>{const result=await ownerChallenge(provider,peerId.trim());if(alive.current)setChallenge(result.challenge);})}>{t('social.createChallenge')}</Button>{challenge && <div className="social-challenge"><p>{t('social.challengeInstructions')}</p><code>{challenge}</code><Button size="sm" variant="ghost" onClick={()=>void perform(refreshAccount)}>{t('social.checkBinding')}</Button></div>}</>}
         </details>

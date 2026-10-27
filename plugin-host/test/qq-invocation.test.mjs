@@ -65,6 +65,7 @@ test('private diagnostics refuse aliased or insecure files without following the
 
 test('trusted installed assets produce only the fixed isolated native invocation', async t => {
   const parentHome = process.env.HOME;
+  const parentFoundationHome = process.env.CFFIXED_USER_HOME;
   const config = await fixture(t), invocation = await prepare(config);
   assert.equal(invocation.command, '/usr/bin/sandbox-exec');
   assert.equal(invocation.cwd, config.dataRoot);
@@ -73,12 +74,14 @@ test('trusted installed assets produce only the fixed isolated native invocation
   assert.equal(invocation.env.ELECTRON_RUN_AS_NODE, '1');
   const nativeHome = join(config.dataRoot, 'home');
   assert.equal(invocation.env.HOME, nativeHome);
+  assert.equal(invocation.env.CFFIXED_USER_HOME, nativeHome, 'Foundation and the native process environment resolve the same private home');
   assert.equal(await realpath(nativeHome), nativeHome);
   assert.equal((await lstat(nativeHome)).mode & 0o777, 0o700);
   assert.equal(process.env.HOME, parentHome, 'only the owned child receives its private home');
+  assert.equal(process.env.CFFIXED_USER_HOME, parentFoundationHome, 'the parent Foundation environment is unchanged');
   assert.ok(invocation.args.includes(`USER_HOME=${await realpath(homedir())}`), 'the OS barrier still denies the real parent home');
   assert.ok(!invocation.args.includes(`USER_HOME=${nativeHome}`));
-  assert.deepEqual(Object.keys(invocation.env).sort(), ['PATH', 'LANG', 'TMPDIR', 'HOME', 'ELECTRON_RUN_AS_NODE'].sort());
+  assert.deepEqual(Object.keys(invocation.env).sort(), ['PATH', 'LANG', 'TMPDIR', 'HOME', 'CFFIXED_USER_HOME', 'ELECTRON_RUN_AS_NODE'].sort());
   assert.equal(Object.hasOwn(invocation.env, 'CODEX_HOME'), false);
   assert.equal(Object.hasOwn(invocation.env, 'APP_SANDBOX_CONTAINER_ID'), false);
   const worker = JSON.parse(await readFile(join(config.controlRoot, 'run.json'), 'utf8'));

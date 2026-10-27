@@ -1,18 +1,28 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+import pytest
 
 
-def test_account_api_is_separate_from_configuration_and_secrets_are_write_only():
+@pytest.mark.parametrize("field,value", [("endpoint", "ws://127.0.0.1:3001"), ("token", "unused-old-secret")])
+def test_native_qq_api_rejects_removed_bridge_fields(field, value):
+    response = TestClient(app).put('/api/social/accounts/qq', json={field: value})
+    assert response.status_code == 422
+
+
+def test_native_qq_api_rejects_external_transport():
+    response = TestClient(app).post('/api/social/accounts/qq/connect', json={"transport": "external"})
+    assert response.status_code == 422
+
+
+def test_account_api_is_separate_from_general_configuration_and_exposes_native_only_settings():
     client = TestClient(app)
     assert [row['provider'] for row in client.get('/api/social/accounts').json()['accounts']] == ['qq']
-    body = {'enabled': False, 'accountId': 'qq-main', 'expectedSelfId': '12345',
-            'endpoint': 'ws://127.0.0.1:3001', 'token': 'private-api-token'}
+    body = {'enabled': False, 'accountId': 'qq-main', 'expectedSelfId': '12345'}
     response = client.put('/api/social/accounts/qq', json=body)
     assert response.status_code == 200
-    assert response.json()['hasCredential'] is True
-    assert 'private-api-token' not in response.text
-    assert 'private-api-token' not in client.get('/api/social/accounts').text
+    assert response.json()['transport'] == 'managed'
+    assert not {'endpoint', 'token', 'hasCredential'}.intersection(response.json())
     assert 'qq-main' not in client.get('/api/state').text
     assert client.put('/api/social/accounts/qq', json={'ownerPeerId': '999'}).status_code == 422
     assert client.put('/api/social/accounts/qq', json={'permissions': {'proactive': True}}).status_code == 400

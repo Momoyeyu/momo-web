@@ -8,15 +8,96 @@ function fixture({onIdentity} = {}) {
   const frames = [], calls = []; let loginListener, sessionListener, depends, msgListener;
   const profile = { getUinByUid: () => new Map([['u_self', '123456'], ['u_peer', '654321']]), getUidByUin: () => new Map([['654321', 'u_peer']]) };
   const buddy = { isBuddy: () => true };
+  const uix = { getUin: () => ({ uinInfo: new Map([['u_peer', '654321']]) }) };
   const msg = { addKernelMsgListener: value => { msgListener = value; }, generateMsgUniqueId: () => '90001', sendMsg: async (...args) => { calls.push(['send', ...args]); return { result: 0 }; } };
-  const session = { init: (config, dependency, dispatcher, listener) => { calls.push(['session', config]); depends=dependency; sessionListener=listener; }, getProfileService: () => profile, getBuddyService: () => buddy, getMsgService: () => msg, getMSFService: () => ({ getServerTime: () => '1000' }) };
+  const session = { init: (config, dependency, dispatcher, listener) => { calls.push(['session', config]); depends=dependency; sessionListener=listener; }, getUixConvertService: () => uix, getProfileService: () => profile, getBuddyService: () => buddy, getMsgService: () => msg, getMSFService: () => ({ getServerTime: () => '1000' }) };
   const login = { initConfig: config => calls.push(['login', config]), addKernelLoginListener: listener => { loginListener=listener; }, connect: () => { calls.push(['connect']); queueMicrotask(() => loginListener.onLoginConnected()); return true; }, getQRCodePicture: () => { calls.push(['qr']); return true; }, abortPolling: () => {}, cancel: () => {}, getMachineGuid: () => '0123456789abcdef0123456789abcdef' };
   const nativeStartup = { start: () => calls.push(['start']) };
   const api = { NodeIO3MiscService: {get:()=>({addO3MiscListener:listener=>calls.push(['dispatcher',listener])})}, NodeIQQNTWrapperEngine: { get: () => ({ initWithDeskTopConfig: config => calls.push(['engine', config]) }) }, NodeIKernelLoginService: { get: () => login }, NodeIQQNTStartupSessionWrapper: { create: () => nativeStartup }, NodeIQQNTWrapperSession: { getNTWrapperSession: () => session } };
   const worker = createNativeWorker({ api, dataRoot: '/private/tmp/momo-worker-test', send: frame => frames.push(frame), now: () => 1000, onIdentity });
   const auth = async () => { await worker.request('prepare', { attemptId: 'a' }); await worker.request('connect', { attemptId: 'a' }); loginListener.onQRCodeLoginSucceed({ uin: '123456', uid: 'u_self' }); await new Promise(r=>setImmediate(r)); sessionListener.onOpentelemetryInit({ is_init: true }); depends.onMSFStatusChange(2, 1); await new Promise(resolve => setImmediate(resolve)); };
-  return { worker, frames, calls, profile, buddy, msg, nativeStartup, nativeLogin:login, nativeSession:session, login: () => loginListener, session: () => sessionListener, depends: () => depends, messages: () => msgListener, auth };
+  return { worker, frames, calls, profile, buddy, uix, msg, nativeStartup, nativeLogin:login, nativeSession:session, login: () => loginListener, session: () => sessionListener, depends: () => depends, messages: () => msgListener, auth };
 }
+const inboundRecord=(overrides={})=>({chatType:1,peerUid:'u_peer',senderUid:'u_peer',msgId:'100',msgTime:'1',elements:[{elementType:1,textElement:{content:'private-text'}}],...overrides});
+const inboundEvents=f=>f.frames.filter(frame=>frame.event==='onebot'&&frame.data.post_type==='message');
+test('UID-only private messages resolve missing, empty and zero UINs using the native UixConvert map',async()=>{
+  const f=fixture();await f.auth();let lookups=0;
+  f.uix.getUin=uids=>{lookups++;assert.deepEqual(uids,['u_peer']);return{uinInfo:new Map([['u_peer','654321']])};};
+  for(const [index,value] of [undefined,'','0','000'].entries())f.messages().onRecvMsg([inboundRecord({msgId:String(100+index),senderUin:value,peerUin:value})]);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(lookups,4);assert.equal(inboundEvents(f).length,4);
+  assert.ok(inboundEvents(f).every(frame=>frame.data.user_id==='654321'&&frame.data.sender.user_id==='654321'));
+});
+test('UID normalization preserves callback order and snapshots text before asynchronous resolution',async()=>{
+  const f=fixture();await f.auth();let finish;
+  f.uix.getUin=()=>new Promise(resolve=>{finish=resolve;});
+  const first=inboundRecord({elements:[{elementType:1,textElement:{content:'first'}}]});
+  f.messages().onRecvMsg([first]);
+  f.messages().onRecvMsg([inboundRecord({msgId:'101',peerUin:'654321',senderUin:'654321',elements:[{elementType:1,textElement:{content:'second'}}]})]);
+  assert.equal(inboundEvents(f).length,0);
+  first.elements[0].textElement.content='mutated-after-callback';
+  finish({uinInfo:new Map([['u_peer','654321']])});await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(inboundEvents(f).map(frame=>frame.data.raw_message),['first','second']);
+});
+test('UID normalization rejects malformed mappings and conflicting or untrusted identities',async()=>{
+  const cases=[
+    {result:{}},{result:{uinInfo:new Map()}},{result:{uinInfo:new Map([['u_other','654321']])}},
+    {result:{uinInfo:new Map([['u_peer',654321]])}},{result:{uinInfo:new Map([['u_peer','123456']])}},
+    {record:{peerUin:'111111'}},{record:{senderUin:654321}},{record:{peerUin:null}},
+    {record:{senderUid:'u_other'}},{record:{chatType:2}},{friend:false},
+  ];
+  for(const item of cases){
+    const f=fixture();await f.auth();
+    f.uix.getUin=()=>item.result??{uinInfo:new Map([['u_peer','654321']])};
+    if(item.friend===false)f.buddy.isBuddy=()=>false;
+    f.messages().onRecvMsg([inboundRecord(item.record)]);await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(inboundEvents(f).length,0);
+  }
+});
+test('UID lookup completion rechecks cancellation and friendship before any delivery',async()=>{
+  for(const revoke of ['cancel','friend']){
+    const f=fixture();await f.auth();let finish;
+    f.uix.getUin=()=>new Promise(resolve=>{finish=resolve;});
+    f.messages().onRecvMsg([inboundRecord()]);
+    if(revoke==='cancel')await f.worker.request('cancel',{attemptId:'a'});else f.buddy.isBuddy=()=>false;
+    finish({uinInfo:new Map([['u_peer','654321']])});await new Promise(resolve=>setImmediate(resolve));
+    assert.equal(inboundEvents(f).length,0);
+  }
+});
+test('a pending UID lookup has a bounded ordered message queue without leaking native text',async()=>{
+  const f=fixture();await f.auth();let finish,lookups=0;
+  const pending=new Promise(resolve=>{finish=resolve;});
+  f.uix.getUin=()=>{lookups++;return pending;};
+  f.messages().onRecvMsg(Array.from({length:100},(_,index)=>inboundRecord({msgId:String(100+index)})));
+  assert.equal(lookups,1);
+  assert.ok(f.frames.some(frame=>frame.event==='diagnostic'&&frame.data.phase==='inbound_rejected'&&frame.data.code===12));
+  finish({uinInfo:new Map([['u_peer','654321']])});await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(inboundEvents(f).length,64);
+  assert.ok(!JSON.stringify(f.frames.filter(frame=>frame.event==='diagnostic')).includes('private-text'));
+});
+test('UID lookup deadlines release later messages and ignore a late native map',async t=>{
+  const f=fixture();await f.auth();let expire,finish;
+  t.mock.method(globalThis,'setTimeout',(callback,milliseconds)=>{assert.equal(milliseconds,10000);expire=callback;return{unref(){}};});
+  f.uix.getUin=()=>new Promise(resolve=>{finish=resolve;});
+  f.messages().onRecvMsg([inboundRecord(),inboundRecord({msgId:'101',peerUin:'654321',senderUin:'654321'})]);
+  expire();await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(inboundEvents(f).map(frame=>frame.data.message_id),['101']);
+  finish({uinInfo:new Map([['u_peer','654321']])});await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(inboundEvents(f).map(frame=>frame.data.message_id),['101']);
+});
+test('serialized UID lookups never reuse another contact identity or deduplicate another conversation',async()=>{
+  const f=fixture();await f.auth();
+  f.uix.getUin=([uid])=>({uinInfo:new Map([[uid,uid==='u_peer'?'654321':'765432']])});
+  f.messages().onRecvMsg([inboundRecord(),inboundRecord({peerUid:'u_other',senderUid:'u_other'})]);
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(inboundEvents(f).map(frame=>frame.data.user_id),['654321','765432']);
+});
+test('a synchronous friendship callback cannot deliver a message after revoking the account',async()=>{
+  const f=fixture();await f.auth();let checks=0;
+  f.buddy.isBuddy=()=>{if(++checks===2)void f.worker.request('cancel',{attemptId:'a'});return true;};
+  f.messages().onRecvMsg([inboundRecord()]);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(inboundEvents(f).length,0);
+});
 test('prepare initializes only explicit private paths and does not connect or request a QR', async () => {
   const f=fixture(); await f.worker.request('prepare',{attemptId:'a'});
   assert.equal(f.calls.some(c=>['connect','qr'].includes(c[0])),false);
@@ -54,6 +135,14 @@ test('private text ingress rejects groups, self echoes and mixed or mismatched a
   f.messages().onRecvMsg([base,{...base,msgId:'101',chatType:2},{...base,msgId:'102',senderUin:'123456'},{...base,msgId:'103',elements:[{elementType:3}]}]);
   const inbox=f.frames.filter(f=>f.event==='onebot'&&f.data.post_type==='message'); assert.equal(inbox.length,1); assert.equal(inbox[0].data.raw_message,'hello');
 });
+test('native message listener supplies stable harmless callbacks for unused SDK slots', async () => {
+  const f=fixture();await f.auth();
+  assert.equal(typeof f.messages().onRecvMsgSvrRspTransInfo,'function');
+  assert.equal(f.messages().onRecvMsgSvrRspTransInfo,f.messages().onRecvMsgSvrRspTransInfo);
+  const before=f.frames.length;
+  f.messages().onRecvMsgSvrRspTransInfo({private:'native-data'});
+  assert.equal(f.frames.length,before);
+});
 test('a native send acceptance is not a delivery receipt; only matched server status confirms', async () => {
   const f=fixture(); await f.auth(); const request={action:'send_private_msg',echo:'command1',params:{user_id:'654321',message:'answer'}};
   await f.worker.request('onebot',request); assert.equal(f.frames.some(f=>f.event==='onebot'&&f.data.echo==='command1'),false);
@@ -63,6 +152,47 @@ test('a native send acceptance is not a delivery receipt; only matched server st
   f.messages().onMsgInfoListUpdate([{guildId:'90001',senderUid:'u_self',peerUid:'u_peer',sendStatus:2,msgId:'88'}]);
   assert.equal(f.frames.find(f=>f.event==='onebot'&&f.data.echo==='command1').data.data.message_id,'88');
   await f.worker.request('onebot',request); assert.equal(f.calls.filter(c=>c[0]==='send').length,1);
+});
+test('a matched success wins over failure rows in either batch order, including after cancellation',async()=>{
+  for(const statuses of [[0,2],[2,0]]){
+    const f=fixture();await f.auth();
+    await f.worker.request('onebot',{action:'send_private_msg',echo:'batch-receipt',params:{user_id:'654321',message:'answer'}});
+    await f.worker.request('cancel',{attemptId:'a'});
+    const rows=statuses.map(sendStatus=>({guildId:'90001',senderUid:'u_self',peerUid:'u_peer',sendStatus,msgId:'88'}));
+    f.messages().onMsgInfoListUpdate(rows);
+    f.messages().onMsgInfoListUpdate(rows);
+    const receipts=f.frames.filter(frame=>frame.event==='onebot'&&frame.data.echo==='batch-receipt');
+    assert.equal(receipts.length,1);assert.equal(receipts[0].data.status,'ok');
+    assert.equal(receipts[0].data.data.message_id,'88');
+  }
+});
+test('malformed or mismatched receipt rows cannot crash the listener or settle another send',async()=>{
+  const f=fixture();await f.auth();
+  await f.worker.request('onebot',{action:'send_private_msg',echo:'strict-receipt',params:{user_id:'654321',message:'answer'}});
+  const valid={guildId:'90001',senderUid:'u_self',peerUid:'u_peer',sendStatus:2,msgId:'88'};
+  const malicious={...valid};Object.defineProperty(malicious,'msgId',{get(){throw Error('private-receipt-detail');}});
+  assert.doesNotThrow(()=>f.messages().onMsgInfoListUpdate([
+    null,undefined,'invalid',[],malicious,
+    {...valid,guildId:'another-command'},{...valid,senderUid:'u_other'},
+    {...valid,peerUid:'u_other'},{...valid,chatType:2},{...valid,sendStatus:'2'},
+    {...valid,msgId:null},{...valid,msgId:''},{...valid,msgId:'x'.repeat(201)},
+    {...valid,senderUid:'u_other',sendStatus:0},
+  ]));
+  assert.equal(f.frames.some(frame=>frame.event==='onebot'&&frame.data.echo==='strict-receipt'),false);
+  f.messages().onMsgInfoListUpdate([valid]);
+  assert.equal(f.frames.find(frame=>frame.event==='onebot'&&frame.data.echo==='strict-receipt').data.data.message_id,'88');
+  assert.equal(JSON.stringify(f.frames).includes('private-receipt-detail'),false);
+});
+test('the first valid matched success supplies the receipt and an isolated matched failure stays failure',async()=>{
+  for(const success of [true,false]){
+    const f=fixture();await f.auth();
+    await f.worker.request('onebot',{action:'send_private_msg',echo:'terminal-receipt',params:{user_id:'654321',message:'answer'}});
+    const row={guildId:'90001',senderUid:'u_self',peerUid:'u_peer',sendStatus:0};
+    f.messages().onMsgInfoListUpdate(success?[row,{...row,sendStatus:2,msgId:'88'},{...row,sendStatus:2,msgId:'99'}]:[row]);
+    const receipt=f.frames.find(frame=>frame.event==='onebot'&&frame.data.echo==='terminal-receipt').data;
+    assert.equal(receipt.status,success?'ok':'failed');
+    assert.deepEqual(receipt.data,success?{message_id:'88'}:{});
+  }
 });
 test('cancellation during recipient lookup prevents native submission', async () => {
   const f=fixture(); await f.auth(); let resolve;

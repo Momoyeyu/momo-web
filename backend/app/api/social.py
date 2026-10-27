@@ -31,8 +31,6 @@ class AccountIn(BaseModel):
     enabled: bool | None = None
     accountId: str | None = Field(default=None, max_length=160)
     expectedSelfId: str | None = Field(default=None, max_length=160)
-    endpoint: str | None = Field(default=None, max_length=2048)
-    token: str | None = Field(default=None, max_length=4096, json_schema_extra={"writeOnly": True})
     permissions: PermissionIn | None = None
     allowlistEnabled: bool | None = None
     allowlist: list[ContactIn] | None = Field(default=None, max_length=200)
@@ -40,7 +38,7 @@ class AccountIn(BaseModel):
 
 class ConnectIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    transport: Literal["managed", "external"] | None = None
+    transport: Literal["managed"] | None = None
 
 
 class OwnerChallengeIn(BaseModel):

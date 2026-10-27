@@ -18,6 +18,14 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
   let connectPromise, stopped = false, identityCheck = null;
   let restoreSession = true, transportReady = false, restoring = false, qrRequested = false;
   const seen = new Set(), outgoing = new Map();
+  // Keep callbacks alive for this worker, including unused native SDK slots.
+  // No payload from an unused callback is logged or interpreted as success.
+  const listeners = new Set();
+  const retainListener = callbacks => {
+    const listener = new Proxy(callbacks, { get: (target, key) => Reflect.get(target, key) ?? notify });
+    listeners.add(listener);
+    return listener;
+  };
   const emit = (event, data) => send({ event, data: { attemptId, ...data } });
   const state = (status, code) => { if (active) emit('state', { status, ...(code ? { code } : {}) }); };
   const bound = callback => (...args) => { if (active && !stopped) return callback(...args); };
@@ -32,26 +40,110 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
   const fail = code => { state('error', code); active = false; connected = false; if (connectResolve) { connectResolve({ attemptId }); connectResolve = null; } };
 
   function messageStatus(records) {
+    diagnostic('outbound_update', Array.isArray(records) ? records.length : -1);
     if (!Array.isArray(records)) return;
-    for (const record of records) {
-      const pending = outgoing.get(record.guildId);
-      if (!pending || pending.done || record.senderUid !== self?.uid || record.peerUid !== pending.peerUid) continue;
-      if (record.sendStatus === 2 && typeof record.msgId === 'string' && record.msgId) {
-        pending.done = true; outgoing.delete(record.guildId); reply(pending.echo, { message_id: record.msgId });
-      } else if (record.sendStatus === 0) { pending.done = true; outgoing.delete(record.guildId); reply(pending.echo, {}, true); }
+    const outcomes = new Map();
+    const data = (record, key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(record, key);
+      if (descriptor && !('value' in descriptor)) throw issue('INPUT');
+      return descriptor?.value;
+    };
+    for (let index = 0; index < records.length; index++) {
+      try {
+        const record = records[index];
+        if (!record || typeof record !== 'object' || Array.isArray(record)) continue;
+        const key = data(record, 'guildId'), pending = outgoing.get(key);
+        if (!pending || pending.done || data(record, 'senderUid') !== self?.uid || data(record, 'peerUid') !== pending.peerUid) continue;
+        const chatType = data(record, 'chatType'), status = data(record, 'sendStatus');
+        if (chatType !== undefined && chatType !== 1) continue;
+        if (status === 2) {
+          const messageId = data(record, 'msgId');
+          if (typeof messageId !== 'string' || !messageId || messageId.length > 200) continue;
+          if (!outcomes.get(key)?.messageId) outcomes.set(key, { pending, messageId });
+        } else if (status === 0 && !outcomes.has(key)) outcomes.set(key, { pending });
+      } catch { /* Malformed native rows cannot settle an admitted operation. */ }
+    }
+    // Inspect the whole batch before settling: a genuine matched success wins
+    // over failure rows, and its first valid receipt retains the command echo.
+    for (const [key, outcome] of outcomes) {
+      const { pending, messageId } = outcome;
+      if (outgoing.get(key) !== pending || pending.done) continue;
+      pending.done = true; outgoing.delete(key);
+      reply(pending.echo, messageId ? { message_id: messageId } : {}, !messageId);
     }
   }
+  const inboundQueue = [];
+  let inboundRunning = false;
+  const missingUin = value => value === undefined || (typeof value === 'string' && (value === '' || /^0+$/.test(value)));
+  const incomingCurrent = value => active && connected && !stopped && !nativeDisconnected && attemptId === value.attemptId && self === value.self;
+  const incomingKey = value => `in:${value.uid}:${value.msgId}`;
+  async function drainIncoming() {
+    if (inboundRunning) return;
+    inboundRunning = true;
+    try {
+      while (inboundQueue.length) {
+        const value = inboundQueue.shift();
+        if (!incomingCurrent(value)) { inboundQueue.length = 0; return; }
+        if (seen.has(incomingKey(value))) { diagnostic('inbound_rejected', 10); continue; }
+        let peerUin = value.peerUin, senderUin = value.senderUin;
+        if (!isId(peerUin) || !isId(senderUin)) {
+          let timer;
+          try {
+            // Exact native UixConvert result; never fall back to profile caches
+            // or invent numeric identities for an unresolved peer.
+            const result = await Promise.race([
+              session.getUixConvertService().getUin([value.uid]),
+              new Promise((_, reject) => { timer = setTimeout(() => reject(issue('IDENTITY_UNVERIFIED')), 10000); timer.unref?.(); }),
+            ]);
+            if (!incomingCurrent(value)) { inboundQueue.length = 0; return; }
+            const resolved = result?.uinInfo instanceof Map ? result.uinInfo.get(value.uid) : undefined;
+            if (!isId(resolved)) { diagnostic('inbound_rejected', 11); continue; }
+            if ((isId(peerUin) && peerUin !== resolved) || (isId(senderUin) && senderUin !== resolved)) { diagnostic('inbound_rejected', 3); continue; }
+            peerUin = resolved; senderUin = resolved;
+          } catch { diagnostic('inbound_rejected', 11); continue; }
+          finally { clearTimeout(timer); }
+        }
+        if (!incomingCurrent(value)) { inboundQueue.length = 0; return; }
+        if (peerUin !== senderUin) { diagnostic('inbound_rejected', 3); continue; }
+        if (senderUin === self.uin || value.uid === self.uid) { diagnostic('inbound_rejected', 4); continue; }
+        if (!isFriend(value.uid)) { diagnostic('inbound_rejected', 6); continue; }
+        if (!incomingCurrent(value)) { inboundQueue.length = 0; return; }
+        if (seen.size >= 10000) { inboundQueue.length = 0; fail('INBOX_CAPACITY'); return; }
+        seen.add(incomingKey(value));
+        diagnostic('inbound_accepted');
+        wire({ post_type: 'message', message_type: 'private', sub_type: 'friend', time: value.timestamp, self_id: self.uin, user_id: peerUin, sender: { user_id: senderUin }, message_id: value.msgId, raw_message: value.text, message: [{ type: 'text', data: { text: value.text } }] });
+      }
+    } finally { inboundRunning = false; }
+  }
   function incoming(records) {
-    if (!active || !connected || !Array.isArray(records)) return;
+    diagnostic('inbound_batch', Array.isArray(records) ? records.length : -1);
+    if (!active || !connected || !Array.isArray(records)) { diagnostic('inbound_rejected', 0); return; }
     for (const record of records) {
-      if (record.chatType !== 1 || !isId(record.peerUin) || record.senderUin !== record.peerUin || record.senderUin === self.uin || !isUid(record.peerUid) || record.senderUid !== record.peerUid || !isFriend(record.peerUid) || typeof record.msgId !== 'string' || !record.msgId || record.msgId.length > 200 || !Array.isArray(record.elements) || !record.elements.length || record.elements.some(element => element.elementType !== 1 || typeof element.textElement?.content !== 'string')) continue;
-      const text = record.elements.map(element => element.textElement.content).join('');
-      const timestamp = typeof record.msgTime === 'string' && /^[1-9]\d{0,12}$/.test(record.msgTime) ? Number(record.msgTime) : NaN;
-      if (!Number.isSafeInteger(timestamp) || timestamp > Math.floor(now() / 1000) + 300) continue;
-      if (!text.trim() || text.length > 32000 || seen.has('in:' + record.msgId)) continue;
-      if (seen.size >= 10000) { fail('INBOX_CAPACITY'); return; }
-      seen.add('in:' + record.msgId);
-      wire({ post_type: 'message', message_type: 'private', sub_type: 'friend', time: timestamp, self_id: self.uin, user_id: record.peerUin, sender: { user_id: record.senderUin }, message_id: record.msgId, raw_message: text, message: [{ type: 'text', data: { text } }] });
+      // Include the one in-flight lookup. Only captured, bounded text is queued;
+      // a burst cannot retain arbitrary native arrays or an unlimited backlog.
+      if (inboundQueue.length + (inboundRunning ? 1 : 0) >= 64) { diagnostic('inbound_rejected', 12); break; }
+      try {
+        if (!record || record.chatType !== 1) { diagnostic('inbound_rejected', 1); continue; }
+        const peerUin = record.peerUin, senderUin = record.senderUin, uid = record.peerUid, senderUid = record.senderUid;
+        const rejected = (!isId(peerUin) && !missingUin(peerUin)) || (!isId(senderUin) && !missingUin(senderUin)) ? 2 : isId(peerUin) && isId(senderUin) && peerUin !== senderUin ? 3 : senderUin === self.uin || uid === self.uid ? 4 : !isUid(uid) || senderUid !== uid ? 5 : !isFriend(uid) ? 6 : 0;
+        if (rejected) { diagnostic('inbound_rejected', rejected); continue; }
+        const msgId = record.msgId, msgTime = record.msgTime, elements = record.elements;
+        if (typeof msgId !== 'string' || !msgId || msgId.length > 200) { diagnostic('inbound_rejected', 7); continue; }
+        if (!Array.isArray(elements) || !elements.length || elements.length > 32000) { diagnostic('inbound_rejected', 8); continue; }
+        let text = '', valid = true;
+        for (const element of elements) {
+          const content = element?.textElement?.content;
+          if (element?.elementType !== 1 || typeof content !== 'string') { valid = false; break; }
+          text += content; if (text.length > 32000) break;
+        }
+        if (!valid) { diagnostic('inbound_rejected', 8); continue; }
+        const timestamp = typeof msgTime === 'string' && /^[1-9]\d{0,12}$/.test(msgTime) ? Number(msgTime) : NaN;
+        if (!Number.isSafeInteger(timestamp) || timestamp > Math.floor(now() / 1000) + 300) { diagnostic('inbound_rejected', 9); continue; }
+        const value = { attemptId, self, uid, peerUin, senderUin, msgId, timestamp, text };
+        if (!text.trim() || text.length > 32000 || seen.has(incomingKey(value))) { diagnostic('inbound_rejected', 10); continue; }
+        inboundQueue.push(value);
+        void drainIncoming().catch(() => { inboundQueue.length = 0; fail('NATIVE_SESSION_FAILED'); });
+      } catch { diagnostic('inbound_rejected', 11); }
     }
   }
   async function verifyIdentity() {
@@ -61,7 +153,7 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     if (!active || !self || nativeDisconnected || !sessionReady || !startupComplete || connected || identityCheck) return;
     identityCheck = (async () => {
       diagnostic('identity_begin');
-      session.getMsgService().addKernelMsgListener({ onRecvMsg: incoming, onMsgInfoListUpdate: messageStatus, onAddSendMsg: notify, onMsgSendError: notify, onKickedOffLine: bound(() => { connected = false; state('disconnected'); active = false; }) });
+      session.getMsgService().addKernelMsgListener(retainListener({ onRecvMsg: incoming, onMsgInfoListUpdate: messageStatus, onAddSendMsg: notify, onMsgSendError: notify, onKickedOffLine: bound(() => { connected = false; state('disconnected'); active = false; }) }));
       await onIdentity({ selfId: self.uin, uid: self.uid });
       if (!active || nativeDisconnected || !sessionReady || !startupComplete) return;
       diagnostic('identity_end');

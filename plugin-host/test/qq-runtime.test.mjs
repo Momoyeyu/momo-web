@@ -78,6 +78,21 @@ test('diagnostics contain only bounded current-attempt phases and never enter pu
   assert.equal(diagnostics.length, count + 1, 'a new attempt has its own finite diagnostic budget');
 });
 
+test('inbound and outbound diagnostics allow only finite phases with integer classification codes', async t => {
+  const diagnostics=[];
+  const {runtime,children}=manager(t,{onDiagnostic:value=>diagnostics.push(value)});
+  const attempt=await runtime.begin({ownerAction:true});
+  const phases=['inbound_batch','inbound_rejected','inbound_accepted','outbound_update'];
+  for(const [index,phase] of phases.entries())children[0].ipc({event:'diagnostic',data:{attemptId:attempt.attemptId,phase,elapsedMs:index,code:index}});
+  assert.deepEqual(diagnostics.slice(-4).map(value=>value.phase),phases);
+  assert.deepEqual(diagnostics.slice(-4).map(value=>value.code),[0,1,2,3]);
+  const count=diagnostics.length;
+  children[0].ipc({event:'diagnostic',data:{attemptId:attempt.attemptId,phase:'inbound_rejected',elapsedMs:4,code:1,message:'private-text'}});
+  children[0].ipc({event:'diagnostic',data:{attemptId:attempt.attemptId,phase:'inbound_rejected',elapsedMs:4,code:'private-account'}});
+  assert.equal(diagnostics.length,count);
+  assert.ok(!JSON.stringify(diagnostics).includes('private-'));
+});
+
 test('throwing or asynchronously failing diagnostic observers cannot change authentication ownership', async t => {
   let callbacks = 0;
   const { runtime, children } = manager(t, { onDiagnostic: () => {
