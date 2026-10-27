@@ -28,7 +28,7 @@ describe("三语字典", () => {
 
   it("界面用到的关键键不会退化成 key 本身", () => {
     // 这几条是曾经出过问题的位置：工具条、backlog 标题、卡片操作
-    const keys = ["settings.title", "backlog.title", "common.edit", "common.del", "social.login.title", "social.login.states.qr_pending", "social.login.errors.RESOURCE_UNAVAILABLE"];
+    const keys = ["settings.title", "backlog.title", "common.edit", "common.del", "social.login.title", "social.login.states.qr_pending", "social.login.errors.RESOURCE_UNAVAILABLE", "social.login.errors.LOCAL_AUTH_REQUIRED"];
     for (const [lang, dict] of Object.entries(DICTS)) {
       for (const key of keys) {
         const value = key

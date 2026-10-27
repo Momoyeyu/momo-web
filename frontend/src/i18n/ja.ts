@@ -45,6 +45,7 @@ export const ja: Dict = {
       "error": "QQ にログインできません。"
     },
     "errors": {
+      "LOCAL_AUTH_REQUIRED": "この画面のローカル認証を確認できません。momo のページを再読み込みして再試行してください。",
       "RUNTIME_UNAVAILABLE": "QQ プラグインのサービスが未準備です。少し待って再試行してください。",
       "OWNER_ACTION_REQUIRED": "この端末の設定画面からログインしてください。",
       "RESOURCE_UNAVAILABLE": "QQ のコンポーネントが未準備です。リソースの準備後に再試行してください。",

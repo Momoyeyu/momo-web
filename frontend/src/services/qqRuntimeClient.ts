@@ -1,7 +1,7 @@
 import {runtimeFetch} from './runtime';
 
 const STATES=['idle','preparing','connecting','qr_pending','awaiting_confirmation','verifying','connected','expired','cancelled','disconnected','identity_mismatch','stopping','stopped','error'] as const;
-const ERROR_CODES=['OWNER_ACTION_REQUIRED','RESOURCE_UNAVAILABLE','RESOURCE_INVALID','INPUT','ATTEMPT_CANCELLED','RUNTIME_FAILED','RUNTIME_UNAVAILABLE','RUNTIME_TIMEOUT','RUNTIME_NOT_QUIESCENT','RUNTIME_STOPPED','IPC_LIMIT','IPC_PROTOCOL','ACCOUNT_MISMATCH','FORGET_UNAVAILABLE','FORGET_FAILED'] as const;
+const ERROR_CODES=['LOCAL_AUTH_REQUIRED','OWNER_ACTION_REQUIRED','RESOURCE_UNAVAILABLE','RESOURCE_INVALID','INPUT','ATTEMPT_CANCELLED','RUNTIME_FAILED','RUNTIME_UNAVAILABLE','RUNTIME_TIMEOUT','RUNTIME_NOT_QUIESCENT','RUNTIME_STOPPED','IPC_LIMIT','IPC_PROTOCOL','ACCOUNT_MISMATCH','FORGET_UNAVAILABLE','FORGET_FAILED'] as const;
 const ACTIONS=['begin','refresh','cancel','stop','forget'] as const;
 export type QQRuntimeAction=(typeof ACTIONS)[number];
 export type QQLoginErrorCode=(typeof ERROR_CODES)[number];
@@ -35,6 +35,7 @@ async function request(action?:QQRuntimeAction,signal?:AbortSignal):Promise<QQRu
   const deadline=new AbortController();const timer=setTimeout(()=>deadline.abort(),45000);
   try{
     const response=await runtimeFetch(`/api/social/accounts/qq/runtime${action?`/${action}`:''}`,{signal:signal?AbortSignal.any([signal,deadline.signal]):deadline.signal,cache:'no-store',...(action?{method:'POST',headers:{'content-type':'application/json'},body:'{}'}:{})});
+    if(response.status===401||response.status===403)throw new QQLoginError('LOCAL_AUTH_REQUIRED');
     if(!response.ok){
       let code:unknown;
       try{const body:unknown=await response.json();if(object(body))code=object(body.detail)?body.detail.code:body.code;}catch{/* Server text and private host details are never displayed. */}

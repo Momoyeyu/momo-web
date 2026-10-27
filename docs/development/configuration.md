@@ -27,7 +27,7 @@ Web 仓路径为 `frontend/`、`backend/`、`plugin-host/`；以下配置在根 
 | 变量 | 用途 |
 | --- | --- |
 | MOMO_API_PORT / MOMO_WEB_PORT | 启动器本机端口，默认 7821 / 5173；占用则退出，不杀其他服务 |
-| MOMO_WEB_ORIGIN | 启动器生成的精确 127.0.0.1 源，用于鉴权 / CORS；不开放任意公网来源 |
+| MOMO_WEB_ORIGIN | 启动器选定的本机 HTTP 端口；鉴权 / CORS 仅接受该端口的 127.0.0.1 与 localhost，其他端口及外部来源拒绝 |
 | MOMO_NODE | 仅开发覆盖 Node 可执行文件；正式包强制使用随包 runtime，不依赖系统 PATH |
 | MOMO_PLUGIN_HOST | 仅开发覆盖私有宿主入口；正式包固定随包代码 |
 | MOMO_QQ_RUNTIME_CONFIG | 安装 / 开发准备阶段生成的私有 QQ 运行绑定 JSON；只由后端启动读取并绑定一次，不是用户账号配置，不传浏览器或模型 |

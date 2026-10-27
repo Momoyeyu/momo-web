@@ -45,6 +45,7 @@ export const zh = {
       "error": "暂时无法登录 QQ。"
     },
     "errors": {
+      "LOCAL_AUTH_REQUIRED": "当前页面未通过本机授权，请刷新 momo 页面后重试。",
       "RUNTIME_UNAVAILABLE": "QQ 插件服务尚未就绪，请稍后重试。",
       "OWNER_ACTION_REQUIRED": "请从本机设置中发起 QQ 登录。",
       "RESOURCE_UNAVAILABLE": "QQ 组件尚未就绪，请完成资源准备后重试。",

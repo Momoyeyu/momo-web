@@ -1,5 +1,6 @@
 import { configDefaults, defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
+import {guardWebProxy} from './dev/web-origin.ts';
 
 // dev 代理：浏览器直连遇到无 CORS 头的服务（如本地 momo-svc）时，
 // 设置页填 http://localhost:<devPort>/proxy/<llm|asr|tts> 即可绕过。
@@ -33,11 +34,11 @@ export default defineConfig({
         // Capability stays in the Vite process, never in the client bundle.
         headers: devToken ? {'x-momo-token': devToken} : undefined,
         configure(proxy) {
-          const check = (req: {headers: Record<string, string | string[] | undefined>}) => {
-            const origin = req.headers.origin;
-            if (devOrigin && origin && origin !== devOrigin) delete req.headers['x-momo-token'];
-          };
-          proxy.on('proxyReq', (_out, req) => check(req));
+          const check=guardWebProxy(devOrigin);
+          // Change the actual outgoing request: removing an incoming header
+          // after the proxy has constructed its request does not revoke it.
+          proxy.on('proxyReq', check);
+          proxy.on('proxyReqWs', check);
         },
       },
       "/proxy/llm": {

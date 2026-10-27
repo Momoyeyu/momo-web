@@ -3,6 +3,7 @@
 import asyncio
 import hmac
 import os
+import re
 
 ORIGINS = {"tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"}
 
@@ -19,7 +20,13 @@ def valid(value):
 
 def allowed_origins():
     origin = os.environ.get("MOMO_WEB_ORIGIN", "")
-    return ORIGINS | ({origin} if origin.startswith("http://127.0.0.1:") else set())
+    selected = re.fullmatch(r"http://(?:127\.0\.0\.1|localhost):([1-9][0-9]{0,4})", origin)
+    if not selected or int(selected[1]) > 65535:
+        return set(ORIGINS)
+    # Both names reach the same loopback-only development listener. Keep the
+    # selected port exact; this is not permission for arbitrary local websites.
+    port = selected[1]
+    return ORIGINS | {f"http://127.0.0.1:{port}", f"http://localhost:{port}"}
 
 
 class DesktopAuth:

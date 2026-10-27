@@ -45,6 +45,7 @@ export const en: Dict = {
       "error": "QQ sign-in is unavailable."
     },
     "errors": {
+      "LOCAL_AUTH_REQUIRED": "This page is not authorized to manage QQ. Reload momo and try again.",
       "RUNTIME_UNAVAILABLE": "The QQ plugin service is not ready. Please try again shortly.",
       "OWNER_ACTION_REQUIRED": "Start QQ sign-in from settings on this device.",
       "RESOURCE_UNAVAILABLE": "QQ components are not ready. Prepare the resources, then retry.",

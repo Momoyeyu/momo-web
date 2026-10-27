@@ -30,6 +30,12 @@ describe('managed QQ login boundary',()=>{
     vi.mocked(runtimeFetch).mockResolvedValueOnce(new Response(JSON.stringify({detail:{code:'/private/token',message:'secret'}}),{status:500}));
     await expect(qqRuntimeAction('begin')).rejects.toMatchObject({code:'RUNTIME_FAILED',message:'RUNTIME_FAILED'});
   });
+  it('identifies local HTTP authorization failures instead of blaming QQ connectivity',async()=>{
+    for(const status of [401,403]){
+      vi.mocked(runtimeFetch).mockResolvedValueOnce(new Response(JSON.stringify({detail:'private local authorization diagnostics'}),{status}));
+      await expect(qqRuntimeAction('refresh')).rejects.toMatchObject({code:'LOCAL_AUTH_REQUIRED',message:'LOCAL_AUTH_REQUIRED'});
+    }
+  });
   it('accepts only bounded PNG QR images attached to a live attempt',()=>{
     const pending={...state('qr_pending'),running:true,executorQuiescent:false,attemptId:'attempt-a',qr:{dataUrl:'data:image/png;base64,iVBORw0KGgo=',expiresAt:Date.now()+30000}};
     expect(parseQQRuntime(pending).qr).toEqual(pending.qr);
