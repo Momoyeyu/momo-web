@@ -12,8 +12,9 @@ const safeAttempt = value => typeof value === 'string' && /^[A-Za-z0-9-]{1,100}$
 
 function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = () => {} }) {
   const startedAt=now();
-  let attemptId = null, expectedSelfId = null, active = false, prepared = false, nativeOnline = false, sessionReady = false;
-  let engine, login, startup, session, self, connected = false, connectResolve;
+  let attemptId = null, expectedSelfId = null, active = false, prepared = false, sessionReady = false, startupComplete = false;
+  let nativeDisconnected = false, everMsfConnected = false;
+  let misc, engine, login, startup, session, self, connected = false, connectResolve;
   let connectPromise, stopped = false, identityCheck = null;
   let restoreSession = true, transportReady = false, restoring = false, qrRequested = false;
   const seen = new Set(), outgoing = new Map();
@@ -54,18 +55,15 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     }
   }
   async function verifyIdentity() {
-    // Only the typed onMSFStatusChange callback establishes connectivity. The
-    // similarly named getter has a different, undocumented numeric contract;
-    // a stale getter must never override an explicit offline notification.
-    if (!active || !self || !nativeOnline || !sessionReady || connected || identityCheck) return;
+    // Account identity comes from the native authentication callback. Native
+    // session readiness and successful start completion are separate gates.
+    // The friend UID cache does not contain self and is not a self-auth API.
+    if (!active || !self || nativeDisconnected || !sessionReady || !startupComplete || connected || identityCheck) return;
     identityCheck = (async () => {
       diagnostic('identity_begin');
-      const mapped = await session.getProfileService().getUinByUid('momo-self-verification', [self.uid]);
-      if (!active || !nativeOnline || !sessionReady) return;
-      if (!(mapped instanceof Map) || String(mapped.get(self.uid) ?? '') !== self.uin) { fail('IDENTITY_UNVERIFIED'); return; }
       session.getMsgService().addKernelMsgListener({ onRecvMsg: incoming, onMsgInfoListUpdate: messageStatus, onAddSendMsg: notify, onMsgSendError: notify, onKickedOffLine: bound(() => { connected = false; state('disconnected'); active = false; }) });
       await onIdentity({ selfId: self.uin, uid: self.uid });
-      if (!active || !nativeOnline || !sessionReady) return;
+      if (!active || nativeDisconnected || !sessionReady || !startupComplete) return;
       diagnostic('identity_end');
       connected = true; emit('connected', { selfId: self.uin });
     })().catch(() => fail('IDENTITY_UNVERIFIED')).finally(() => { identityCheck = null; });
@@ -101,12 +99,23 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     };
     diagnostic('session_init');
     session.init(sessionConfig,
-      { onMSFStatusChange: bound(status => { diagnostic('msf_notification',status); nativeOnline = status === 2; if (!nativeOnline && connected) { connected = false; state('disconnected'); } void verifyIdentity(); }), onMSFSsoError: bound(code => {diagnostic('native_failure',code);fail('NATIVE_NETWORK_FAILED');}), getGroupCode: notify },
+      { onMSFStatusChange: bound((status, reason) => {
+        diagnostic('msf_notification', status);
+        if (status === 2) { everMsfConnected = true; void verifyIdentity(); return; }
+        // The initial disconnected snapshot precedes account session startup;
+        // it is not a transition away from a verified live account.
+        if (status === 1 && reason === 0 && !connected && !everMsfConnected) return;
+        nativeDisconnected = true; connected = false; state('disconnected'); active = false;
+      }), onMSFSsoError: bound(code => {diagnostic('native_failure',code);fail('NATIVE_NETWORK_FAILED');}), getGroupCode: notify },
       // Optional UI notifications only. No synthetic signing or success reply.
       { dispatchRequest: notify, dispatchCall: notify, dispatchCallWithJson: notify },
-      { onNTSessionCreate: notify, onGProSessionCreate: notify, onSessionInitComplete: bound(() => { diagnostic('session_ready');sessionReady = true; void verifyIdentity(); }), onOpentelemetryInit: bound(info => { diagnostic('telemetry_ready',info?.is_init===true?1:0);if (info?.is_init !== true) { fail('NATIVE_SESSION_FAILED'); return; } sessionReady = true; void verifyIdentity(); }), onUserOnlineResult: notify, onGetSelfTinyId: notify });
+      { onNTSessionCreate: notify, onGProSessionCreate: notify, onSessionInitComplete: bound(() => { diagnostic('session_ready'); }), onOpentelemetryInit: bound(info => { diagnostic('telemetry_ready',info?.is_init===true?1:0);if (info?.is_init !== true) { fail('NATIVE_SESSION_FAILED'); return; } sessionReady = true; void verifyIdentity(); }), onUserOnlineResult: notify, onGetSelfTinyId: notify });
     diagnostic('session_configured');
-    startup.start(); diagnostic('startup_started');
+    if (!active || stopped || nativeDisconnected) return;
+    Promise.resolve(startup.start()).then(() => {
+      if (!active || stopped) return;
+      startupComplete = true; diagnostic('startup_started'); void verifyIdentity();
+    }, () => { if (active && !stopped) fail('NATIVE_SESSION_FAILED'); });
   }
   function requestQr() {
     if (!active || self || restoring || qrRequested) return;
@@ -120,6 +129,10 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     if (prepared) { requireAttempt(value); return { attemptId }; }
     attemptId = value; expectedSelfId = expected ?? null; restoreSession = restore; active = true; prepared = true;
     diagnostic('prepare');
+    // This native listener initializes event dispatch for a standalone host.
+    // It supplies no opaque data, signatures or manufactured native response.
+    misc = api.NodeIO3MiscService.get();
+    misc.addO3MiscListener({ getOnAmgomDataPiece: notify });
     engine = api.NodeIQQNTWrapperEngine.get(); login = api.NodeIKernelLoginService.get();
     startup = api.NodeIQQNTStartupSessionWrapper.create(); session = api.NodeIQQNTWrapperSession.getNTWrapperSession('nt_1');
     const dataGlobal = path.join(dataRoot, 'global');
@@ -180,7 +193,7 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     const requireConnection = () => { requireAttempt(ownedAttempt); if (!connected) throw issue('PLUGIN_UNAVAILABLE'); };
     const { action, echo } = params;
     if (typeof echo !== 'string' || !echo || echo.length > 200) throw issue('INPUT');
-    if (action === 'get_login_info') { await verifyLiveIdentity(); reply(echo, { user_id: self.uin }); return { attemptId }; }
+    if (action === 'get_login_info') { await verifyLiveIdentity(); requireConnection(); reply(echo, { user_id: self.uin }); return { attemptId }; }
     if (action !== 'send_private_msg' || !isId(params.params?.user_id) || params.params.user_id === self.uin || typeof params.params.message !== 'string' || !params.params.message.trim() || params.params.message.length > 32000) throw issue('INPUT');
     if (seen.has('send:' + echo)) return { attemptId };
     if (seen.size >= 10000 || outgoing.size >= 512) throw issue('INBOX_CAPACITY');
@@ -204,9 +217,9 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     return { attemptId };
   }
   async function verifyLiveIdentity() {
-    const mapped = await session.getProfileService().getUinByUid('momo-self-verification', [self.uid]);
-    if (!(mapped instanceof Map) || String(mapped.get(self.uid) ?? '') !== self.uin || !connected || !active) throw issue('IDENTITY_UNVERIFIED');
+    if (!self || !connected || !active || nativeDisconnected || !sessionReady || !startupComplete || (expectedSelfId && self.uin !== expectedSelfId)) throw issue('IDENTITY_UNVERIFIED');
   }
+
   return {
     async request(method, params = {}) {
       if (method === 'prepare') return prepare(params.attemptId, params.expectedSelfId, params.restoreSession);

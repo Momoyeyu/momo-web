@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, mkdir, writeFile, readFile, chmod, realpath, rm, symlink, lstat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 const module = await import('../src/qq-invocation.mjs').catch(() => ({}));
@@ -64,20 +64,46 @@ test('private diagnostics refuse aliased or insecure files without following the
 });
 
 test('trusted installed assets produce only the fixed isolated native invocation', async t => {
+  const parentHome = process.env.HOME;
   const config = await fixture(t), invocation = await prepare(config);
   assert.equal(invocation.command, '/usr/bin/sandbox-exec');
   assert.equal(invocation.cwd, config.dataRoot);
   assert.deepEqual(invocation.args.slice(-4), [join(config.resourceRoot, roles.bootstrap), config.canaryPath, join(config.resourceRoot, roles.worker), join(config.controlRoot, 'run.json')]);
   assert.ok(invocation.args.includes(`PRIVATE_ROOT=${config.privateRoot}`));
   assert.equal(invocation.env.ELECTRON_RUN_AS_NODE, '1');
-  assert.equal(Object.hasOwn(invocation.env, 'HOME'), false);
+  const nativeHome = join(config.dataRoot, 'home');
+  assert.equal(invocation.env.HOME, nativeHome);
+  assert.equal(await realpath(nativeHome), nativeHome);
+  assert.equal((await lstat(nativeHome)).mode & 0o777, 0o700);
+  assert.equal(process.env.HOME, parentHome, 'only the owned child receives its private home');
+  assert.ok(invocation.args.includes(`USER_HOME=${await realpath(homedir())}`), 'the OS barrier still denies the real parent home');
+  assert.ok(!invocation.args.includes(`USER_HOME=${nativeHome}`));
+  assert.deepEqual(Object.keys(invocation.env).sort(), ['PATH', 'LANG', 'TMPDIR', 'HOME', 'ELECTRON_RUN_AS_NODE'].sort());
   assert.equal(Object.hasOwn(invocation.env, 'CODEX_HOME'), false);
+  assert.equal(Object.hasOwn(invocation.env, 'APP_SANDBOX_CONTAINER_ID'), false);
   const worker = JSON.parse(await readFile(join(config.controlRoot, 'run.json'), 'utf8'));
   assert.equal(worker.wrapperPath, join(config.resourceRoot, roles.wrapper));
   assert.equal(worker.schemaVersion, 1);
   assert.deepEqual(worker.expectedNativeABI, pins.nativeABI);
   assert.equal(Object.hasOwn(worker, 'endpoint'), false);
   assert.deepEqual(await prepare(config), invocation, 'an explicit refresh can reuse private paths after the previous tree stopped');
+});
+
+test('native child home aliases are rejected without following or replacing them', async t => {
+  const config = await fixture(t), nativeHome = join(config.dataRoot, 'home');
+  await symlink(config.resourceRoot, nativeHome);
+  await assert.rejects(prepare(config), { code: 'RESOURCE_INVALID' });
+  assert.equal((await lstat(nativeHome)).isSymbolicLink(), true);
+  await assert.rejects(readFile(join(config.controlRoot, 'run.json')), { code: 'ENOENT' });
+});
+
+test('an existing publicly accessible native child home is rejected instead of weakening privacy', async t => {
+  const config = await fixture(t), nativeHome = join(config.dataRoot, 'home');
+  await mkdir(nativeHome, { mode: 0o700 });
+  await chmod(nativeHome, 0o755);
+  await assert.rejects(prepare(config), { code: 'RESOURCE_INVALID' });
+  assert.equal((await lstat(nativeHome)).mode & 0o777, 0o755);
+  await assert.rejects(readFile(join(config.controlRoot, 'run.json')), { code: 'ENOENT' });
 });
 
 test('an altered native dependency is rejected at use and cannot produce a worker config', async t => {

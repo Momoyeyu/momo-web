@@ -4,17 +4,18 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { createNativeWorker } = require('../src/qq-native-worker.cjs');
 
-function fixture() {
+function fixture({onIdentity} = {}) {
   const frames = [], calls = []; let loginListener, sessionListener, depends, msgListener;
   const profile = { getUinByUid: () => new Map([['u_self', '123456'], ['u_peer', '654321']]), getUidByUin: () => new Map([['654321', 'u_peer']]) };
   const buddy = { isBuddy: () => true };
   const msg = { addKernelMsgListener: value => { msgListener = value; }, generateMsgUniqueId: () => '90001', sendMsg: async (...args) => { calls.push(['send', ...args]); return { result: 0 }; } };
   const session = { init: (config, dependency, dispatcher, listener) => { calls.push(['session', config]); depends=dependency; sessionListener=listener; }, getProfileService: () => profile, getBuddyService: () => buddy, getMsgService: () => msg, getMSFService: () => ({ getServerTime: () => '1000' }) };
   const login = { initConfig: config => calls.push(['login', config]), addKernelLoginListener: listener => { loginListener=listener; }, connect: () => { calls.push(['connect']); queueMicrotask(() => loginListener.onLoginConnected()); return true; }, getQRCodePicture: () => { calls.push(['qr']); return true; }, abortPolling: () => {}, cancel: () => {}, getMachineGuid: () => '0123456789abcdef0123456789abcdef' };
-  const api = { NodeIQQNTWrapperEngine: { get: () => ({ initWithDeskTopConfig: config => calls.push(['engine', config]) }) }, NodeIKernelLoginService: { get: () => login }, NodeIQQNTStartupSessionWrapper: { create: () => ({ start: () => calls.push(['start']) }) }, NodeIQQNTWrapperSession: { getNTWrapperSession: () => session } };
-  const worker = createNativeWorker({ api, dataRoot: '/private/tmp/momo-worker-test', send: frame => frames.push(frame), now: () => 1000 });
+  const nativeStartup = { start: () => calls.push(['start']) };
+  const api = { NodeIO3MiscService: {get:()=>({addO3MiscListener:listener=>calls.push(['dispatcher',listener])})}, NodeIQQNTWrapperEngine: { get: () => ({ initWithDeskTopConfig: config => calls.push(['engine', config]) }) }, NodeIKernelLoginService: { get: () => login }, NodeIQQNTStartupSessionWrapper: { create: () => nativeStartup }, NodeIQQNTWrapperSession: { getNTWrapperSession: () => session } };
+  const worker = createNativeWorker({ api, dataRoot: '/private/tmp/momo-worker-test', send: frame => frames.push(frame), now: () => 1000, onIdentity });
   const auth = async () => { await worker.request('prepare', { attemptId: 'a' }); await worker.request('connect', { attemptId: 'a' }); loginListener.onQRCodeLoginSucceed({ uin: '123456', uid: 'u_self' }); await new Promise(r=>setImmediate(r)); sessionListener.onOpentelemetryInit({ is_init: true }); depends.onMSFStatusChange(2, 1); await new Promise(resolve => setImmediate(resolve)); };
-  return { worker, frames, calls, profile, buddy, msg, nativeLogin:login, nativeSession:session, login: () => loginListener, session: () => sessionListener, depends: () => depends, messages: () => msgListener, auth };
+  return { worker, frames, calls, profile, buddy, msg, nativeStartup, nativeLogin:login, nativeSession:session, login: () => loginListener, session: () => sessionListener, depends: () => depends, messages: () => msgListener, auth };
 }
 test('prepare initializes only explicit private paths and does not connect or request a QR', async () => {
   const f=fixture(); await f.worker.request('prepare',{attemptId:'a'});
@@ -38,12 +39,13 @@ test('one native process cannot reassign callback ownership to another attempt',
   f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});
   assert.equal(f.frames.length,count);
 });
-test('authentication requires session readiness, native online state and mapped self identity', async () => {
+test('native transport and generic session notifications alone cannot authenticate an account', async () => {
   const f=fixture(); await f.worker.request('prepare',{attemptId:'a'}); await f.worker.request('connect',{attemptId:'a'});
   f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'}); await new Promise(r=>setImmediate(r));
   assert.equal(f.frames.some(f=>f.event==='connected'),false);
-  f.session().onOpentelemetryInit({is_init:true}); await Promise.resolve(); assert.equal(f.frames.some(f=>f.event==='connected'),false);
-  f.depends().onMSFStatusChange(2,1); await new Promise(r=>setImmediate(r));
+  f.depends().onMSFStatusChange(2,1);f.session().onSessionInitComplete();await new Promise(r=>setImmediate(r));
+  assert.equal(f.frames.some(f=>f.event==='connected'),false);
+  f.session().onOpentelemetryInit({is_init:true});await new Promise(r=>setImmediate(r));
   assert.equal(f.frames.find(f=>f.event==='connected').data.selfId,'123456');
   assert.equal(f.calls.find(c=>c[0]==='session')[1].desktopPathConfig.account_path,'/private/tmp/momo-worker-test');
 });
@@ -93,9 +95,8 @@ test('private cached login resumes only an explicitly pinned matching account', 
   f.session().onOpentelemetryInit({is_init:true});f.depends().onMSFStatusChange(2,1);await new Promise(r=>setImmediate(r));
   assert.equal(f.frames.at(-1).data.selfId,'123456');
 });
-test('disconnect during identity lookup cannot authenticate a stale online snapshot', async () => {
-  const f=fixture();let resolve;
-  f.profile.getUinByUid=()=>new Promise(r=>{resolve=r;});
+test('disconnect during the owned identity commit cannot authenticate a stale session', async () => {
+  let resolve;const f=fixture({onIdentity:()=>new Promise(r=>{resolve=r;})});
   await f.auth();f.depends().onMSFStatusChange(1,2);
   resolve(new Map([['u_self','123456']]));await new Promise(r=>setImmediate(r));
   assert.equal((await f.worker.request('status')).connected,false);
@@ -177,9 +178,8 @@ test('cached acceptance alone does not prove the authenticated account identity'
   assert.equal(f.calls.some(c=>c[0]==='session'),false);
 });
 test('an explicit offline notification wins over a stale native status getter', async () => {
-  const f=fixture();let resolve;
+  let resolve;const f=fixture({onIdentity:()=>new Promise(r=>{resolve=r;})});
   f.nativeSession.getMSFService=()=>({getMsfStatus:()=>2});
-  f.profile.getUinByUid=()=>new Promise(r=>{resolve=r;});
   await f.auth();f.depends().onMSFStatusChange(1,2);
   resolve(new Map([['u_self','123456']]));await new Promise(r=>setImmediate(r));
   assert.equal((await f.worker.request('status')).connected,false);
@@ -220,4 +220,88 @@ test('genuine native authentication wins over a late cached-login error result',
   resolve({result:'0',loginErrorInfo:{errMsg:'private late explanation'}});await new Promise(r=>setImmediate(r));
   assert.equal(f.calls.some(c=>c[0]==='qr'),false);
   await f.worker.request('cancel',{attemptId:'a'});
+});
+
+test('native event dispatcher is registered before engine initialization and does not manufacture O3 data', async () => {
+  const f=fixture();await f.worker.request('prepare',{attemptId:'a'});
+  const dispatcher=f.calls.findIndex(c=>c[0]==='dispatcher'),engine=f.calls.findIndex(c=>c[0]==='engine');
+  assert.ok(dispatcher>=0&&dispatcher<engine);
+  assert.deepEqual(Object.keys(f.calls[dispatcher][1]),['getOnAmgomDataPiece']);
+  assert.equal(f.calls[dispatcher][1].getOnAmgomDataPiece(),undefined);
+});
+
+test('native account readiness does not require finding self in the friend cache or an initial MSF-connected callback', async () => {
+  const f=fixture();f.profile.getUinByUid=()=>{throw Error('friend cache is not self identity');};
+  await f.worker.request('prepare',{attemptId:'a',expectedSelfId:'123456'});await f.worker.request('connect',{attemptId:'a'});
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});await new Promise(r=>setImmediate(r));
+  f.depends().onMSFStatusChange(1,0);f.session().onSessionInitComplete();await new Promise(r=>setImmediate(r));
+  assert.equal((await f.worker.request('status')).connected,false,'session notification alone is not native readiness');
+  f.session().onOpentelemetryInit({is_init:true});await new Promise(r=>setImmediate(r));
+  assert.equal((await f.worker.request('status')).connected,true);
+  await f.worker.request('onebot',{action:'get_login_info',echo:'self'});
+  assert.equal(f.frames.find(x=>x.event==='onebot'&&x.data.echo==='self').data.data.user_id,'123456');
+});
+test('positive native readiness cannot overtake a pending startup return', async () => {
+  const f=fixture();let finish;f.nativeStartup.start=()=>new Promise(r=>{finish=r;});
+  await f.worker.request('prepare',{attemptId:'a'});await f.worker.request('connect',{attemptId:'a'});
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});await new Promise(r=>setImmediate(r));
+  f.session().onOpentelemetryInit({is_init:true});f.depends().onMSFStatusChange(2,1);await new Promise(r=>setImmediate(r));
+  assert.equal((await f.worker.request('status')).connected,false);
+  finish();await new Promise(r=>setImmediate(r));assert.equal((await f.worker.request('status')).connected,true);
+});
+test('native startup rejection never publishes a connected account', async () => {
+  const f=fixture();let reject;f.nativeStartup.start=()=>new Promise((_,r)=>{reject=r;});
+  await f.worker.request('prepare',{attemptId:'a'});await f.worker.request('connect',{attemptId:'a'});
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});await new Promise(r=>setImmediate(r));
+  f.session().onOpentelemetryInit({is_init:true});reject(Error('private-start-detail'));await new Promise(r=>setImmediate(r));
+  assert.equal(f.frames.some(x=>x.event==='connected'),false);
+  assert.equal(f.frames.filter(x=>x.event==='state').at(-1).data.status,'error');
+  assert.equal(JSON.stringify(f.frames).includes('private-start-detail'),false);
+});
+test('a mismatched native login identity cannot initialize or publish a session', async () => {
+  const f=fixture();await f.worker.request('prepare',{attemptId:'a',expectedSelfId:'123456'});await f.worker.request('connect',{attemptId:'a'});
+  f.login().onQRCodeLoginSucceed({uin:'654321',uid:'u_peer'});await new Promise(r=>setImmediate(r));
+  assert.equal(f.calls.some(c=>c[0]==='session'),false);assert.equal(f.frames.some(x=>x.event==='connected'),false);
+  assert.equal(f.frames.filter(x=>x.event==='state').at(-1).data.code,'ACCOUNT_MISMATCH');
+});
+test('synchronous native initialization failure withdraws startup before dispatch', async () => {
+  const f=fixture();f.nativeSession.init=(_config,_depends,_dispatcher,listener)=>listener.onOpentelemetryInit({is_init:false});
+  await f.worker.request('prepare',{attemptId:'a'});await f.worker.request('connect',{attemptId:'a'});
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});await new Promise(r=>setImmediate(r));
+  assert.equal(f.calls.some(c=>c[0]==='start'),false);
+  assert.equal(f.frames.some(x=>x.event==='connected'),false);
+});
+
+test('cancellation fences a pending startup completion after positive native readiness', async () => {
+  const f=fixture();let finish;
+  f.nativeStartup.start=()=>new Promise(resolve=>{finish=resolve;});
+  await f.worker.request('prepare',{attemptId:'a'});await f.worker.request('connect',{attemptId:'a'});
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});await new Promise(resolve=>setImmediate(resolve));
+  f.session().onOpentelemetryInit({is_init:true});
+  assert.equal((await f.worker.request('status')).connected,false);
+  await f.worker.request('cancel',{attemptId:'a'});
+  finish();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal((await f.worker.request('status')).connected,false);
+  assert.equal(f.frames.some(frame=>frame.event==='connected'),false);
+  await assert.rejects(f.worker.request('onebot',{action:'get_login_info',echo:'cancelled-startup'}),{code:'PLUGIN_UNAVAILABLE'});
+});
+
+test('an initial-looking MSF snapshot after connection withdraws account access', async () => {
+  const f=fixture();await f.worker.request('prepare',{attemptId:'a'});await f.worker.request('connect',{attemptId:'a'});
+  f.login().onQRCodeLoginSucceed({uin:'123456',uid:'u_self'});await new Promise(resolve=>setImmediate(resolve));
+  f.depends().onMSFStatusChange(1,0);f.session().onOpentelemetryInit({is_init:true});await new Promise(resolve=>setImmediate(resolve));
+  assert.equal((await f.worker.request('status')).connected,true);
+  f.depends().onMSFStatusChange(1,0);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal((await f.worker.request('status')).connected,false);
+  assert.equal(f.frames.filter(frame=>frame.event==='state').at(-1).data.status,'disconnected');
+  await assert.rejects(f.worker.request('onebot',{action:'get_login_info',echo:'offline'}),{code:'PLUGIN_UNAVAILABLE'});
+});
+
+test('cancellation before the awaited login-info reply emits no stale identity response', async () => {
+  const f=fixture();await f.auth();
+  const reply=f.worker.request('onebot',{action:'get_login_info',echo:'cancelled-identity'});
+  assert.equal(f.frames.some(frame=>frame.event==='onebot'&&frame.data.echo==='cancelled-identity'),false);
+  await f.worker.request('cancel',{attemptId:'a'});
+  await assert.rejects(reply,{code:'ATTEMPT_CANCELLED'});
+  assert.equal(f.frames.some(frame=>frame.event==='onebot'&&frame.data.echo==='cancelled-identity'),false);
 });

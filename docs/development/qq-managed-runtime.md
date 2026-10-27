@@ -1,14 +1,14 @@
 # QQ 受管运行时：当前边界
 
-004 由 momo 管理 QQ 个人号运行资源、独立会话与设置内登录。新的原生链路不依赖 Docker、外部网关或签名服务；设置 → 拓展 → 插件 → QQ 提供账号、权限、记录。登录管理器、固定启动工厂、原生 worker、Cordis / Python API 与设置界面已接入；真实二维码已验证；实际扫码授权后，当前 macOS 候选的原生模块在会话初始化阶段发生 SIGABRT，尚未核验聊天就绪或真实收发，不能作为完整 QQ 插件已交付的依据。
+004 由 momo 管理 QQ 个人号运行资源、独立会话与设置内登录。新的原生链路不依赖 Docker、外部网关或签名服务；设置 → 拓展 → 插件 → QQ 提供账号、权限、记录。登录管理器、固定启动工厂、原生 worker、Cordis / Python API 与设置界面已接入；真实二维码、已授权账号恢复、会话就绪及设置内启用聊天均已在 macOS 候选验证。真实对端收发和完整生命周期验收仍须分别检查，不以模拟测试替代。
 
 登录与聊天分开：`qq.runtime.*` 只管理私有认证，`connect {transport: "managed"}` 才在核验实际身份后启用渠道。QQChannel 通过相同管理器的私有 IPC 复用现有消息准入、渠道上下文和回执账本。Python 继续是唯一推理 / 记忆 / 注意力协调器。旧外部传输仅作明确选择的兼容模式，内置通路失败不会自动回退。
 
-当前原生 worker 只初始化受测 QQ 原生接口，不加载完整 NapCat Shell 或厂商应用入口，不修改厂商文件、签名和 RunAsNode fuse。平台连接回调不当作账号认证；必须完成会话、原生在线状态和实际身份映射。二维码及核验阶段有截止时间；刷新使用全新自有进程以避免原生回调串到另一尝试。退出首先收束 QQ 自有进程树，其他插件慢关闭不能拖延它。
+当前原生 worker 只初始化受测 QQ 原生接口，不加载完整 NapCat Shell 或厂商应用入口，不修改厂商文件、签名和 RunAsNode fuse。平台连接回调不当作账号认证；必须收到实际原生登录身份并匹配绑定，随后等待正向会话就绪与启动调用成功完成；过期、取消、掉线及不匹配身份不能发布连接。二维码及核验阶段有截止时间；刷新使用全新自有进程以避免原生回调串到另一尝试。退出首先收束 QQ 自有进程树，其他插件慢关闭不能拖延它。
 
 ## 登录恢复、刷新与诊断
 
-普通开始可恢复明确绑定账号的私有会话。传输已连接的控制 ACK 立即返回，不等待 `getLoginList` 或 `quickLoginWithUin` 完成；恢复仍受核验截止时间约束。缓存中的账号资料或快速登录调用被接受，不算账号认证，必须等待原生登录成功回调，并继续核验会话、在线状态及身份映射。
+普通开始可恢复明确绑定账号的私有会话。传输已连接的控制 ACK 立即返回，不等待 `getLoginList` 或 `quickLoginWithUin` 完成；恢复仍受核验截止时间约束。缓存中的账号资料或快速登录调用被接受，不算账号认证，必须等待原生登录成功回调，并继续等待 `onOpentelemetryInit({is_init:true})` 与原生 startup 成功返回。普通的初始化通知、请求 ACK 或等待超时都不算就绪；好友 UID 缓存不用于核验自己的账号。初始 `MSF(1,0)` 是启动快照，不能据此将账号判为已上线；连接建立后的离线通知会立即撤销权限。
 
 「刷新二维码」与「重新扫码」在旧自有进程完全停止后创建新尝试，明确跳过会话恢复，不删除已有票据。认证成功后的迟到二维码/扫码通知不能使状态倒退或清除核验期限；恢复失败触发的真正二维码回退仍可展示。窗口观察与认证生命周期分开，关闭弹窗不等于退出账号。
 
@@ -59,9 +59,9 @@ QQNT 框架原有的 `Versions/Current` 等内部链接保留原状。未声明�
 
 `plugin-host/src/qq-runtime.mjs` 的 `QQRuntimeManager` 拥有独立于消息配置的引擎生命周期。构造时不启动；显式 `begin` / `refreshQR` 建立新 attempt；取消、断连或重启后旧 attempt 的事件失效。默认状态不包含二维码，经过本机鉴权的接口才可请求短期二维码详情。
 
-可信启动工厂缺失时明确返回 `RESOURCE_UNAVAILABLE`，不自动猜路径、下载资源或使用旧 QQ 登录。生产 transport 只启动服务端准备的固定 `sandbox-exec` 调用，不接受账号请求中的 argv、环境或任意管理命令，也不改写 `HOME`。它拥有独立进程组；直接父进程退出不等于后代已停止，忘记会话前须确认进程组静止。
+可信启动工厂缺失时明确返回 `RESOURCE_UNAVAILABLE`，不自动猜路径、下载资源或使用旧 QQ 登录。生产 transport 只启动服务端准备的固定 `sandbox-exec` 调用，不接受账号请求中的 argv、环境或任意管理命令。为 QQ 子进程预先创建并校验 `dataRoot/home`（0700、当前用户所有、无符号链接），仅在该子进程环境提供私有 `HOME`；父进程环境不变，OS 屏障仍按真实用户主目录拒绝访问。原生旧数据导入代码直接读取进程环境，不能只依赖 JavaScript 的 `os.homedir()` 适配；遗漏该变量会导致空指针和随后延迟报告的 SIGABRT。它拥有独立进程组；直接父进程退出不等于后代已停止，忘记会话前须确认进程组静止。
 
-worker 的控制通信使用有界的 `MOMO_QQ_IPC ` JSON 帧。原生日志不转发到用户错误、模型或状态。每次认证消息关联 attempt；到期二维码撤下，账号不匹配时拒绝连接。当前模块不转发 `inbox` / `receipt`，避免把无发送关联的事件当成真实业务事实；消息与迟到回执仍由现有渠道适配器负责。
+worker 在初始化内核之前注册原生 O3 事件分发监听器，回调为空，不提供不透明数据或伪造签名。worker 的控制通信使用有界的 `MOMO_QQ_IPC ` JSON 帧。原生日志不转发到用户错误、模型或状态。每次认证消息关联 attempt；到期二维码撤下，账号不匹配时拒绝连接。当前模块不转发 `inbox` / `receipt`，避免把无发送关联的事件当成真实业务事实；消息与迟到回执仍由现有渠道适配器负责。
 
 ## 开发者离线准备资源
 
@@ -95,7 +95,7 @@ uv run --project backend --frozen python -m pytest scripts/test_prepare_qq_runti
 
 在 `plugin-host/` 运行 `npm test`。资源测试使用合成文件，生命周期测试包含真实的惰性 Node 子进程与后代回收，不登录 QQ；这些测试通过不代表平台登录 E2E 通过。
 
-上述工厂、worker、API、界面和受管传输已在源码接入。当前关口是定位实际 macOS 原生会话初始化崩溃，之后完成真实账号核验、回执支持的双向收发，以及 Boot、专注、权限和未知投递验证。只有新链路通过验收后才替换当前通信原型，004 保持进行中。
+上述工厂、worker、API、界面和受管传输已在源码接入。启动环境导致的原生崩溃已定位并修复，账号与会话就绪已实际核验。后续关口是回执支持的真实对端收发、重启保留，以及 Boot、专注、权限和未知投递验证。只有新链路通过验收后才替换当前通信原型，004 保持进行中。
 
 ## 固定源码参考
 
@@ -104,3 +104,6 @@ uv run --project backend --frozen python -m pytest scripts/test_prepare_qq_runti
 - [NapCat 工作目录](https://github.com/NapNeko/NapCatQQ/blob/v4.18.41/packages/napcat-common/src/path.ts)、[固定发行](https://github.com/NapNeko/NapCatQQ/releases/tag/v4.18.41)
 - [Mac 安装器与共享目录说明](https://github.com/NapNeko/NapCat-Mac-Installer/blob/d2d15e6288a23287dabfc35378fa9b4735e84b2d/README.md)
 - [NapCat 许可原文](https://github.com/NapNeko/NapCatQQ/blob/v4.18.41/LICENSE)
+
+- [原生 SDK 的账号会话就绪与启动生命周期](https://github.com/lc-cn/qq-native-mirror/blob/a2d543def70f66703b8f70c37a6e5da992f0e294/sdk/src/runtime/account-session-lifecycle.ts)
+- [独立宿主的事件分发注册](https://github.com/NapukettoDev/NapukettoQQ/blob/15df7476692bde286a72e8d8d57573af763c6619/packages/loader/src/host/core/self-host.ts)

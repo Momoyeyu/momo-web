@@ -60,10 +60,12 @@ export async function prepareQQInvocation(input) {
     const manifest = JSON.parse((await privateFile(config.manifestPath)).toString('utf8'));
     const qualified = await qualifyQQResources({ root: config.resourceRoot, manifest });
     valid(qualified.qq.version === '6.9.95' && qualified.qq.buildVersion === '48517');
-    const temporaryRoot = join(config.dataRoot, 'tmp');
-    try { await mkdir(temporaryRoot, { mode: 0o700 }); }
-    catch (cause) { if (cause.code !== 'EEXIST') throw cause; }
-    await privateDirectory(temporaryRoot);
+    const temporaryRoot = join(config.dataRoot, 'tmp'), nativeHome = join(config.dataRoot, 'home');
+    for (const path of [temporaryRoot, nativeHome]) {
+      try { await mkdir(path, { mode: 0o700 }); }
+      catch (cause) { if (cause.code !== 'EEXIST') throw cause; }
+      await privateDirectory(path);
+    }
     const configPath = join(config.controlRoot, 'run.json');
     await writeRunConfig(configPath, { schemaVersion: 1, privateRoot: config.privateRoot, resourceRoot: config.resourceRoot, dataRoot: config.dataRoot, wrapperPath: qualified.paths.wrapper, canaryPath: config.canaryPath, expectedNativeABI: qualified.nativeABI });
     const userHome = await realpath(homedir());
@@ -75,7 +77,9 @@ export async function prepareQQInvocation(input) {
       command: '/usr/bin/sandbox-exec',
       args: [...Object.entries(parameters).flatMap(([key, value]) => ['-D', `${key}=${value}`]), '-f', qualified.paths.profile, qualified.paths.bootstrap, config.canaryPath, qualified.paths.worker, configPath],
       cwd: config.dataRoot,
-      env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'en_US.UTF-8', TMPDIR: temporaryRoot, ELECTRON_RUN_AS_NODE: '1' },
+      // Native QQ also reads NSProcessInfo.environment, beyond os.homedir().
+      // This child-only home never changes the real-home Seatbelt boundary.
+      env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', LANG: 'en_US.UTF-8', TMPDIR: temporaryRoot, HOME: nativeHome, ELECTRON_RUN_AS_NODE: '1' },
     };
   } catch (cause) { throw new QQRuntimeError(cause?.code === 'ENOENT' ? 'RESOURCE_UNAVAILABLE' : 'RESOURCE_INVALID'); }
 }
