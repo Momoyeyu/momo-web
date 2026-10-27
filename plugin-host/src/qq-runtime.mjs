@@ -81,6 +81,7 @@ export class QQRuntimeManager {
   #phaseTimer = null; #phaseStatus = null; #phaseAttempt = null;
   #diagnosticCount = 0; #attemptStartedAt = 0;
   #nativeAuthenticated = false;
+  #requireFreshLogin = false;
 
   constructor({ createTransport, prepareInvocation, forgetSession, onState = () => {}, onDiagnostic = () => {}, now = Date.now, requestTimeoutMs = 10000, stopTimeoutMs = 1000, phaseTimeoutMs = 30000, maxFrameBytes = 512 * 1024 } = {}) {
     this.#createTransport = createTransport;
@@ -189,7 +190,7 @@ export class QQRuntimeManager {
     this.#transition('preparing');
     try {
       await this.#ensureStarted(); this.#assertAttempt(attemptId);
-      await this.#request('prepare', { attemptId, expectedSelfId: this.#expectedSelfId, restoreSession }); this.#assertAttempt(attemptId);
+      await this.#request('prepare', { attemptId, expectedSelfId: this.#expectedSelfId, restoreSession: restoreSession && !this.#requireFreshLogin }); this.#assertAttempt(attemptId);
       this.#transition('connecting');
       this.#applyResult(await this.#request('connect', { attemptId }), attemptId); this.#assertAttempt(attemptId);
       if (this.#state !== 'connected') {
@@ -233,6 +234,7 @@ export class QQRuntimeManager {
   async forget({ ownerAction = false } = {}) {
     this.#owner(ownerAction);
     if (this.#forgetting) throw failure('RUNTIME_NOT_QUIESCENT');
+    this.#requireFreshLogin = true;
     this.#forgetting = true;
     try {
       const result = await this.stop();
@@ -454,6 +456,7 @@ export class QQRuntimeManager {
     if (!safeId(data.selfId)) return;
     this.#clearQR();
     if (this.#expectedSelfId && data.selfId !== this.#expectedSelfId) { this.#fail('ACCOUNT_MISMATCH'); return; }
+    this.#requireFreshLogin = false;
     this.#actualSelfId = data.selfId; this.#transition('connected');
   }
 

@@ -7,7 +7,7 @@ import Hint from '../../ui/Hint';
 
 const PENDING=new Set<QQRuntimeState['status']>(['preparing','connecting','qr_pending','awaiting_confirmation','verifying']);
 
-export default function QQLoginPanel({active,identityDirty,onAuthenticated,channel,connectionBusy,onConnect}:{active:boolean;identityDirty:boolean;onAuthenticated:()=>void;channel:SocialAccount;connectionBusy:boolean;onConnect:()=>void}){
+export default function QQLoginPanel({active,identityDirty,onAuthenticated,onSignOut,channel,connectionBusy,onConnect}:{active:boolean;identityDirty:boolean;onAuthenticated:()=>void;onSignOut:(operation:()=>Promise<void>)=>Promise<void>;channel:SocialAccount;connectionBusy:boolean;onConnect:()=>void}){
   const t=useT();
   const [runtime,setRuntime]=useState<QQRuntimeState|null>(null);
   const [error,setError]=useState<QQLoginErrorCode|null>(null);
@@ -18,6 +18,7 @@ export default function QQLoginPanel({active,identityDirty,onAuthenticated,chann
   const [now,setNow]=useState(Date.now);
   const observer=useRef<ReturnType<typeof observeQQRuntime>|null>(null);
   const authenticated=useRef(onAuthenticated);authenticated.current=onAuthenticated;
+  const signOut=useRef(onSignOut);signOut.current=onSignOut;
   const lastIdentity=useRef<string|null>(null);
   useEffect(()=>{
     const change=()=>setVisible(document.visibilityState!=='hidden');
@@ -40,11 +41,17 @@ export default function QQLoginPanel({active,identityDirty,onAuthenticated,chann
   },[active,visible,runtime?.qr?.expiresAt]);
   const state=runtime?visibleQQRuntime(runtime,now):null;
   const code=error??state?.error;
-  const isPending=state?PENDING.has(state.status):busy&&pendingAction!=='stop'&&pendingAction!=='forget'&&pendingAction!=='cancel';
+  const isPending=state?PENDING.has(state.status):busy&&pendingAction!=='forget'&&pendingAction!=='cancel';
   const canBegin=!identityDirty&&!busy&&!connectionBusy&&!isPending&&!state?.connected&&state?.status!=='stopping';
   const canRefresh=!identityDirty&&!busy&&!connectionBusy&&!state?.connected&&state?.status!=='stopping';
-  const run=(action:QQRuntimeAction)=>{if(connectionBusy)return;setConfirmForget(false);setPendingAction(action);void observer.current?.act(action);};
-  const message=code?t(`social.login.errors.${code}`):busy?t(pendingAction==='stop'?'social.login.states.stopping':pendingAction==='forget'?'social.login.forgetting':'social.login.states.preparing'):t(`social.login.states.${state?.status??'loading'}`);
+  const run=(action:QQRuntimeAction)=>{
+    if(connectionBusy)return;setConfirmForget(false);setPendingAction(action);
+    const observation=observer.current;
+    const operation=()=>observation?.act(action)??Promise.resolve();
+    if(action==='forget')void signOut.current(operation);
+    else void operation();
+  };
+  const message=code?t(`social.login.errors.${code}`):busy?t(pendingAction==='forget'?'social.login.forgetting':'social.login.states.preparing'):t(`social.login.states.${state?.status??'loading'}`);
   const qr=state?.qr;
   const showFresh=state&&!qr&&!state.connected&&state.status!=='expired'&&(state.attemptId!==null||state.status!=='idle');
   const chatConnected=channel.enabled&&channel.status==='connected'&&channel.actualSelfId===state?.actualSelfId;
@@ -64,14 +71,11 @@ export default function QQLoginPanel({active,identityDirty,onAuthenticated,chann
         {showFresh?<Button size="sm" variant="ghost" disabled={!canRefresh} onClick={()=>run('refresh')}>{t('social.login.fresh')}</Button>:null}
         {isPending?<Button size="sm" variant="ghost" disabled={connectionBusy} onClick={()=>run('cancel')}>{t('social.login.cancel')}</Button>:null}
         {state?.connected&&!chatConnected?<Button size="sm" disabled={busy||connectionBusy||channel.status==='quarantined'} onClick={onConnect}>{t(connectionBusy?'social.saving':'social.login.enableChat')}</Button>:null}
-        {state?.connected?<Button size="sm" variant="ghost" disabled={busy||connectionBusy} onClick={()=>run('stop')}>{t('social.login.stop')}</Button>:null}
+        {state&&!confirmForget?<Button size="sm" variant="ghost" disabled={busy||connectionBusy} onClick={()=>setConfirmForget(true)}>{t('social.login.forget')}</Button>:null}
       </div>
+      {confirmForget?<div className="qq-login-forget-confirm"><p>{t('social.login.forgetConfirm')}</p><Button size="sm" variant="ghost" onClick={()=>setConfirmForget(false)}>{t('common.cancel')}</Button><Button size="sm" disabled={busy||connectionBusy} onClick={()=>run('forget')}>{t('social.login.forget')}</Button></div>:null}
       {state?.connected&&channel.enabled?<p className="qq-login-chat-state" role="status">{t(channel.status==='quarantined'?'social.login.chatQuarantined':chatConnected?'social.login.chatConnected':'social.login.chatConnecting')}</p>:null}
       {identityDirty?<p className="qq-login-footnote">{t('social.login.saveIdentity')}</p>:<p className="qq-login-footnote">{t('social.login.permissionNote')}</p>}
-      <details className="qq-login-session"><summary>{t('social.login.session')}</summary>
-        <p>{t('social.login.sessionHint')}</p>
-        {confirmForget?<div className="qq-login-forget-confirm"><p>{t('social.login.forgetConfirm')}</p><Button size="sm" variant="ghost" onClick={()=>setConfirmForget(false)}>{t('common.cancel')}</Button><Button size="sm" disabled={busy||connectionBusy} onClick={()=>run('forget')}>{t('social.login.forget')}</Button></div>:<div className="qq-login-actions">{state?.running&&!state.connected?<Button size="sm" variant="ghost" disabled={busy||connectionBusy} onClick={()=>run('stop')}>{t('social.login.stop')}</Button>:null}<Button size="sm" variant="ghost" disabled={busy||connectionBusy||!state} onClick={()=>setConfirmForget(true)}>{t('social.login.forget')}</Button></div>}
-      </details>
     </div>
   </div>;
 }

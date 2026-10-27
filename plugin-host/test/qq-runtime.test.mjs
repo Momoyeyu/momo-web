@@ -545,6 +545,48 @@ test('stop escalates only its owned child and forget waits for confirmed quiesce
   assert.deepEqual(children[0].signals, ['SIGTERM']);
 });
 
+test('logout requires fresh authentication across retries until a genuine connected identity arrives', async t => {
+  const { runtime, children } = manager(t, { forgetSession: async () => {} });
+  await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  await runtime.forget({ ownerAction: true });
+  const first = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  assert.equal(children[1].commands.find(command => command.method === 'prepare').params.restoreSession, false);
+  children[1].ipc({ event: 'state', data: { attemptId: first.attemptId, status: 'verifying', authenticated: true } });
+  await runtime.stop();
+  const second = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  assert.equal(children[2].commands.find(command => command.method === 'prepare').params.restoreSession, false,
+    'a scanned or initialized session has not completed fresh authentication');
+  children[2].ipc({ event: 'connected', data: { attemptId: first.attemptId, selfId: '123456' } });
+  await runtime.stop();
+  const third = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  assert.equal(children[3].commands.find(command => command.method === 'prepare').params.restoreSession, false,
+    'a stale connected callback cannot permit cached restoration');
+  children[3].ipc({ event: 'connected', data: { attemptId: third.attemptId, selfId: '123456' } });
+  assert.equal(runtime.status().connected, true);
+  await runtime.stop();
+  await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  assert.equal(children[4].commands.find(command => command.method === 'prepare').params.restoreSession, true);
+  assert.notEqual(first.attemptId, second.attemptId);
+});
+
+test('ordinary internal stop preserves cached-session restoration without forgetting credentials', async t => {
+  let forgotten = 0;
+  const { runtime, children } = manager(t, { forgetSession: async () => { forgotten++; } });
+  await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  await runtime.stop();
+  await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  assert.equal(children[1].commands.find(command => command.method === 'prepare').params.restoreSession, true);
+  assert.equal(forgotten, 0);
+});
+
+test('failed credential removal is reported and cannot silently reuse the saved session', async t => {
+  const { runtime, children } = manager(t, { forgetSession: async () => { throw new Error('private storage failure'); } });
+  await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  await assert.rejects(runtime.forget({ ownerAction: true }), { code: 'FORGET_FAILED' });
+  await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  assert.equal(children[1].commands.find(command => command.method === 'prepare').params.restoreSession, false);
+});
+
 test('an unkillable child blocks forgetting and refuses a replacement process', async t => {
   let forgotten = 0;
   const { runtime, children } = manager(t, { forgetSession: async () => { forgotten++; } }, { stubborn: true, exitOnStop: false });

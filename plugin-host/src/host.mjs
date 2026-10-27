@@ -168,7 +168,22 @@ export class PluginHost {
   }
 
   async qqRuntimeAction(method, params) {
-    try { return await this.qqRuntime[method](params); }
+    try {
+      if (method === 'forget') {
+        if (params?.ownerAction !== true) throw new QQRuntimeError('OWNER_ACTION_REQUIRED');
+        const plugin = this.plugins.get('momo-qq');
+        if (plugin?.config.type === 'qq') {
+          plugin.enabled = false; plugin.connected = false;
+          this.plugins.delete(plugin.id); this.toolVersion++;
+          for (const controller of plugin.controllers) controller.abort();
+          // Retire only this adapter. Native logout must not wait behind an
+          // unrelated MCP mutation or a blocked Cordis disposal. QQ close keeps
+          // submitted echoes correlated until their original late receipt.
+          void this.disposePlugin(plugin).catch(() => {});
+        }
+      }
+      return await this.qqRuntime[method](params);
+    }
     catch (cause) {
       const safe = cause instanceof QQRuntimeError ? cause : new QQRuntimeError('RUNTIME_FAILED');
       throw new HostError(safe.code, safe.message);

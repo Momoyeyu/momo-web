@@ -45,10 +45,7 @@
 .qq-login-actions { display:flex;flex-wrap:wrap;gap:8px;margin-top:14px; }
 .qq-login-actions > button { min-width:0; }
 .qq-login-footnote { font-size:11px;line-height:1.7;color:var(--text-faint);margin:12px 0 0; }
-.qq-login-session { margin-top:14px;font-size:11px;color:var(--text-dim);line-height:1.7; }
-.qq-login-session summary { width:fit-content;cursor:pointer; }
-.qq-login-session > p { margin:8px 0; }
-.qq-login-forget-confirm { padding:10px 12px;margin-top:10px;border:1px solid var(--line);border-radius:8px; }
+.qq-login-forget-confirm { padding:10px 12px;margin-top:10px;border:1px solid var(--line);border-radius:8px;font-size:12px;line-height:1.7; }
 .qq-login-forget-confirm p { margin:0 0 10px; }
 .qq-login-forget-confirm button { margin:0 8px 4px 0; }
 .social-connection-state { display:flex; align-items:center; gap:12px; margin-bottom:18px;padding:12px 14px;background:rgba(231,190,119,.035);border:1px solid var(--line);border-radius:10px; }

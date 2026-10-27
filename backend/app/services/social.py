@@ -113,6 +113,7 @@ def _identifier(value, label="identity"):
 class SocialAccounts:
     def __init__(self):
         self.lock = threading.RLock()
+        self._qq_logging_out = False
 
     def _path(self):
         # macOS exposes /var through /private/var. Canonicalize the configured
@@ -224,9 +225,30 @@ class SocialAccounts:
     def managed_qq_runtime(self, action="status"):
         """Local-user login management is independent of Boot and message grants.
 
-        The host owns engine/session lifecycle. Polling or successful login never
-        changes the account's owner binding, enabled state, or message policy.
+        The host owns engine/session lifecycle. Login never grants messaging;
+        explicit logout withdraws business without changing grants or identity.
         """
+        if action != "forget":
+            return self._request_qq_runtime(action)
+        with self.lock:
+            if self._qq_logging_out:
+                raise QQRuntimeError("RUNTIME_NOT_QUIESCENT")
+            data = self._read()
+            account = data.get("qq")
+            if account is not None:
+                account["enabled"] = False
+                account["policyRevision"] = int(account["policyRevision"]) + 1
+                self._write(data)
+            self._qq_logging_out = True
+        try:
+            # Withdraw Python's event/send/Boot gates before the native stop.
+            # Do not wait for unrelated MCP configuration to release QQ.
+            return self._request_qq_runtime(action)
+        finally:
+            with self.lock:
+                self._qq_logging_out = False
+
+    def _request_qq_runtime(self, action):
         from .coordinator import runtime
         if action not in {"status", "begin", "refresh", "cancel", "stop", "forget"}:
             raise QQRuntimeError("INPUT")
@@ -247,7 +269,12 @@ class SocialAccounts:
             # finite public codes even if a future transport regresses that rule.
             code = str(error)
             raise QQRuntimeError(code if code in QQ_RUNTIME_ERRORS else "RUNTIME_UNAVAILABLE") from None
-        return _public_qq_runtime_status(value)
+        result = _public_qq_runtime_status(value)
+        if action == "forget" and (result["status"] != "idle" or result["running"]
+            or not result["executorQuiescent"] or result["actualSelfId"] is not None
+            or result["attemptId"] is not None or result["qr"] is not None):
+            raise QQRuntimeError("IPC_PROTOCOL")
+        return result
 
     def _health(self, provider):
         from .coordinator import runtime
@@ -414,6 +441,8 @@ class SocialAccounts:
     def connect(self, provider, *, transport=None):
         from .coordinator import runtime
         with self.lock:
+            if self._qq_logging_out:
+                raise SocialError("QQ logout is in progress; log in again before enabling chat")
             data = self._read()
             original = copy.deepcopy(data.get(provider, self._default(provider)))
             if original.get("quarantined"):
@@ -442,6 +471,8 @@ class SocialAccounts:
                 if blocked:
                     raise SocialError("Reconcile this account's pending operation before changing its connection")
         with self.lock:
+            if self._qq_logging_out:
+                raise SocialError("QQ logout is in progress; log in again before enabling chat")
             data = self._read()
             current = data.get(provider, self._default(provider))
             if current != original:

@@ -67,15 +67,15 @@ test('QQ account settings offer managed sign-in only and enforce an empty allowl
   }
 });
 
-test('managed channel quarantine and disconnect controls remain visible without a legacy panel',async({page,request})=>{
+test('managed channel quarantine recovery stays visible without duplicate disconnect controls',async({page,request})=>{
   const initial=(await (await request.get('/api/social/accounts')).json()).accounts[0];
   let account={...initial,enabled:true,transport:'managed',expectedSelfId:'123456',actualSelfId:'123456',status:'quarantined'};
   const actions:string[]=[];
   await page.route(/\/api\/social\/accounts$/,route=>route.fulfill({json:{accounts:[account],providers:[]}}));
-  await page.route(/\/api\/social\/accounts\/qq\/(?:resume|disconnect)$/,async route=>{
+  await page.route(/\/api\/social\/accounts\/qq\/resume$/,async route=>{
     const action=route.request().url().split('/').at(-1)!;actions.push(action);
     expect(route.request().postDataJSON()).toEqual({});
-    account={...account,status:action==='resume'?'connected':'disconnected'};
+    account={...account,status:'connected'};
     await route.fulfill({json:account});
   });
   await openExtensionTab(page,'插件');
@@ -86,9 +86,8 @@ test('managed channel quarantine and disconnect controls remain visible without 
   await dialog.getByRole('button',{name:'核对后恢复新消息',exact:true}).click();
   await expect(dialog.locator('.social-connection-state')).toContainText('已连接');
   await expect(dialog.getByRole('button',{name:'核对后恢复新消息',exact:true})).toHaveCount(0);
-  await dialog.getByRole('button',{name:'断开连接',exact:true}).click();
-  await expect(dialog.locator('.social-connection-state')).toContainText('未连接');
-  expect(actions).toEqual(['resume','disconnect']);
+  await expect(dialog.getByRole('button',{name:/断开|忘记登录/})).toHaveCount(0);
+  expect(actions).toEqual(['resume']);
 });
 
 test('chat focus can be changed while text input remains available',async({page,request})=>{

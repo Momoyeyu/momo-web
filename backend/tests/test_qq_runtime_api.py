@@ -23,6 +23,20 @@ def login_status(**values):
             "qr": {"dataUrl": PNG, "expiresAt": int(time.time() * 1000) + 60000}, **values}
 
 
+def logged_out_status():
+    return login_status(status="idle", running=False, connected=False, actualSelfId=None,
+                        attemptId=None, executorQuiescent=True, qr=None)
+
+
+def enabled_account():
+    account = social._default("qq")
+    account.update(enabled=True, expectedSelfId="10001", ownerPeerId="20002",
+                   permissions={**account["permissions"], "reply": False},
+                   allowlistEnabled=True, allowlist=[{"peerId": "20002", "label": "owner"}])
+    social._write({"qq": account})
+    return copy.deepcopy(account)
+
+
 @pytest.fixture
 def private_host(monkeypatch):
     calls = []
@@ -89,12 +103,112 @@ def test_fixed_login_actions_reject_client_paths_commands_and_identity(action, p
 
 @pytest.mark.parametrize("action,timeout", [("refresh", 35), ("cancel", 20), ("stop", 20), ("forget", 20)])
 def test_local_login_control_is_not_a_message_policy_update(action, timeout, private_host):
+    if action == "forget":
+        private_host[1].update(logged_out_status())
     response = TestClient(app).post(f"/api/social/accounts/qq/runtime/{action}")
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
     assert private_host[0] == [(f"qq.runtime.{action}", {"ownerAction": True}, timeout)]
     assert runtime.mode == "dormant"
     assert not social._path().exists()
+
+
+def test_logout_disables_business_before_native_forget_without_waiting_for_mcp(private_host, monkeypatch):
+    before = enabled_account()
+    monkeypatch.setattr(runtime, "refresh_social_plugins", lambda: pytest.fail("logout must not wait for MCP"))
+
+    def request(method, params=None, timeout=None):
+        assert method == "qq.runtime.forget" and params == {"ownerAction": True}
+        assert social._read()["qq"]["enabled"] is False
+        assert social.native_restore_binding() is None
+        assert social.host_configs() == []
+        return logged_out_status()
+
+    monkeypatch.setattr(runtime.host, "request", request)
+    response = TestClient(app).post("/api/social/accounts/qq/runtime/forget")
+    assert response.status_code == 200
+    after = social._read()["qq"]
+    assert after == {**before, "enabled": False, "policyRevision": before["policyRevision"] + 1}
+    assert runtime.mode == "dormant"
+
+
+@pytest.mark.parametrize("code", ["FORGET_FAILED", "RUNTIME_NOT_QUIESCENT"])
+def test_logout_failure_is_visible_and_never_reenables_business(code, private_host, monkeypatch):
+    before = enabled_account()
+
+    def request(method, params=None, timeout=None):
+        assert social._read()["qq"]["enabled"] is False
+        raise HostError(code)
+
+    monkeypatch.setattr(runtime.host, "request", request)
+    response = TestClient(app).post("/api/social/accounts/qq/runtime/forget")
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == code
+    after = social._read()["qq"]
+    assert after == {**before, "enabled": False, "policyRevision": before["policyRevision"] + 1}
+    assert social.native_restore_binding() is None
+
+
+def test_logout_with_unavailable_native_host_still_withdraws_business(private_host, monkeypatch):
+    enabled_account()
+    monkeypatch.setattr(runtime, "host", None)
+    response = TestClient(app).post("/api/social/accounts/qq/runtime/forget")
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "RUNTIME_UNAVAILABLE"
+    assert social._read()["qq"]["enabled"] is False
+    assert social.native_restore_binding() is None
+
+
+def test_logout_cannot_report_success_while_native_runtime_is_still_connected(private_host):
+    enabled_account()
+    private_host[1].update(status="connected", connected=True, actualSelfId="10001", qr=None)
+    response = TestClient(app).post("/api/social/accounts/qq/runtime/forget")
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == "IPC_PROTOCOL"
+    assert social._read()["qq"]["enabled"] is False
+
+
+def test_connect_cannot_start_during_logout(private_host, monkeypatch):
+    from app.services.social import SocialError
+    enabled_account()
+
+    def request(method, params=None, timeout=None):
+        assert method == "qq.runtime.forget"
+        with pytest.raises(SocialError, match="logout"):
+            social.connect("qq")
+        return logged_out_status()
+
+    monkeypatch.setattr(runtime.host, "request", request)
+    response = TestClient(app).post("/api/social/accounts/qq/runtime/forget")
+    assert response.status_code == 200
+    assert social._read()["qq"]["enabled"] is False
+
+
+def test_connect_verification_started_before_logout_cannot_commit_afterward(private_host, monkeypatch):
+    from app.services.social import SocialError
+    enabled_account()
+    ready = login_status(status="connected", connected=True, actualSelfId="10001", qr=None)
+    logout_started = False
+
+    def request(method, params=None, timeout=None):
+        nonlocal logout_started
+        if method == "qq.runtime.status":
+            logout_started = True
+            social.managed_qq_runtime("forget")
+            return ready
+        if method == "channels.health":
+            return {"actualSelfId": "10001", "status": "connected", "executorQuiescent": True}
+        if method == "plugins.configure":
+            return {}
+        assert method == "qq.runtime.forget"
+        return logged_out_status()
+
+    monkeypatch.setattr(runtime.host, "request", request)
+    monkeypatch.setattr(runtime, "_unresolved_commands", lambda: [])
+    with pytest.raises(SocialError):
+        social.connect("qq")
+    assert logout_started
+    assert social._read()["qq"]["enabled"] is False
 
 
 def test_raw_native_diagnostics_and_unrecognized_fields_never_reach_browser(private_host):

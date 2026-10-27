@@ -7,7 +7,7 @@ import pytest
 
 from app.services import coordinator
 from app.services.coordinator import Coordinator, CoordinationError
-from app.services.social import SocialAccounts
+from app.services.social import QQRuntimeError, SocialAccounts
 
 
 ATTEMPT = "076a3a21-f6a1-4fd8-8377-1b1b93479434"
@@ -122,6 +122,36 @@ def test_boot_never_authenticates_ineligible_accounts(boot_core, change):
     core.enter("player")
     joined(core)
     assert not any(method.startswith("qq.runtime") for method, _, _ in core.host.calls)
+
+
+@pytest.mark.parametrize("forget_fails", [False, True])
+def test_explicit_boot_never_restores_an_account_after_logout(boot_core, monkeypatch, forget_fails):
+    from app.core.plugin_host import HostError
+    core, store = boot_core
+    host = core.host
+    original = host.request
+
+    def request(method, params=None, timeout=None):
+        if method == "qq.runtime.forget":
+            host.calls.append((method, copy.deepcopy(params), timeout))
+            if forget_fails:
+                raise HostError("FORGET_FAILED")
+            host.native = native_status()
+            return copy.deepcopy(host.native)
+        return original(method, params, timeout)
+
+    monkeypatch.setattr(host, "request", request)
+    monkeypatch.setattr(coordinator, "runtime", core)
+    if forget_fails:
+        with pytest.raises(QQRuntimeError, match="could not be removed"):
+            store.managed_qq_runtime("forget")
+    else:
+        store.managed_qq_runtime("forget")
+    assert store.get("qq")["enabled"] is False
+    core.enter("player")
+    joined(core)
+    assert [method for method, _, _ in host.calls if method.startswith("qq.runtime")] == ["qq.runtime.forget"]
+    assert configured(host) == []
 
 
 def test_matching_page_restoration_does_not_start_background_qq_login(boot_core):

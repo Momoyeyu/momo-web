@@ -32,9 +32,9 @@ export default function SocialConfigModal({initial,onClose,onChanged}:{initial:S
     void socialRecords(provider,request.signal).then(setRecords).catch(()=>{if(!request.signal.aborted)setError(t('social.recordsError'));}).finally(()=>{if(!request.signal.aborted)setLoadingRecords(false);});
     return()=>request.abort();
   },[tab,provider,recordRevision]);
-  const refreshAccount=async()=>{
+  const refreshAccount=async(syncEnabled=false)=>{
     const result=await socialAccounts();const next=result.accounts.find(item=>item.provider===provider);
-    if(next&&alive.current)setAccount(next);onChanged();
+    if(next&&alive.current){setAccount(next);if(syncEnabled)setDraft(current=>({...current,enabled:next.enabled}));}onChanged();
   };
   const perform=async(operation:()=>Promise<unknown>,close=false)=>{
     if(busy)return;setBusy(true);setError(null);
@@ -66,7 +66,18 @@ export default function SocialConfigModal({initial,onClose,onChanged}:{initial:S
     {error && <p role="alert" className="social-error">{error}</p>}
     <div className="social-viewport"><div className="social-track" style={{transform:`translateX(${-index*100}%)`}}>
       <section id="social-panel-account" role="tabpanel" aria-labelledby="social-tab-account" aria-hidden={tab!=='account'} inert={tab!=='account'} className="social-pane">
-        <QQLoginPanel active={tab==='account'} identityDirty={draft.expectedSelfId!==account.expectedSelfId} channel={account} connectionBusy={busy} onAuthenticated={()=>{void refreshAccount().catch(()=>{});}} onConnect={()=>void perform(async()=>{
+        <QQLoginPanel active={tab==='account'} identityDirty={draft.expectedSelfId!==account.expectedSelfId} channel={account} connectionBusy={busy} onAuthenticated={()=>{void refreshAccount().catch(()=>{});}} onSignOut={async operation=>{
+          if(busy||!alive.current)return;setBusy(true);setError(null);
+          try{await operation();}
+          catch{if(alive.current)setError(t('social.actionError'));}
+          finally{
+            // Refresh on failure too: business may already be disabled while
+            // native credentials remain. Preserve every other unsaved field.
+            try{await refreshAccount(true);}
+            catch{if(alive.current)setError(t('social.loadError'));}
+            finally{if(alive.current)setBusy(false);}
+          }
+        }} onConnect={()=>void perform(async()=>{
           // The explicit action saves the visible grants; /connect alone enables
           // and binds the verified native account. Authentication never does.
           await saveSocialAccount(provider,{...draft,enabled:undefined,allowlist:parseAllowlist(allowlist)});
@@ -75,10 +86,7 @@ export default function SocialConfigModal({initial,onClose,onChanged}:{initial:S
         })}/>
         <div className="social-connection-state"><i className={account.status==='connected'?'is-connected':''}/><div><strong>{t(`social.status.${account.status}`)===`social.status.${account.status}`?t('social.status.disconnected'):t(`social.status.${account.status}`)}</strong><span>{account.actualSelfId?t('social.verifiedIdentity',{id:account.actualSelfId}):t('social.identityPending')}</span></div></div>
         {account.error && <p className="social-error">{account.error}</p>}
-        <div className="social-connection-actions"><Button size="sm" variant="ghost" disabled={busy||!account.enabled||account.status==='disconnected'} onClick={()=>void perform(async()=>{
-          await connectSocialAccount(provider,false);
-          if(alive.current)setDraft(current=>({...current,enabled:false}));
-        })}>{t('social.disconnect')}</Button>{account.status==='quarantined' && <Button size="sm" variant="ghost" disabled={busy} onClick={()=>void perform(()=>resumeSocialAccount(provider))}>{t('social.resume')}</Button>}</div>
+        {account.status==='quarantined' && <div className="social-connection-actions"><Button size="sm" variant="ghost" disabled={busy} onClick={()=>void perform(()=>resumeSocialAccount(provider))}>{t('social.resume')}</Button></div>}
         <FieldRow label={t('social.enabled')}><Switch title={t('social.enabled')} on={draft.enabled} onChange={enabled=>setDraft(current=>({...current,enabled}))}/></FieldRow>
         <FieldRow label={t('social.expectedIdentity')} hint={t('social.identityHint')}><input value={draft.expectedSelfId} autoComplete="off" onChange={event=>setDraft(current=>({...current,expectedSelfId:event.target.value}))}/></FieldRow>
         <details className="social-disclosure"><summary>{t('social.ownerBinding')}<Hint text={t('social.ownerHint')} side="down"/></summary>
