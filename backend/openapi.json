@@ -456,8 +456,9 @@
             "type": "string"
           },
           "peerId": {
-            "maxLength": 160,
-            "minLength": 1,
+            "maxLength": 12,
+            "minLength": 5,
+            "pattern": "^[1-9][0-9]{4,11}$",
             "title": "Peerid",
             "type": "string"
           }

@@ -30,13 +30,6 @@ export function accountDraft(account:SocialAccount):SocialDraft {
   // Login identity and verified owner bindings are not editable policy fields.
   return {enabled:account.enabled,expectedSelfId:account.expectedSelfId,permissions:{...account.permissions},allowlistEnabled:account.allowlistEnabled,allowlist:account.allowlist.map(peer=>({...peer}))};
 }
-export function parseAllowlist(text:string):SocialPeer[] {
-  const unique=new Map<string,SocialPeer>();
-  for(const raw of text.split(/\r?\n/)){
-    const peerId=raw.trim();if(peerId)unique.set(peerId,{peerId});
-  }
-  return [...unique.values()];
-}
 export async function socialAccounts(signal?:AbortSignal):Promise<{accounts:SocialAccount[];providers:unknown[]}> {
   const response=await apiJson<{accounts:SocialAccount[];providers:unknown[]}>('/api/social/accounts',{signal});
   if(!Array.isArray(response?.accounts)||!Array.isArray(response.providers))throw new Error('Invalid social accounts response');

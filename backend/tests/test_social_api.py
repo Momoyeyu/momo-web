@@ -55,3 +55,12 @@ def test_retired_provider_routes_reject_before_account_access():
     ]:
         response = getattr(client, method)("/api/social/accounts" + path, **({"json": body} if body is not None else {}))
         assert response.status_code == 422
+
+
+@pytest.mark.parametrize('peer', ['abc', '1234', '012345', '１２３４５', '1234567890123', '12345,23456', ' 12345 '])
+def test_qq_allowlist_api_rejects_malformed_numbers_atomically(peer):
+    client = TestClient(app)
+    before = client.get('/api/social/accounts').json()['accounts'][0]['allowlist']
+    response = client.put('/api/social/accounts/qq', json={'allowlist': [{'peerId': '12345'}, {'peerId': peer}]})
+    assert response.status_code == 422
+    assert client.get('/api/social/accounts').json()['accounts'][0]['allowlist'] == before

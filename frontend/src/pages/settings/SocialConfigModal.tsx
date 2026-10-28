@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState,type KeyboardEvent} from 'react';
 import {useT} from '../../i18n';
-import {parseAllowlist,socialPreferenceWriter,socialRecords,type SocialAccount,type SocialPermission,type SocialRecord} from '../../services/socialClient';
+import {socialPreferenceWriter,socialRecords,type SocialAccount,type SocialPermission,type SocialRecord} from '../../services/socialClient';
 import type {SocialPreferencePatch} from '../../services/socialPreferences';
 import type {QQLoginErrorCode,QQRuntimeAction,QQRuntimeState} from '../../services/qqRuntimeClient';
 import Modal from '../../ui/Modal';
@@ -8,11 +8,12 @@ import Button from '../../ui/Button';
 import FieldRow from '../../ui/FieldRow';
 import Hint from '../../ui/Hint';
 import Switch from '../../ui/Switch';
+import {addQQContacts} from '../../services/qqAllowlist';
 import QQLoginPanel from './QQLoginPanel';
 
 const TABS=['account','permissions','records'] as const;
-const PERMISSIONS:SocialPermission[]=['receive','reply','proactive','contacts','history'];
-const UNSUPPORTED=['media','friendRequests','groups','profile'] as const;
+const PERMISSIONS:SocialPermission[]=['receive','reply'];
+const UNSUPPORTED=['proactive','contacts','history','media','friendRequests','groups','profile'] as const;
 const preferences=(account:SocialAccount)=>({permissions:{...account.permissions},allowlistEnabled:account.allowlistEnabled,allowlist:account.allowlist.map(peer=>({...peer}))});
 export default function SocialConfigModal({account,runtime,runtimeError,busy,pendingAction,onLogin,onLogout,onClose,onAccountChanged}:{
   account:SocialAccount;runtime:QQRuntimeState|null;runtimeError:QQLoginErrorCode|null;busy:boolean;pendingAction:QQRuntimeAction|null;
@@ -20,7 +21,9 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
 }){
   const t=useT();const provider=account.provider;
   const [draft,setDraft]=useState(()=>preferences(account));
-  const [allowlist,setAllowlist]=useState(account.allowlist.map(peer=>peer.peerId).join('\n'));
+  const [contactInput,setContactInput]=useState('');
+  const [contactError,setContactError]=useState<string|null>(null);
+  const inputRef=useRef<HTMLInputElement>(null);
   const [tab,setTab]=useState<(typeof TABS)[number]>('account');
   const [saving,setSaving]=useState(false);const [saveError,setSaveError]=useState(false);const [saved,setSaved]=useState(false);
   const [records,setRecords]=useState<SocialRecord[]>([]);const [loadingRecords,setLoadingRecords]=useState(false);const [recordError,setRecordError]=useState(false);
@@ -34,9 +37,9 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
       confirmed.current=actual;accountChanged.current(actual);
       if(!alive.current)return;
       const next={...preferences(actual),...pending,permissions:{...actual.permissions,...pending.permissions}};
-      setDraft(next);if(pending.allowlist===undefined)setAllowlist(actual.allowlist.map(peer=>peer.peerId).join('\n'));setSaved(true);
+      setDraft(next);setSaved(true);
     },
-    onError:failed=>{if(alive.current){setSaveError(failed);if(failed){setDraft(preferences(confirmed.current));setAllowlist(confirmed.current.allowlist.map(peer=>peer.peerId).join('\n'));}}},
+    onError:failed=>{if(alive.current){setSaveError(failed);if(failed){setDraft(preferences(confirmed.current));}}},
     onBusy:value=>{if(alive.current)setSaving(value);},
     });
     return()=>{alive.current=false;unsubscribe();void writer.flush();};
@@ -57,6 +60,10 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
   },[tab,provider]);
   const patch=(value:SocialPreferencePatch)=>{
     setSaved(false);setSaveError(false);setDraft(current=>({...current,...value,permissions:{...current.permissions,...value.permissions}}));writer.patch(value);
+  };
+  const addContacts=()=>{
+    try{const allowlist=addQQContacts(contactInput,draft.allowlist);patch({allowlist});setContactInput('');setContactError(null);inputRef.current?.focus();}
+    catch(error){setContactError(error instanceof Error?error.message:'invalid');}
   };
   const close=()=>{void writer.flush();onClose();};
   const navigateTab=(event:KeyboardEvent<HTMLButtonElement>,index:number)=>{
@@ -80,11 +87,18 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
       </section>
       <section id="social-panel-permissions" role="tabpanel" aria-labelledby="social-tab-permissions" aria-hidden={tab!=='permissions'} inert={tab!=='permissions'} className="social-pane">
         <div className="social-permission-heading"><h3>{t('social.messagePermissions')}</h3><Hint text={t('social.permissionsHint')} side="down"/></div>
-        {PERMISSIONS.map(permission=><FieldRow key={permission} label={t(`social.permissions.${permission}`)} hint={!account.capabilities[permission]?t('social.unsupported'):undefined}><Switch title={t(`social.permissions.${permission}`)} on={draft.permissions[permission]} disabled={!account.capabilities[permission]&&!draft.permissions[permission]} onChange={value=>patch({permissions:{[permission]:value}})}/></FieldRow>)}
+        {PERMISSIONS.map(permission=><FieldRow key={permission} label={t(`social.permissions.${permission}`)} ><Switch title={t(`social.permissions.${permission}`)} on={draft.permissions[permission]} onChange={value=>patch({permissions:{[permission]:value}})}/></FieldRow>)}
         <div className="social-allowlist"><FieldRow label={t('social.allowlist')} hint={t('social.allowlistHint')}><Switch title={t('social.allowlist')} on={draft.allowlistEnabled} onChange={allowlistEnabled=>patch({allowlistEnabled})}/></FieldRow>
-          {draft.allowlistEnabled?<div className="social-allowlist-editor"><label htmlFor="social-peer-list">{t('social.allowlistIds')}</label><textarea id="social-peer-list" rows={4} value={allowlist} onChange={event=>{setAllowlist(event.target.value);patch({allowlist:parseAllowlist(event.target.value)});}} spellCheck={false}/>{parseAllowlist(allowlist).length===0?<p className="social-empty-policy">{t('social.allowlistEmpty')}</p>:null}</div>:null}
+          {draft.allowlistEnabled?<div className="social-allowlist-editor">
+            <label htmlFor="social-peer-input">{t('social.allowlistIds')}</label>
+            <div className="social-contact-add"><input ref={inputRef} id="social-peer-input" type="text" inputMode="numeric" autoComplete="off" value={contactInput} placeholder={t('social.contactPlaceholder')} aria-invalid={!!contactError} aria-describedby={contactError?'social-contact-error':'social-contact-hint'} onChange={event=>{setContactInput(event.target.value);setContactError(null);}} onKeyDown={event=>{if(event.key==='Enter'&&!event.nativeEvent.isComposing){event.preventDefault();addContacts();}}} spellCheck={false}/><Button size="sm" onClick={addContacts}>{t('social.addContact')}</Button></div>
+            <p id="social-contact-hint" className="social-help">{t('social.contactHint')}</p>
+            {contactError?<p id="social-contact-error" role="alert" className="social-error">{t(`social.contactErrors.${contactError}`)}</p>:null}
+            <ul className="social-contact-list" aria-label={t('social.contactList')}>{draft.allowlist.map(peer=><li key={peer.peerId}><span>{peer.peerId}</span><Button variant="ghost" size="sm" aria-label={t('social.removeContact',{id:peer.peerId})} onClick={()=>{patch({allowlist:draft.allowlist.filter(item=>item.peerId!==peer.peerId)});setContactError(null);}}>{t('social.removeContactButton')}</Button></li>)}</ul>
+            {draft.allowlist.length===0?<p className="social-empty-policy">{t('social.allowlistEmpty')}</p>:null}
+          </div>:null}
         </div>
-        <div className="social-unsupported">{UNSUPPORTED.map(item=><div key={item}><span>{t(`social.permissions.${item}`)}</span><span>{t('social.unsupported')}</span></div>)}</div>
+        <details className="social-unsupported"><summary>{t('social.unsupportedSummary')}</summary>{UNSUPPORTED.map(item=><div key={item}><span>{t(`social.permissions.${item}`)}</span><span>{t('social.unsupported')}</span></div>)}</details>
       </section>
       <section id="social-panel-records" role="tabpanel" aria-labelledby="social-tab-records" aria-hidden={tab!=='records'} inert={tab!=='records'} className="social-pane">
         <div className="social-record-heading"><h3>{t('social.operationRecords')}</h3></div>

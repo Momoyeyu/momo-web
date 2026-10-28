@@ -22,7 +22,7 @@ class PermissionIn(BaseModel):
 
 class ContactIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    peerId: str = Field(min_length=1, max_length=160)
+    peerId: str = Field(pattern=r"^[1-9][0-9]{4,11}$", min_length=5, max_length=12)
     label: str = Field(default="", max_length=160)
 
 

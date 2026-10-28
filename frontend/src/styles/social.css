@@ -60,7 +60,15 @@
 .social-allowlist { border-top:1px solid var(--line);margin-top:14px; }
 .social-allowlist-editor { padding:8px 0 10px 160px; }
 .social-allowlist-editor > label { display:block;color:var(--text-dim);font-size:12px;margin-bottom:8px; }
-.social-allowlist-editor textarea { width:100%;font:inherit;font-size:13px;resize:vertical;line-height:1.6; }
+.social-contact-add { display:flex;gap:10px;align-items:center; }
+.social-contact-add input { flex:1;min-width:0;width:100%; }
+.social-contact-add button { flex:none; }
+.social-contact-add input[aria-invalid="true"] { border-color:var(--danger); }
+.social-contact-list { display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:12px 0;padding:0; }
+.social-contact-list li { display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:8px;padding:6px 8px 6px 12px;font-size:13px; }
+.social-contact-list button { padding:4px 8px; }
+.social-unsupported summary { color:var(--text-dim);font-size:12px;cursor:pointer; }
+
 .social-empty-policy { font-size:12px;color:var(--accent);margin:8px 0 0; }
 .social-unsupported { margin-top:20px;padding-top:14px;border-top:1px solid var(--line); }
 .social-unsupported > div { display:flex;justify-content:space-between;font-size:12px;color:var(--text-faint);padding:8px 0; }
