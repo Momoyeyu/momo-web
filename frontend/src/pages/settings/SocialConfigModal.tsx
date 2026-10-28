@@ -74,7 +74,6 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
     <div className="social-viewport"><div className="social-track" style={{transform:`translateX(${-index*100}%)`}}>
       <section id="social-panel-account" role="tabpanel" aria-labelledby="social-tab-account" aria-hidden={tab!=='account'} inert={tab!=='account'} className="social-pane">
         <QQLoginPanel runtime={runtime} error={runtimeError} busy={busy} pendingAction={pendingAction} onLogin={onLogin} onLogout={onLogout}/>
-        <div className="social-connection-state"><i className={account.status==='connected'?'is-connected':''}/><div><strong>{t(`social.status.${account.status}`)===`social.status.${account.status}`?t('social.status.disconnected'):t(`social.status.${account.status}`)}</strong><span>{account.actualSelfId?t('social.verifiedIdentity',{id:account.actualSelfId}):t('social.identityPending')}</span></div></div>
         {account.error?<p className="social-error">{account.error}</p>:null}
         {account.ownerPeerId?<p className="social-help">{t('social.ownerVerified',{id:account.ownerPeerId})}</p>:null}
         {account.status==='quarantined'?<p className="social-help">{t('social.unknownHold')}</p>:null}

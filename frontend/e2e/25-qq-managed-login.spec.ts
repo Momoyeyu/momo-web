@@ -85,6 +85,7 @@ test('Login is auth-only and supports a cached session without promising a QR',a
   await expect(dialog.getByRole('button',{name:'退出登录',exact:true})).toHaveCount(0);
   await dialog.getByRole('button',{name:'登录 QQ',exact:true}).click();
   await expect(dialog.getByText('QQ 已登录',{exact:true})).toBeVisible();
+  await expect(dialog.getByText('实际登录身份尚未核验',{exact:true})).toHaveCount(0);
   await expect(dialog.getByRole('button',{name:'退出登录',exact:true})).toBeEnabled();
   await expect(dialog.getByRole('button',{name:'登录 QQ',exact:true})).toHaveCount(0);
   await expect(dialog.locator('.qq-login img')).toHaveCount(0);

@@ -38,8 +38,8 @@ test('QQ account settings offer managed sign-in only and enforce an empty allowl
     await expect(dialog.locator('input[placeholder^="ws:"]')).toHaveCount(0);
     await expect(dialog.getByText('高级连接（兼容旧桥接）',{exact:true})).toHaveCount(0);
     await expect(dialog.getByText('连接标识',{exact:true})).toHaveCount(0);
-    await expect(dialog.locator('.social-connection-state')).toBeVisible();
-    await expect(dialog.locator('.social-connection-state').locator('xpath=ancestor::details')).toHaveCount(0);
+    await expect(dialog.locator('.qq-login')).toBeVisible();
+    await expect(dialog.locator('.qq-login').locator('xpath=ancestor::details')).toHaveCount(0);
     await page.screenshot({path:info.outputPath('qq-account.png')});
     await dialog.getByRole('tab',{name:'权限'}).click();
     await page.mouse.move(20,20);
