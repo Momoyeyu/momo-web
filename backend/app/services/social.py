@@ -114,6 +114,7 @@ class SocialAccounts:
     def __init__(self):
         self.lock = threading.RLock()
         self._qq_logging_out = False
+        self._qq_login_revision = 0
 
     def _path(self):
         # macOS exposes /var through /private/var. Canonicalize the configured
@@ -229,7 +230,7 @@ class SocialAccounts:
         explicit logout withdraws business without changing grants or identity.
         """
         if action != "forget":
-            return self._request_qq_runtime(action)
+            return self._request_qq_runtime(action, bind_identity=True)
         with self.lock:
             if self._qq_logging_out:
                 raise QQRuntimeError("RUNTIME_NOT_QUIESCENT")
@@ -240,6 +241,7 @@ class SocialAccounts:
                 account["policyRevision"] = int(account["policyRevision"]) + 1
                 self._write(data)
             self._qq_logging_out = True
+            self._qq_login_revision += 1
         try:
             # Withdraw Python's event/send/Boot gates before the native stop.
             # Do not wait for unrelated MCP configuration to release QQ.
@@ -248,12 +250,16 @@ class SocialAccounts:
             with self.lock:
                 self._qq_logging_out = False
 
-    def _request_qq_runtime(self, action):
+    def _request_qq_runtime(self, action, *, bind_identity=False):
         from .coordinator import runtime
         if action not in {"status", "begin", "refresh", "cancel", "stop", "forget"}:
             raise QQRuntimeError("INPUT")
         if not runtime.started or not runtime.host:
             raise QQRuntimeError("RUNTIME_UNAVAILABLE")
+        host = runtime.host
+        host_instance = getattr(host, "host_instance", None)
+        with self.lock:
+            login_revision = self._qq_login_revision
         params = {"authenticatedDetail": True} if action == "status" else {"ownerAction": True}
         if action == "begin":
             with self.lock:
@@ -263,7 +269,7 @@ class SocialAccounts:
             params["expectedSelfId"] = expected
         timeout = 3 if action == "status" else 35 if action in {"begin", "refresh"} else 20
         try:
-            value = runtime.host.request("qq.runtime." + action, params, timeout=timeout)
+            value = host.request("qq.runtime." + action, params, timeout=timeout)
         except Exception as error:
             # HostError already strips native diagnostics. Preserve only the
             # finite public codes even if a future transport regresses that rule.
@@ -274,6 +280,23 @@ class SocialAccounts:
             or not result["executorQuiescent"] or result["actualSelfId"] is not None
             or result["attemptId"] is not None or result["qr"] is not None):
             raise QQRuntimeError("IPC_PROTOCOL")
+        if bind_identity and result["connected"] and result["attemptId"] is not None:
+            with self.lock:
+                closed = getattr(host, "closed", None)
+                if (not runtime.started or runtime.host is not host
+                    or getattr(host, "host_instance", None) != host_instance
+                    or closed is not None and closed.is_set()
+                    or self._qq_logging_out or login_revision != self._qq_login_revision):
+                    return result
+                data = self._read()
+                account = data.get("qq", self._default("qq"))
+                if not account["expectedSelfId"]:
+                    # Only the manager's genuine current authenticated attempt
+                    # supplies this pin. Cached metadata and channel health do not.
+                    account["expectedSelfId"] = result["actualSelfId"]
+                    account["policyRevision"] = int(account["policyRevision"]) + 1
+                    data["qq"] = account
+                    self._write(data)
         return result
 
     def _health(self, provider):
@@ -300,7 +323,7 @@ class SocialAccounts:
             data = self._read()
             old = data.get(provider, self._default(provider))
             account = copy.deepcopy(old)
-            if not old["enabled"] and values.get("enabled") is True:
+            if values.get("enabled") is True:
                 raise SocialError("Use the verified QQ connection action to enable managed chat")
             for flag in ("enabled", "allowlistEnabled"):
                 if flag in values:
@@ -445,13 +468,12 @@ class SocialAccounts:
                 raise SocialError("QQ logout is in progress; log in again before enabling chat")
             data = self._read()
             original = copy.deepcopy(data.get(provider, self._default(provider)))
-            if original.get("quarantined"):
-                raise SocialError("Reconcile pending operations before resuming this account")
         if transport not in {None, "managed"}:
             raise SocialError("Unsupported QQ transport")
         account = copy.deepcopy(original)
         # No account lock is held while the RPC reader may admit messages.
-        native = self.managed_qq_runtime()
+        # Bind and enable together below, preserving this snapshot's strict CAS.
+        native = self._request_qq_runtime("status")
         if not native["connected"] or not native.get("actualSelfId"):
             raise SocialError("Log in to the managed QQ account before enabling chat")
         if account["expectedSelfId"] and native["actualSelfId"] != account["expectedSelfId"]:
@@ -477,7 +499,8 @@ class SocialAccounts:
             current = data.get(provider, self._default(provider))
             if current != original:
                 raise SocialError("QQ settings changed while verifying the account; try connecting again")
-            account.update({"transport": "managed", "enabled": True, "policyRevision": int(original["policyRevision"]) + 1})
+            account.update({"transport": "managed", "enabled": True, "quarantined": False,
+                            "policyRevision": int(original["policyRevision"]) + 1})
             data[provider] = account
             self._write(data)
         try:
@@ -495,6 +518,7 @@ class SocialAccounts:
             current = data.get(provider, self._default(provider))
             if current["policyRevision"] == account["policyRevision"]:
                 current["enabled"] = False
+                current["quarantined"] = original.get("quarantined", False)
                 current["policyRevision"] += 1
                 data[provider] = current
                 self._write(data)
@@ -508,28 +532,12 @@ class SocialAccounts:
         return self.put(provider, {"enabled": False})
 
     def resume(self, provider):
-        """Explicit human action; a closed unknown command is never retried."""
-        from .coordinator import runtime
+        """Compatibility entry; use the same verified enable action as the UI."""
         with self.lock:
-            data = self._read()
-            account = data.get(provider, self._default(provider))
+            account = self._account(provider)
             if not account.get("quarantined"):
                 raise SocialError("This account is not awaiting explicit resumption")
-            for row in runtime._unresolved_commands() if runtime.started else []:
-                payload = json.loads(row["payload"])
-                params = payload.get("params", payload)
-                if params.get("accountId") == account["accountId"]:
-                    raise SocialError("Reconcile this account's pending operation first")
-            account["quarantined"] = False
-            account["policyRevision"] += 1
-            data[provider] = account
-            self._write(data)
-        self._refresh()
-        result = self.get(provider)
-        if result["status"] not in {"connected", "ready", "online"} or result.get("actualSelfId") != account["expectedSelfId"]:
-            self.quarantine(provider)
-            raise SocialError("Verify the account connection before resuming new messages")
-        return self.get(provider)
+        return self.connect(provider, transport="managed")
 
     def records(self, provider):
         account = self.get(provider)

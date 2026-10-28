@@ -61,6 +61,8 @@ class Coordinator:
         self.qq_restore_thread = None
         self.qq_restore_pending = None
         self.qq_restore_owner = None
+        self.qq_recovery_thread = None
+        self.qq_recovery_owner = None
 
     def schema(self):
         with db.tx() as c:
@@ -114,6 +116,7 @@ class Coordinator:
             self.started = True
             self.worker_thread = threading.Thread(target=self._worker, name="momo-inbox", daemon=True)
             self.worker_thread.start()
+            self._schedule_qq_recovery()
         except Exception:
             if self.host:
                 self.host.close()
@@ -126,6 +129,7 @@ class Coordinator:
         with self.condition:
             self.qq_restore_pending = None
             self.qq_restore_owner = None
+            self.qq_recovery_owner = None
             self.mode = "paused"
             self.owner = None
             self.presentation = None
@@ -137,6 +141,9 @@ class Coordinator:
         restore_thread = self.qq_restore_thread
         if restore_thread and restore_thread is not threading.current_thread():
             restore_thread.join(timeout=STOP_SECONDS)
+        recovery_thread = self.qq_recovery_thread
+        if recovery_thread and recovery_thread is not threading.current_thread():
+            recovery_thread.join(timeout=STOP_SECONDS)
         if self.worker_thread and self.worker_thread is not threading.current_thread():
             self.worker_thread.join(timeout=STOP_SECONDS)
         with self.condition:
@@ -394,6 +401,106 @@ class Coordinator:
         if payload.get("method") == "channels.send" and receipt["status"] in {"completed", "delivered"}:
             from . import checkpoint
             checkpoint.acknowledge_external(row["run_id"], checkpoint.generated_reply(row["run_id"]), receipt["commandId"])
+        params = payload.get("params", payload)
+        if (old in {"pending", "executing", "unknown"} and payload.get("method") == "channels.send"
+            and params.get("pluginId") == "momo-qq" and receipt["status"] == "closed_unknown"
+            and receipt.get("automatic") is True and receipt.get("executorQuiescent") is True
+            and receipt.get("deliveryStatus") == "unknown"):
+            # Shutdown may have withdrawn the recovery worker already. Persist
+            # its owned host's proof without silently restoring QQ next Boot.
+            self._quarantine_qq_command(params)
+        if receipt["status"] == "unknown":
+            self._schedule_qq_recovery()
+
+    @staticmethod
+    def _quarantine_qq_command(params):
+        from .social import social
+        with social.lock:
+            data = social._read()
+            account = data.get("qq")
+            if account and account.get("accountId") == params.get("accountId"):
+                if account.get("enabled") or not account.get("quarantined"):
+                    account.update(enabled=False, quarantined=True,
+                        policyRevision=int(account["policyRevision"]) + 1)
+                    social._write(data)
+
+    def _qq_unknown_commands(self):
+        rows = []
+        for row in self._unresolved_commands():
+            payload = json.loads(row["payload"])
+            params = payload.get("params", payload)
+            if payload.get("method") == "channels.send" and params.get("pluginId") == "momo-qq" and params.get("accountId"):
+                rows.append((row, params))
+        return rows
+
+    def _qq_recovery_current(self, owner):
+        return bool(owner and self.started and self.qq_recovery_owner is owner
+            and self.closed is owner["closed"] and not self.closed.is_set()
+            and self.host is owner["host"] and self.core_id == owner["coreId"]
+            and getattr(self.host, "host_instance", None) == owner["hostInstance"]
+            and not self.restoring)
+
+    def _schedule_qq_recovery(self):
+        # A receipt callback runs on the sole host reader: stopping the native
+        # executor and awaiting its reply must happen on a separate worker.
+        if not self.started or not self._qq_unknown_commands():
+            return
+        with self.condition:
+            host_instance = getattr(self.host, "host_instance", None)
+            if self.closed.is_set() or self.restoring or not host_instance:
+                return
+            if self.qq_recovery_thread and self.qq_recovery_thread.is_alive() and self._qq_recovery_current(self.qq_recovery_owner):
+                return
+            owner = {"host": self.host, "hostInstance": host_instance,
+                     "closed": self.closed, "coreId": self.core_id}
+            self.qq_recovery_owner = owner
+            self.qq_recovery_thread = threading.Thread(target=self._recover_unknown_qq,
+                args=(owner,), name="momo-qq-recovery", daemon=True)
+            self.qq_recovery_thread.start()
+
+    def _recover_unknown_qq(self, owner):
+        from .social import SocialError
+        try:
+            with self.transition:
+                with self.condition:
+                    settled = self.condition.wait_for(lambda: not self._qq_recovery_current(owner) or self.active is None,
+                                                      timeout=STOP_SECONDS)
+                    if not settled or not self._qq_recovery_current(owner):
+                        return
+                for row, params in self._qq_unknown_commands():
+                    with self.condition:
+                        if not self._qq_recovery_current(owner):
+                            return
+                        # Withdraw persistent business authorization first. Do
+                        # not refresh every MCP plugin just to stop one phone.
+                        self._quarantine_qq_command(params)
+                    result = owner["host"].request("qq.settleUnknown", {
+                        "commandId": row["command_id"], "accountId": params["accountId"]}, timeout=STOP_SECONDS + 2)
+                    with self.condition:
+                        if not self._qq_recovery_current(owner):
+                            return
+                        receipt = result.get("receipt", {})
+                        if (result.get("settled") is not True or result.get("executorQuiescent") is not True
+                            or receipt.get("commandId") != row["command_id"] or receipt.get("runId") != row["run_id"]
+                            or receipt.get("activityEpoch") != row["epoch"]
+                            or any(receipt.get(key) != params.get(key) for key in ("pluginId", "accountId", "peerId"))):
+                            continue
+                        if receipt.get("status") == "closed_unknown":
+                            if receipt.get("deliveryStatus") != "unknown" or receipt.get("executorQuiescent") is not True:
+                                continue
+                        elif receipt.get("status") not in {"completed", "delivered", "failed"}:
+                            continue
+                        self.record_receipt(receipt)
+                with self.condition:
+                    if not self._qq_recovery_current(owner) or self._unresolved_commands():
+                        return
+                # Recovery only returns to the title's dormant brain. A genuine
+                # provider fact or a reaped executor must never perform Boot.
+                self._recover_attention_locked(resume_owner=False)
+        except (HostError, CoordinationError, SocialError, OSError, ValueError, TypeError, KeyError):
+            # No proof means no reconciliation. In particular, a fresh host's
+            # empty runtime cannot attest that a prior host's executor stopped.
+            pass
 
     def _unresolved_commands(self):
         rows = db.query("SELECT * FROM outbox WHERE status='unknown'")
@@ -872,6 +979,7 @@ class Coordinator:
                     self.epoch += 1
                     self._cancel_generation()
                     self.condition.notify_all()
+                self._schedule_qq_recovery()
             raise
 
     @contextmanager

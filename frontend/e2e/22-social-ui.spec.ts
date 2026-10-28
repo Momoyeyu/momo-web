@@ -50,7 +50,8 @@ test('QQ account settings offer managed sign-in only and enforce an empty allowl
     await expect(policy.getByRole('switch')).toHaveAttribute('aria-checked','false');
     await policy.getByRole('switch').click();
     await expect(dialog.getByText('白名单为空，所有联系人均暂停处理。')).toBeVisible();
-    await dialog.getByRole('button',{name:'保存',exact:true}).click();
+    await expect.poll(async()=>((await (await request.get('/api/social/accounts')).json()).accounts[0].allowlistEnabled)).toBe(true);
+    await dialog.getByRole('button',{name:'关闭',exact:true}).click();
     await expect(dialog).toHaveCount(0);
     const saved=(await (await request.get('/api/social/accounts')).json()).accounts;
     expect(saved.find((item:{provider:string})=>item.provider==='qq').allowlistEnabled).toBe(true);
@@ -65,29 +66,6 @@ test('QQ account settings offer managed sign-in only and enforce an empty allowl
       await request.put(`/api/social/accounts/${account.provider}`,{data:{allowlistEnabled:account.allowlistEnabled,allowlist:account.allowlist}});
     }
   }
-});
-
-test('managed channel quarantine recovery stays visible without duplicate disconnect controls',async({page,request})=>{
-  const initial=(await (await request.get('/api/social/accounts')).json()).accounts[0];
-  let account={...initial,enabled:true,transport:'managed',expectedSelfId:'123456',actualSelfId:'123456',status:'quarantined'};
-  const actions:string[]=[];
-  await page.route(/\/api\/social\/accounts$/,route=>route.fulfill({json:{accounts:[account],providers:[]}}));
-  await page.route(/\/api\/social\/accounts\/qq\/resume$/,async route=>{
-    const action=route.request().url().split('/').at(-1)!;actions.push(action);
-    expect(route.request().postDataJSON()).toEqual({});
-    account={...account,status:'connected'};
-    await route.fulfill({json:account});
-  });
-  await openExtensionTab(page,'插件');
-  await page.locator('.official-plugins .social-card').getByRole('button',{name:'配置',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'QQ 账号设置'});
-  await expect(dialog.locator('.social-connection-state')).toContainText('待核对');
-  await expect(dialog.getByRole('button',{name:'核对后恢复新消息',exact:true})).toBeVisible();
-  await dialog.getByRole('button',{name:'核对后恢复新消息',exact:true}).click();
-  await expect(dialog.locator('.social-connection-state')).toContainText('已连接');
-  await expect(dialog.getByRole('button',{name:'核对后恢复新消息',exact:true})).toHaveCount(0);
-  await expect(dialog.getByRole('button',{name:/断开|忘记登录/})).toHaveCount(0);
-  expect(actions).toEqual(['resume']);
 });
 
 test('chat focus can be changed while text input remains available',async({page,request})=>{

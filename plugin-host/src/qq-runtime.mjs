@@ -82,8 +82,9 @@ export class QQRuntimeManager {
   #diagnosticCount = 0; #attemptStartedAt = 0;
   #nativeAuthenticated = false;
   #requireFreshLogin = false;
+  #loginIntent = null; #retryTimer = null; #intentTimer = null; #retryDelay; #loginIntentTimeout;
 
-  constructor({ createTransport, prepareInvocation, forgetSession, onState = () => {}, onDiagnostic = () => {}, now = Date.now, requestTimeoutMs = 10000, stopTimeoutMs = 1000, phaseTimeoutMs = 30000, maxFrameBytes = 512 * 1024 } = {}) {
+  constructor({ createTransport, prepareInvocation, forgetSession, onState = () => {}, onDiagnostic = () => {}, now = Date.now, requestTimeoutMs = 10000, stopTimeoutMs = 1000, phaseTimeoutMs = 30000, maxFrameBytes = 512 * 1024, autoRetryDelayMs = 1000, loginIntentTimeoutMs = 300000 } = {}) {
     this.#createTransport = createTransport;
     this.#prepareInvocation = prepareInvocation;
     this.#forgetSession = forgetSession;
@@ -92,6 +93,8 @@ export class QQRuntimeManager {
     this.#stopTimeout = Math.max(10, Math.min(Number(stopTimeoutMs) || 1000, 5000));
     this.#phaseTimeout = Math.max(10, Math.min(Number(phaseTimeoutMs) || 30000, 90000));
     this.#maxFrameBytes = Math.max(1024, Math.min(Number(maxFrameBytes) || 512 * 1024, 1024 * 1024));
+    this.#retryDelay = Math.max(10, Math.min(Number(autoRetryDelayMs) || 1000, 10000));
+    this.#loginIntentTimeout = Math.max(1000, Math.min(Number(loginIntentTimeoutMs) || 300000, 600000));
   }
 
   status({ authenticatedDetail = false, restoreDetail = false } = {}) {
@@ -144,7 +147,7 @@ export class QQRuntimeManager {
   }
 
   async begin({ ownerAction = false, expectedSelfId } = {}) {
-    return this.#begin({ ownerAction, expectedSelfId }, true);
+    return this.#begin({ ownerAction, expectedSelfId }, true, true);
   }
 
   async restore({ ownerAction = false, expectedSelfId, expectedAttemptId, expectedLoginRevision } = {}) {
@@ -154,7 +157,7 @@ export class QQRuntimeManager {
     // Check both fields before #begin can revoke anything. A stop/cancel while
     // idle still changes the revision even though the attempt remains null.
     if (expectedAttemptId !== this.#attempt || expectedLoginRevision !== this.#loginRevision) throw failure('ATTEMPT_CANCELLED');
-    if (this.#unquiescent || this.#starting || this.#stopping || this.#forgetting) throw failure('RUNTIME_NOT_QUIESCENT');
+    if (this.#unquiescent || this.#starting || this.#stopping || this.#forgetting || this.#loginIntent) throw failure('RUNTIME_NOT_QUIESCENT');
     if (this.#state === 'connected') {
       if (expectedSelfId !== this.#actualSelfId) throw failure('ACCOUNT_MISMATCH');
       return this.status({ restoreDetail: true });
@@ -168,7 +171,7 @@ export class QQRuntimeManager {
     return { ...result, loginRevision: revision };
   }
 
-  async #begin({ ownerAction, expectedSelfId }, restoreSession) {
+  async #begin({ ownerAction, expectedSelfId }, restoreSession, explicitLogin = false) {
     this.#owner(ownerAction);
     if (expectedSelfId !== undefined && expectedSelfId !== null && !safeId(expectedSelfId)) throw failure('INPUT');
     if (this.#state === 'connected') {
@@ -176,6 +179,13 @@ export class QQRuntimeManager {
       return this.status();
     }
     if (this.#unquiescent || this.#forgetting) throw failure('RUNTIME_NOT_QUIESCENT');
+    if (explicitLogin) {
+      this.#clearLoginIntent();
+      const intent = { deadline: this.#now() + this.#loginIntentTimeout, qrRenewals: 0, retries: 0 };
+      this.#loginIntent = intent;
+      this.#intentTimer = setTimeout(() => { if (this.#loginIntent === intent) this.#endLoginIntent('qr'); }, this.#loginIntentTimeout);
+      this.#intentTimer.unref?.();
+    }
     const revision = ++this.#loginRevision;
     this.#revoke('ATTEMPT_CANCELLED');
     // The native SDK's callbacks have no request ID. A worker therefore owns
@@ -205,9 +215,10 @@ export class QQRuntimeManager {
     }
   }
 
-  async refreshQR({ ownerAction = false } = {}) { return this.#begin({ ownerAction, expectedSelfId: this.#expectedSelfId }, false); }
+  async refreshQR({ ownerAction = false } = {}) { return this.#begin({ ownerAction, expectedSelfId: this.#expectedSelfId }, false, true); }
 
   async cancel() {
+    this.#clearLoginIntent();
     this.#loginRevision++;
     const attemptId = this.#attempt;
     this.#revoke('ATTEMPT_CANCELLED'); this.#actualSelfId = null; this.#transition('cancelled');
@@ -219,6 +230,7 @@ export class QQRuntimeManager {
   }
 
   async stop() {
+    this.#clearLoginIntent();
     this.#loginRevision++;
     return this.#stopRuntime();
   }
@@ -247,6 +259,39 @@ export class QQRuntimeManager {
   }
 
   #owner(allowed) { if (allowed !== true) throw failure('OWNER_ACTION_REQUIRED'); }
+  #clearLoginIntent() {
+    clearTimeout(this.#retryTimer); clearTimeout(this.#intentTimer);
+    this.#retryTimer = null; this.#intentTimer = null; this.#loginIntent = null;
+  }
+  #endLoginIntent(kind) {
+    this.#clearLoginIntent();
+    const revision = ++this.#loginRevision;
+    void this.#stopRuntime().then(result => {
+      if (this.#loginRevision === revision && !this.#attempt && result.executorQuiescent) this.#transition(kind === 'qr' ? 'expired' : 'error', kind === 'qr' ? null : 'RUNTIME_TIMEOUT');
+    });
+  }
+  #recoverLogin(kind) {
+    const intent = this.#loginIntent;
+    if (!intent || this.#state === 'connected' || this.#forgetting) return;
+    if (this.#retryTimer) return;
+    const counter = kind === 'qr' ? 'qrRenewals' : 'retries';
+    const limit = kind === 'qr' ? 3 : 2;
+    if (this.#now() >= intent.deadline || intent[counter] >= limit) { this.#endLoginIntent(kind); return; }
+    intent[counter]++;
+    const revision = this.#loginRevision, attempt = this.#attempt;
+    const backoff = this.#retryDelay * (kind === 'qr' ? 1 : 2 ** (intent.retries - 1));
+    const timer = setTimeout(() => {
+      if (this.#retryTimer !== timer) return;
+      this.#retryTimer = null;
+      if (this.#loginIntent !== intent || this.#loginRevision !== revision || this.#attempt !== attempt) return;
+      if (this.#now() >= intent.deadline) { this.#endLoginIntent('qr'); return; }
+      if (this.#state === 'connected' || this.#forgetting || this.#unquiescent) { this.#clearLoginIntent(); return; }
+      // Only this bounded, explicit login may replace its pre-auth worker.
+      // #begin reaps the owned process tree before accepting new callbacks.
+      void this.#begin({ ownerAction: true, expectedSelfId: this.#expectedSelfId }, kind !== 'qr').catch(() => {});
+    }, backoff);
+    this.#retryTimer = timer; timer.unref?.();
+  }
   #assertAttempt(attemptId) { if (attemptId !== this.#attempt || !this.#child || this.#unquiescent) throw failure('ATTEMPT_CANCELLED'); }
   #transition(status, code = null) {
     this.#state = status; this.#error = code;
@@ -287,14 +332,38 @@ export class QQRuntimeManager {
   }
   #clearQR() { this.#qr = null; clearTimeout(this.#qrTimer); this.#qrTimer = null; }
   #expireQR() {
-    if (this.#qr && this.#qr.expiresAt <= this.#now()) { this.#revoke('ATTEMPT_CANCELLED'); if (this.#state !== 'connected') this.#state = 'expired'; }
+    if (this.#qr && this.#qr.expiresAt <= this.#now()) {
+      this.#revoke('ATTEMPT_CANCELLED');
+      if (this.#state !== 'connected') { this.#state = 'expired'; this.#recoverLogin('qr'); }
+    }
   }
   #revoke(code) {
     const previous = this.#attempt; this.#attempt = null; this.#nativeAuthenticated = false; this.#clearQR(); this.#clearPhase();
     for (const [id, pending] of this.#pending) if (pending.attemptId === previous && pending.method !== 'stop') { this.#pending.delete(id); clearTimeout(pending.timer); pending.reject(failure(code)); }
   }
   #fail(code) {
+    const intent = this.#loginIntent;
     this.#revoke(code); this.#actualSelfId = null; this.#transition(code === 'ACCOUNT_MISMATCH' ? 'identity_mismatch' : 'error', code);
+    if (this.#loginIntent !== intent) return;
+    if (code === 'RUNTIME_TIMEOUT' || code === 'RUNTIME_STOPPED') this.#recoverLogin('transient');
+    else {
+      this.#clearLoginIntent();
+      if (intent && (this.#child || this.#starting)) {
+        const revision = this.#loginRevision;
+        const status = code === 'ACCOUNT_MISMATCH' ? 'identity_mismatch' : 'error';
+        // A terminal explicit login has no remaining user action that owns its
+        // worker. Reap it automatically, retaining the actionable failure while
+        // shutdown runs and fencing completion against a newer login or logout.
+        setImmediate(() => {
+          if (this.#loginRevision !== revision || this.#attempt || this.#loginIntent) return;
+          const stopping = this.#stopRuntime();
+          this.#transition(status, code);
+          void stopping.then(result => {
+            if (this.#loginRevision === revision && !this.#attempt && result.executorQuiescent) this.#transition(status, code);
+          });
+        });
+      }
+    }
   }
 
   async #ensureStarted() {
@@ -370,7 +439,7 @@ export class QQRuntimeManager {
       for (const [id, pending] of this.#pending) { this.#pending.delete(id); clearTimeout(pending.timer); pending.reject(failure('RUNTIME_STOPPED')); }
       this.#revoke('RUNTIME_STOPPED'); this.#actualSelfId = null;
       if (!this.#releaseStoppedTree(child)) this.#unquiescent = true;
-      if (!this.#stopping) this.#transition('disconnected', 'RUNTIME_STOPPED');
+      if (!this.#stopping) { this.#clearLoginIntent(); this.#transition('disconnected', 'RUNTIME_STOPPED'); }
     };
     child.once('close', close);
     // Parent exit withdraws auth immediately. Only the tree ownership probe
@@ -430,9 +499,17 @@ export class QQRuntimeManager {
       // authentication makes verification monotonic for this owned attempt.
       if (this.#nativeAuthenticated && this.#state === 'verifying' && ['qr_pending', 'awaiting_confirmation'].includes(data.status)) return;
       if (['qr_pending', 'awaiting_confirmation', 'verifying'].includes(data.status)) this.#transition(data.status);
-      else if (data.status === 'expired') { this.#revoke('ATTEMPT_CANCELLED'); this.#transition('expired'); }
+      else if (data.status === 'expired') {
+        const intent = this.#loginIntent, revision = this.#loginRevision;
+        this.#revoke('ATTEMPT_CANCELLED'); this.#transition('expired');
+        if (this.#loginIntent === intent && this.#loginRevision === revision) this.#recoverLogin('qr');
+      }
       else if (data.status === 'error') this.#fail(knownErrorCode(data.code));
-      else if (data.status === 'disconnected') { this.#revoke('RUNTIME_STOPPED'); this.#actualSelfId = null; this.#transition('disconnected'); }
+      else if (data.status === 'disconnected') {
+        const intent = this.#loginIntent, revision = this.#loginRevision;
+        this.#revoke('RUNTIME_STOPPED'); this.#actualSelfId = null; this.#transition('disconnected');
+        if (this.#loginIntent === intent && this.#loginRevision === revision) this.#recoverLogin('transient');
+      }
     }
     // Message execution and receipts remain owned by the existing QQChannel.
     // This auth-only foundation cannot turn uncorrelated worker events into
@@ -456,6 +533,7 @@ export class QQRuntimeManager {
     if (!safeId(data.selfId)) return;
     this.#clearQR();
     if (this.#expectedSelfId && data.selfId !== this.#expectedSelfId) { this.#fail('ACCOUNT_MISMATCH'); return; }
+    this.#clearLoginIntent();
     this.#requireFreshLogin = false;
     this.#actualSelfId = data.selfId; this.#transition('connected');
   }

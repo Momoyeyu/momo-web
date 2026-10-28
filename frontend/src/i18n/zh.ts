@@ -3,8 +3,8 @@
 export const zh = {
   social: {
   "login": {
+    "loggingIn": "正在登录…",
     "loginFirst": "请先登录 QQ，再启用聊天。",
-    "enableChat": "保存并启用 QQ 聊天",
     "chatConnected": "QQ 聊天已连接",
     "chatConnecting": "已启用，正在连接 QQ 聊天…",
     "chatQuarantined": "QQ 聊天已暂停，请核对执行记录。",
@@ -17,14 +17,9 @@ export const zh = {
     "privateAccount": "独立账号会话",
     "verified": "账号已核验",
     "begin": "登录 QQ",
-    "refresh": "刷新二维码",
-    "fresh": "重新扫码",
     "preparing": "正在准备…",
-    "cancel": "取消登录",
-    "saveIdentity": "账号 ID 已修改，请先保存，再重新打开这里登录。",
     "permissionNote": "登录与聊天权限独立；收发范围在「权限」中设置。",
     "forget": "退出登录",
-    "forgetConfirm": "退出登录将停用 QQ 收发并清除本机登录凭据，下次需要扫码。聊天、记忆和权限设置会保留。",
     "states": {
       "loading": "正在读取登录状态…",
       "idle": "让 momo 登录自己的 QQ 账号。",
@@ -34,7 +29,7 @@ export const zh = {
       "awaiting_confirmation": "已扫码，请在手机上确认登录。",
       "verifying": "正在核验登录账号…",
       "connected": "QQ 已登录",
-      "expired": "二维码已过期，请刷新。",
+      "expired": "二维码已过期。",
       "cancelled": "本次登录已取消。",
       "disconnected": "QQ 已断开，可以重新登录。",
       "identity_mismatch": "登录账号与已绑定账号不一致。",
@@ -93,6 +88,10 @@ export const zh = {
     "permissions": "权限",
     "records": "记录"
   },
+  "autoSave": "修改后自动保存",
+  "saved": "已保存",
+  "saveError": "未能保存，请检查当前设置后重试。",
+  "unknownHold": "存在结果未知的操作，QQ 收发暂时暂停。记录会保留真实结果，不会自动重发。",
   "recordsError": "暂时无法读取记录。",
   "retiredTitle": "历史未确认操作（{count}）",
   "retiredHint": "这些记录来自已停用的微信桥接。",

@@ -139,6 +139,7 @@ export class PluginHost {
       case 'plugins.promptContext': return this.promptContext(params);
       case 'plugins.callTool': return this.callTool(params);
       case 'commands.reconcile': return this.reconcileCommand(params);
+      case 'qq.settleUnknown': return this.settleUnknownQQ(params);
       case 'channels.health': return this.channelHealth(params);
       case 'channels.send': return this.sendChannel(params);
       case 'channels.ack': return this.ackChannel(params);
@@ -490,6 +491,46 @@ export class PluginHost {
     return { reconciled: true, receipt: this.receipt(command, status, { reconciled: true, ...(status === 'closed_unknown' ? { deliveryStatus: 'unknown', executorQuiescent: true } : {}) }) };
   }
 
+  async settleUnknownQQ({ commandId, accountId }) {
+    if (!opaque(commandId) || !opaque(accountId)) fail('INPUT', 'A QQ command and account are required');
+    const command = this.commands.get(commandId);
+    // A new host's empty native runtime proves nothing about an old executor.
+    if (!command) return { settled: false, executorQuiescent: false };
+    if (command.kind !== 'channel.send' || command.pluginId !== 'momo-qq'
+      || command.accountId !== accountId || command.hostInstance !== this.hostInstance
+      || command.coreInstance !== this.coreInstance) fail('INPUT', 'The command is not an owned QQ send');
+    if (this.inflight.has(commandId)) fail('BUSY', 'Command execution has not settled');
+    const plugin = this.plugins.get('momo-qq');
+    this.paused = true;
+    this.awaitingGrant = false;
+    if (plugin?.config.type === 'qq' && plugin.config.accountId === accountId) {
+      plugin.enabled = false;
+      plugin.connected = false;
+      this.channelQuarantines.set(plugin.id, plugin.fingerprint);
+      plugin.channel?.quarantine();
+      for (const controller of plugin.controllers) controller.abort();
+    }
+    // This private RPC bypasses the MCP disposal queue. A submitted native
+    // send loses its executor only after this owned process group is reaped.
+    if (this.qqRuntime.channelQuiescent() !== true) {
+      const stopped = await this.qqRuntimeAction('stop');
+      if (stopped.executorQuiescent !== true || this.qqRuntime.channelQuiescent() !== true) {
+        return { settled: false, executorQuiescent: false };
+      }
+    }
+    // A provider echo may have arrived during stop. Preserve that real fact,
+    // on the original command, rather than replacing it with an unknown close.
+    if (!this.unresolved.has(commandId)) {
+      const receipt = this.receipts.findLast(item => item.commandId === commandId
+        && ['completed', 'delivered', 'failed', 'closed_unknown'].includes(item.status));
+      return { settled: Boolean(receipt), executorQuiescent: true, ...(receipt ? { receipt } : {}) };
+    }
+    this.unresolved.delete(commandId);
+    return { settled: true, executorQuiescent: true, receipt: this.receipt(command, 'closed_unknown', {
+      deliveryStatus: 'unknown', executorQuiescent: true, automatic: true, requiresReconciliation: false,
+    }) };
+  }
+
   receive({ messageId, text, accountId = 'virtual' }) {
     if (!opaque(messageId) || !opaque(accountId) || typeof text !== 'string' || text.length > 32000) fail('INPUT', 'Invalid virtual message');
     if (![...this.plugins.values()].some(item => item.config.type === 'virtual' && item.enabled && item.connected)) fail('PLUGIN_UNAVAILABLE', 'Virtual channel is disabled');
@@ -587,7 +628,19 @@ export class PluginHost {
     // QQ owns a detached process group. Reclaim it immediately: an unrelated
     // provider's close() must not keep it alive until Python kills this host.
     const nativeStopped = this.qqRuntimeAction('stop')
-      .then(result => result.executorQuiescent === true, () => false);
+      .then(async result => {
+        if (result.executorQuiescent !== true) return false;
+        // Persist this old host's real ownership proof before its pipe exits.
+        // A future empty host cannot safely infer the same fact after restart.
+        await Promise.allSettled([...this.inflight.values()]
+          .filter(item => item.command.pluginId === 'momo-qq').map(item => item.promise));
+        for (const command of [...this.unresolved.values()]) {
+          if (command.kind === 'channel.send' && command.pluginId === 'momo-qq') {
+            await this.settleUnknownQQ({ commandId: command.commandId, accountId: command.accountId });
+          }
+        }
+        return true;
+      }, () => false).catch(() => false);
     const pluginsStopped = (async () => {
       const operations = await this.stopAll('shutdown');
       const plugins = [...this.plugins.values()];

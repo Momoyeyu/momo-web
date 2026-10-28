@@ -3,8 +3,8 @@ import type { Dict } from "./zh";
 export const ja: Dict = {
   social: {
   "login": {
+    "loggingIn": "ログイン中…",
     "loginFirst": "チャットを有効にする前に QQ にログインしてください。",
-    "enableChat": "保存して QQ 会話を有効化",
     "chatConnected": "QQ の会話に接続済み",
     "chatConnecting": "有効です。QQ の会話に接続中…",
     "chatQuarantined": "QQ の会話は一時停止中です。実行記録を確認してください。",
@@ -17,14 +17,9 @@ export const ja: Dict = {
     "privateAccount": "専用アカウントのセッション",
     "verified": "アカウント確認済み",
     "begin": "QQ にログイン",
-    "refresh": "QR コードを更新",
-    "fresh": "QR コードを再発行",
     "preparing": "準備中…",
-    "cancel": "ログインを中止",
-    "saveIdentity": "アカウント ID が変更されています。保存してから、この画面を開き直してください。",
     "permissionNote": "ログインと会話の権限は別です。送受信の範囲は「権限」で設定できます。",
     "forget": "ログアウト",
-    "forgetConfirm": "ログアウトし、QQ の送受信を無効にして端末内の認証情報を削除しますか？次回は QR コードの読み取りが必要です。会話履歴、記憶、権限設定は保持されます。",
     "states": {
       "loading": "ログイン状態を確認中…",
       "idle": "momo 自身の QQ アカウントでログインできます。",
@@ -34,7 +29,7 @@ export const ja: Dict = {
       "awaiting_confirmation": "読み取り済みです。スマートフォンでログインを確認してください。",
       "verifying": "ログインしたアカウントを確認中…",
       "connected": "QQ にログイン済み",
-      "expired": "QR コードの期限が切れました。更新してください。",
+      "expired": "QRコードの有効期限が切れました。",
       "cancelled": "今回のログインは中止されました。",
       "disconnected": "QQ は切断されています。再ログインできます。",
       "identity_mismatch": "ログインしたアカウントが登録済みのアカウントと異なります。",
@@ -93,6 +88,10 @@ export const ja: Dict = {
     "permissions": "権限",
     "records": "記録"
   },
+  "autoSave": "変更は自動保存されます",
+  "saved": "保存済み",
+  "saveError": "保存できませんでした。現在の設定を確認して再度お試しください。",
+  "unknownHold": "結果が不明な操作があるため、QQの送受信を一時停止しています。実際の結果を記録し、自動で再送することはありません。",
   "recordsError": "記録を取得できません。",
   "retiredTitle": "未確認の過去の操作（{count}）",
   "retiredHint": "これらは廃止済みの WeChat ブリッジによる記録です。",

@@ -3,8 +3,8 @@ import type { Dict } from "./zh";
 export const en: Dict = {
   social: {
   "login": {
+    "loggingIn": "Signing in…",
     "loginFirst": "Sign in to QQ before enabling chat.",
-    "enableChat": "Save and enable QQ chat",
     "chatConnected": "QQ chat connected",
     "chatConnecting": "Enabled. Connecting QQ chat…",
     "chatQuarantined": "QQ chat is paused. Review the operation records.",
@@ -17,14 +17,9 @@ export const en: Dict = {
     "privateAccount": "Separate account session",
     "verified": "Account verified",
     "begin": "Sign in to QQ",
-    "refresh": "Refresh QR code",
-    "fresh": "Scan a new QR code",
     "preparing": "Preparing…",
-    "cancel": "Cancel sign-in",
-    "saveIdentity": "The account ID changed. Save it, then reopen this panel to sign in.",
     "permissionNote": "Sign-in and chat permissions are separate. Set message access under Permissions.",
     "forget": "Sign out",
-    "forgetConfirm": "Sign out, disable QQ messaging and clear local sign-in credentials? You will need to scan again next time. Chat history, memories and permission settings will be kept.",
     "states": {
       "loading": "Reading sign-in status…",
       "idle": "Let momo sign in to her own QQ account.",
@@ -34,7 +29,7 @@ export const en: Dict = {
       "awaiting_confirmation": "Scanned. Confirm sign-in on your phone.",
       "verifying": "Verifying the signed-in account…",
       "connected": "Signed in to QQ",
-      "expired": "The QR code expired. Refresh to continue.",
+      "expired": "QR code expired.",
       "cancelled": "This sign-in was cancelled.",
       "disconnected": "QQ disconnected. You can sign in again.",
       "identity_mismatch": "The signed-in account does not match the bound account.",
@@ -93,6 +88,10 @@ export const en: Dict = {
     "permissions": "Permissions",
     "records": "Records"
   },
+  "autoSave": "Changes save automatically",
+  "saved": "Saved",
+  "saveError": "Could not save. Check the current settings and try again.",
+  "unknownHold": "QQ messaging is paused while a delivery result is unknown. Records retain the actual outcome; messages are never resent automatically.",
   "recordsError": "Records are unavailable.",
   "retiredTitle": "Unresolved archived operations ({count})",
   "retiredHint": "These records came from the retired WeChat bridge.",

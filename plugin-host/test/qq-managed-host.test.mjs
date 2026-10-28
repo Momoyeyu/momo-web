@@ -73,3 +73,90 @@ test('native unknown sends survive auth cancellation and plugin disposal as orig
   assert.equal(host.paused, true, 'a provider fact never grants a new business activity');
   assert.equal(sent.length, 1);
 });
+
+test('automatic QQ recovery stops the owned executor and closes only its wait without claiming delivery', async t => {
+  const { host, runtime, request, sent, permit } = await setup(t, { reply: false });
+  const p = permit();
+  await assert.rejects(request('channels.send', { pluginId: 'momo-qq', accountId: 'native-account', peerId: '456789', text: 'One uncertain submission', policyRevision: 1, permit: p }), { code: 'OUTCOME_UNKNOWN' });
+  const result = await request('qq.settleUnknown', { commandId: p.commandId, accountId: 'native-account' });
+  assert.equal(result.settled, true);
+  assert.equal(result.executorQuiescent, true);
+  assert.equal(result.receipt.status, 'closed_unknown');
+  assert.equal(result.receipt.deliveryStatus, 'unknown');
+  assert.equal(result.receipt.automatic, true);
+  assert.equal(result.receipt.runId, p.runId);
+  assert.equal(runtime.status().executorQuiescent, true);
+  assert.equal(host.unresolved.size, 0);
+  assert.equal(host.plugins.get('momo-qq').enabled, false);
+  assert.equal(host.plugins.get('momo-qq').channel.quarantined, true);
+  assert.equal(host.paused, true, 'settling a wait cannot grant attention');
+  assert.equal(sent.length, 1);
+  const duplicate = await request('qq.settleUnknown', { commandId: p.commandId, accountId: 'native-account' });
+  assert.equal(duplicate.receipt.seq, result.receipt.seq);
+});
+
+test('automatic QQ recovery requires current-host ownership and verified native quiescence', async t => {
+  const { host, runtime, request, permit } = await setup(t, { reply: false });
+  const p = permit();
+  assert.equal((await request('qq.settleUnknown', { commandId: 'prior-host-command', accountId: 'native-account' })).settled, false);
+  await assert.rejects(request('channels.send', { pluginId: 'momo-qq', accountId: 'native-account', peerId: '456789', text: 'Unknown only', policyRevision: 1, permit: p }), { code: 'OUTCOME_UNKNOWN' });
+  await assert.rejects(request('qq.settleUnknown', { commandId: p.commandId, accountId: 'different-account' }), { code: 'INPUT' });
+  const stop = runtime.stop.bind(runtime);
+  runtime.stop = async () => ({ executorQuiescent: false });
+  const refused = await request('qq.settleUnknown', { commandId: p.commandId, accountId: 'native-account' });
+  assert.equal(refused.settled, false);
+  assert.equal(host.unresolved.has(p.commandId), true);
+  assert.equal(host.receipts.at(-1).status, 'unknown');
+  runtime.stop = stop;
+});
+
+test('a genuine late QQ fact during automatic stop stays on its original command and no unknown MCP effect is settled', async t => {
+  const { host, runtime, request, sent, complete, permit } = await setup(t, { reply: false });
+  const p = permit();
+  await assert.rejects(request('channels.send', { pluginId: 'momo-qq', accountId: 'native-account', peerId: '456789', text: 'Original fact only', policyRevision: 1, permit: p }), { code: 'OUTCOME_UNKNOWN' });
+  const unrelated = { commandId: 'mcp-unknown', runId: 'another-run', kind: 'mcp.tool', pluginId: 'other', hostInstance: host.hostInstance };
+  host.commands.set(unrelated.commandId, unrelated); host.unresolved.set(unrelated.commandId, unrelated);
+  await assert.rejects(request('qq.settleUnknown', { commandId: unrelated.commandId, accountId: 'native-account' }), { code: 'INPUT' });
+  const stop = runtime.stop.bind(runtime);
+  runtime.stop = async () => { complete(sent[0].echo); return stop(); };
+  const result = await request('qq.settleUnknown', { commandId: p.commandId, accountId: 'native-account' });
+  assert.equal(result.receipt.status, 'completed');
+  assert.equal(result.receipt.deliveryStatus, 'provider_accepted');
+  assert.equal(result.receipt.commandId, p.commandId);
+  assert.equal(result.receipt.runId, p.runId);
+  assert.equal(result.receipt.late, true);
+  assert.equal(host.receipts.filter(r => r.commandId === p.commandId && r.status === 'closed_unknown').length, 0);
+  assert.equal(host.unresolved.has(unrelated.commandId), true);
+  assert.equal(sent.length, 1);
+});
+
+test('graceful shutdown persists owned QQ quiescence as unknown delivery before the old host exits', async t => {
+  const { host, runtime, request, sent, permit } = await setup(t, { reply: false });
+  const p = permit();
+  await assert.rejects(request('channels.send', { pluginId: 'momo-qq', accountId: 'native-account', peerId: '456789', text: 'No replay after restart', policyRevision: 1, permit: p }), { code: 'OUTCOME_UNKNOWN' });
+  await host.close();
+  assert.equal(runtime.status().executorQuiescent, true);
+  const closed = host.receipts.findLast(receipt => receipt.commandId === p.commandId);
+  assert.equal(closed.status, 'closed_unknown');
+  assert.equal(closed.deliveryStatus, 'unknown');
+  assert.equal(closed.executorQuiescent, true);
+  assert.equal(closed.runId, p.runId);
+  assert.equal(host.unresolved.size, 0);
+  assert.equal(sent.length, 1);
+});
+
+test('shutdown also safely closes a QQ send that was still in flight when stop began', async t => {
+  const { host, request, sent, permit } = await setup(t, { reply: false });
+  const p = permit();
+  const pending = request('channels.send', { pluginId: 'momo-qq', accountId: 'native-account', peerId: '456789', text: 'Only the original submission', policyRevision: 1, permit: p });
+  const rejected = assert.rejects(pending, { code: 'OUTCOME_UNKNOWN' });
+  await until(() => sent.length === 1);
+  await host.close();
+  await rejected;
+  const closed = host.receipts.findLast(receipt => receipt.commandId === p.commandId);
+  assert.equal(closed.status, 'closed_unknown');
+  assert.equal(closed.deliveryStatus, 'unknown');
+  assert.equal(closed.executorQuiescent, true);
+  assert.equal(closed.runId, p.runId);
+  assert.equal(sent.length, 1);
+});

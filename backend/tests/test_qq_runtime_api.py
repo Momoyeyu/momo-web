@@ -89,6 +89,80 @@ def test_first_login_does_not_require_external_endpoint_or_enabled_plugin(privat
     assert runtime.mode == "dormant"
 
 
+@pytest.mark.parametrize("action", ["begin", "status"])
+def test_authenticated_native_login_binds_blank_identity_without_enabling_plugin(action, private_host):
+    private_host[1].update(status="connected", connected=True, actualSelfId="10001", qr=None)
+    response = (TestClient(app).get("/api/social/accounts/qq/runtime") if action == "status"
+                else TestClient(app).post("/api/social/accounts/qq/runtime/begin"))
+    assert response.status_code == 200
+    saved = social._read()["qq"]
+    assert saved["expectedSelfId"] == "10001"
+    assert saved["enabled"] is False and saved["ownerPeerId"] is None
+    assert saved["permissions"] == {"receive": True, "reply": True, "proactive": False, "contacts": False, "history": False}
+    before = social._path().read_bytes()
+    TestClient(app).get("/api/social/accounts/qq/runtime")
+    assert social._path().read_bytes() == before
+    TestClient(app).post("/api/social/accounts/qq/runtime/begin")
+    assert private_host[0][-1] == ("qq.runtime.begin", {"ownerAction": True, "expectedSelfId": "10001"}, 35)
+    assert social.native_restore_binding() is None
+    assert runtime.mode == "dormant"
+
+
+def test_verified_first_identity_binding_preserves_existing_scope_and_owner_metadata(private_host):
+    account = social._default("qq")
+    account.update(ownerPeerId="20002", permissions={**account["permissions"], "reply": False},
+                   allowlistEnabled=True, allowlist=[{"peerId": "20002", "label": "owner"}])
+    social._write({"qq": account})
+    private_host[1].update(status="connected", connected=True, actualSelfId="10001", qr=None)
+    response = TestClient(app).get("/api/social/accounts/qq/runtime")
+    assert response.status_code == 200
+    saved = social._read()["qq"]
+    assert saved["expectedSelfId"] == "10001"
+    for key in ("accountId", "enabled", "ownerPeerId", "permissions", "allowlistEnabled", "allowlist", "quarantined"):
+        assert saved[key] == account[key]
+
+
+def test_authenticated_native_status_never_rebinds_an_existing_different_identity(private_host):
+    account = social._default("qq")
+    account.update(expectedSelfId="20002", ownerPeerId="30003")
+    social._write({"qq": account})
+    before = social._path().read_bytes()
+    private_host[1].update(status="connected", connected=True, actualSelfId="10001", qr=None)
+    TestClient(app).get("/api/social/accounts/qq/runtime")
+    assert social._path().read_bytes() == before
+
+
+def test_connected_snapshot_without_a_live_attempt_cannot_create_an_identity_binding(private_host):
+    private_host[1].update(status="connected", connected=True, actualSelfId="10001", attemptId=None, qr=None)
+    TestClient(app).get("/api/social/accounts/qq/runtime")
+    assert not social._path().exists()
+
+
+def test_late_login_snapshot_cannot_bind_identity_after_logout(private_host, monkeypatch):
+    ready = login_status(status="connected", connected=True, actualSelfId="10001", qr=None)
+
+    def request(method, params=None, timeout=None):
+        if method == "qq.runtime.status":
+            social.managed_qq_runtime("forget")
+            return ready
+        assert method == "qq.runtime.forget"
+        return logged_out_status()
+
+    monkeypatch.setattr(runtime.host, "request", request)
+    TestClient(app).get("/api/social/accounts/qq/runtime")
+    assert not social._path().exists()
+
+
+def test_late_login_from_a_replaced_host_cannot_create_an_identity_binding(private_host, monkeypatch):
+    def request(method, params=None, timeout=None):
+        monkeypatch.setattr(runtime, "host", SimpleNamespace(request=lambda *a, **k: logged_out_status()))
+        return login_status(status="connected", connected=True, actualSelfId="10001", qr=None)
+
+    monkeypatch.setattr(runtime.host, "request", request)
+    TestClient(app).get("/api/social/accounts/qq/runtime")
+    assert not social._path().exists()
+
+
 @pytest.mark.parametrize("action", ["begin", "refresh", "cancel", "stop", "forget"])
 def test_fixed_login_actions_reject_client_paths_commands_and_identity(action, private_host):
     client = TestClient(app)

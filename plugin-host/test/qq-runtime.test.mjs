@@ -7,6 +7,8 @@ import { spawn } from 'node:child_process';
 const loaded = await import('../src/qq-runtime.mjs');
 const QR = 'data:image/png;base64,iVBORw0KGgo=';
 const tick = () => new Promise(resolve => setImmediate(resolve));
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+async function eventually(check) { for (let index = 0; index < 100 && !check(); index++) await wait(5); assert.ok(check()); }
 
 function childTransport({ handle, stubborn = false, exitOnStop = true } = {}) {
   const child = new EventEmitter();
@@ -41,6 +43,183 @@ function manager(t, options = {}, childOptions = {}) {
   t.after(() => runtime.stop());
   return { runtime, children, states };
 }
+
+function expiringLogin(t, options = {}, childOptions = {}) {
+  let now = Date.now();
+  const result = manager(t, { now: () => now, autoRetryDelayMs: 10, ...options }, { ...childOptions, handle(command, child) {
+    if (childOptions.handle?.(command, child) === true) return true;
+    if (command.method === 'requestQr') {
+      child.ipc({ event: 'qr', data: { attemptId: command.params.attemptId, dataUrl: QR, expiresAt: now + 1000 } });
+      child.reply(command); return true;
+    }
+  } });
+  return { ...result, expire: (elapsed = 1001) => { now += elapsed; return result.runtime.status(); } };
+}
+
+test('only an explicit login intent automatically renews expired QRs in fully reaped owned processes', async t => {
+  const { runtime, children, expire } = expiringLogin(t);
+  await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  const first = runtime.status();
+  expire();
+  await eventually(() => children.length === 2 && runtime.status({ authenticatedDetail: true }).qr !== null);
+  assert.equal(children[0].exitCode, 0);
+  assert.notEqual(runtime.status().attemptId, first.attemptId);
+  assert.equal(children[1].commands[0].params.expectedSelfId, '123456');
+  assert.equal(children[1].commands[0].params.restoreSession, false);
+  assert.ok(children.every(child => child.commands.every(command => command.method !== 'onebot')));
+
+  const background = expiringLogin(t);
+  await background.runtime.restore(restoreInput(background.runtime));
+  background.expire(); await wait(35);
+  assert.equal(background.children.length, 1, 'Boot restoration and status observation cannot create an interactive login intent');
+});
+
+test('QR renewal is bounded by both its finite count and the original explicit-login deadline', async t => {
+  const { runtime, children, expire } = expiringLogin(t);
+  await runtime.begin({ ownerAction: true });
+  for (let count = 2; count <= 4; count++) {
+    expire(); await eventually(() => children.length === count && runtime.status({ authenticatedDetail: true }).qr !== null);
+  }
+  expire(); await wait(45);
+  assert.equal(children.length, 4);
+  assert.equal(runtime.status().status, 'expired');
+  assert.equal(runtime.status().running, false, 'the exhausted login cannot leave an authenticating worker alive');
+  assert.ok(children.every(child => child.exitCode === 0));
+
+  const timed = expiringLogin(t);
+  await timed.runtime.begin({ ownerAction: true });
+  timed.expire(300001); await wait(35);
+  assert.equal(timed.children.length, 1, 'expired user intent cannot authorize a later QR renewal');
+  assert.equal(timed.runtime.status().running, false);
+});
+
+test('the original login deadline revokes verification and reaps the worker without waiting for another QR expiry', async t => {
+  const { runtime, children } = manager(t, { autoRetryDelayMs: 10, loginIntentTimeoutMs: 1000, phaseTimeoutMs: 5000 });
+  const attempt = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  children[0].ipc({ event: 'state', data: { attemptId: attempt.attemptId, status: 'verifying', authenticated: true } });
+  await wait(1050);
+  await eventually(() => runtime.status().status === 'expired' && !runtime.status().running);
+  assert.equal(runtime.status().attemptId, null);
+  children[0].ipc({ event: 'connected', data: { attemptId: attempt.attemptId, selfId: '123456' } });
+  assert.equal(runtime.status().connected, false);
+  assert.equal(children.length, 1);
+});
+
+test('native process loss cancels a queued renewal instead of turning a crash into automatic relaunch', async t => {
+  const { runtime, children, expire } = expiringLogin(t, { autoRetryDelayMs: 30 });
+  const attempt = await runtime.begin({ ownerAction: true });
+  expire(); children[0].finish();
+  await wait(65);
+  assert.equal(children.length, 1);
+  assert.equal(runtime.status().running, false);
+  children[0].ipc({ event: 'connected', data: { attemptId: attempt.attemptId, selfId: '123456' } });
+  assert.equal(runtime.status().connected, false);
+});
+
+for (const action of ['cancel', 'stop', 'forget', 'begin']) {
+  test(`an owner ${action} fences a queued automatic QR renewal`, async t => {
+    const { runtime, children, expire } = expiringLogin(t, { autoRetryDelayMs: 30, forgetSession: async () => {} });
+    await runtime.begin({ ownerAction: true });
+    expire();
+    await runtime[action]({ ownerAction: true });
+    const owned = runtime.status({ restoreDetail: true });
+    await wait(65);
+    assert.deepEqual(runtime.status({ restoreDetail: true }), owned);
+    assert.equal(children.length, action === 'begin' ? 2 : 1);
+  });
+}
+
+test('a manual login fences an automatic renewal already waiting to reap its old process', async t => {
+  let heldStop;
+  const { runtime, children, expire } = expiringLogin(t, {}, { handle(command, child) {
+    if (command.method === 'stop' && !heldStop) { heldStop = { command, child }; return true; }
+  } });
+  await runtime.begin({ ownerAction: true }); expire();
+  await eventually(() => heldStop !== undefined);
+  const replacement = runtime.begin({ ownerAction: true });
+  heldStop.child.reply(heldStop.command); heldStop.child.finish();
+  const latest = await replacement;
+  await wait(35);
+  assert.equal(children.length, 2);
+  assert.equal(runtime.status().attemptId, latest.attemptId);
+  assert.equal(runtime.status({ authenticatedDetail: true }).qr.dataUrl, QR);
+});
+
+test('pre-authentication timeouts recover with bounded backoff but never grant channel authority', async t => {
+  let connects = 0;
+  const { runtime, children } = manager(t, { autoRetryDelayMs: 10, requestTimeoutMs: 10 }, { handle(command) {
+    if (command.method === 'connect') { connects++; return connects === 1; }
+  } });
+  await assert.rejects(runtime.begin({ ownerAction: true, expectedSelfId: '123456' }), { code: 'RUNTIME_TIMEOUT' });
+  await eventually(() => children.length === 2 && runtime.status().status === 'qr_pending');
+  assert.equal(children[0].exitCode, 0);
+  assert.equal(runtime.status().connected, false);
+  await assert.rejects(runtime.requestChannel('send_private_msg', { user_id: '456789', message: 'not authorized' }, 'never-send'), { code: 'RUNTIME_STOPPED' });
+
+  const failed = manager(t, { autoRetryDelayMs: 10, requestTimeoutMs: 10 }, { handle: command => command.method === 'connect' });
+  await assert.rejects(failed.runtime.begin({ ownerAction: true }), { code: 'RUNTIME_TIMEOUT' });
+  await eventually(() => failed.children.length === 3 && failed.runtime.status().status === 'error');
+  await wait(80);
+  assert.equal(failed.children.length, 3, 'only two transient recovery attempts belong to the original login');
+});
+
+test('pre-auth disconnect can recover but successful authentication ends automatic recovery permanently', async t => {
+  const { runtime, children } = manager(t, { autoRetryDelayMs: 10 });
+  const first = await runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  children[0].ipc({ event: 'state', data: { attemptId: first.attemptId, status: 'disconnected' } });
+  await eventually(() => children.length === 2 && runtime.status().status === 'qr_pending');
+  const current = runtime.status();
+  children[0].ipc({ event: 'connected', data: { attemptId: first.attemptId, selfId: '123456' } });
+  assert.equal(runtime.status().connected, false);
+  children[1].ipc({ event: 'state', data: { attemptId: current.attemptId, status: 'verifying', authenticated: true } });
+  assert.equal(runtime.status().connected, false, 'a scan alone never establishes a ready account session');
+  children[1].ipc({ event: 'connected', data: { attemptId: current.attemptId, selfId: '123456' } });
+  assert.equal(runtime.status().connected, true);
+  children[1].ipc({ event: 'state', data: { attemptId: current.attemptId, status: 'disconnected' } });
+  await wait(45);
+  assert.equal(children.length, 2, 'a later account disconnect needs a new explicit login');
+});
+
+test('fatal resource and account errors never trigger automatic login recovery', async t => {
+  let preparations = 0;
+  const unavailable = manager(t, { autoRetryDelayMs: 10, prepareInvocation: async () => { preparations++; throw new loaded.QQRuntimeError('RESOURCE_INVALID'); } });
+  await assert.rejects(unavailable.runtime.begin({ ownerAction: true }), { code: 'RESOURCE_INVALID' });
+  await wait(35); assert.equal(preparations, 1); assert.equal(unavailable.children.length, 0);
+  const mismatch = manager(t, { autoRetryDelayMs: 10 });
+  const attempt = await mismatch.runtime.begin({ ownerAction: true, expectedSelfId: '123456' });
+  mismatch.children[0].ipc({ event: 'connected', data: { attemptId: attempt.attemptId, selfId: '654321' } });
+  await wait(35);
+  assert.equal(mismatch.runtime.status().status, 'identity_mismatch');
+  assert.equal(mismatch.children.length, 1);
+});
+
+test('a fatal explicit-login error reaps its worker and preserves the original error', async t => {
+  const {runtime,children}=manager(t,{autoRetryDelayMs:10,loginIntentTimeoutMs:1000});
+  const attempt=await runtime.begin({ownerAction:true,expectedSelfId:'123456'});
+  children[0].ipc({event:'connected',data:{attemptId:attempt.attemptId,selfId:'654321'}});
+  await eventually(()=>!runtime.status().running);
+  assert.equal(runtime.status().status,'identity_mismatch');
+  assert.equal(runtime.status().error,'ACCOUNT_MISMATCH');
+  assert.equal(runtime.status().executorQuiescent,true);
+  assert.equal(children[0].exitCode,0);
+  children[0].ipc({event:'connected',data:{attemptId:attempt.attemptId,selfId:'123456'}});
+  assert.equal(runtime.status().connected,false);
+  assert.equal(children.length,1);
+});
+
+test('fatal cleanup cannot stop a newer explicit login started before cleanup runs', async t => {
+  const {runtime,children}=manager(t,{autoRetryDelayMs:10});
+  const old=await runtime.begin({ownerAction:true,expectedSelfId:'123456'});
+  children[0].ipc({event:'connected',data:{attemptId:old.attemptId,selfId:'654321'}});
+  const current=await runtime.begin({ownerAction:true,expectedSelfId:'123456'});
+  await wait(35);
+  assert.equal(children.length,2);
+  assert.equal(children[0].exitCode,0);
+  assert.equal(children[1].exitCode,null);
+  assert.equal(runtime.status().attemptId,current.attemptId);
+  assert.equal(runtime.status().status,'qr_pending');
+  assert.equal(runtime.status().error,null);
+});
 
 test('diagnostics contain only bounded current-attempt phases and never enter public status', async t => {
   const diagnostics = [];

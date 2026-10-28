@@ -1,4 +1,5 @@
 import {apiJson,jsonInit} from './http';
+import {createSocialPreferenceWriter,type SocialPreferencePatch} from './socialPreferences';
 
 export type SocialProvider='qq';
 export type SocialPermission='receive'|'reply'|'proactive'|'contacts'|'history';
@@ -45,6 +46,23 @@ export function saveSocialAccount(provider:SocialProvider,draft:Partial<SocialDr
   const {enabled,expectedSelfId,permissions,allowlistEnabled,allowlist}=draft;
   const body={enabled,expectedSelfId,permissions,allowlistEnabled,allowlist};
   return apiJson(`/api/social/accounts/${provider}`,jsonInit('PUT',body));
+}
+export function saveSocialPreferences(provider:SocialProvider,patch:SocialPreferencePatch):Promise<SocialAccount> {
+  const {permissions,allowlistEnabled,allowlist}=patch;
+  return apiJson(`/api/social/accounts/${provider}`,jsonInit('PUT',{permissions,allowlistEnabled,allowlist}));
+}
+// Each provider has one write order even when a modal or settings page unmounts.
+const preferenceWriters=new Map<SocialProvider,ReturnType<typeof createSocialPreferenceWriter<SocialAccount>>>();
+export function socialPreferenceWriter(provider:SocialProvider){
+  let writer=preferenceWriters.get(provider);
+  if(!writer){
+    writer=createSocialPreferenceWriter({save:patch=>saveSocialPreferences(provider,patch),read:async()=>{
+      const next=(await socialAccounts()).accounts.find(account=>account.provider===provider);
+      if(!next)throw new Error('Missing account');return next;
+    }});
+    preferenceWriters.set(provider,writer);
+  }
+  return writer;
 }
 export function connectSocialAccount(provider:SocialProvider,connect:boolean):Promise<SocialAccount> {
   return apiJson(`/api/social/accounts/${provider}/${connect?'connect':'disconnect'}`,jsonInit('POST',{}));
