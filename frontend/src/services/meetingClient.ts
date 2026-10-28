@@ -6,7 +6,7 @@ export interface AttentionState {
   focus:boolean;
   phonePaused:boolean;
   busy:boolean;
-  activity:{runId:string;source:string;accountId?:string;phase:string}|null;
+  activity:{runId:string;source:string;accountId?:string;phase:string;toolSource?:string}|null;
   presentation:{runId:string;token:string;generation:number}|null;
 }
 const DORMANT:AttentionState={activation:'dormant',focus:false,phonePaused:false,busy:false,activity:null,presentation:null};

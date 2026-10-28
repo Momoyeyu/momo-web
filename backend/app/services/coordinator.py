@@ -402,7 +402,16 @@ class Coordinator:
             from . import checkpoint
             checkpoint.acknowledge_external(row["run_id"], checkpoint.generated_reply(row["run_id"]), receipt["commandId"])
         params = payload.get("params", payload)
-        if (old in {"pending", "executing", "unknown"} and payload.get("method") == "channels.send"
+        if payload.get("method") == "channels.action" and params.get("proactive") is True and receipt["status"] in {"completed","unknown"}:
+            from .social import social
+            with social.lock:
+                data=social._read();account=data.get("qq")
+                if account and account.get("accountId")==params.get("accountId") and account.get("expectedSelfId")==params.get("selfId"):
+                    # Provider/unknown receipt happens after the possible SDK
+                    # dispatch. Retain a conservative interval across restarts.
+                    account["lastProactiveAttemptAt"]=max(float(account.get("lastProactiveAttemptAt",0)),time.time())
+                    data["qq"]=account;social._write(data)
+        if (old in {"pending", "executing", "unknown"} and (payload.get("method") == "channels.send" or payload.get("method") == "channels.action" and params.get("action") in {"private.send","group.send","media.send","friends.respond","groups.manage"})
             and params.get("pluginId") == "momo-qq" and receipt["status"] == "closed_unknown"
             and receipt.get("automatic") is True and receipt.get("executorQuiescent") is True
             and receipt.get("deliveryStatus") == "unknown"):
@@ -429,7 +438,7 @@ class Coordinator:
         for row in self._unresolved_commands():
             payload = json.loads(row["payload"])
             params = payload.get("params", payload)
-            if payload.get("method") == "channels.send" and params.get("pluginId") == "momo-qq" and params.get("accountId"):
+            if (payload.get("method") == "channels.send" or payload.get("method") == "channels.action" and params.get("action") in {"private.send","group.send","media.send","friends.respond","groups.manage"}) and params.get("pluginId") == "momo-qq" and params.get("accountId"):
                 rows.append((row, params))
         return rows
 
@@ -504,7 +513,7 @@ class Coordinator:
 
     def _unresolved_commands(self):
         rows = db.query("SELECT * FROM outbox WHERE status='unknown'")
-        return [r for r in rows if json.loads(r["payload"]).get("method") in {"plugins.callTool", "channels.send"} or json.loads(r["receipt"] or "{}").get("requiresReconciliation")]
+        return [r for r in rows if json.loads(r["payload"]).get("method") in {"plugins.callTool", "channels.send"} or (json.loads(r["payload"]).get("method") == "channels.action" and json.loads(r["payload"]).get("action") in {"private.send","group.send","media.send","friends.respond","groups.manage"}) or json.loads(r["receipt"] or "{}").get("requiresReconciliation")]
 
     @staticmethod
     def _retired_channel_command(row):
@@ -776,7 +785,7 @@ class Coordinator:
         self.require_meeting(client, lease)
         with self.condition:
             self.interrupt_hold = True
-            phone_active = bool(self.activity and self.activity["source"] != "meeting") or self._external_running()
+            phone_active = bool(self.activity and (self.activity["source"] != "meeting" or self.activity.get("toolSource") == "qq")) or self._external_running()
             self._release_held()
         if phone_active:
             with self.transition:
@@ -809,7 +818,7 @@ class Coordinator:
             self.controls[request_id] = action
             if len(self.controls) > 256:
                 self.controls.pop(next(iter(self.controls)))
-            stop_active = bool(not from_run and action in {"stop", "focus_on"} and ((self.activity and self.activity["source"] != "meeting") or self._external_running()))
+            stop_active = bool(not from_run and action in {"stop", "focus_on"} and ((self.activity and (self.activity["source"] != "meeting" or self.activity.get("toolSource") == "qq")) or self._external_running()))
             self._release_held()
             self.condition.notify_all()
         if stop_active:
@@ -937,6 +946,50 @@ class Coordinator:
             self._expire()
             return not self.started or (not self.restoring and self.active == run_id and self.mode == "meeting")
 
+    def social_action(self, action, arguments):
+        """Model QQ actions share the active run, never a channel-owned brain."""
+        from .social import social
+        from . import checkpoint, social_media
+        run_id = current_run.get()
+        with self.condition:
+            if not run_id or not self.started or not self.valid_run(run_id):
+                raise CoordinationError("QQ tools require the current activated run")
+            if self.focus or self.phone_paused:
+                raise CoordinationError("QQ activity is paused")
+            rows = db.query("SELECT * FROM inbox WHERE run_id=? ORDER BY seq DESC LIMIT 1",(run_id,))
+            if not rows or rows[0]['audience'] != checkpoint.audience():
+                raise CoordinationError("QQ action audience is not the admitted conversation")
+            local = rows[0]['source'] == 'meeting' and rows[0]['audience'] == 'owner'
+            if self.interrupt_hold and not local:
+                raise CoordinationError('QQ activity is held for local conversation')
+            run_epoch, run_generation = self.epoch, checkpoint.generation()
+            if action == 'media.library':
+                if not local or social._account('qq').get('permissions',{}).get('media') is not True or not social._account('qq').get('enabled'):
+                    raise CoordinationError("QQ media library is not granted")
+                return {'items': social_media.listing()}
+            authorization = social.authorize_action(action,arguments,audience=checkpoint.audience(),local_owner=local)
+        native_args = dict(authorization['params'])
+        if action == 'media.send':
+            native_args.pop('mediaId',None)
+            native_args.update(social_media.payload(authorization['params']['mediaId'],audience=checkpoint.audience(),expected=authorization))
+        result = self.command('channels.action',{
+            'pluginId':authorization['pluginId'],'accountId':authorization['accountId'],
+            'policyRevision':authorization['policyRevision'],'peerId':authorization.get('peerId'),'selfId':authorization['expectedSelfId'],
+            'action':action,'arguments':native_args,'authorizationArguments':authorization['params'],
+            'audience':checkpoint.audience(),'localOwner':local,'replyMode':not local,
+        },run_id)
+        from .social_actions import MUTATIONS
+        with self.condition:
+            if action not in MUTATIONS and (not self.valid_run(run_id) or self.focus or self.phone_paused or self.interrupt_hold and not local or self.epoch != run_epoch or checkpoint.generation() != run_generation):
+                raise CoordinationError('QQ query result belongs to withdrawn attention')
+            filtered = social.filter_action_result(authorization,result.get('result',{}))
+            if action == 'media.fetch':
+                filtered = social_media.store_result(filtered,audience=checkpoint.audience(),expected=authorization)
+        receipt = result.get('receipt',{})
+        # Receipts describe the original operation, not a fabricated read/sent
+        # claim. Query bytes/contact data are never copied into event receipts.
+        return {'result':filtered,'receipt':{k:receipt[k] for k in ('commandId','status','deliveryStatus','externalMessageId') if k in receipt}}
+
     def command(self, method, params, run_id=None):
         run_id = run_id or current_run.get()
         with self.condition:
@@ -948,11 +1001,23 @@ class Coordinator:
                     raise CoordinationError("Phone activity is paused")
                 social.authorize_send(params["accountId"], params["peerId"], params["policyRevision"], audience=params.get("audience"))
             permit = self.host.permit(run_id)
-            payload = {"method": method, **{k: params[k] for k in ("pluginId", "accountId", "peerId", "policyRevision") if k in params}}
+            if method == "channels.action":
+                from .social import social
+                if self.phone_paused or self.interrupt_hold and not params.get("localOwner"):
+                    raise CoordinationError("QQ activity is paused")
+                social.authorize_action(params['action'],params['authorizationArguments'],
+                    account_id=params['accountId'],revision=params['policyRevision'],
+                    audience=params['audience'],local_owner=params['localOwner'],consume=True,command_id=permit['commandId'])
+            payload = {"method": method, **{k: params[k] for k in ("pluginId", "accountId", "peerId", "policyRevision", "action", "selfId") if k in params}}
+            if method == "channels.action":
+                payload["proactive"] = params["action"] in {"private.send","group.send"} or params["action"] == "media.send" and params.get("localOwner") is True
+                arguments = params.get("authorizationArguments",{})
+                payload.update({key:arguments[key] for key in ("operation","memberId","approve") if key in arguments})
             if "text" in params: payload["textHash"] = hashlib.sha256(params["text"].encode()).hexdigest()
             with db.tx() as c:
                 c.execute("INSERT INTO outbox(command_id,run_id,epoch,status,payload,at) VALUES(?,?,?,?,?,?)", (permit["commandId"], run_id, permit["activityEpoch"], "pending", json.dumps(payload), db.now_iso()))
             if self.activity: self.activity["phase"] = "sending" if method == "channels.send" else "tool"
+            if self.activity and method == "channels.action": self.activity["toolSource"] = "qq"
         try:
             result = self.host.request(method, {**params, "permit": permit}, timeout=35)
             receipt = result.get("receipt", result) if isinstance(result, dict) else {}
@@ -968,9 +1033,10 @@ class Coordinator:
             # its receipt has already recorded failed or unknown, and the
             # conditional update below preserves that stronger fact.
             safe = {"PAUSED", "STALE_PERMIT", "INVALID_PERMIT", "DUPLICATE_COMMAND", "CAPACITY", "TOOL_UNAVAILABLE", "STALE_CONFIG", "Plugin host is unavailable", "PERMISSION_DENIED", "CHANNEL_UNAVAILABLE", "IDENTITY_MISMATCH"}
-            if method == "channels.send":
+            if method in {"channels.send", "channels.action"}:
                 safe |= {"PLUGIN_UNAVAILABLE", "CAPABILITY_UNAVAILABLE", "FORBIDDEN", "INPUT"}
-            status = "failed" if str(error) in safe else "unknown"
+            read_only_action = method == "channels.action" and params["action"] in {"contacts.list","history.list","media.fetch","friends.listRequests","groups.list","groups.members"}
+            status = "failed" if read_only_action or str(error) in safe else "unknown"
             with db.tx() as c:
                 c.execute("UPDATE outbox SET status=? WHERE command_id=? AND status IN ('pending','executing')", (status, permit["commandId"]))
             if self.started and self._unresolved_commands():
@@ -981,6 +1047,11 @@ class Coordinator:
                     self.condition.notify_all()
                 self._schedule_qq_recovery()
             raise
+        finally:
+            with self.condition:
+                if method == "channels.action" and self.activity and self.activity.get("runId") == run_id:
+                    self.activity.pop("toolSource",None)
+                    self.activity["phase"] = "thinking"
 
     @contextmanager
     def maintenance(self):
@@ -1025,7 +1096,7 @@ class Coordinator:
                     if first["source"] in {"qq"}:
                         from .social import social
                         from .turn_context import validate_plugin_context
-                        incoming = {"source": first["source"], "accountId": first["account_id"], "peerId": first["peer_id"], "senderId": first["sender_id"], "selfId": first["self_id"], "conversationKind": "private", "externalMessageId": first["raw_external_id"], "text": first["text"], "policyRevision": int(first["policy_revision"] or 0)}
+                        incoming = {"source": first["source"], "accountId": first["account_id"], "peerId": first["peer_id"], "senderId": first["sender_id"], "selfId": first["self_id"], "conversationKind": "group" if first["peer_id"].startswith("group:") else "private", "groupId": first["peer_id"][6:] if first["peer_id"].startswith("group:") else None, "externalMessageId": first["raw_external_id"], "text": first["text"], "policyRevision": int(first["policy_revision"] or 0)}
                         normalized = social.authorize_event(incoming)
                         if normalized is None or normalized["audience"] != first["audience"] or not normalized["allowReply"]:
                             self.inbox_status(first["id"], "held_scope")

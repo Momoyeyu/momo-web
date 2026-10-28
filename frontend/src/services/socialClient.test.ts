@@ -1,7 +1,7 @@
 import {describe,expect,it,vi,beforeEach} from 'vitest';
 vi.mock('./http',()=>({apiJson:vi.fn(),jsonInit:(method:string,body:unknown)=>({method,body:JSON.stringify(body)})}));
 import {apiJson} from './http';
-import {accountDraft,connectSocialAccount,endRetiredSocialWait,retiredSocialRecords,saveSocialAccount,socialAccounts,type SocialAccount} from './socialClient';
+import {accountDraft,connectSocialAccount,endRetiredSocialWait,retiredSocialRecords,saveSocialAccount,saveSocialPreferences,uploadQQMedia,removeQQMedia,socialAccounts,type SocialAccount} from './socialClient';
 beforeEach(()=>vi.mocked(apiJson).mockReset());
 describe('social configuration boundary',()=>{
   it('edits only managed QQ policy, without bridge fields or internal account identity',()=>{
@@ -30,6 +30,21 @@ describe('social configuration boundary',()=>{
     await saveSocialAccount('qq',{enabled:undefined,permissions:{receive:false,reply:false,proactive:false,contacts:false,history:false},allowlistEnabled:true,allowlist:[]});
     const body=JSON.parse(String(vi.mocked(apiJson).mock.calls[0]?.[1]?.body));
     expect(body).not.toHaveProperty('enabled');expect(body.permissions.reply).toBe(false);expect(body.allowlist).toEqual([]);
+  });
+  it('keeps full permission scopes in auto-save',async()=>{
+    const patch={permissions:{groups:true,groupManagement:true},groupAllowlist:[{peerId:'12345'}],proactivePolicy:{recipientIds:['23456'],maxPerHour:3}};
+    await saveSocialPreferences('qq',patch);
+    expect(JSON.parse(String(vi.mocked(apiJson).mock.calls[0]?.[1]?.body))).toEqual(patch);
+  });
+  it('uploads an explicit File with multipart encoding and deletes only by opaque media ID',async()=>{
+    const file=new File(['synthetic'],'note.txt',{type:'text/plain'});
+    await uploadQQMedia(file);
+    const upload=vi.mocked(apiJson).mock.calls[0];
+    expect(upload?.[0]).toBe('/api/social/accounts/qq/media');
+    expect(upload?.[1]?.body).toBeInstanceOf(FormData);
+    expect((upload?.[1]?.body as FormData).get('file')).toBe(file);
+    await removeQQMedia('opaque/id');
+    expect(apiJson).toHaveBeenLastCalledWith('/api/social/accounts/qq/media/opaque%2Fid',{method:'DELETE',signal:undefined});
   });
   it('reads unresolved retired operations separately from active account configuration',async()=>{
     const records=[{commandId:'old-command',source:'wechat',accountId:null,peerId:null,status:'unknown',createdAt:'old-time',deliveryStatus:'unknown'}];

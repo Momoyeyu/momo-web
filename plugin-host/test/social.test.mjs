@@ -117,7 +117,7 @@ test('official QQ adapter verifies account, receives private events and sends on
   await req('plugins.configure', { plugins: [config()] });
   const health = await req('channels.health', { pluginId: 'momo-qq' });
   assert.equal(health.actualSelfId, '123456'); assert.equal(health.status, 'connected');
-  assert.equal(health.capabilities.reply, true); assert.equal(health.capabilities.groups, false);
+  for(const capability of ['receive','reply','proactive','contacts','history','media','friendRequests','groups','groupManagement'])assert.equal(health.capabilities[capability],true);
   bot.push(incoming()); await until(() => events.some(e => e.event === 'inbox'));
   const message = events.find(e => e.event === 'inbox').data;
   assert.equal(message.peerId, '456789'); assert.equal(message.senderId, '456789'); assert.equal(message.selfId, '123456'); assert.equal(message.text, '你好');

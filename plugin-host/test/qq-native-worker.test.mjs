@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { createNativeWorker } = require('../src/qq-native-worker.cjs');
 
-function fixture({onIdentity} = {}) {
+function fixture({onIdentity,dataRoot='/private/tmp/momo-worker-test',autoCommit=true} = {}) {
   const frames = [], calls = []; let loginListener, sessionListener, depends, msgListener;
   const profile = { getUinByUid: () => new Map([['u_self', '123456'], ['u_peer', '654321']]), getUidByUin: () => new Map([['654321', 'u_peer']]) };
   const buddy = { isBuddy: () => true };
@@ -14,12 +14,57 @@ function fixture({onIdentity} = {}) {
   const login = { initConfig: config => calls.push(['login', config]), addKernelLoginListener: listener => { loginListener=listener; }, connect: () => { calls.push(['connect']); queueMicrotask(() => loginListener.onLoginConnected()); return true; }, getQRCodePicture: () => { calls.push(['qr']); return true; }, abortPolling: () => {}, cancel: () => {}, getMachineGuid: () => '0123456789abcdef0123456789abcdef' };
   const nativeStartup = { start: () => calls.push(['start']) };
   const api = { NodeIO3MiscService: {get:()=>({addO3MiscListener:listener=>calls.push(['dispatcher',listener])})}, NodeIQQNTWrapperEngine: { get: () => ({ initWithDeskTopConfig: config => calls.push(['engine', config]) }) }, NodeIKernelLoginService: { get: () => login }, NodeIQQNTStartupSessionWrapper: { create: () => nativeStartup }, NodeIQQNTWrapperSession: { getNTWrapperSession: () => session } };
-  const worker = createNativeWorker({ api, dataRoot: '/private/tmp/momo-worker-test', send: frame => frames.push(frame), now: () => 1000, onIdentity });
+  const worker = createNativeWorker({ api, dataRoot, send: frame => {frames.push(frame);if(autoCommit&&frame.event==='channelReady')queueMicrotask(()=>void worker.request('commitChannel',{attemptId:frame.data.attemptId,echo:frame.data.echo}).catch(()=>{}));}, now: () => 1000, onIdentity });
   const auth = async () => { await worker.request('prepare', { attemptId: 'a' }); await worker.request('connect', { attemptId: 'a' }); loginListener.onQRCodeLoginSucceed({ uin: '123456', uid: 'u_self' }); await new Promise(r=>setImmediate(r)); sessionListener.onOpentelemetryInit({ is_init: true }); depends.onMSFStatusChange(2, 1); await new Promise(resolve => setImmediate(resolve)); };
   return { worker, frames, calls, profile, buddy, uix, msg, nativeStartup, nativeLogin:login, nativeSession:session, login: () => loginListener, session: () => sessionListener, depends: () => depends, messages: () => msgListener, auth };
 }
+const expectNativeRejected=async(f,request,code)=>{await f.worker.request('onebot',request);const result=f.frames.find(frame=>frame.event==='onebot'&&frame.data?.echo===request.echo)?.data;assert.equal(result?.status,'failed');assert.equal(result?.data.errorCode,code);};
 const inboundRecord=(overrides={})=>({chatType:1,peerUid:'u_peer',senderUid:'u_peer',msgId:'100',msgTime:'1',elements:[{elementType:1,textElement:{content:'private-text'}}],...overrides});
 const inboundEvents=f=>f.frames.filter(frame=>frame.event==='onebot'&&frame.data.post_type==='message');
+test('an explicitly allowed joined group beyond the first index page still receives prompt scope',async t=>{
+  const {QQChannel}=await import('../src/channels.mjs');
+  const f=fixture();await f.auth();let groupListener;
+  const groups=Array.from({length:51},(_,index)=>({groupCode:String(700000+index),groupName:'Joined '+index,memberRole:2}));
+  const target='group:'+groups.at(-1).groupCode;
+  f.nativeSession.getGroupService=()=>({
+    addKernelGroupListener:listener=>{groupListener=listener;},
+    getGroupList:()=>{queueMicrotask(()=>groupListener.onGroupListUpdate(0,groups));},
+  });
+  const observers=new Set();let cursor=f.frames.length;
+  const native={
+    status:()=>({connected:true,actualSelfId:'123456'}),
+    onNativeEvent:listener=>{observers.add(listener);return()=>observers.delete(listener);},
+    channelQuiescent:()=>true,
+    requestChannel:async(action,params,echo)=>{
+      await f.worker.request('onebot',{action,params,echo});
+      for(const frame of f.frames.slice(cursor))if(frame.event==='onebot')for(const observer of observers)observer(frame.data);
+      cursor=f.frames.length;
+    },
+  };
+  const adapter=new QQChannel({id:'momo-qq',type:'qq',transport:'managed',accountId:'qq-main',expectedSelfId:'123456',policyRevision:1,permissions:{receive:true,reply:true,groups:true},allowlistEnabled:false,allowlist:[],groupAllowlist:[groups.at(-1).groupCode]}, {nativeRuntime:native});
+  t.after(()=>adapter.close());await adapter.connect();
+  await adapter.verifyPromptScope(target);
+});
+test('permission withdrawal during native recipient lookup prevents an unsubmitted send',async t=>{
+ const {QQChannel}=await import('../src/channels.mjs');
+ const f=fixture();await f.auth();const observers=new Set();let cursor=f.frames.length,finishLookup;
+ const native={cancelChannel:echo=>f.worker.request('cancelChannel',{attemptId:'a',echo}),status:()=>({connected:true,actualSelfId:'123456'}),onNativeEvent:listener=>{observers.add(listener);return()=>observers.delete(listener);},channelQuiescent:()=>true,requestChannel:async(action,params,echo)=>{
+  await f.worker.request('onebot',{action,params,echo});
+  for(const frame of f.frames.slice(cursor))if(frame.event==='onebot')for(const observer of observers)observer(frame.data);
+  cursor=f.frames.length;
+ }};
+ const adapter=new QQChannel({id:'momo-qq',type:'qq',transport:'managed',accountId:'qq-main',expectedSelfId:'123456',policyRevision:1,permissions:{receive:true,reply:true,proactive:true},allowlistEnabled:false,allowlist:[],proactivePolicy:{recipientIds:['654321'],maxPerHour:6,minIntervalSeconds:0,quietStart:0,quietEnd:0}}, {nativeRuntime:native});
+ t.after(()=>adapter.close());await adapter.connect();
+ f.profile.getUidByUin=()=>new Promise(resolve=>{finishLookup=resolve;});
+ const pending=adapter.action('private.send',{peerId:'654321',text:'withdrawn before actual submission'},{commandId:'review-withdrawn-native'});pending.catch(()=>{});
+ for(let index=0;index<10&&!finishLookup;index++)await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(typeof finishLookup,'function');
+ adapter.config.permissions.proactive=false;await adapter.close();
+ await assert.rejects(pending,{code:'OUTCOME_UNKNOWN'});
+ finishLookup(new Map([['654321','u_peer']]));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.calls.filter(row=>row[0]==='send').length,0,'withdrawn native preparation must never become a new external side effect');
+});
 test('UID-only private messages resolve missing, empty and zero UINs using the native UixConvert map',async()=>{
   const f=fixture();await f.auth();let lookups=0;
   f.uix.getUin=uids=>{lookups++;assert.deepEqual(uids,['u_peer']);return{uinInfo:new Map([['u_peer','654321']])};};
@@ -434,4 +479,162 @@ test('cancellation before the awaited login-info reply emits no stale identity r
   await f.worker.request('cancel',{attemptId:'a'});
   await assert.rejects(reply,{code:'ATTEMPT_CANCELLED'});
   assert.equal(f.frames.some(frame=>frame.event==='onebot'&&frame.data.echo==='cancelled-identity'),false);
+});
+
+test('native contacts and bounded history return reviewed fields only',async()=>{
+ const f=fixture();await f.auth();
+ f.buddy.getBuddyListV2=async(...args)=>{assert.deepEqual(args,['0',true,0]);return{result:0,data:[{buddyUids:['u_self','u_peer']}]};};
+ f.profile.getCoreAndBaseInfo=async()=>new Map([['u_self',{coreInfo:{uin:'123456',uid:'u_self',nick:'Self',remark:''}}],['u_peer',{coreInfo:{uin:'654321',uid:'u_peer',nick:'Peer',remark:'Known'},baseInfo:{phoneNum:'never'},secret:'never'}]]);
+ await f.worker.request('onebot',{action:'contacts.list',params:{limit:10},echo:'contacts'});
+ assert.deepEqual(f.frames.find(v=>v.data?.echo==='contacts').data.data,{contacts:[{peerId:'654321',name:'Peer',remark:'Known'}]});
+ f.msg.getMsgsIncludeSelf=async(peer,id,count,reverse)=>{assert.deepEqual(peer,{chatType:1,peerUid:'u_peer',guildId:''});assert.equal(count,2);return{result:0,msgList:[{chatType:1,peerUid:'u_peer',senderUid:'u_peer',senderUin:'654321',msgId:'old',msgTime:'1',elements:[{elementType:1,textElement:{content:'past'}}]}]};};
+ await f.worker.request('onebot',{action:'history.list',params:{peerId:'654321',limit:2},echo:'history'});
+ assert.equal(f.frames.find(v=>v.data?.echo==='history').data.data.messages[0].text,'past');
+});
+
+test('native group queries require real membership and management checks role before dispatch',async()=>{
+ const f=fixture();await f.auth();let listener;const calls=[];
+ const groups={addKernelGroupListener:l=>{listener=l;},getGroupList:()=>{queueMicrotask(()=>listener.onGroupListUpdate(0,[{groupCode:'777777',groupName:'Test',memberRole:2,memberCount:2}]));return{result:0};},getAllMemberList:async()=>({errCode:0,result:{infos:new Map([['u_self',{uid:'u_self',uin:'123456',role:2}],['u_peer',{uid:'u_peer',uin:'654321',role:2}]])}}),setGroupShutUp:async()=>{calls.push('mute');return{result:0};}};
+ f.nativeSession.getGroupService=()=>groups;
+ await f.worker.request('onebot',{action:'groups.list',params:{},echo:'groups'});
+ assert.equal(f.frames.find(v=>v.data?.echo==='groups').data.data.groups[0].peerId,'group:777777');
+ await expectNativeRejected(f,{action:'groups.manage',params:{peerId:'group:777777',operation:'muteAll',enabled:true},echo:'admin'},'FORBIDDEN');
+ assert.deepEqual(calls,[]);
+ await expectNativeRejected(f,{action:'group.send',params:{peerId:'group:888888',text:'wrong group'},echo:'unjoined'},'PEER_UNVERIFIED');
+});
+
+test('native group message send waits for matched group receipt and scopes ingress',async()=>{
+ const f=fixture();await f.auth();let listener;
+ f.nativeSession.getGroupService=()=>({addKernelGroupListener:l=>{listener=l;},getGroupList:()=>{queueMicrotask(()=>listener.onGroupListUpdate(0,[{groupCode:'777777',groupName:'Test',memberRole:2}]));return{result:0};}});
+ f.messages().onRecvMsg([inboundRecord({chatType:2,peerUid:'777777',senderUid:'u_peer',senderUin:'654321',msgId:'group-1'})]);await new Promise(r=>setImmediate(r));
+ assert.equal(inboundEvents(f)[0].data.message_type,'group');assert.equal(inboundEvents(f)[0].data.group_id,'777777');
+ await f.worker.request('onebot',{action:'group.send',params:{peerId:'group:777777',text:'hello group'},echo:'group-send'});
+ assert.equal(f.frames.filter(frame=>frame.event==='onebot'&&frame.data?.echo==='group-send').length,0);
+ const sent=f.calls.find(row=>row[0]==='send');assert.equal(sent[2].chatType,2);assert.equal(sent[2].peerUid,'777777');
+ f.messages().onMsgInfoListUpdate([{guildId:'90001',senderUid:'u_self',peerUid:'777777',chatType:1,sendStatus:2,msgId:'false-private'}]);assert.equal(f.frames.filter(frame=>frame.event==='onebot'&&frame.data?.echo==='group-send').length,0);
+ f.messages().onMsgInfoListUpdate([{guildId:'90001',senderUid:'u_self',peerUid:'777777',chatType:2,sendStatus:2,msgId:'true-group'}]);assert.equal(f.frames.find(frame=>frame.event==='onebot'&&frame.data?.echo==='group-send').data.data.message_id,'true-group');
+});
+
+test('native pending friend requests are exact, UID verified and approval confirms friendship',async()=>{
+ const f=fixture();await f.auth();let listener,approved=false;const actions=[];
+ f.buddy.isBuddy=()=>approved;
+ f.buddy.addKernelBuddyListener=l=>{listener=l;};
+ f.buddy.getBuddyReq=()=>{queueMicrotask(()=>listener.onBuddyReqChange({buddyReqs:[{friendUid:'u_peer',reqTime:'123',friendNick:'Peer',extWords:'hello',isDecide:approved,isInitiator:false}]}));return{result:0};};
+ f.buddy.approvalFriendRequest=async value=>{actions.push(value);approved=true;};
+ await f.worker.request('onebot',{action:'friends.listRequests',params:{},echo:'requests'});
+ assert.deepEqual(f.frames.find(frame=>frame.event==='onebot'&&frame.data?.echo==='requests').data.data.requests,[{peerId:'654321',requestId:'u_peer:123',name:'Peer',message:'hello'}]);
+ await expectNativeRejected(f,{action:'friends.respond',params:{peerId:'999999',requestId:'u_peer:123',approve:true},echo:'wrong-request'},'PEER_UNVERIFIED');assert.equal(actions.length,0);
+ await f.worker.request('onebot',{action:'friends.respond',params:{peerId:'654321',requestId:'u_peer:123',approve:true},echo:'approved'});
+ assert.deepEqual(actions,[{friendUid:'u_peer',reqTime:'123',accept:true}]);assert.equal(f.frames.find(frame=>frame.event==='onebot'&&frame.data?.echo==='approved').data.data.operationStatus,'confirmed');
+});
+
+test('native media uses isolated bytes, image elements and exact scoped download references',async t=>{
+ const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+ const dataRoot=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'momo-media-test-')));t.after(()=>fs.rmSync(dataRoot,{recursive:true,force:true}));
+ const f=fixture({dataRoot});await f.auth();
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jhb8AAAAASUVORK5CYII=','base64');
+ await f.worker.request('onebot',{action:'media.send',params:{peerId:'654321',name:'photo.png',mime:'image/png',dataBase64:png.toString('base64')},echo:'media-send'});
+ const send=f.calls.find(row=>row[0]==='send'),picture=send[3][0].picElement;
+ assert.equal(send[3][0].elementType,2);assert.equal(picture.picWidth,1);assert.equal(picture.picHeight,1);assert.deepEqual(fs.readFileSync(picture.sourcePath),png);
+ assert.ok(picture.sourcePath.startsWith(dataRoot+'/outbox/'));
+ f.messages().onMsgInfoListUpdate([{guildId:'90001',senderUid:'u_self',peerUid:'u_peer',chatType:1,sendStatus:2,msgId:'sent-image'}]);assert.equal(fs.existsSync(picture.sourcePath),false);
+ f.msg.getMsgsByMsgId=async()=>({result:0,msgList:[{chatType:1,peerUid:'u_peer',msgId:'received',elements:[{elementType:2,elementId:'elem',picElement:{fileName:'photo.png',fileSize:String(png.length)}}]}]});
+ const downloads=[];f.msg.downloadRichMedia=args=>{downloads.push(args);fs.writeFileSync(args.filePath,png,{mode:0o600});queueMicrotask(()=>f.messages().onRichMediaDownloadComplete({msgId:args.msgId,msgElementId:args.elementId,fileErrCode:'0',filePath:args.filePath}));};
+ await expectNativeRejected(f,{action:'media.fetch',params:{peerId:'654321',messageId:'received',elementId:'wrong'},echo:'bad-download'},'PEER_UNVERIFIED');assert.equal(downloads.length,0);
+ await f.worker.request('onebot',{action:'media.fetch',params:{peerId:'654321',messageId:'received',elementId:'elem'},echo:'download'});
+ const result=f.frames.find(frame=>frame.event==='onebot'&&frame.data?.echo==='download').data.data;assert.equal(result.mime,'image/png');assert.equal(result.dataBase64,png.toString('base64'));assert.equal(fs.existsSync(downloads[0].filePath),false);
+ await expectNativeRejected(f,{action:'media.send',params:{peerId:'654321',name:'../secret',mime:'text/plain',dataBase64:'YQ=='},echo:'path'},'INPUT');
+});
+
+test('WebP accepted by the attachment library can be submitted as native image media',async t=>{
+ const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+ const dataRoot=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'momo-webp-test-')));t.after(()=>fs.rmSync(dataRoot,{recursive:true,force:true}));
+ const f=fixture({dataRoot});await f.auth();
+ const webp=fs.readFileSync(new URL('../../frontend/public/brand/momo-presence-v2.webp',import.meta.url));
+ assert.equal(webp.toString('ascii',8,12),'WEBP');
+ await f.worker.request('onebot',{action:'media.send',params:{peerId:'654321',name:'picture.webp',mime:'image/webp',dataBase64:webp.toString('base64')},echo:'webp-send'});
+ const sent=f.calls.find(row=>row[0]==='send');assert.ok(sent,'accepted WebP must reach the native send boundary');
+ assert.equal(sent[3][0].elementType,2);
+});
+
+test('native management performs only reviewed operations as a verified group administrator',async()=>{
+ const f=fixture();await f.auth();let listener;const calls=[];
+ f.nativeSession.getGroupService=()=>({addKernelGroupListener:l=>{listener=l;},getGroupList:()=>{queueMicrotask(()=>listener.onGroupListUpdate(0,[{groupCode:'777777',groupName:'Test',memberRole:3}]));return{result:0};},getAllMemberList:async()=>({errCode:0,result:{infos:new Map([['u_self',{uid:'u_self',uin:'123456',role:3}],['u_peer',{uid:'u_peer',uin:'654321',role:2}],['u_owner',{uid:'u_owner',uin:'765432',role:4}]])}}),setMemberShutUp:async(...args)=>{calls.push(args);return{result:0};}});
+ await f.worker.request('onebot',{action:'groups.manage',params:{peerId:'group:777777',operation:'muteMember',memberId:'654321',durationSeconds:30},echo:'mute-member'});
+ assert.deepEqual(calls,[['777777',[{uid:'u_peer',timeStamp:30}]]]);
+ await expectNativeRejected(f,{action:'groups.manage',params:{peerId:'group:777777',operation:'muteMember',memberId:'765432',durationSeconds:30},echo:'mute-owner'},'FORBIDDEN');
+ assert.equal(calls.length,1);
+});
+
+test('rejecting a friend request never claims success for a concurrent acceptance',async()=>{
+ const f=fixture();await f.auth();let listener,processed=false;
+ f.buddy.isBuddy=()=>processed;
+ f.buddy.addKernelBuddyListener=l=>{listener=l;};
+ f.buddy.getBuddyReq=()=>{queueMicrotask(()=>listener.onBuddyReqChange({buddyReqs:[{friendUid:'u_peer',reqTime:'123',friendNick:'Peer',isDecide:processed,isInitiator:false,isAgreed:processed,reqType:processed?2:1}]}));return{result:0};};
+ f.buddy.approvalFriendRequest=async()=>{processed=true;};
+ await assert.rejects(f.worker.request('onebot',{action:'friends.respond',params:{peerId:'654321',requestId:'u_peer:123',approve:false},echo:'concurrent-reject'}),e=>e.code==='OUTCOME_UNKNOWN');
+ assert.equal(f.frames.filter(frame=>frame.event==='onebot'&&frame.data?.echo==='concurrent-reject').length,0);
+});
+
+test('UID-only media messages resolve their sender without dropping attachments',async()=>{
+ const f=fixture();await f.auth();
+ f.messages().onRecvMsg([inboundRecord({msgId:'image-in',elements:[{elementType:2,elementId:'image-1',picElement:{fileName:'image.png',fileSize:'123'}}]})]);
+ await new Promise(resolve=>setImmediate(resolve));const event=inboundEvents(f)[0]?.data;
+ assert.equal(event.user_id,'654321');assert.equal(event.message[0].type,'image');assert.equal(event.message[0].data.element_id,'image-1');
+});
+
+test('failed native media downloads remove partial bytes and a late completion cleans recreated output',async t=>{
+ const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+ const dataRoot=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'momo-media-fail-')));t.after(()=>fs.rmSync(dataRoot,{recursive:true,force:true}));
+ const f=fixture({dataRoot});await f.auth();let expire,output;
+ t.mock.method(globalThis,'setTimeout',(callback)=>{expire=callback;return{unref(){}};});
+ f.msg.getMsgsByMsgId=async()=>({result:0,msgList:[{chatType:1,peerUid:'u_peer',msgId:'received',elements:[{elementType:3,elementId:'elem',fileElement:{fileName:'note.txt',fileSize:'100'}}]}]});
+ f.msg.downloadRichMedia=args=>{output=args.filePath;fs.writeFileSync(output,'partial',{mode:0o600});};
+ const pending=f.worker.request('onebot',{action:'media.fetch',params:{peerId:'654321',messageId:'received',elementId:'elem'},echo:'failed-fetch'});
+ for(let i=0;i<10&&!expire;i++)await new Promise(resolve=>setImmediate(resolve));assert.ok(output);expire();await assert.rejects(pending,e=>e.code==='TIMEOUT');assert.equal(fs.existsSync(output),false);
+ fs.writeFileSync(output,'late-bytes',{mode:0o600});f.messages().onRichMediaDownloadComplete({msgId:'received',msgElementId:'elem',fileErrCode:'0',filePath:output});assert.equal(fs.existsSync(output),false);
+});
+
+test('a fresh owned worker cleans its stale media only, preserving unrelated native downloads',async t=>{
+ const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+ const dataRoot=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'momo-media-clean-')));t.after(()=>fs.rmSync(dataRoot,{recursive:true,force:true}));
+ fs.mkdirSync(path.join(dataRoot,'outbox'));const stale=path.join(dataRoot,'outbox','momo-media-00000000-0000-4000-8000-000000000000'),other=path.join(dataRoot,'outbox','native-download.txt');fs.writeFileSync(stale,'stale');fs.writeFileSync(other,'keep');
+ const f=fixture({dataRoot});await f.worker.request('prepare',{attemptId:'a'});assert.equal(fs.existsSync(stale),false);assert.equal(fs.readFileSync(other,'utf8'),'keep');
+});
+
+test('native allowlist projections filter contacts and requests before the first page',async()=>{
+ const f=fixture();await f.auth();const uids=Array.from({length:60},(_,index)=>`u_peer${index}`),ids=uids.map((_,index)=>String(600000+index));
+ f.buddy.getBuddyListV2=async()=>({result:0,data:[{buddyUids:uids}]});
+ f.profile.getUidByUin=async(_from,scope)=>new Map(scope.map(id=>[id,uids[ids.indexOf(id)]]));
+ f.profile.getCoreAndBaseInfo=async(_from,selected)=>new Map(selected.map(uid=>[uid,{coreInfo:{uid,uin:ids[uids.indexOf(uid)],nick:uid,remark:''}}]));
+ await f.worker.request('onebot',{action:'contacts.list',params:{scopePeerIds:[ids.at(-1)],limit:1},echo:'allowed-contact-page'});
+ assert.deepEqual(f.frames.find(frame=>frame.event==='onebot'&&frame.data?.echo==='allowed-contact-page').data.data.contacts.map(row=>row.peerId),[ids.at(-1)]);
+ let buddyListener;f.buddy.addKernelBuddyListener=listener=>{buddyListener=listener;};
+ f.buddy.getBuddyReq=()=>{queueMicrotask(()=>buddyListener.onBuddyReqChange({buddyReqs:uids.map((uid,index)=>({friendUid:uid,reqTime:String(index+100),friendNick:uid,isDecide:false,isInitiator:false}))}));return{result:0};};
+ f.uix.getUin=selected=>({uinInfo:new Map(selected.map(uid=>[uid,ids[uids.indexOf(uid)]]))});
+ await f.worker.request('onebot',{action:'friends.listRequests',params:{scopePeerIds:[ids.at(-1)],limit:1},echo:'allowed-request-page'});
+ assert.deepEqual(f.frames.find(frame=>frame.event==='onebot'&&frame.data?.echo==='allowed-request-page').data.data.requests.map(row=>row.peerId),[ids.at(-1)]);
+});
+
+test('native cursors count only scoped rows and allow reading subsequent pages',async()=>{
+ const f=fixture();await f.auth();const uids=Array.from({length:60},(_,i)=>`u_page${i}`),ids=uids.map((_,i)=>String(800000+i));
+ f.buddy.getBuddyListV2=async()=>({result:0,data:[{buddyUids:uids}]});f.profile.getUidByUin=async(_from,scope)=>new Map(scope.map(id=>[id,uids[ids.indexOf(id)]]));
+ f.profile.getCoreAndBaseInfo=async(_from,scope)=>new Map(scope.map(uid=>[uid,{coreInfo:{uid,uin:ids[uids.indexOf(uid)],nick:uid,remark:''}}]));
+ const scope=[ids[20],ids[59]];
+ await f.worker.request('onebot',{action:'contacts.list',params:{scopePeerIds:scope,limit:1},echo:'page-first'});
+ const first=f.frames.find(frame=>frame.event==='onebot'&&frame.data?.echo==='page-first').data.data;assert.deepEqual(first.contacts.map(row=>row.peerId),[ids[20]]);assert.equal(first.cursor,'1');
+ await f.worker.request('onebot',{action:'contacts.list',params:{scopePeerIds:scope,limit:1,cursor:first.cursor},echo:'page-second'});
+ const second=f.frames.find(frame=>frame.event==='onebot'&&frame.data?.echo==='page-second').data.data;assert.deepEqual(second.contacts.map(row=>row.peerId),[ids[59]]);assert.equal(second.cursor,undefined);
+});
+
+test('native preparation alone cannot dispatch; cancellation ACK rejects a later commit',async()=>{
+ const f=fixture({autoCommit:false});await f.auth();
+ const pending=f.worker.request('onebot',{action:'private.send',params:{peerId:'654321',text:'prepared only'},echo:'prepare-not-send'});
+ for(let i=0;i<10&&!f.frames.some(frame=>frame.event==='channelReady');i++)await new Promise(resolve=>setImmediate(resolve));
+ assert.ok(f.frames.some(frame=>frame.event==='channelReady'&&frame.data.echo==='prepare-not-send'));
+ assert.equal(f.calls.filter(row=>row[0]==='send').length,0);
+ assert.deepEqual(await f.worker.request('cancelChannel',{attemptId:'a',echo:'prepare-not-send'}),{attemptId:'a',cancelled:true,submitted:false});await pending;
+ await assert.rejects(f.worker.request('commitChannel',{attemptId:'a',echo:'prepare-not-send'}),{code:'ATTEMPT_CANCELLED'});
+ assert.equal(f.calls.filter(row=>row[0]==='send').length,0);
+ const failure=f.frames.find(frame=>frame.event==='onebot'&&frame.data.echo==='prepare-not-send');assert.equal(failure.data.status,'failed');
 });

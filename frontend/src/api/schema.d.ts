@@ -595,6 +595,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/social/accounts/qq/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Items */
+        get: operations["items_api_social_accounts_qq_media_get"];
+        put?: never;
+        /** Upload */
+        post: operations["upload_api_social_accounts_qq_media_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/social/accounts/qq/media/{media_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove */
+        delete: operations["remove_api_social_accounts_qq_media__media_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/social/accounts/retired/end-wait": {
         parameters: {
             query?: never;
@@ -944,7 +979,10 @@ export interface components {
             enabled?: boolean | null;
             /** Expectedselfid */
             expectedSelfId?: string | null;
+            /** Groupallowlist */
+            groupAllowlist?: components["schemas"]["ContactIn"][] | null;
             permissions?: components["schemas"]["PermissionIn"] | null;
+            proactivePolicy?: components["schemas"]["ProactivePolicyIn"] | null;
         };
         /** AckIn */
         AckIn: {
@@ -976,6 +1014,11 @@ export interface components {
             restore: boolean;
             /** Runid */
             runId?: string | null;
+        };
+        /** Body_upload_api_social_accounts_qq_media_post */
+        Body_upload_api_social_accounts_qq_media_post: {
+            /** File */
+            file: string;
         };
         /** Body_upload_ref_api_tts_ref_post */
         Body_upload_ref_api_tts_ref_post: {
@@ -1209,8 +1252,16 @@ export interface components {
         PermissionIn: {
             /** Contacts */
             contacts?: boolean | null;
+            /** Friendrequests */
+            friendRequests?: boolean | null;
+            /** Groupmanagement */
+            groupManagement?: boolean | null;
+            /** Groups */
+            groups?: boolean | null;
             /** History */
             history?: boolean | null;
+            /** Media */
+            media?: boolean | null;
             /** Proactive */
             proactive?: boolean | null;
             /** Receive */
@@ -1254,6 +1305,19 @@ export interface components {
             motions: components["schemas"]["ControlIn"][];
             /** Revision */
             revision: string;
+        };
+        /** ProactivePolicyIn */
+        ProactivePolicyIn: {
+            /** Maxperhour */
+            maxPerHour?: number | null;
+            /** Minintervalseconds */
+            minIntervalSeconds?: number | null;
+            /** Quietend */
+            quietEnd?: number | null;
+            /** Quietstart */
+            quietStart?: number | null;
+            /** Recipientids */
+            recipientIds?: string[] | null;
         };
         /** Probe */
         Probe: {
@@ -2414,6 +2478,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    items_api_social_accounts_qq_media_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    upload_api_social_accounts_qq_media_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_api_social_accounts_qq_media_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_api_social_accounts_qq_media__media_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                media_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

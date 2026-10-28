@@ -16,7 +16,7 @@ input.on('line', line => {
   if (closing) return;
   let message;
   try {
-    if (Buffer.byteLength(line) > 1024 * 1024) throw new HostError('PROTOCOL', 'Message exceeds protocol size limit');
+    if (Buffer.byteLength(line) > 20 * 1024 * 1024) throw new HostError('PROTOCOL', 'Message exceeds protocol size limit');
     message = JSON.parse(line);
   } catch {
     write({ v: 1, id: null, ok: false, error: { code: 'PROTOCOL', message: 'Invalid protocol message' } });

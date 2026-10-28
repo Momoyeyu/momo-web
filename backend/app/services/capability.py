@@ -170,11 +170,16 @@ _BY_NAME: dict[str, Tool] = {t.name: t for t in _TOOLS}
 
 def builtin_names() -> set[str]:
     """内置能力名——拓展工具注入时用于避让撞名（不可用即不可见的另一半）。"""
-    return set(_BY_NAME)
+    from .social_tools import NAMES
+    return set(_BY_NAME) | NAMES
 
 
 def execute_tool(name: str, args: dict[str, Any]) -> str:
     """执行单个 tool call，返回字符串化结果（不向上抛）。"""
+    from .social_tools import execute
+    social_result = execute(name, args)
+    if social_result is not None:
+        return social_result
     tool = _BY_NAME.get(name)
     if tool is None:
         return f"未知工具：{name}"

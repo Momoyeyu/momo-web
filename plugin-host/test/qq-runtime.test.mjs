@@ -626,7 +626,8 @@ test('native channel dispatch requires verified identity and supports only fixed
   children[0].ipc({ event: 'connected', data: { attemptId: attempt.attemptId, selfId: '123456' } });
   await assert.rejects(runtime.requestChannel('delete_msg', {}, 'bad-1'), { code: 'INPUT' });
   await assert.rejects(runtime.requestChannel('send_private_msg', { user_id: '123456', message: 'self' }, 'bad-2'), { code: 'INPUT' });
-  await runtime.requestChannel('send_private_msg', { user_id: '654321', message: 'hello', token: 'ignore' }, 'send-1');
+  await assert.rejects(runtime.requestChannel('send_private_msg', { user_id: '654321', message: 'hello', token: 'ignore' }, 'send-extra'), {code:'INPUT'});
+  await runtime.requestChannel('send_private_msg', { user_id: '654321', message: 'hello' }, 'send-1');
   assert.deepEqual(children[0].commands.at(-1).params, { attemptId: attempt.attemptId, action: 'send_private_msg', params: { user_id: '654321', message: 'hello' }, echo: 'send-1' });
 });
 

@@ -100,3 +100,30 @@
 
 .social-save-state { flex:1;align-self:center;color:var(--text-faint);font-size:11px;line-height:1.6; }
 .social-save-state.is-error { color:var(--danger); }
+
+/* Permissions keep the stage's palette and hierarchy; details live in Hint. */
+.social-permission-group + .social-permission-group { margin-top:20px; }
+.social-permission-group h4 { margin:0 0 4px;font-size:12px;font-weight:500;color:var(--text-faint); }
+.social-permission-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:26px; }
+.social-permission-grid .opt-row { min-width:0;min-height:48px; }
+.social-permission-grid .opt-label { width:auto;flex:1;min-width:0; }
+.social-permission-grid .opt-ctl { flex:none; }
+.social-policy-section { border-top:1px solid var(--line);padding-top:20px;margin-top:20px; }
+.social-scope-inset { padding:8px 0 10px 160px; }
+.social-scope-heading { display:flex;align-items:center;gap:7px;margin-bottom:9px;color:var(--text-dim);font-size:12px; }
+.social-contact-list small { display:block;color:var(--text-faint);font-size:11px;margin-top:3px; }
+.social-policy-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:26px;margin-top:12px; }
+.social-policy-grid .opt-label { width:auto;flex:1; }
+.social-policy-grid .opt-ctl { flex:none;width:112px; }
+.social-policy-grid .sel { width:100%; }
+@media(max-width:900px) { .social-scope-inset { padding-left:125px; } }
+@media(max-width:620px) { .social-permission-grid,.social-policy-grid { grid-template-columns:minmax(0,1fr); }.social-scope-inset { padding-left:0; } }
+.social-library-heading { display:flex;align-items:center;justify-content:space-between;gap:12px; }
+.social-library-heading .social-permission-heading { margin:0; }
+.social-file-picker { display:none; }
+.social-media-list { list-style:none;padding:0;margin:12px 0 0; }
+.social-media-list li { display:flex;align-items:center;gap:12px;min-width:0;padding:9px 0;border-bottom:1px solid var(--line);font-size:13px; }
+.social-media-name { min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.social-media-size { color:var(--text-faint);font-size:11px;flex:none; }
+.social-tabs > button:hover,.social-tabs > button:focus { background:none;box-shadow:none; }
+.social-tabs > button:focus-visible { outline:2px solid var(--accent);outline-offset:-3px; }

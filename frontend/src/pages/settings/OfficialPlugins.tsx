@@ -56,7 +56,7 @@ export default function OfficialPlugins({active=true}:{active?:boolean}){
     if(alive.current){accountRead.current++;setAccounts(current=>current.map(account=>account.provider===next.provider?next:account));}
   };
   const updatePreferences=(next:SocialAccount)=>{
-    if(alive.current)setAccounts(current=>current.map(account=>account.provider===next.provider&&next.policyRevision>=account.policyRevision?{...account,permissions:next.permissions,allowlistEnabled:next.allowlistEnabled,allowlist:next.allowlist,policyRevision:next.policyRevision}:account));
+    if(alive.current)setAccounts(current=>current.map(account=>account.provider===next.provider&&next.policyRevision>=account.policyRevision?{...account,permissions:next.permissions,allowlistEnabled:next.allowlistEnabled,allowlist:next.allowlist,proactivePolicy:next.proactivePolicy,groupAllowlist:next.groupAllowlist,policyRevision:next.policyRevision}:account));
   };
   const run=async(action:'begin'|'forget')=>{
     if(actionLock.current||!observer.current||!runtime||(action==='begin'?runtime.connected:!runtime.connected))return;

@@ -65,10 +65,35 @@
             ],
             "title": "Expectedselfid"
           },
+          "groupAllowlist": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ContactIn"
+                },
+                "maxItems": 200,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groupallowlist"
+          },
           "permissions": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PermissionIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "proactivePolicy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProactivePolicyIn"
               },
               {
                 "type": "null"
@@ -183,6 +208,20 @@
           "action"
         ],
         "title": "AttentionIn",
+        "type": "object"
+      },
+      "Body_upload_api_social_accounts_qq_media_post": {
+        "properties": {
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_upload_api_social_accounts_qq_media_post",
         "type": "object"
       },
       "Body_upload_ref_api_tts_ref_post": {
@@ -843,6 +882,39 @@
             ],
             "title": "Contacts"
           },
+          "friendRequests": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Friendrequests"
+          },
+          "groupManagement": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groupmanagement"
+          },
+          "groups": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groups"
+          },
           "history": {
             "anyOf": [
               {
@@ -853,6 +925,17 @@
               }
             ],
             "title": "History"
+          },
+          "media": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Media"
           },
           "proactive": {
             "anyOf": [
@@ -995,6 +1078,80 @@
           "motions"
         ],
         "title": "PresentationIn",
+        "type": "object"
+      },
+      "ProactivePolicyIn": {
+        "additionalProperties": false,
+        "properties": {
+          "maxPerHour": {
+            "anyOf": [
+              {
+                "maximum": 60.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxperhour"
+          },
+          "minIntervalSeconds": {
+            "anyOf": [
+              {
+                "maximum": 86400.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minintervalseconds"
+          },
+          "quietEnd": {
+            "anyOf": [
+              {
+                "maximum": 23.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quietend"
+          },
+          "quietStart": {
+            "anyOf": [
+              {
+                "maximum": 23.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quietstart"
+          },
+          "recipientIds": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 200,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recipientids"
+          }
+        },
+        "title": "ProactivePolicyIn",
         "type": "object"
       },
       "Probe": {
@@ -2473,6 +2630,93 @@
           }
         },
         "summary": "Accounts"
+      }
+    },
+    "/api/social/accounts/qq/media": {
+      "get": {
+        "operationId": "items_api_social_accounts_qq_media_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Items"
+      },
+      "post": {
+        "operationId": "upload_api_social_accounts_qq_media_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_api_social_accounts_qq_media_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload"
+      }
+    },
+    "/api/social/accounts/qq/media/{media_id}": {
+      "delete": {
+        "operationId": "remove_api_social_accounts_qq_media__media_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "media_id",
+            "required": true,
+            "schema": {
+              "title": "Media Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove"
       }
     },
     "/api/social/accounts/retired/end-wait": {

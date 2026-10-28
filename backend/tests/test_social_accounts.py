@@ -125,7 +125,7 @@ def test_no_fake_permissions_or_unsafe_endpoint_credentials():
     with pytest.raises(SocialError):
         configured(store, endpoint="ws://secret:password@127.0.0.1:3001")
     with pytest.raises(SocialError):
-        configured(store, permissions={"receive": True, "reply": True, "proactive": True})
+        configured(store, permissions={"receive": True, "reply": True, "unreviewed": True})
     with pytest.raises(SocialError):
         configured(store, ownerPeerId="20002")
 

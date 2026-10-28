@@ -1,3 +1,4 @@
+import { QQ_MUTATIONS, qqOperationParams } from './qq-operations.mjs';
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { isAbsolute } from 'node:path';
@@ -84,7 +85,7 @@ export class QQRuntimeManager {
   #requireFreshLogin = false;
   #loginIntent = null; #retryTimer = null; #intentTimer = null; #retryDelay; #loginIntentTimeout;
 
-  constructor({ createTransport, prepareInvocation, forgetSession, onState = () => {}, onDiagnostic = () => {}, now = Date.now, requestTimeoutMs = 10000, stopTimeoutMs = 1000, phaseTimeoutMs = 30000, maxFrameBytes = 512 * 1024, autoRetryDelayMs = 1000, loginIntentTimeoutMs = 300000 } = {}) {
+  constructor({ createTransport, prepareInvocation, forgetSession, onState = () => {}, onDiagnostic = () => {}, now = Date.now, requestTimeoutMs = 10000, stopTimeoutMs = 1000, phaseTimeoutMs = 30000, maxFrameBytes = 16 * 1024 * 1024, autoRetryDelayMs = 1000, loginIntentTimeoutMs = 300000 } = {}) {
     this.#createTransport = createTransport;
     this.#prepareInvocation = prepareInvocation;
     this.#forgetSession = forgetSession;
@@ -92,7 +93,7 @@ export class QQRuntimeManager {
     this.#requestTimeout = Math.max(10, Math.min(Number(requestTimeoutMs) || 10000, 30000));
     this.#stopTimeout = Math.max(10, Math.min(Number(stopTimeoutMs) || 1000, 5000));
     this.#phaseTimeout = Math.max(10, Math.min(Number(phaseTimeoutMs) || 30000, 90000));
-    this.#maxFrameBytes = Math.max(1024, Math.min(Number(maxFrameBytes) || 512 * 1024, 1024 * 1024));
+    this.#maxFrameBytes = Math.max(1024, Math.min(Number(maxFrameBytes) || 16 * 1024 * 1024, 16 * 1024 * 1024));
     this.#retryDelay = Math.max(10, Math.min(Number(autoRetryDelayMs) || 1000, 10000));
     this.#loginIntentTimeout = Math.max(1000, Math.min(Number(loginIntentTimeoutMs) || 300000, 600000));
   }
@@ -113,22 +114,29 @@ export class QQRuntimeManager {
     return () => this.#nativeObservers.delete(callback);
   }
 
-  channelQuiescent() { return ![...this.#channelEchoes.values()].some(entry => entry.action === 'send_private_msg'); }
+  channelQuiescent() { return ![...this.#channelEchoes.values()].some(entry => QQ_MUTATIONS.has(entry.action)); }
 
-  async requestChannel(action, params, echo) {
+  get requiresChannelCommit(){return true;}
+
+  async cancelChannel(echo){
+    if(!bounded(echo,200)||!echo)throw failure('INPUT');
+    const entry=this.#channelEchoes.get(echo);if(!entry)return{cancelled:true,submitted:false};
+    entry.cancelled=true;
+    return this.#request('cancelChannel',{attemptId:this.#attempt,echo});
+  }
+
+  async requestChannel(action, params, echo,{beforeCommit=()=>{}}={}) {
     let submitted = false;
     try {
       if (this.#state !== 'connected' || !this.#actualSelfId || !this.#attempt || !this.#child || this.#parentExited || this.#unquiescent || this.#stopping) throw failure('RUNTIME_STOPPED');
       if (!bounded(echo, 200) || !echo || this.#channelEchoes.has(echo) || this.#channelEchoes.size >= 1024 || !object(params)) throw failure('INPUT');
-      let arguments_;
-      if (action === 'get_login_info') arguments_ = {};
-      else if (action === 'send_private_msg' && safeId(params.user_id) && params.user_id !== this.#actualSelfId && bounded(params.message, 32000) && params.message.trim()) arguments_ = { user_id: params.user_id, message: params.message };
-      else throw failure('INPUT');
-      this.#channelEchoes.set(echo, { action, selfId: this.#actualSelfId, generation: this.#generation });
+      const arguments_ = qqOperationParams(action, params);
+      if ((params.user_id ?? params.peerId) === this.#actualSelfId) throw failure('INPUT');
+      this.#channelEchoes.set(echo, { action, selfId: this.#actualSelfId, generation: this.#generation,beforeCommit,cancelled:false,ready:false });
       try {
         // This is only a control acceptance. The channel adapter independently
         // waits for the matching native OneBot delivery response below.
-        return await this.#request('onebot', { attemptId: this.#attempt, action, params: arguments_, echo }, () => { submitted = action === 'send_private_msg'; });
+        return await this.#request('onebot', { attemptId: this.#attempt, action, params: arguments_, echo }, () => { submitted = QQ_MUTATIONS.has(action); });
       } catch (cause) { if (!submitted) this.#channelEchoes.delete(echo); throw cause; }
     } catch (cause) { throw Object.assign(sanitizedError(cause), { submitted }); }
   }
@@ -140,7 +148,7 @@ export class QQRuntimeManager {
       if (!pending || pending.generation !== this.#generation || !['ok', 'failed'].includes(data.status) || !Number.isInteger(data.retcode) || !object(data.data)) return;
       if (pending.action === 'get_login_info' && data.status === 'ok' && String(data.data.user_id ?? '') !== pending.selfId) return;
       this.#channelEchoes.delete(data.echo);
-    } else if (data.post_type !== 'message' || this.#state !== 'connected' || !this.#actualSelfId || String(data.self_id ?? '') !== this.#actualSelfId) return;
+    } else if (!['message','request'].includes(data.post_type) || this.#state !== 'connected' || !this.#actualSelfId || String(data.self_id ?? '') !== this.#actualSelfId) return;
     // Original operation correlation survives cancellation/disconnection while
     // its owned child remains alive. New inbound messages require live auth.
     for (const observer of this.#nativeObservers) { try { observer(structuredClone(data)); } catch {} }
@@ -474,6 +482,14 @@ export class QQRuntimeManager {
     if (!object(message)) return;
     if (message.event === 'diagnostic') {
       if (workerDiagnosticPhases.has(message.data?.phase)) this.#acceptDiagnostic(message.data);
+      return;
+    }
+    if(message.event==='channelReady'){
+      const data=message.data,entry=object(data)?this.#channelEchoes.get(data.echo):null;
+      if(!entry||entry.generation!==this.#generation||data.attemptId!==this.#attempt||entry.ready||!QQ_MUTATIONS.has(entry.action))return;
+      entry.ready=true;
+      try{if(entry.cancelled||this.#state!=='connected'||this.#stopping)throw failure('ATTEMPT_CANCELLED');entry.beforeCommit();void this.#request('commitChannel',{attemptId:this.#attempt,echo:data.echo}).catch(()=>this.cancelChannel(data.echo).catch(()=>{}));}
+      catch{void this.cancelChannel(data.echo).catch(()=>{});}
       return;
     }
     if (message.event === 'onebot') { this.#onebot(message.data); return; }

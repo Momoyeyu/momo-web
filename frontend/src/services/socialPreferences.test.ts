@@ -29,3 +29,19 @@ describe('automatic QQ preference writes',()=>{
     writer.patch({enabled:true} as never);await writer.flush();expect(save).not.toHaveBeenCalled();
   });
 });
+
+describe('full QQ capability preferences',()=>{
+  it('saves every implemented permission and scope without lifecycle fields',async()=>{
+    const save=vi.fn().mockResolvedValue(account);const writer=createSocialPreferenceWriter({save,read:async()=>account});
+    writer.patch({permissions:{media:true,friendRequests:true,groups:true,groupManagement:true},groupAllowlist:[{peerId:'123456'}],proactivePolicy:{recipientIds:['234567'],maxPerHour:3}} as never);
+    await writer.flush();
+    expect(save).toHaveBeenCalledExactlyOnceWith({permissions:{media:true,friendRequests:true,groups:true,groupManagement:true},groupAllowlist:[{peerId:'123456'}],proactivePolicy:{recipientIds:['234567'],maxPerHour:3}});
+  });
+  it('coalesces proactive limits by changed field without overwriting recipients',async()=>{
+    const save=vi.fn().mockResolvedValue(account);const writer=createSocialPreferenceWriter({save,read:async()=>account});
+    writer.patch({proactivePolicy:{recipientIds:['234567'],maxPerHour:3}} as never);
+    writer.patch({proactivePolicy:{quietStart:23}} as never);
+    await writer.flush();
+    expect(save).toHaveBeenCalledExactlyOnceWith({proactivePolicy:{recipientIds:['234567'],maxPerHour:3,quietStart:23}});
+  });
+});

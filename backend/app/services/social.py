@@ -98,10 +98,12 @@ def _public_qq_runtime_status(value):
 
 
 PROVIDERS = ("qq",)
-CAPABILITIES = {"receive": True, "reply": True, "proactive": False,
-                "contacts": False, "history": False, "ownerBinding": True}
 PERMISSIONS = {"receive": True, "reply": True, "proactive": False,
-               "contacts": False, "history": False}
+               "contacts": False, "history": False, "media": False,
+               "friendRequests": False, "groups": False, "groupManagement": False}
+CAPABILITIES = {**dict.fromkeys(PERMISSIONS, True), "ownerBinding": True}
+PROACTIVE_POLICY = {"recipientIds": [], "maxPerHour": 6, "minIntervalSeconds": 60,
+                    "quietStart": 22, "quietEnd": 8}
 
 
 def _identifier(value, label="identity"):
@@ -139,6 +141,8 @@ class SocialAccounts:
                 # account or carry an old gateway credential into the host.
                 managed = account.get("transport") == "managed"
                 account = {**self._default("qq"), **account}
+                account["permissions"] = {**PERMISSIONS, **account.get("permissions", {})}
+                account["proactivePolicy"] = {**copy.deepcopy(PROACTIVE_POLICY), **account.get("proactivePolicy", {})}
                 if not managed:
                     account["enabled"] = False
                 account["transport"] = "managed"
@@ -177,7 +181,8 @@ class SocialAccounts:
                 "accountId": provider + "-main", "expectedSelfId": "",
                 "transport": "managed",
                 "enabled": False, "permissions": dict(PERMISSIONS), "allowlistEnabled": False,
-                "allowlist": [], "ownerPeerId": None, "policyRevision": 0, "quarantined": False}
+                "allowlist": [], "groupAllowlist": [], "proactivePolicy": copy.deepcopy(PROACTIVE_POLICY),
+                "ownerPeerId": None, "policyRevision": 0, "quarantined": False}
 
     def _account(self, provider):
         return self._read().get(provider, self._default(provider))
@@ -316,7 +321,7 @@ class SocialAccounts:
     def put(self, provider, values):
         if not isinstance(values, dict):
             raise SocialError("Account configuration must be an object")
-        allowed = {"enabled", "accountId", "expectedSelfId", "permissions", "allowlistEnabled", "allowlist"}
+        allowed = {"enabled", "accountId", "expectedSelfId", "permissions", "allowlistEnabled", "allowlist", "groupAllowlist", "proactivePolicy"}
         if set(values) - allowed:
             raise SocialError("Unknown account field; owner identity requires a verified challenge")
         with self.lock:
@@ -340,20 +345,39 @@ class SocialAccounts:
                 if any(not isinstance(value, bool) or value and not CAPABILITIES[key] for key, value in grants.items()):
                     raise SocialError("A requested permission is not supported")
                 account["permissions"] = {**account["permissions"], **grants}
-            if "allowlist" in values:
-                entries = values["allowlist"]
+            for list_key in ("allowlist", "groupAllowlist"):
+                if list_key not in values:
+                    continue
+                entries = values[list_key]
                 if not isinstance(entries, list) or len(entries) > 200:
-                    raise SocialError("Use at most 200 allowed contacts")
+                    raise SocialError("Use at most 200 allowed contacts or groups")
                 normalized = {}
                 for entry in entries:
                     if not isinstance(entry, dict) or set(entry) - {"peerId", "label"}:
-                        raise SocialError("Invalid allowed contact")
+                        raise SocialError("Invalid allowed contact or group")
                     peer = _identifier(entry.get("peerId"), "contact identity")
+                    if list_key == "groupAllowlist" and not re.fullmatch(r"[1-9][0-9]{0,19}", peer):
+                        raise SocialError("Invalid QQ group number")
                     label = entry.get("label", "")
                     if not isinstance(label, str) or len(label) > 160:
                         raise SocialError("Invalid contact label")
                     normalized[peer] = {"peerId": peer, "label": label}
-                account["allowlist"] = list(normalized.values())
+                account[list_key] = list(normalized.values())
+            if "proactivePolicy" in values:
+                proposed = values["proactivePolicy"]
+                if not isinstance(proposed, dict) or set(proposed) - set(PROACTIVE_POLICY):
+                    raise SocialError("Invalid proactive policy")
+                policy = {**account["proactivePolicy"], **proposed}
+                recipients = policy["recipientIds"]
+                if (not isinstance(recipients, list) or len(recipients) > 200
+                    or any(not isinstance(peer, str) or not re.fullmatch(r"[1-9][0-9]{0,19}", peer) for peer in recipients)):
+                    raise SocialError("Invalid proactive recipient list")
+                policy["recipientIds"] = list(dict.fromkeys(recipients))
+                for field, lower, upper in (("maxPerHour", 1, 60), ("minIntervalSeconds", 0, 86400),
+                                             ("quietStart", 0, 23), ("quietEnd", 0, 23)):
+                    if type(policy[field]) is not int or not lower <= policy[field] <= upper:
+                        raise SocialError("Invalid proactive rate or quiet hours")
+                account["proactivePolicy"] = policy
             required = ("accountId", "expectedSelfId")
             if account["enabled"] and not all(account[k] for k in required):
                 raise SocialError("Configure the account identity first")
@@ -379,14 +403,22 @@ class SocialAccounts:
                     "accountId": row["accountId"], "expectedSelfId": row["expectedSelfId"],
                     "permissions": row["permissions"],
                     "policyRevision": row["policyRevision"], "allowlistEnabled": row["allowlistEnabled"],
-                    "allowlist": [p["peerId"] for p in row["allowlist"]]})
+                    "allowlist": [p["peerId"] for p in row["allowlist"]],
+                    "groupAllowlist": [p["peerId"] for p in row["groupAllowlist"]],
+                    "proactivePolicy": copy.deepcopy(row["proactivePolicy"])})
             return result
 
     def _peer_allowed(self, account, peer):
         return not account["allowlistEnabled"] or peer in {p["peerId"] for p in account["allowlist"]}
 
+    def _group_allowed(self, account, group_id):
+        return bool(account["permissions"].get("groups") and group_id in {p["peerId"] for p in account["groupAllowlist"]})
+
+    def _scope_allowed(self, account, peer):
+        return self._group_allowed(account, peer[6:]) if peer.startswith("group:") else self._peer_allowed(account, peer)
+
     def _audience(self, account, peer):
-        return "owner" if account.get("ownerPeerId") == peer else "social:" + hashlib.sha256(
+        return "owner" if not peer.startswith("group:") and account.get("ownerPeerId") == peer else "social:" + hashlib.sha256(
             json.dumps([account["provider"], account["accountId"], peer], separators=(",", ":")).encode()).hexdigest()
 
     def authorize_event(self, event):
@@ -396,18 +428,46 @@ class SocialAccounts:
                 return None
             account = self._account(provider)
             peer, sender = event.get("peerId"), event.get("senderId")
+            kind = event.get("conversationKind")
             if (not account["enabled"] or account.get("quarantined") or not account["permissions"]["receive"]
                 or event.get("accountId") != account["accountId"] or event.get("selfId") != account["expectedSelfId"]
-                or event.get("conversationKind") != "private" or not isinstance(peer, str) or not peer
-                or sender != peer or sender == account["expectedSelfId"] or not self._peer_allowed(account, peer)
-                or not isinstance(event.get("text"), str) or not 0 < len(event["text"]) <= 16000
+                or not isinstance(peer, str) or not peer or not isinstance(sender, str) or not sender
+                or sender == account["expectedSelfId"] or not self._peer_allowed(account, sender)
+                or not isinstance(event.get("text"), str) or len(event["text"]) > 16000
                 or not isinstance(event.get("externalMessageId"), str) or not event["externalMessageId"]):
                 return None
+            if kind == "private":
+                if sender != peer or peer.startswith("group:"):
+                    return None
+            elif kind == "group":
+                group = event.get("groupId")
+                if (not isinstance(group, str) or not re.fullmatch(r"[1-9][0-9]{0,19}", group)
+                    or peer != "group:" + group or not self._group_allowed(account, group)):
+                    return None
+            else:
+                return None
+            attachments = event.get("attachments", [])
+            if not isinstance(attachments, list) or len(attachments) > 10:
+                return None
+            if attachments:
+                if not account["permissions"].get("media"):
+                    return None
+                for item in attachments:
+                    if (not isinstance(item, dict) or set(item) - {"mediaId", "elementId", "messageId", "kind", "name", "size", "mime"}
+                        or not any(isinstance(item.get(key), str) and re.fullmatch(r"[A-Za-z0-9_-]{1,160}", item[key]) for key in ("mediaId", "elementId"))
+                        or any(key in item and (not isinstance(item[key], str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", item[key])) for key in ("mediaId", "elementId", "messageId"))
+                        or item.get("kind") not in {"image", "audio", "video", "file"}
+                        or not isinstance(item.get("name", ""), str) or len(item.get("name", "")) > 160
+                        or type(item.get("size", 0)) is not int or not 0 <= item.get("size", 0) <= 10 * 1024 * 1024):
+                        return None
+            if not event["text"].strip() and not attachments:
+                return None
+            event = {**event, "text": event["text"] or "[QQ attachment: " + ", ".join(item["kind"] for item in attachments) + "]"}
             revision = event.get("policyRevision")
             if revision is not None and revision != account["policyRevision"]:
                 return None
             challenge = account.get("ownerChallenge")
-            if challenge and challenge["peerId"] == peer and challenge["expiresAt"] > time.time():
+            if kind == "private" and challenge and challenge["peerId"] == peer and challenge["expiresAt"] > time.time():
                 digest = hashlib.sha256(event["text"].strip().encode()).hexdigest()
                 if secrets.compare_digest(digest, challenge["hash"]):
                     data = self._read()
@@ -426,10 +486,20 @@ class SocialAccounts:
                             if provider in PROVIDERS and row.get("provider") == provider and row.get("accountId") == account_id), None)
             if (not account or not account["enabled"] or account.get("quarantined")
                 or not account["permissions"]["reply"] or account["policyRevision"] != revision
-                or not self._peer_allowed(account, peer_id) or peer_id == account["expectedSelfId"]
+                or not self._scope_allowed(account, peer_id) or peer_id == account["expectedSelfId"]
                 or audience != self._audience(account, peer_id)):
                 raise SocialError("Reply permission or recipient scope changed")
             return {k: copy.deepcopy(v) for k, v in account.items() if k not in {"credentialRef", "ownerChallenge"}}
+
+    def authorize_action(self, action, params, *, account_id=None, revision=None,
+                         audience="owner", local_owner=False, consume=False, command_id=None):
+        from .social_actions import authorize_action
+        return authorize_action(self, action, params, account_id=account_id, revision=revision,
+                                audience=audience, local_owner=local_owner, consume=consume, command_id=command_id)
+
+    def filter_action_result(self, authorization, result):
+        from .social_actions import filter_action_result
+        return filter_action_result(self, authorization, result)
 
     def owner_challenge(self, provider, peer_id):
         peer = _identifier(peer_id, "contact identity")
@@ -552,7 +622,7 @@ class SocialAccounts:
                     continue
                 receipt = json.loads(row["receipt"] or "{}")
                 records.append({"commandId": row["command_id"], "status": row["status"],
-                    "peerId": params.get("peerId"), "createdAt": row["at"],
+                    "peerId": params.get("peerId"), "createdAt": row["at"], "action": params.get("action") or "automatic.reply",
                     "executorQuiescent": account.get("executorQuiescent") is True,
                     "evidence": receipt.get("evidence") or receipt.get("deliveryEvidence")})
             except (ValueError, AttributeError):

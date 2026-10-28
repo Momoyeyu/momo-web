@@ -103,3 +103,6 @@ app.add_middleware(
     barrier_factory=lambda: runtime.maintenance() if runtime.started else None,
 )
 app.add_middleware(DesktopAuth)
+
+from .api import social_media
+app.include_router(social_media.router)

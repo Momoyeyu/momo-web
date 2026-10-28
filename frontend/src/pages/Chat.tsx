@@ -156,7 +156,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
     // 转写已是句级：末条 assistant 就是最后一句，切句全在 backend
     : streamText || (lastAssistant ? lastAssistant.text : "");
   const busy = status === "thinking" || status === "speaking";
-  const phoneBusy=attention.activity?.source==='qq';
+  const phoneBusy=(attention.activity?.source==='qq'||attention.activity?.toolSource==='qq');
   const control=async(action:Parameters<typeof controlAttention>[0])=>{
     setControlling(true);
     try{if(action==='stop')getChatEngine().interrupt();await controlAttention(action);}

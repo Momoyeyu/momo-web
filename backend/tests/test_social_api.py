@@ -25,7 +25,7 @@ def test_account_api_is_separate_from_general_configuration_and_exposes_native_o
     assert not {'endpoint', 'token', 'hasCredential'}.intersection(response.json())
     assert 'qq-main' not in client.get('/api/state').text
     assert client.put('/api/social/accounts/qq', json={'ownerPeerId': '999'}).status_code == 422
-    assert client.put('/api/social/accounts/qq', json={'permissions': {'proactive': True}}).status_code == 400
+    assert client.put('/api/social/accounts/qq', json={'permissions': {'proactive': True}}).status_code == 200
 
 
 def test_account_api_cannot_reconcile_another_accounts_command():

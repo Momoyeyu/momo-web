@@ -98,7 +98,8 @@ def test_authenticated_native_login_binds_blank_identity_without_enabling_plugin
     saved = social._read()["qq"]
     assert saved["expectedSelfId"] == "10001"
     assert saved["enabled"] is False and saved["ownerPeerId"] is None
-    assert saved["permissions"] == {"receive": True, "reply": True, "proactive": False, "contacts": False, "history": False}
+    from app.services.social import PERMISSIONS
+    assert saved["permissions"] == PERMISSIONS
     before = social._path().read_bytes()
     TestClient(app).get("/api/social/accounts/qq/runtime")
     assert social._path().read_bytes() == before

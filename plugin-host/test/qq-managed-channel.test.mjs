@@ -143,3 +143,67 @@ test('managed QQ checks the final dispatch gate and current authentication befor
   await assert.rejects(adapter.send({ peerId: '456789', text: 'disconnected', beforeDispatch() {} }), { submitted: false });
   assert.equal(native.calls.filter(call => call.action === 'send_private_msg').length, 0);
 });
+
+test('extended queries require their own grant and filter private indexes before projection',async t=>{
+ const {native,adapter}=await channel(t,{settings:{permissions:{receive:true,reply:true,contacts:true,groups:true},allowlistEnabled:true,allowlist:['456789'],groupAllowlist:['777777']}});
+ native.requestChannel=async function(action,params,echo){this.calls.push({action,params,echo});queueMicrotask(()=>this.event({echo,status:'ok',retcode:0,data:action==='get_login_info'?{user_id:this.selfId}:action==='contacts.list'?{contacts:[{peerId:'456789',name:'Allowed'},{peerId:'987654',name:'Private'}]}:{groups:[{peerId:'group:777777',name:'Allowed group'},{peerId:'group:888888',name:'Secret group'}]}}));};
+ assert.deepEqual((await adapter.action('contacts.list',{})).contacts,[{peerId:'456789',name:'Allowed'}]);
+ assert.deepEqual((await adapter.action('groups.list',{})).groups,[{peerId:'group:777777',name:'Allowed group'}]);
+ const before=native.calls.length;await assert.rejects(adapter.action('history.list',{peerId:'456789'}),{code:'FORBIDDEN'});assert.equal(native.calls.length,before);
+});
+
+test('extended mutations keep native receipts, cancellation facts and final permission fences',async t=>{
+ const {native,adapter,late}=await channel(t,{settings:{permissions:{receive:true,reply:true,proactive:true,groups:true,groupManagement:true},proactivePolicy:{recipientIds:['456789'],maxPerHour:6,quietStart:0,quietEnd:0},groupAllowlist:['777777']}});
+ native.reply=false;const controller=new AbortController();
+ const pending=adapter.action('private.send',{peerId:'456789',text:'one send'},{signal:controller.signal,commandId:'proactive-once'});
+ await until(()=>native.calls.some(call=>call.action==='private.send'));const echo=native.calls.find(call=>call.action==='private.send').echo;
+ controller.abort();await assert.rejects(pending,{code:'OUTCOME_UNKNOWN',submitted:true});native.complete(echo);assert.equal(late[0].commandId,'proactive-once');
+ const before=native.calls.filter(call=>call.action==='groups.manage').length;
+ await assert.rejects(adapter.action('groups.manage',{peerId:'group:888888',operation:'muteAll',enabled:true}),{code:'FORBIDDEN'});
+ assert.equal(native.calls.filter(call=>call.action==='groups.manage').length,before);
+ adapter.config.permissions.proactive=false;await assert.rejects(adapter.action('private.send',{peerId:'456789',text:'revoked'}),{code:'FORBIDDEN'});
+});
+
+test('group and media ingress are separately scoped and carry exact fetch identifiers',async t=>{
+ const {native,adapter,inbox}=await channel(t,{settings:{permissions:{receive:true,reply:true,groups:true,media:true},groupAllowlist:['777777']}});
+ const event={post_type:'message',message_type:'group',self_id:'123456',user_id:'456789',group_id:'777777',message_id:'media-msg',time:100,message:[{type:'image',data:{message_id:'media-msg',element_id:'5',name:'photo.png',size:200}}]};
+ native.event({...event,group_id:'888888'});assert.equal(inbox.length,0);
+ native.event(event);assert.equal(inbox.length,1);assert.equal(inbox[0].peerId,'group:777777');assert.equal(inbox[0].groupId,'777777');assert.equal(inbox[0].senderId,'456789');assert.equal(inbox[0].attachments[0].elementId,'5');
+ adapter.config.permissions.media=false;native.event({...event,message_id:'media-2'});assert.equal(inbox.length,1);
+});
+
+test('a proactive action rechecks quiet time after identity lookup and never dispatches late',async t=>{
+ let now=new Date(2026,9,29,12,0).getTime();const {adapter,native}=await channel(t,{now:()=>now,settings:{permissions:{receive:true,reply:true,proactive:true},proactivePolicy:{recipientIds:['456789'],maxPerHour:1,quietStart:22,quietEnd:8}}});
+ let finish;native.requestChannel=async function(action,params,echo){this.calls.push({action,params,echo});if(action==='get_login_info')finish=()=>this.event({echo,status:'ok',retcode:0,data:{user_id:this.selfId}});};
+ const pending=adapter.action('private.send',{peerId:'456789',text:'too late'});await until(()=>!!finish);now=new Date(2026,9,29,23,0).getTime();finish();
+ await assert.rejects(pending,{code:'FORBIDDEN'});assert.equal(native.calls.filter(call=>call.action==='private.send').length,0);
+});
+
+test('trusted same-conversation media replies need reply+media but no proactive grant',async t=>{
+ const {adapter,native}=await channel(t,{settings:{permissions:{receive:true,reply:true,media:true,proactive:false}}});
+ const params={peerId:'456789',name:'note.txt',mime:'text/plain',dataBase64:'YQ=='};
+ await assert.rejects(adapter.action('media.send',params),{code:'FORBIDDEN'});
+ const result=await adapter.action('media.send',params,{replyMode:true,beforeDispatch(){}});assert.equal(result.deliveryStatus,'provider_accepted');
+ assert.equal(native.calls.filter(call=>call.action==='media.send').length,1);assert.equal(adapter.proactiveAdmissions.length,0);
+ adapter.config.permissions.reply=false;await assert.rejects(adapter.action('media.send',params,{replyMode:true}),{code:'FORBIDDEN'});
+});
+
+test('proactive minimum interval starts at the previous native dispatch',async t=>{
+ let now=12000;
+ const {adapter,native}=await channel(t,{now:()=>now,settings:{permissions:{receive:true,reply:true,proactive:true},proactivePolicy:{recipientIds:['456789'],maxPerHour:6,minIntervalSeconds:60,quietStart:0,quietEnd:0}}});
+ await adapter.action('private.send',{peerId:'456789',text:'first after asynchronous identity verification'});
+ now=60000;
+ await assert.rejects(adapter.action('private.send',{peerId:'456789',text:'only 48 seconds after dispatch'}),{code:'FORBIDDEN'});
+ assert.equal(native.calls.filter(call=>call.action==='private.send').length,1);
+});
+
+test('adapter-owned list scopes cannot be replaced with a caller-provided scope',async t=>{
+ const {adapter,native}=await channel(t,{settings:{permissions:{receive:true,reply:true,contacts:true},allowlistEnabled:true,allowlist:['456789']}});
+ const before=native.calls.length;await assert.rejects(adapter.action('contacts.list',{scopePeerIds:['987654']}),{code:'INPUT'});assert.equal(native.calls.length,before);
+});
+
+test('minimum intervals longer than the hourly quota window retain the last dispatch',async t=>{
+ let now=12000;const {adapter}=await channel(t,{now:()=>now,settings:{permissions:{receive:true,reply:true,proactive:true},proactivePolicy:{recipientIds:['456789'],maxPerHour:6,minIntervalSeconds:10800,quietStart:0,quietEnd:0}}});
+ await adapter.action('private.send',{peerId:'456789',text:'first'});now+=7200000;
+ await assert.rejects(adapter.action('private.send',{peerId:'456789',text:'within three hour interval'}),{code:'FORBIDDEN'});
+});

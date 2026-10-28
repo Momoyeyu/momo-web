@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState,type KeyboardEvent} from 'react';
 import {useT} from '../../i18n';
-import {socialPreferenceWriter,socialRecords,type SocialAccount,type SocialPermission,type SocialRecord} from '../../services/socialClient';
+import {DEFAULT_PROACTIVE_POLICY,socialPreferenceWriter,socialRecords,type SocialAccount,type SocialPermission,type SocialRecord} from '../../services/socialClient';
 import type {SocialPreferencePatch} from '../../services/socialPreferences';
 import type {QQLoginErrorCode,QQRuntimeAction,QQRuntimeState} from '../../services/qqRuntimeClient';
 import Modal from '../../ui/Modal';
@@ -8,22 +8,28 @@ import Button from '../../ui/Button';
 import FieldRow from '../../ui/FieldRow';
 import Hint from '../../ui/Hint';
 import Switch from '../../ui/Switch';
-import {addQQContacts} from '../../services/qqAllowlist';
+import Select from '../../ui/Select';
+import QQScopeEditor from './QQScopeEditor';
+import QQMediaLibrary from './QQMediaLibrary';
 import QQLoginPanel from './QQLoginPanel';
 
 const TABS=['account','permissions','records'] as const;
-const PERMISSIONS:SocialPermission[]=['receive','reply'];
-const UNSUPPORTED=['proactive','contacts','history','media','friendRequests','groups','profile'] as const;
-const preferences=(account:SocialAccount)=>({permissions:{...account.permissions},allowlistEnabled:account.allowlistEnabled,allowlist:account.allowlist.map(peer=>({...peer}))});
+const PERMISSION_GROUPS:{id:string;permissions:SocialPermission[]}[]=[{id:'messages',permissions:['receive','reply','media']},{id:'account',permissions:['proactive','contacts','history','friendRequests']},{id:'groups',permissions:['groups','groupManagement']}];
+const HOURS=Array.from({length:24},(_,i)=>({value:String(i),label:`${String(i).padStart(2,'0')}:00`}));
+const RECORD_ACTIONS=new Map([
+  ['contacts.list','contacts'],['history.list','history'],['private.send','privateSend'],
+  ['group.send','groupSend'],['media.send','mediaSend'],['media.fetch','mediaFetch'],
+  ['friends.listRequests','friendRequests'],['friends.respond','friendRespond'],
+  ['groups.list','groups'],['groups.members','groupMembers'],['groups.manage','groupManage'],
+  ['automatic.reply','reply'],
+]);
+const preferences=(account:SocialAccount)=>({permissions:{...account.permissions},allowlistEnabled:account.allowlistEnabled,allowlist:account.allowlist.map(peer=>({...peer})),groupAllowlist:(account.groupAllowlist??[]).map(peer=>({...peer})),proactivePolicy:{...DEFAULT_PROACTIVE_POLICY,...account.proactivePolicy}});
 export default function SocialConfigModal({account,runtime,runtimeError,busy,pendingAction,onLogin,onLogout,onClose,onAccountChanged}:{
   account:SocialAccount;runtime:QQRuntimeState|null;runtimeError:QQLoginErrorCode|null;busy:boolean;pendingAction:QQRuntimeAction|null;
   onLogin:()=>void;onLogout:()=>void;onClose:()=>void;onAccountChanged:(account:SocialAccount)=>void;
 }){
   const t=useT();const provider=account.provider;
   const [draft,setDraft]=useState(()=>preferences(account));
-  const [contactInput,setContactInput]=useState('');
-  const [contactError,setContactError]=useState<string|null>(null);
-  const inputRef=useRef<HTMLInputElement>(null);
   const [tab,setTab]=useState<(typeof TABS)[number]>('account');
   const [saving,setSaving]=useState(false);const [saveError,setSaveError]=useState(false);const [saved,setSaved]=useState(false);
   const [records,setRecords]=useState<SocialRecord[]>([]);const [loadingRecords,setLoadingRecords]=useState(false);const [recordError,setRecordError]=useState(false);
@@ -36,7 +42,7 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
     onSettled:(actual,pending)=>{
       confirmed.current=actual;accountChanged.current(actual);
       if(!alive.current)return;
-      const next={...preferences(actual),...pending,permissions:{...actual.permissions,...pending.permissions}};
+      const next={...preferences(actual),...pending,permissions:{...actual.permissions,...pending.permissions},proactivePolicy:{...DEFAULT_PROACTIVE_POLICY,...actual.proactivePolicy,...pending.proactivePolicy}};
       setDraft(next);setSaved(true);
     },
     onError:failed=>{if(alive.current){setSaveError(failed);if(failed){setDraft(preferences(confirmed.current));}}},
@@ -59,11 +65,7 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
     void poll();return()=>{request.abort();clearTimeout(timer);};
   },[tab,provider]);
   const patch=(value:SocialPreferencePatch)=>{
-    setSaved(false);setSaveError(false);setDraft(current=>({...current,...value,permissions:{...current.permissions,...value.permissions}}));writer.patch(value);
-  };
-  const addContacts=()=>{
-    try{const allowlist=addQQContacts(contactInput,draft.allowlist);patch({allowlist});setContactInput('');setContactError(null);inputRef.current?.focus();}
-    catch(error){setContactError(error instanceof Error?error.message:'invalid');}
+    setSaved(false);setSaveError(false);setDraft(current=>({...current,...value,permissions:{...current.permissions,...value.permissions},proactivePolicy:{...current.proactivePolicy,...value.proactivePolicy}}));writer.patch(value);
   };
   const close=()=>{void writer.flush();onClose();};
   const navigateTab=(event:KeyboardEvent<HTMLButtonElement>,index:number)=>{
@@ -87,24 +89,28 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
       </section>
       <section id="social-panel-permissions" role="tabpanel" aria-labelledby="social-tab-permissions" aria-hidden={tab!=='permissions'} inert={tab!=='permissions'} className="social-pane">
         <div className="social-permission-heading"><h3>{t('social.messagePermissions')}</h3><Hint text={t('social.permissionsHint')} side="down"/></div>
-        {PERMISSIONS.map(permission=><FieldRow key={permission} label={t(`social.permissions.${permission}`)} ><Switch title={t(`social.permissions.${permission}`)} on={draft.permissions[permission]} onChange={value=>patch({permissions:{[permission]:value}})}/></FieldRow>)}
-        <div className="social-allowlist"><FieldRow label={t('social.allowlist')} hint={t('social.allowlistHint')}><Switch title={t('social.allowlist')} on={draft.allowlistEnabled} onChange={allowlistEnabled=>patch({allowlistEnabled})}/></FieldRow>
-          {draft.allowlistEnabled?<div className="social-allowlist-editor">
-            <label htmlFor="social-peer-input">{t('social.allowlistIds')}</label>
-            <div className="social-contact-add"><input ref={inputRef} id="social-peer-input" type="text" inputMode="numeric" autoComplete="off" value={contactInput} placeholder={t('social.contactPlaceholder')} aria-invalid={!!contactError} aria-describedby={contactError?'social-contact-error':'social-contact-hint'} onChange={event=>{setContactInput(event.target.value);setContactError(null);}} onKeyDown={event=>{if(event.key==='Enter'&&!event.nativeEvent.isComposing){event.preventDefault();addContacts();}}} spellCheck={false}/><Button size="sm" onClick={addContacts}>{t('social.addContact')}</Button></div>
-            <p id="social-contact-hint" className="social-help">{t('social.contactHint')}</p>
-            {contactError?<p id="social-contact-error" role="alert" className="social-error">{t(`social.contactErrors.${contactError}`)}</p>:null}
-            <ul className="social-contact-list" aria-label={t('social.contactList')}>{draft.allowlist.map(peer=><li key={peer.peerId}><span>{peer.peerId}</span><Button variant="ghost" size="sm" aria-label={t('social.removeContact',{id:peer.peerId})} onClick={()=>{patch({allowlist:draft.allowlist.filter(item=>item.peerId!==peer.peerId)});setContactError(null);}}>{t('social.removeContactButton')}</Button></li>)}</ul>
-            {draft.allowlist.length===0?<p className="social-empty-policy">{t('social.allowlistEmpty')}</p>:null}
-          </div>:null}
+        <div className="social-permission-groups">{PERMISSION_GROUPS.map(group=><section className="social-permission-group" key={group.id} aria-label={t(`social.permissionGroups.${group.id}`)}><h4>{t(`social.permissionGroups.${group.id}`)}</h4><div className="social-permission-grid">{group.permissions.map(permission=><FieldRow key={permission} label={t(`social.permissions.${permission}`)} hint={t(`social.permissionHints.${permission}`)}><Switch title={t(`social.permissions.${permission}`)} on={draft.permissions[permission]===true} onChange={value=>patch({permissions:{[permission]:value}})}/></FieldRow>)}</div></section>)}</div>
+        <div className="social-allowlist"><FieldRow label={t('social.allowlist')} hint={`${t('social.allowlistHint')}${draft.allowlistEnabled&&draft.allowlist.length===0?` ${t('social.allowlistEmpty')}`:''}`}><Switch title={t('social.allowlist')} on={draft.allowlistEnabled} onChange={allowlistEnabled=>patch({allowlistEnabled})}/></FieldRow>
+          {draft.allowlistEnabled?<div className="social-scope-inset"><QQScopeEditor id="social-peer-input" label={t('social.allowlistIds')} hint={t('social.contactHint')} emptyHint={t('social.allowlistEmpty')} placeholder={t('social.contactPlaceholder')} listLabel={t('social.contactList')} removeLabel={t('social.removeContact')} value={draft.allowlist} onChange={allowlist=>patch({allowlist})}/></div>:null}
         </div>
-        <details className="social-unsupported"><summary>{t('social.unsupportedSummary')}</summary>{UNSUPPORTED.map(item=><div key={item}><span>{t(`social.permissions.${item}`)}</span><span>{t('social.unsupported')}</span></div>)}</details>
+        {draft.permissions.media&&account.permissions.media?<QQMediaLibrary/>:null}
+        {draft.permissions.proactive?<section className="social-policy-section social-proactive-policy" aria-label={t('social.proactiveSettings')}>
+          <div className="social-permission-heading"><h3>{t('social.proactiveSettings')}</h3><Hint text={t('social.proactiveSettingsHint')} side="down"/></div>
+          <QQScopeEditor id="social-proactive-input" label={t('social.proactiveRecipients')} hint={t('social.contactHint')} emptyHint={t('social.proactiveEmpty')} placeholder={t('social.contactPlaceholder')} listLabel={t('social.proactiveRecipientList')} removeLabel={t('social.removeProactiveRecipient')} value={draft.proactivePolicy.recipientIds.map(peerId=>({peerId}))} onChange={peers=>patch({proactivePolicy:{recipientIds:peers.map(peer=>peer.peerId)}})}/>
+          <div className="social-policy-grid">
+            <FieldRow label={t('social.proactiveMaxPerHour')} hint={t('social.proactiveMaxPerHourHint')}><Select value={String(draft.proactivePolicy.maxPerHour)} options={[...new Set([1,3,6,12,30,60,draft.proactivePolicy.maxPerHour])].sort((a,b)=>a-b).map(value=>({value:String(value),label:t('social.perHour',{value:String(value)})}))} onChange={value=>patch({proactivePolicy:{maxPerHour:Number(value)}})}/></FieldRow>
+            <FieldRow label={t('social.proactiveInterval')} hint={t('social.proactiveIntervalHint')}><Select value={String(draft.proactivePolicy.minIntervalSeconds)} options={[...new Set([0,30,60,300,900,3600,draft.proactivePolicy.minIntervalSeconds])].sort((a,b)=>a-b).map(value=>({value:String(value),label:t('social.seconds',{value:String(value)})}))} onChange={value=>patch({proactivePolicy:{minIntervalSeconds:Number(value)}})}/></FieldRow>
+            <FieldRow label={t('social.proactiveQuietStart')} hint={t('social.proactiveQuietHint')}><Select value={String(draft.proactivePolicy.quietStart)} options={HOURS} onChange={value=>patch({proactivePolicy:{quietStart:Number(value)}})}/></FieldRow>
+            <FieldRow label={t('social.proactiveQuietEnd')} hint={t('social.proactiveQuietHint')}><Select value={String(draft.proactivePolicy.quietEnd)} options={HOURS} onChange={value=>patch({proactivePolicy:{quietEnd:Number(value)}})}/></FieldRow>
+          </div>
+        </section>:null}
+        {draft.permissions.groups||draft.permissions.groupManagement?<section className="social-policy-section social-group-policy" aria-label={t('social.groupSettings')}><div className="social-permission-heading"><h3>{t('social.groupSettings')}</h3><Hint text={t('social.groupSettingsHint')} side="down"/></div><QQScopeEditor id="social-group-input" label={t('social.groupIds')} hint={t('social.groupInputHint')} emptyHint={t('social.groupsEmpty')} placeholder={t('social.groupPlaceholder')} listLabel={t('social.groupList')} removeLabel={t('social.removeGroup')} value={draft.groupAllowlist} onChange={groupAllowlist=>patch({groupAllowlist})}/></section>:null}
       </section>
       <section id="social-panel-records" role="tabpanel" aria-labelledby="social-tab-records" aria-hidden={tab!=='records'} inert={tab!=='records'} className="social-pane">
         <div className="social-record-heading"><h3>{t('social.operationRecords')}</h3></div>
         {recordError?<p role="alert" className="social-error">{t('social.recordsError')}</p>:null}
         {loadingRecords?<p className="muted">{t('social.loading')}</p>:records.length===0?<p className="social-empty-records">{t('social.noRecords')}</p>:records.map(record=><article className="social-record" key={record.commandId}>
-          <div className="social-record-top"><strong>{record.peerId||t('social.unknownPeer')}</strong><span>{t(`social.delivery.${record.status}`)===`social.delivery.${record.status}`?t('social.delivery.unknown'):t(`social.delivery.${record.status}`)}</span></div>
+          <div className="social-record-top"><strong>{RECORD_ACTIONS.has(record.action??'')?`${t(`social.recordActions.${RECORD_ACTIONS.get(record.action!)}`)}${record.peerId?` · ${record.peerId}`:''}`:record.peerId||t('social.unknownPeer')}</strong><span>{t(`social.delivery.${record.status}`)===`social.delivery.${record.status}`?t('social.delivery.unknown'):t(`social.delivery.${record.status}`)}</span></div>
           <code>{record.commandId}</code>{record.createdAt?<time>{record.createdAt}</time>:null}{record.evidence?<pre className="social-record-evidence">{typeof record.evidence==='string'?record.evidence:JSON.stringify(record.evidence,null,2)}</pre>:null}{record.error?<p className="social-error">{record.error}</p>:null}
           {record.status==='unknown'?<p className="social-help">{t('social.unknownHold')}</p>:null}
         </article>)}

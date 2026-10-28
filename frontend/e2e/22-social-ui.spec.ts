@@ -45,13 +45,14 @@ test('QQ account settings offer managed sign-in only and enforce an empty allowl
     await page.mouse.move(20,20);
     await page.waitForTimeout(450); // Let the horizontal tab transition finish for visual evidence.
     await page.screenshot({path:info.outputPath('qq-permissions.png')});
-    for(const name of ['主动私信','读取联系人','读取历史'])await expect(dialog.getByRole('switch',{name,exact:true})).toHaveCount(0);
-    await dialog.getByText('当前未支持的能力',{exact:true}).click();
-    await expect(dialog.getByText('主动私信',{exact:true})).toBeVisible();
+    for(const name of ['主动私信','读取联系人','读取历史','附件与媒体','处理好友申请','群聊','群管理'])await expect(dialog.getByRole('switch',{name,exact:true})).toBeEnabled();
+    await expect(dialog.locator('.social-unsupported')).toHaveCount(0);
     const policy=dialog.locator('.social-allowlist');
     await expect(policy.getByRole('switch')).toHaveAttribute('aria-checked','false');
     await policy.getByRole('switch').click();
-    await expect(dialog.getByText('白名单为空，所有联系人均暂停处理。')).toBeVisible();
+    await expect(dialog.locator('.social-empty-policy')).toHaveCount(0);
+    await expect(dialog.locator('.social-scope-heading .hint')).toHaveAttribute('data-tip',/白名单为空/);
+    await expect(dialog.locator('#social-contact-hint')).toHaveCount(0);
     await expect.poll(async()=>((await (await request.get('/api/social/accounts')).json()).accounts[0].allowlistEnabled)).toBe(true);
     const input=dialog.getByRole('textbox',{name:'添加 QQ 号',exact:true});
     const list=dialog.getByRole('list',{name:'已允许的 QQ 号'});

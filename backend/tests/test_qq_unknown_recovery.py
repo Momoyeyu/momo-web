@@ -205,3 +205,18 @@ def test_duplicate_old_shutdown_receipt_cannot_disable_a_later_explicit_connecti
     core.record_receipt(receipt)
     assert social._read()["qq"]["enabled"] is True
     assert social._read()["qq"]["policyRevision"] == 100
+
+
+@pytest.mark.parametrize('action',['private.send','group.send','media.send','friends.respond','groups.manage'])
+def test_reviewed_mutation_actions_use_the_same_automatic_unknown_recovery(monkeypatch,action):
+    core=running_core(monkeypatch)
+    receipt=seed(core,method='channels.action')
+    row=db.query('SELECT * FROM outbox')[0]
+    payload=json.loads(row['payload']);payload['action']=action
+    with db.tx() as c:c.execute('UPDATE outbox SET payload=?',(json.dumps(payload),))
+    core.record_receipt(receipt);finished(core)
+    assert db.query('SELECT status FROM outbox')[0]['status']=='closed_unknown'
+    assert social._account('qq')['enabled'] is False
+    assert core.mode=='dormant'
+    core.record_receipt({**receipt,'status':'completed','deliveryStatus':'provider_accepted'})
+    assert db.query('SELECT status FROM outbox')[0]['status']=='completed'

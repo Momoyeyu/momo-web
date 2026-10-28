@@ -142,6 +142,7 @@ export class PluginHost {
       case 'qq.settleUnknown': return this.settleUnknownQQ(params);
       case 'channels.health': return this.channelHealth(params);
       case 'channels.send': return this.sendChannel(params);
+      case 'channels.action': return this.actionChannel(params);
       case 'channels.ack': return this.ackChannel(params);
       case 'qq.runtime.status': return this.qqRuntime.status({ authenticatedDetail: params.authenticatedDetail === true, restoreDetail: params.restoreDetail === true });
       case 'qq.runtime.begin': return this.qqRuntimeAction('begin', { ownerAction: params.ownerAction === true, expectedSelfId: params.expectedSelfId });
@@ -318,7 +319,7 @@ export class PluginHost {
     // A permission save may withdraw the plugin while identity verification is
     // pending. No stale adapter contribution may escape after that withdrawal.
     checkCurrent();
-    return { pluginId, source, scope: 'current_turn', sections: plugin.channel.promptContext() };
+    return { pluginId, source, scope: 'current_turn', sections: plugin.channel.promptContext(peerId) };
   }
 
   ackChannel({ pluginId, accountId, inboxId }) {
@@ -356,6 +357,43 @@ export class PluginHost {
     })();
     entry.promise = promise; this.inflight.set(command.commandId, entry);
     return promise;
+  }
+
+  async actionChannel({ pluginId, accountId, action, arguments: args = {}, policyRevision, permit, replyMode = false }) {
+    this.checkPermit(permit);
+    const reads = new Set(['contacts.list','history.list','media.fetch','friends.listRequests','groups.list','groups.members']);
+    const writes = new Set(['private.send','group.send','media.send','friends.respond','groups.manage']);
+    if (!reads.has(action) && !writes.has(action)) fail('INPUT', 'Unknown reviewed QQ action');
+    const mutation = writes.has(action);
+    const plugin = this.plugins.get(pluginId);
+    const checkCurrent = () => {
+      this.checkPermit(permit);
+      if (!plugin?.channel || plugin.config.type !== 'qq' || !plugin.enabled || !plugin.connected || plugin.channel.quarantined || this.plugins.get(pluginId) !== plugin) fail('STALE_CONFIG', 'QQ action authorization changed');
+      if (accountId !== plugin.config.accountId || policyRevision !== plugin.config.policyRevision) fail('STALE_CONFIG', 'QQ account or permissions changed');
+    };
+    checkCurrent();
+    if (typeof plugin.channel.action !== 'function') fail('CAPABILITY_UNAVAILABLE','QQ action unavailable');
+    const command = { ...this.beginCommand(permit, mutation ? 'channel.send' : 'channel.query'), pluginId, accountId, policyRevision, action, ...(args.peerId ? {peerId:args.peerId} : {}) };
+    this.commands.set(command.commandId,command);
+    const controller = new AbortController();plugin.controllers.add(controller);
+    const entry = {command,controller,plugin,promise:null};
+    const promise = (async()=>{
+      try {
+        const result = await plugin.channel.action(action,args,{signal:controller.signal,commandId:command.commandId,beforeDispatch:checkCurrent,replyMode:replyMode===true});
+        if (!mutation) checkCurrent();
+        // Native operation results are returned privately; only original
+        // command facts are broadcast as receipts (never bytes/contact lists).
+        return {result,receipt:this.receipt(command,'completed',{deliveryStatus:mutation?(result?.deliveryStatus ?? 'provider_accepted'):'queried',...(typeof result?.externalMessageId==='string'&&result.externalMessageId.length<=200?{externalMessageId:result.externalMessageId}:{})})};
+      } catch(cause) {
+        if (mutation && cause?.submitted === true) {
+          this.unresolved.set(command.commandId,command);this.paused=true;this.awaitingGrant=false;
+          this.receipt(command,'unknown',{deliveryStatus:'unknown',requiresReconciliation:true});
+          this.event('host.paused',{reason:'unknown_command_outcome',commandId:command.commandId});
+        } else this.receipt(command,'failed',{deliveryStatus:mutation?'not_sent':'query_failed'});
+        throw new HostError(cause?.code ?? 'CHANNEL','QQ action failed or result is unknown');
+      } finally {plugin.controllers.delete(controller);this.inflight.delete(command.commandId);}
+    })();
+    entry.promise=promise;this.inflight.set(command.commandId,entry);return promise;
   }
 
   async connectMcp(plugin) {

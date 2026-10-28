@@ -18,12 +18,33 @@ class PermissionIn(BaseModel):
     proactive: bool | None = None
     contacts: bool | None = None
     history: bool | None = None
+    media: bool | None = None
+    friendRequests: bool | None = None
+    groups: bool | None = None
+    groupManagement: bool | None = None
 
 
 class ContactIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
     peerId: str = Field(pattern=r"^[1-9][0-9]{4,11}$", min_length=5, max_length=12)
     label: str = Field(default="", max_length=160)
+
+
+class ProactivePolicyIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    recipientIds: list[str] | None = Field(default=None, max_length=200)
+    maxPerHour: int | None = Field(default=None, ge=1, le=60, strict=True)
+    minIntervalSeconds: int | None = Field(default=None, ge=0, le=86400, strict=True)
+    quietStart: int | None = Field(default=None, ge=0, le=23, strict=True)
+    quietEnd: int | None = Field(default=None, ge=0, le=23, strict=True)
+
+    @field_validator("recipientIds")
+    @classmethod
+    def valid_recipients(cls, values):
+        import re
+        if values is not None and any(not re.fullmatch(r"[1-9][0-9]{4,11}", value) for value in values):
+            raise ValueError("Invalid QQ number")
+        return values
 
 
 class AccountIn(BaseModel):
@@ -34,6 +55,8 @@ class AccountIn(BaseModel):
     permissions: PermissionIn | None = None
     allowlistEnabled: bool | None = None
     allowlist: list[ContactIn] | None = Field(default=None, max_length=200)
+    groupAllowlist: list[ContactIn] | None = Field(default=None, max_length=200)
+    proactivePolicy: ProactivePolicyIn | None = None
 
 
 class ConnectIn(BaseModel):
