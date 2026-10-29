@@ -71,12 +71,19 @@ test('settings spotlight persists CP1 and naming memory completes only after ret
  await page.locator('[data-intro=boot]').click();
  await expect(page.locator('.subtitle')).toHaveText('我该怎么称呼你呀？');
  await expect(page.locator('.intro-guide')).toContainText('称呼');
+ for(const viewport of [{width:1280,height:720},{width:800,height:450}]){
+  await page.setViewportSize(viewport);
+  await expect.poll(async()=>{const guide=await page.locator('.intro-guide').boundingBox(),dialog=await page.locator('.dialog-box').boundingBox();return guide!.y+guide!.height<=dialog!.y-8;}).toBe(true);
+ }
+ await page.setViewportSize({width:1280,height:720});
  await page.locator('.input-row input').fill('随便聊聊');await page.locator('.input-row input').press('Enter');
  await expect.poll(async()=>JSON.parse((await call(directory,'/api/onboarding')).body).stage).toBe('clarifying');
  await expect(page.locator('.input-row input')).toBeEnabled();
  await page.locator('.input-row input').fill('叫我小星');await page.locator('.input-row input').press('Enter');
  await expect(page.locator('.intro-guide')).toContainText('返回标题');
  await page.screenshot({path:info.outputPath('intro-name-saved.png')});
+ const guideEnd=await page.locator('.intro-guide').boundingBox(),dialogEnd=await page.locator('.dialog-box').boundingBox();
+ expect(guideEnd!.y+guideEnd!.height).toBeLessThanOrEqual(dialogEnd!.y-8);
  await page.locator('[data-intro=chat-back]').click();
  await expect(page.locator('.title-screen')).toBeVisible();
  await expect(page.locator('.intro-guide')).toHaveCount(0);

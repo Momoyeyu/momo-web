@@ -7,7 +7,7 @@ import {useT} from '../i18n';
 import Button from '../ui/Button';
 import '../styles/intro.css';
 
-type Box={x:number;y:number;width:number;height:number;stageWidth:number;stageHeight:number};
+type Box={x:number;y:number;width:number;height:number;stageWidth:number;stageHeight:number;dialog?:{x:number;y:number;width:number;height:number}};
 export default function IntroGuide({ready}:{ready:boolean}){
  const intro=useIntro(),route=useRoute(),t=useT();
  const [guideHeight,setGuideHeight]=useState(140);
@@ -67,7 +67,11 @@ export default function IntroGuide({ready}:{ready:boolean}){
      target.current=el;
      const raw=el.getBoundingClientRect(),list=el.querySelector('.sel-list')?.getBoundingClientRect();
      const r=list?{x:Math.min(raw.x,list.x),y:Math.min(raw.y,list.y),width:Math.max(raw.right,list.right)-Math.min(raw.x,list.x),height:Math.max(raw.bottom,list.bottom)-Math.min(raw.y,list.y)}:raw;
-     const next={x:Math.max(0,r.x-stage.x-7),y:Math.max(0,r.y-stage.y-7),width:Math.min(stage.width,r.width+14),height:Math.min(stage.height,r.height+14),stageWidth:stage.width,stageHeight:stage.height};
+     const next={x:Math.max(0,r.x-stage.x-7),y:Math.max(0,r.y-stage.y-7),width:Math.min(stage.width,r.width+14),height:Math.min(stage.height,r.height+14),stageWidth:stage.width,stageHeight:stage.height,dialog:undefined as Box['dialog']};
+     if(route==='chat'){
+       const dialogue=document.querySelector('.page-wrap:not([aria-hidden]) .dialog-box')?.getBoundingClientRect();
+       if(dialogue)next.dialog={x:dialogue.x-stage.x-4,y:dialogue.y-stage.y-4,width:dialogue.width+8,height:dialogue.height+8};
+     }
      setBox(old=>JSON.stringify(old)===JSON.stringify(next)?old:next);
    };
    fit();const timer=setInterval(fit,100);window.addEventListener('resize',fit);document.addEventListener('scroll',fit,true);
@@ -109,11 +113,22 @@ export default function IntroGuide({ready}:{ready:boolean}){
    if(box.x+box.width+16+w<=box.stageWidth-16){left=box.x+box.width+16;top=box.y;}
    else if(box.x>=w+32){left=box.x-w-16;top=box.y;}
    else if(top+h>box.stageHeight-16)top=box.y-h-16;
+   if(box.dialog){left=box.dialog.x;top=box.dialog.y-h-16;}
    style={left:Math.max(16,Math.min(box.stageWidth-w-16,left)),top:Math.max(16,Math.min(box.stageHeight-h-16,top))};
  }
 
+ const rectangle=(r:{x:number;y:number;width:number;height:number})=>`M${r.x} ${r.y} h${r.width} v${r.height} h-${r.width} Z`;
+ let holes=box?rectangle(box):'';
+ if(box?.dialog){
+   const d=box.dialog;
+   // Input is inside the dialogue: use one union hole, not overlapping XOR cuts.
+   if(anchor==='name-input'){
+     const x=Math.min(d.x,box.x),y=Math.min(d.y,box.y);
+     holes=rectangle({x,y,width:Math.max(d.x+d.width,box.x+box.width)-x,height:Math.max(d.y+d.height,box.y+box.height)-y});
+   }else holes+=rectangle(d);
+ }
  return <div className="intro-layer">
-   <svg className="intro-shade" width="100%" height="100%" aria-hidden="true"><path fillRule="evenodd" d={box?`M0 0 H${box.stageWidth} V${box.stageHeight} H0 Z M${box.x} ${box.y} h${box.width} v${box.height} h-${box.width} Z`:'M0 0 H10000 V10000 H0 Z'}/></svg>
+   <svg className="intro-shade" width="100%" height="100%" aria-hidden="true"><path fillRule="evenodd" d={box?`M0 0 H${box.stageWidth} V${box.stageHeight} H0 Z ${holes}`:'M0 0 H10000 V10000 H0 Z'}/></svg>
    {box&&<div className="intro-ring" style={{left:box.x,top:box.y,width:box.width,height:box.height}}/>}
    <div className="intro-guide" data-step={anchor} data-ready={!!box} style={style} ref={panel} tabIndex={-1} role="region" aria-label={t('intro.label')} aria-live="polite">
      <span className="intro-guide-mark" aria-hidden="true">✦</span>
