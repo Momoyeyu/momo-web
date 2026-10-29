@@ -51,8 +51,17 @@ test.afterEach(async({page})=>{await page.close();const worker=workers.get(direc
 async function setup(page:Page,options={}){
  await bridge(page,directory,{configured:false,intro:true,...options});await page.goto('/');
  await expect(page.locator('.intro-guide')).toContainText('设置');
+ const messages:string[]=[];
+ await page.evaluate(()=>{
+  const scope=window as unknown as {introObserved:string[]};scope.introObserved=[];
+  new MutationObserver(()=>{const text=document.querySelector('.intro-guide')?.textContent;if(text)scope.introObserved.push(text);}).observe(document.body,{subtree:true,childList:true,characterData:true});
+ });
  await page.locator('[data-intro=settings]').click();
  await expect(page.locator('.intro-guide')).toContainText('语言');
+ messages.push(...await page.evaluate(()=>(window as unknown as {introObserved:string[]}).introObserved));
+ expect(messages.every(text=>!text.includes('准备下一步')&&!text.includes('结束初识'))).toBeTruthy();
+ expect(await page.locator('.intro-guide').evaluate(el=>getComputedStyle(el).backgroundColor)).toMatch(/rgba\([^)]*, 0\.76\)/);
+
  await page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true}).click();
  await page.locator('[data-intro=tab-models]').click();
  await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','llm');

@@ -16,6 +16,8 @@ export default function IntroGuide({ready}:{ready:boolean}){
  const [models,setModels]=useState(false);
  const panel=useRef<HTMLDivElement>(null),target=useRef<HTMLElement|null>(null);
  const finishing=useRef(false);
+ const lastGuide=useRef<{box:Box;message:string;anchor:string;confirm:boolean}|null>(null);
+ useLayoutEffect(()=>{if(box&&message)lastGuide.current={box,message,anchor,confirm};});
  const phase=intro.data?.phase;
  const restricted=phase!=='completed';
  useEffect(()=>subscribeMeeting(()=>{if(phase==='return_title'&&route==='chat'&&meetingSnapshot().state==='failed')navigate('title');}),[phase,route]);
@@ -35,7 +37,7 @@ export default function IntroGuide({ready}:{ready:boolean}){
    else if(route==='chat'){anchor='name-input';message='name';}
  }else if(phase==='return_title'){
    if(route==='chat'){anchor='chat-back';message='finish';}
-   else message='settling';
+   else message='';
  }
  useEffect(()=>{
    if(!restricted)return;
@@ -106,15 +108,18 @@ export default function IntroGuide({ready}:{ready:boolean}){
    return()=>{cancelled=true;clearTimeout(timer);};
  },[ready,phase,route,intro.busy,intro.data]);
  if(!ready||!restricted)return null;
+ const shown=box?{box,message,anchor,confirm}:lastGuide.current;
+ const placement=shown?.box;
+ const displayedAnchor=shown?.anchor??anchor;
  let style:React.CSSProperties={left:'50%',top:'40%',transform:'translateX(-50%)'};
- if(box){
-   const w=Math.min(318,box.stageWidth-32),h=guideHeight;
-   let left=box.x,top=box.y+box.height+16;
-   if(box.x+box.width+16+w<=box.stageWidth-16){left=box.x+box.width+16;top=box.y;}
-   else if(box.x>=w+32){left=box.x-w-16;top=box.y;}
-   else if(top+h>box.stageHeight-16)top=box.y-h-16;
-   if(box.dialog){left=box.dialog.x;top=box.dialog.y-h-16;}
-   style={left:Math.max(16,Math.min(box.stageWidth-w-16,left)),top:Math.max(16,Math.min(box.stageHeight-h-16,top))};
+ if(placement){
+   const w=Math.min(318,placement.stageWidth-32),h=guideHeight;
+   let left=placement.x,top=placement.y+placement.height+16;
+   if(placement.x+placement.width+16+w<=placement.stageWidth-16){left=placement.x+placement.width+16;top=placement.y;}
+   else if(placement.x>=w+32){left=placement.x-w-16;top=placement.y;}
+   else if(top+h>placement.stageHeight-16)top=placement.y-h-16;
+   if(placement.dialog){left=placement.dialog.x;top=placement.dialog.y-h-16;}
+   style={left:Math.max(16,Math.min(placement.stageWidth-w-16,left)),top:Math.max(16,Math.min(placement.stageHeight-h-16,top))};
  }
 
  const rectangle=(r:{x:number;y:number;width:number;height:number})=>`M${r.x} ${r.y} h${r.width} v${r.height} h-${r.width} Z`;
@@ -132,12 +137,12 @@ export default function IntroGuide({ready}:{ready:boolean}){
    {box&&<div className="intro-ring" style={{left:box.x,top:box.y,width:box.width,height:box.height}}/>}
    <div className="intro-guide" data-step={anchor} data-ready={!!box} style={style} ref={panel} tabIndex={-1} role="region" aria-label={t('intro.label')} aria-live="polite">
      <span className="intro-guide-mark" aria-hidden="true">✦</span>
-     {anchor==='llm'&&<button className="intro-help hint" aria-label={t('meeting.helpLabel')} aria-expanded={helpOpen} onClick={()=>setHelpOpen(value=>!value)}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.01"/></svg></button>}
-     {anchor==='llm'&&helpOpen&&<div className="intro-model-help"><p>{t('meeting.connectBody')}</p><a href="https://platform.deepseek.com/" target="_blank" rel="noopener noreferrer">{t('meeting.providerLink')}</a></div>}
+     {displayedAnchor==='llm'&&<button className="intro-help hint" aria-label={t('meeting.helpLabel')} aria-expanded={helpOpen} onClick={()=>setHelpOpen(value=>!value)}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.01"/></svg></button>}
+     {displayedAnchor==='llm'&&helpOpen&&<div className="intro-model-help"><p>{t('meeting.connectBody')}</p><a href="https://platform.deepseek.com/" target="_blank" rel="noopener noreferrer">{t('meeting.providerLink')}</a></div>}
 
-     <p>{t(!phase||intro.failed?'intro.loading':!box&&anchor?'intro.preparing':`intro.${message||'loading'}`)}</p>
+     <p>{t(!phase||intro.failed?'intro.loading':`intro.${shown?.message||message||'loading'}`)}</p>
      {intro.error&&<p role="alert" className="intro-error">{t('intro.error')}</p>}
-     {confirm&&box&&<Button size="sm" disabled={intro.busy} onClick={()=>void confirmIntroLanguage().catch(()=>{})}>{t(intro.busy?'intro.checking':'intro.continue')}</Button>}
+     {shown?.confirm&&<Button size="sm" disabled={intro.busy||!box} onClick={()=>void confirmIntroLanguage().catch(()=>{})}>{t(intro.busy?'intro.checking':'intro.continue')}</Button>}
      {(!phase||intro.failed||intro.error)&&<Button size="sm" variant="ghost" disabled={intro.busy} onClick={()=>void refreshIntro()}>{t('meeting.retry')}</Button>}
    </div>
  </div>;

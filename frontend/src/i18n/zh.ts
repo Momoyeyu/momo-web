@@ -1,7 +1,7 @@
 // 中文（基准字典——key 结构的单一来源，其他语言需与之同形）。
 
 export const zh = {
-  intro: {"label":"初次启动引导","settings":"先打开设置，让我们做好相遇的准备。","language":"选择你喜欢的界面语言，然后继续。","models":"接下来，打开模型设置。","llm":"填写对话模型的 API 地址、密钥和模型名称，再点击「测试」。","back":"模型已准备好。请返回标题。","boot":"准备好了，点击启动，和 momo 打个招呼吧。","name":"momo 想知道该怎么称呼你。在下方告诉她一个喜欢的昵称吧。","finish":"momo 已经记住你的称呼。请返回标题，完成这次初识。","settling":"正在结束初识，马上就好。","loading":"正在读取引导进度……","preparing":"稍等，正在准备下一步……","continue":"继续","checking":"正在检查……","error":"未能完成这一步，请检查配置或网络后重试。模型需要支持工具调用。"},
+  intro: {"label":"初次启动引导","settings":"先打开设置，让我们做好相遇的准备。","language":"选择你喜欢的界面语言，然后继续。","models":"接下来，打开模型设置。","llm":"填写对话模型的 API 地址、密钥和模型名称，再点击「测试」。","back":"模型已准备好。请返回标题。","boot":"准备好了，点击启动，和 momo 打个招呼吧。","name":"momo 想知道该怎么称呼你。在下方告诉她一个喜欢的昵称吧。","finish":"momo 已经记住你的称呼。请返回标题，完成这次初识。","loading":"正在读取引导进度……","continue":"继续","checking":"正在检查……","error":"未能完成这一步，请检查配置或网络后重试。模型需要支持工具调用。"},
   social: {
   "login": {
     "loggingIn": "正在登录…",
@@ -18,13 +18,11 @@ export const zh = {
     "privateAccount": "独立账号会话",
     "verified": "账号已核验",
     "begin": "登录 QQ",
-    "preparing": "正在准备…",
     "permissionNote": "登录与聊天权限独立；收发范围在「权限」中设置。",
     "forget": "退出登录",
     "states": {
       "loading": "正在读取登录状态…",
       "idle": "让 momo 登录自己的 QQ 账号。",
-      "preparing": "正在准备 QQ 组件…",
       "connecting": "正在连接 QQ…",
       "qr_pending": "等待扫码",
       "awaiting_confirmation": "已扫码，请在手机上确认登录。",

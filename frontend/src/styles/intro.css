@@ -2,7 +2,7 @@
 .intro-shade {position:absolute;inset:0;overflow:visible;pointer-events:none;}
 .intro-shade path {fill:var(--backdrop);pointer-events:fill;}
 .intro-ring {position:absolute;border:1px solid var(--accent);border-radius:var(--r-md);box-shadow:0 0 0 3px var(--accent-ring),0 0 25px var(--accent-glow);pointer-events:none;}
-.intro-guide {position:absolute;width:min(318px,calc(100% - 32px));padding:17px 20px;background:var(--panel-solid);border:1px solid var(--line-strong);border-radius:var(--r-lg);pointer-events:auto;box-shadow:0 12px 40px var(--backdrop);font-size:14px;line-height:1.7;outline:none;}
+.intro-guide {position:absolute;width:min(318px,calc(100% - 32px));padding:17px 20px;background:rgba(var(--panel-rgb),0.76);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid var(--line-strong);border-radius:var(--r-lg);pointer-events:auto;box-shadow:0 12px 40px var(--backdrop);font-size:14px;line-height:1.7;outline:none;}
 .intro-guide p {margin:0 0 10px;}.intro-guide p:last-child {margin-bottom:0;}
 .intro-guide-mark {display:block;color:var(--accent);margin-bottom:5px;font-size:16px;}
 .intro-guide button+button {margin-left:8px;}.intro-error {color:var(--danger-text);}

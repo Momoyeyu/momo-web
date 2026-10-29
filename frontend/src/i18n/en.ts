@@ -1,7 +1,7 @@
 import type { Dict } from "./zh";
 
 export const en: Dict = {
-  intro: {"label":"Getting started","settings":"Open settings to get ready for your first hello.","language":"Choose your interface language, then continue.","models":"Next, open the model settings.","llm":"Enter your model API address, key and model name, then click Test.","back":"Your model is ready. Return to the title.","boot":"Ready? Click Boot to say hello to momo.","name":"What should momo call you? Tell her a nickname you like below.","finish":"momo remembers your name. Return to the title to finish your introduction.","settling":"Finishing your introduction…","loading":"Reading your progress…","preparing":"Preparing the next step…","continue":"Continue","checking":"Checking…","error":"This step could not finish. Check your settings or connection and retry. Your model must support tool calls."},
+  intro: {"label":"Getting started","settings":"Open settings to get ready for your first hello.","language":"Choose your interface language, then continue.","models":"Next, open the model settings.","llm":"Enter your model API address, key and model name, then click Test.","back":"Your model is ready. Return to the title.","boot":"Ready? Click Boot to say hello to momo.","name":"What should momo call you? Tell her a nickname you like below.","finish":"momo remembers your name. Return to the title to finish your introduction.","loading":"Reading your progress…","continue":"Continue","checking":"Checking…","error":"This step could not finish. Check your settings or connection and retry. Your model must support tool calls."},
   social: {
   "login": {
     "loggingIn": "Signing in…",
@@ -18,13 +18,11 @@ export const en: Dict = {
     "privateAccount": "Separate account session",
     "verified": "Account verified",
     "begin": "Sign in to QQ",
-    "preparing": "Preparing…",
     "permissionNote": "Sign-in and chat permissions are separate. Set message access under Permissions.",
     "forget": "Sign out",
     "states": {
       "loading": "Reading sign-in status…",
       "idle": "Let momo sign in to her own QQ account.",
-      "preparing": "Preparing QQ components…",
       "connecting": "Connecting to QQ…",
       "qr_pending": "Waiting for QR scan",
       "awaiting_confirmation": "Scanned. Confirm sign-in on your phone.",
