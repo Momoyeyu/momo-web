@@ -115,3 +115,27 @@ test('operation records show concise action labels while old and unknown actions
   await expect(records.nth(3).locator('.social-record-top strong')).toHaveText('98765');
   await expect(dialog.getByText('future.technical.action',{exact:true})).toHaveCount(0);
 });
+
+for(const viewport of [{width:1280,height:720},{width:1100,height:700}])test(`QQ permissions and records reach their actual bottom with wheel at ${viewport.width}`,async({page,request},info)=>{
+  await page.setViewportSize(viewport);
+  const initial=(await(await request.get('/api/social/accounts')).json()).accounts[0];
+  const account={...initial,permissions:Object.fromEntries(keys.map(key=>[key,true])),allowlistEnabled:true,allowlist:[],groupAllowlist:[]};
+  await page.route(/\/api\/social\/accounts$/,route=>route.fulfill({json:{accounts:[account],providers:[]}}));
+  await page.route(/\/api\/social\/accounts\/qq\/media$/,route=>route.fulfill({json:{items:[]}}));
+  await page.route(/\/api\/social\/accounts\/qq\/records$/,route=>route.fulfill({json:{records:Array.from({length:35},(_,i)=>({commandId:`scroll-record-${i}`,status:'completed',peerId:'12345',action:'history.list'}))}}));
+  await openExtensionTab(page,'插件');await page.locator('.official-plugins').getByRole('button',{name:'配置',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'QQ 账号设置'});
+  for(const tab of ['权限','记录']){
+    await dialog.getByRole('tab',{name:tab,exact:true}).click();await page.waitForTimeout(400);
+    const panel=dialog.locator('.social-pane[aria-hidden="false"]');
+    const bounds=await panel.boundingBox();expect(bounds).not.toBeNull();
+    await page.mouse.move(bounds!.x+bounds!.width/2,bounds!.y+Math.min(60,bounds!.height/2));
+    await page.mouse.wheel(0,10000);
+    await expect.poll(()=>panel.evaluate(el=>Math.abs(el.scrollHeight-el.clientHeight-el.scrollTop))).toBeLessThan(2);
+    const bottom=tab==='权限'?panel.locator('.social-group-policy'):panel.getByText('scroll-record-34',{exact:true});
+    const target=await bottom.boundingBox();const clip=await dialog.locator('.social-viewport').boundingBox();
+    expect(target!.y+target!.height).toBeLessThanOrEqual(clip!.y+clip!.height+1);
+    await expect(dialog.getByRole('button',{name:'关闭',exact:true})).toBeInViewport();
+    await page.screenshot({path:info.outputPath(`qq-${tab==='权限'?'permissions':'records'}-bottom.png`)});
+  }
+});
