@@ -9,6 +9,7 @@ async function fixture(page: Page, waitForState: Promise<void> = Promise.resolve
       if (route.request().method() === 'GET') await waitForState;
       body = {settings:{general:{lang:language,voiceInput:false},llm:{url:'',model:'',key:''},tts:{url:'',key:'',voice:'',prompt:''}}};
     }
+    if (url.pathname === '/api/intro') body = {phase:firstLaunch?'setup':'completed',languageConfirmed:false,configurationValid:false};
     if (url.pathname === '/api/life/history') body = {summary:'',messages:[],hasMore:false,nextBefore:null};
     if (url.pathname === '/api/onboarding') body = {stage:firstLaunch?'new':'completed',busy:false,generation:0,configured:false};
     if (url.pathname === '/api/checkpoints' || url.pathname === '/api/memories') body = [];
@@ -20,7 +21,7 @@ async function fixture(page: Page, waitForState: Promise<void> = Promise.resolve
 }
 
 for (const asset of ['/stage/stage-room.jpg', '/live2d/hiyori/Hiyori.model3.json']) {
-test(`title crossfades independently of ${asset}, then Boot opens configuration`, async ({page}, info) => {
+test(`title crossfades independently of ${asset}, then settings guidance is available`, async ({page}, info) => {
   await fixture(page, Promise.resolve(), 'zh', true);
   let releaseRoom!:()=>void;
   const room = new Promise<void>(resolve=>{releaseRoom=resolve;});
@@ -50,8 +51,8 @@ test(`title crossfades independently of ${asset}, then Boot opens configuration`
   expect(fading.at(-1)!.time-fading[0].time).toBeGreaterThan(400);
   expect(fading.every(frame=>frame.inert&&!frame.setup)).toBe(true);
   releaseRoom();
-  await page.locator('.title-menu .menu-item').first().click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.locator('[data-intro=settings]').click();
+  await expect(page.locator('.settings-page')).toBeVisible();
   await info.attach('startup-crossfade-frames',{body:JSON.stringify(frames),contentType:'application/json'});
   await page.screenshot({path:info.outputPath('first-launch-ready.png')});
 });
@@ -64,8 +65,8 @@ test('unavailable first-launch artwork falls back without trapping the configura
   await page.goto('/');
   await expect(page.locator('#startup')).toHaveCount(0);
   await expect(page.locator('.title-screen')).toBeVisible();
-  await page.locator('.title-menu .menu-item').first().click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.locator('[data-intro=settings]').click();
+  await expect(page.locator('.settings-page')).toBeVisible();
 });
 
 test('a stalled model has a bounded startup wait', async ({page}) => {
@@ -77,8 +78,8 @@ test('a stalled model has a bounded startup wait', async ({page}) => {
     await page.goto('/', {waitUntil:'domcontentloaded'});
     await expect(page.locator('#startup')).toHaveCount(0, {timeout:6000});
     await expect(page.locator('.title-screen')).toBeVisible();
-    await page.locator('.title-menu .menu-item').first().click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await page.locator('[data-intro=settings]').click();
+    await expect(page.locator('.settings-page')).toBeVisible();
   } finally { release(); }
 });
 

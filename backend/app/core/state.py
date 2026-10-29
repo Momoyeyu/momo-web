@@ -8,10 +8,14 @@ from __future__ import annotations
 import copy
 import os
 import tempfile
+import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import yaml
+
+# Serialize configuration replacement with intro validation/Boot admission.
+configuration_lock = threading.RLock()
 
 if TYPE_CHECKING:
     from ..models import State
@@ -127,19 +131,20 @@ def read_state() -> dict[str, Any] | None:
 
 def write_state(state: dict[str, Any]) -> None:
     """整体写入 momo.yaml（不做归一化，读取时再合并默认值）。"""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    temporary = None
-    try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=DATA_DIR,
-                                         prefix=".momo-", suffix=".yaml", delete=False) as stream:
-            temporary = Path(stream.name)
-            stream.write(yaml.safe_dump(_retire_remote_services(state), allow_unicode=True, sort_keys=False))
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, STATE_PATH)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+    with configuration_lock:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=DATA_DIR,
+                                             prefix=".momo-", suffix=".yaml", delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write(yaml.safe_dump(_retire_remote_services(state), allow_unicode=True, sort_keys=False))
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, STATE_PATH)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
 
 def retire_legacy_services() -> bool:

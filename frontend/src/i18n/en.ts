@@ -1,6 +1,7 @@
 import type { Dict } from "./zh";
 
 export const en: Dict = {
+  intro: {"label":"Getting started","settings":"Open settings to get ready for your first hello.","language":"Choose your interface language, then continue.","models":"Next, open the model settings.","llm":"Enter your model API address, key and model name, then click Test.","back":"Your model is ready. Return to the title.","boot":"Ready? Click Boot to say hello to momo.","name":"What should momo call you? Tell her a nickname you like below.","finish":"momo remembers your name. Return to the title to finish your introduction.","settling":"Finishing your introduction…","loading":"Reading your progress…","preparing":"Preparing the next step…","continue":"Continue","checking":"Checking…","error":"This step could not finish. Check your settings or connection and retry. Your model must support tool calls."},
   social: {
   "login": {
     "loggingIn": "Signing in…",

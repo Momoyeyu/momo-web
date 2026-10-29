@@ -344,7 +344,8 @@ class Coordinator:
             return "queued"
         if self.mode != "meeting":
             return "held_inactive"
-        if self.focus:
+        from . import intro
+        if self.focus or intro.restricted():
             return "held_focus"
         if self.phone_paused:
             return "held_paused"
@@ -628,6 +629,9 @@ class Coordinator:
             self.host.request("grant", {"activityEpoch": self.epoch})
 
     def enter(self, client, lease=None, *, restore=False):
+        from . import intro
+        if not intro.can_boot():
+            raise CoordinationError("Complete model configuration before Boot")
         if not self.transition.acquire(blocking=False):
             raise CoordinationError("An attention transition is in progress; retry shortly")
         try:
@@ -649,11 +653,14 @@ class Coordinator:
             try:
                 self._revoke("meeting")
                 self._grant()
-                with self.condition:
+                with self.condition, db._lock, state.configuration_lock:
+                    if not intro.can_boot():
+                        raise CoordinationError("Model configuration changed during Boot")
                     self.mode = "meeting"
                     self.rebinding = False
                     self.interrupt_hold = False
                     self.owner = {"clientId": client, "leaseId": uuid.uuid4().hex, "expiresAt": time.monotonic() + LEASE_SECONDS}
+                    intro.did_boot()
                     self._release_held()
                     self.condition.notify_all()
                     if not restore:
@@ -844,6 +851,11 @@ class Coordinator:
                     elif self.started and self.mode != "meeting": raise CoordinationError("Momo is not activated")
                     elif self.focus or self.phone_paused or self.interrupt_hold:
                         raise CoordinationError("Phone work is held by the current attention policy")
+                    from . import intro
+                    if source != "meeting" and intro.restricted():
+                        raise CoordinationError("Phone work is held during intro")
+                    if source == "meeting" and intro.phase() == "return_title":
+                        raise CoordinationError("Return to title to complete intro")
                     blocked = self.active or self.presentation or self.queue[0] != run_id
                     if source != "meeting": blocked = blocked or self.focus or self.phone_paused or self.interrupt_hold
                     if not blocked: break
@@ -954,7 +966,8 @@ class Coordinator:
         with self.condition:
             if not run_id or not self.started or not self.valid_run(run_id):
                 raise CoordinationError("QQ tools require the current activated run")
-            if self.focus or self.phone_paused:
+            from . import intro
+            if self.focus or self.phone_paused or intro.restricted():
                 raise CoordinationError("QQ activity is paused")
             rows = db.query("SELECT * FROM inbox WHERE run_id=? ORDER BY seq DESC LIMIT 1",(run_id,))
             if not rows or rows[0]['audience'] != checkpoint.audience():
@@ -994,6 +1007,8 @@ class Coordinator:
         run_id = run_id or current_run.get()
         with self.condition:
             if not self.valid_run(run_id): raise CoordinationError("Stale execution")
+            from . import intro
+            if intro.restricted(): raise CoordinationError("Plugin activity is paused during intro")
             if self.focus: raise CoordinationError("Plugin activity is paused while focusing")
             if method == "channels.send":
                 from .social import social
@@ -1077,7 +1092,8 @@ class Coordinator:
         while not self.closed.wait(.05):
             with self.condition:
                 self._expire()
-                if self.mode != "meeting" or self.restoring or self.active or self.presentation or self.focus or self.phone_paused or self.interrupt_hold:
+                from . import intro
+                if self.mode != "meeting" or self.restoring or self.active or self.presentation or self.focus or self.phone_paused or self.interrupt_hold or intro.restricted():
                     continue
             rows = db.query("SELECT * FROM inbox WHERE status='queued' ORDER BY seq LIMIT 1")
             if not rows or rows[0]["source"] == "meeting": continue

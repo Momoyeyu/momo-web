@@ -4,6 +4,7 @@ import {historyPage} from "./services/lifeClient";
 import {useT} from "./i18n";
 import Button from "./ui/Button";
 import TooltipLayer from "./ui/TooltipLayer";
+import IntroGuide from "./components/IntroGuide";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import StageCanvas from "./live2d/StageCanvas";
 import Title from "./pages/Title";
@@ -258,6 +259,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
         </div>
       </div>}
       <TooltipLayer />
+      <IntroGuide ready={ready} />
 
       {/* 换场特效：落点 + 水面光晕（涟漪环已删——正圆光环盖过不规则边缘） */}
       <div className="tx-fx" aria-hidden="true">

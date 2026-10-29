@@ -55,6 +55,7 @@ export default function Settings() {
           {TABS.map((id) => (
             <Button
               key={id}
+              data-intro={`tab-${id}`}
               className={`stab${tab === id ? " active" : ""}`}
               onClick={() => setTab(id)}
             >
@@ -119,7 +120,7 @@ export default function Settings() {
         <div className="footbar-inner">
           <BuiltinResourcesNotice />
           <div className="foot-right">
-            <Button variant="ghost" onClick={() => navigate(backRoute)}>
+            <Button data-intro="settings-back" variant="ghost" onClick={() => navigate(backRoute)}>
               {backLabel}
             </Button>
           </div>

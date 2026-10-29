@@ -2,6 +2,7 @@ import { runtime } from "./services/runtime";
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import {refreshIntro} from "./services/introClient";
 import { bootPersist, getSettings } from "./lib/store";
 import { startupPresence } from "./startup/presence";
 import { historyPage } from "./services/lifeClient";
@@ -32,6 +33,7 @@ void runtime()
       })
       .catch(() => {}),
   )
+  .then(refreshIntro)
   .then(() => {
     createRoot(document.getElementById("root")!).render(
       <StrictMode>

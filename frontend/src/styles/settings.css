@@ -97,7 +97,8 @@
   z-index: 1;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  /* The horizontal track is transformed, never a scroll container. */
+  overflow: clip;
 }
 
 /* 四面板常驻横排，translateX 切换；时长/缓动与 stab-thumb 严格一致。 */

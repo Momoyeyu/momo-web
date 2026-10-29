@@ -11,7 +11,7 @@ import uuid
 from ..core import db, llm
 from ..core.state import load
 from ..models import vectors
-from . import checkpoint
+from . import checkpoint, intro
 from .prompt import conversation_lang
 
 KEY = "first_meeting"
@@ -120,7 +120,7 @@ def _get(c):
     gen = int(
         c.execute("SELECT generation FROM sessions WHERE id='live'").fetchone()[0]
     )
-    if value["stage"] in {"asking", "clarifying"} and value.get("generation") != gen:
+    if value["stage"] in {"asking", "clarifying"} and value.get("generation") != gen and not intro.restricted():
         value.update(stage="skipped", claim=None)
         _save(c, value)
     return value, gen
@@ -345,8 +345,8 @@ def resolve(text, gen, at=None, allow_new=False):
                             "Call first_meeting_result exactly once. name: a clearly stated preferred name or nickname, including a bare name or a correction. "
                             "Do not choose another person mentioned in a story, quoted examples, jokes, commands or an ambiguous list. "
                             "quote must be an exact substring of the CURRENT message and contain name. "
-                            "skip: refusal OR starting an unrelated topic; accept this and do not ask for personal information again. "
-                            "clarify: a genuinely ambiguous answer to the name question. No ordinary dialogue or memory tools."
+                            + ("Refusal, jokes or unrelated topics: clarify and gently ask for a nickname again; never invent a name. " if intro.restricted() else "skip: refusal OR starting an unrelated topic; accept this and do not ask for personal information again. ")
+                            + "clarify: a genuinely ambiguous answer to the name question. No ordinary dialogue or memory tools."
                         ),
                     },
                     {"role": "user", "content": text},
@@ -401,19 +401,21 @@ def resolve(text, gen, at=None, allow_new=False):
                             (mid, event_id),
                         )
                 outcome.update(stage="completed", memoryId=mid)
+                if intro.restricted():
+                    intro.name_saved(c,mid)
                 instruction = (
                     "The preferred name is now durably saved as a normal editable memory: "
                     + json.dumps(name, ensure_ascii=False)
-                    + ". Acknowledge warmly using that name, then invite natural conversation. Do not call memory_add for this fact again."
+                    + (". Acknowledge warmly using that name in one short sentence, then invite the player to return to the title to finish setup. Do not invite more conversation or call memory_add again." if intro.restricted() else ". Acknowledge warmly using that name, then invite natural conversation. Do not call memory_add for this fact again.")
                 )
-            elif action == "skip" or stage == "clarifying":
+            elif (action == "skip" or stage == "clarifying") and not intro.restricted():
                 outcome["stage"] = "skipped"
                 instruction = "The first meeting is now finished without a name. Respect privacy, do not ask again or guess a name. Respond naturally to the player's actual topic."
             else:
                 outcome["stage"] = "clarifying"
-                instruction = "Ask one short, gentle clarification of the preferred name. Do not claim to have saved it; no name has been confirmed. If they decline or change topic, accept it."
+                instruction = "Ask one short, gentle clarification of the preferred name. Do not claim to have saved it; no name has been confirmed. If they decline or change topic, gently invite a nickname; this introduction is not yet complete." if intro.restricted() else "Ask one short, gentle clarification of the preferred name; accept a refusal."
             run_id = checkpoint.current_run(gen, at) if at else None
-            if run_id:
+            if run_id and not intro.restricted():
                 value["pendingReply"] = dict(
                     outcome, runId=run_id, generation=gen, at=at, previousStage=stage
                 )

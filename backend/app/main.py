@@ -30,6 +30,8 @@ from .api import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from .services import intro as intro_service
+    intro_service.initialize()
     await __import__("asyncio").to_thread(runtime.start)
     try:
         state_service.migrate_legacy_services()
@@ -106,3 +108,6 @@ app.add_middleware(DesktopAuth)
 
 from .api import social_media
 app.include_router(social_media.router)
+
+from .api import intro
+app.include_router(intro.router)

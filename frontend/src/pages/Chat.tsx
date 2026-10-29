@@ -1,3 +1,4 @@
+import {useIntro} from "../services/introClient";
 // 对话页：VN 式对话框（铭牌 + 字幕 + 输入 + 快捷栏）。
 // 历史不在本页展示，走 backlog 子页（#/backlog）。
 // 引擎是应用级单例：离开本页回合不中断，回来即恢复显示。
@@ -35,6 +36,8 @@ const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
 
 export default function Chat({active,attention}: {active: boolean;attention:AttentionState}) {
   const t = useT();
+  const intro=useIntro();
+  const introActive=!!intro.data && intro.data.phase!=="completed";
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
   useSyncExternalStore(subscribe, getState);
   const name = speakerName();
@@ -121,9 +124,9 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
   useEffect(() => {
     const engine = getChatEngine();
     engine.setSceneActive(interactive);
-    if(interactive)engine.resumeMic();
+    if(interactive&&!introActive)engine.resumeMic();
     return () => {engine.setSceneActive(false);engine.suspendMic();};
-  }, [interactive]);
+  }, [interactive,introActive]);
 
   const send = (): void => {
     const text = input.trim();
@@ -184,7 +187,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
             ) : undefined
           }
         >
-          <div className="input-row">
+          <div data-intro="name-input" className="input-row">
             <input
               value={input}
               placeholder={t("chat.placeholder", { name })}
@@ -269,6 +272,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
           </Button>
           <Button
             className="tb"
+            data-intro="chat-back"
             aria-label={t("common.backTitle")}
             title={t("common.backTitle")}
             onClick={() => {

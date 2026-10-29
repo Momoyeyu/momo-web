@@ -667,6 +667,19 @@
         "title": "InterruptIn",
         "type": "object"
       },
+      "LanguageIn": {
+        "properties": {
+          "lang": {
+            "title": "Lang",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lang"
+        ],
+        "title": "LanguageIn",
+        "type": "object"
+      },
       "LeaseIn": {
         "properties": {
           "clientId": {
@@ -2014,6 +2027,110 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/intro": {
+      "get": {
+        "operationId": "status_api_intro_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status"
+      }
+    },
+    "/api/intro/finish": {
+      "post": {
+        "operationId": "finish_api_intro_finish_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Finish"
+      }
+    },
+    "/api/intro/language": {
+      "post": {
+        "operationId": "language_api_intro_language_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LanguageIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Language"
+      }
+    },
+    "/api/intro/verify": {
+      "post": {
+        "operationId": "verify_api_intro_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Probe"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Verify"
       }
     },
     "/api/life/ack": {

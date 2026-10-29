@@ -12,6 +12,7 @@ import Button from "../../ui/Button";
 import FieldRow from "../../ui/FieldRow";
 import Hint from "../../ui/Hint";
 import Switch from "../../ui/Switch";
+import {introRestricted,verifyIntro,useIntro} from "../../services/introClient";
 import { supportsThinking } from "../../lib/thinking";
 
 type EndpointSection = "llm" | "tts";
@@ -35,6 +36,7 @@ function urlError(sec: EndpointSection, url: string): boolean {
 
 export default function ModelsTab() {
   const t = useT();
+  const intro=useIntro();
   const settings = useSyncExternalStore(subscribe, getState).settings;
 
   const [showKey, setShowKey] = useState<Record<EndpointSection, boolean>>({
@@ -51,7 +53,10 @@ export default function ModelsTab() {
     EndpointSection,
     (s: SettingsData) => Promise<ProbeResult>
   > = {
-    llm: (s) => probeLlm(s.llm),
+    llm: async (s) => {
+      if(!introRestricted())return probeLlm(s.llm);
+      try{await verifyIntro();return {ok:true,detail:"1ms"};}catch{return {ok:false,detail:"invalid response"};}
+    },
     tts: (s) => probeTts(s.tts),
   };
 
@@ -204,7 +209,7 @@ export default function ModelsTab() {
   return (
 <div className="settings-cols">
 {/* 两张卡片均为四行，共用标签、控件和底部对齐线。 */}
-<section className="panel settings-col opt-list">
+<section data-intro="llm" className="panel settings-col opt-list">
   <h3 className="opt-group">
     {t("settings.groups.llm")}
     <Hint text={t("settings.llmHint")} side="down" />
@@ -221,7 +226,7 @@ export default function ModelsTab() {
       onChange={(e) => patchEndpoint("llm", "model", e.target.value)}
     />
   </FieldRow>
-  <FieldRow label={t("settings.thinking")} hint={t("settings.thinkingHint")}>
+  <div inert={!!intro.data && intro.data.phase!=="completed"}><FieldRow label={t("settings.thinking")} hint={t("settings.thinkingHint")}>
     <Switch
       on={settings.llm.thinking && supportsThinking(settings.llm.url)}
       disabled={!supportsThinking(settings.llm.url)}
@@ -231,7 +236,7 @@ export default function ModelsTab() {
       })}
     />
   </FieldRow>
-</section>
+</div></section>
 <section className="panel settings-col opt-list">
   <h3 className="opt-group">
     {t("settings.groups.tts")}

@@ -17,7 +17,7 @@ from ..core.sentences import Sentence, SentenceStream
 from ..core import db
 from ..core.state import load as load_state
 from ..models import ChatMessage, ErrorEvent, State, StoredMessage, TurnEvent
-from . import checkpoint, compress, memory, onboarding
+from . import checkpoint, compress, memory, onboarding, intro
 from .capability import TOOLS, builtin_names, run_call
 from .prompt import build_system_prompt
 from .turn_context import build_turn_context
@@ -91,7 +91,7 @@ def _run_turn(
         if direction:
             messages.insert(-1, {"role": "system", "content": direction})
         with mcp.open_tools(
-            state["settings"]["extensions"] if checkpoint.audience() == "owner" else [], builtin_names()
+            state["settings"]["extensions"] if checkpoint.audience() == "owner" and not intro.restricted() else [], [] if intro.restricted() else builtin_names()
         ) as ext_tools:
             for event in react(messages, ext_tools, state, gen, at, presentation, source=source):
                 if event["t"] == "error":
@@ -217,9 +217,9 @@ def react(
      工具参数是分片下发的、在客户端按 index 累积。
      工具表：无可用拓展时原样下发内置表（`TOOLS` 本身，不做拷贝）。
     """
-    builtins = TOOLS if source == "meeting" else [tool for tool in TOOLS if tool["function"]["name"] != "attention_control"]
+    builtins = [] if intro.restricted() else TOOLS if source == "meeting" else [tool for tool in TOOLS if tool["function"]["name"] != "attention_control"]
     from .social_tools import declarations
-    qq_tools = declarations(source=source)
+    qq_tools = [] if intro.restricted() else declarations(source=source)
     tools = builtins + ext_tools.decls + qq_tools if ext_tools.decls or qq_tools else builtins
     llm_cfg = state["settings"]["llm"]
     usage: dict[str, Any] = {}  # 末次调用的用量（压缩阈值判定用）

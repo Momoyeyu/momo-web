@@ -44,6 +44,8 @@ if not state.STATE_PATH.exists():
         checkpoint.acknowledge(checkpoint.current_run(gen,at),'欢迎回来。',gen)
 if not request.get('real'):
     def classify(*a, **k):
+        if request.get('intro') and k.get('tools',[{}])[0].get('function',{}).get('name')=='intro_connection_check':
+            return {'tool_calls':[{'function':{'name':'intro_connection_check','arguments':'{"ok":true}'}}]}
         text = a[1][-1]['content']
         if text == '模拟失败': raise llm.LlmError('simulated failure')
         action = 'name' if text.startswith('叫我') else 'clarify' if text == '你猜' else 'skip'
@@ -52,6 +54,8 @@ if not request.get('real'):
         messages = a[1]
         saved = next((r['content'] for r in db.query('SELECT content FROM memories')), '')
         text = ('小星，我记住啦。你现在想聊什么？' if saved else '没关系，我们先聊聊吧。')
+        if request.get('intro'):
+            text='小星，我记住啦。请先返回标题。' if saved else '那给我一个喜欢的昵称好吗？'
         yield {'type': 'text', 'delta': text}
     llm.chat_completion = classify
     llm.chat_stream = stream

@@ -13,7 +13,7 @@ let queue: {resolve:(r:Result)=>void;reject:(e:Error)=>void}[] = [];
 function call(path:string, method='GET', body?:unknown, real=false):Promise<Result> {
   return new Promise((resolve,reject) => {
     queue.push({resolve,reject});
-    child.stdin!.write(JSON.stringify({directory:dir,path,method,body,real})+'\n');
+    child.stdin!.write(JSON.stringify({directory:dir,path,method,body,real,legacy:true})+'\n');
   });
 }
 test.beforeEach(async ({page}) => {

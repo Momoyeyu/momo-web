@@ -5,6 +5,7 @@ import EcgCanvas from "../components/EcgCanvas";
 import Button from "../ui/Button";
 import {PRESENCE_URL,TITLE_PRESENCE} from "../lib/presenceTransition";
 import "../styles/title.css";
+import {introSnapshot,verifyIntro} from "../services/introClient";
 import {useState} from "react";
 import {enterMeeting,leaveMeeting,meetingSnapshot} from "../services/meetingClient";
 import {getChatEngine} from "../chat/engineInstance";
@@ -13,7 +14,7 @@ export default function Title() {
   const t = useT();
   const [starting,setStarting]=useState(false);
   const [failed,setFailed]=useState(false);
-  const boot=async()=>{setStarting(true);setFailed(false);try{await leaveMeeting(getChatEngine().finishMeeting());await enterMeeting();navigate('chat');}catch{setFailed(true);}finally{setStarting(false);}};
+  const boot=async()=>{setStarting(true);setFailed(false);try{if(introSnapshot().data?.phase!=="completed")await verifyIntro();await leaveMeeting(getChatEngine().finishMeeting());await enterMeeting();navigate('chat');}catch{setFailed(true);}finally{setStarting(false);}};
   const items = [
     {key: "boot", labelKey: "title.start", hint: "boot", onClick: () => void boot()},
     {key: "config", labelKey: "title.config", hint: "config", onClick: () => navigate("settings")},
@@ -33,6 +34,7 @@ export default function Title() {
         {items.map((m, i) => (
           <Button
             key={m.key}
+            data-intro={m.key === "config" ? "settings" : "boot"}
             className="menu-item"
             style={{ animationDelay: `${0.12 + i * 0.08}s` }}
             onClick={m.onClick}

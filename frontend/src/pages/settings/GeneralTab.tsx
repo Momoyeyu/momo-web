@@ -1,3 +1,4 @@
+import {useIntro} from "../../services/introClient";
 import DataTransfer from "./DataTransfer";
 // 「通用」tab：界面语言与对话语言、语音输入/输出、对话框透明度与速度、对话框预览。
 // 原先这些都挤在 Settings.tsx 里，状态与补丁函数一并搬过来。
@@ -16,6 +17,8 @@ import DialogPreview from "./DialogPreview";
 
 export default function GeneralTab() {
   const t = useT();
+  const intro=useIntro();
+  const guided=!!intro.data && intro.data.phase!=="completed";
   const settings = useSyncExternalStore(subscribe, getState).settings;
 
   const [voiceMuted, setVoiceMuted] = useState(getChatEngine().muted);
@@ -52,7 +55,7 @@ export default function GeneralTab() {
 <section className="panel settings-col panel-raised">
   <h3 className="opt-group">{t("settings.groups.lang")}</h3>
   <div className="opt-list">
-  <FieldRow label={t("settings.langLabel")}>
+  <div data-intro="language"><FieldRow label={t("settings.langLabel")}>
     <Select
       value={settings.general.lang}
       options={LANGS.map((l) => ({
@@ -66,9 +69,9 @@ export default function GeneralTab() {
       }
     />
   </FieldRow>
-  <FieldRow label={t("settings.chatLang")}>
+  </div><div inert={guided} aria-disabled={guided}><FieldRow label={t("settings.chatLang")}>
     <Select
-      value={settings.general.chatLang}
+      value={guided ? "auto" : settings.general.chatLang}
       options={[
         { value: "auto", label: t("settings.langAuto") },
         ...LANGS.map((l) => ({
@@ -82,7 +85,7 @@ export default function GeneralTab() {
         })
       }
     />
-  </FieldRow>
+  </FieldRow></div>
   </div>
 </section>
 

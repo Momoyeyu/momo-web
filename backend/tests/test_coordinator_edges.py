@@ -224,6 +224,9 @@ def test_unobserved_first_meeting_opening_can_resume_after_refresh(monkeypatch):
     cfg = state.load()
     cfg["settings"]["llm"] = {"url": "https://example.test", "model": "test", "key": ""}
     state.write_state(cfg)
+    from app.services import intro
+    with db.tx() as c:
+        intro._save(c,{'version':1,'phase':'completed','legacy':True,'languageConfirmed':True})
     with TestClient(main.app) as client:
         old = client.post("/api/meeting/enter", json={"clientId": "client-one"}).json()
         first = client.post(
@@ -307,6 +310,9 @@ def test_partial_opening_recovery_keeps_seen_prefix_and_emits_only_remainder(
     cfg = state.load()
     cfg["settings"]["llm"] = {"url": "https://example.test", "model": "test", "key": ""}
     state.write_state(cfg)
+    from app.services import intro
+    with db.tx() as c:
+        intro._save(c,{'version':1,'phase':'completed','legacy':True,'languageConfirmed':True})
     with TestClient(main.app) as client:
         old = client.post("/api/meeting/enter", json={"clientId": "client-one"}).json()
         owner = {"clientId": "client-one", "leaseId": old["leaseId"]}
