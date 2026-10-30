@@ -67,11 +67,11 @@ def test_name_memory_checkpoint_survives_unobserved_reply(monkeypatch):
     onboarding.resolve('call me Star',gen,at)
     onboarding.settle_reply(at)
     assert intro.status()['phase']=='return_title'
-    assert len(db.query('SELECT * FROM memories WHERE pinned=0'))==1
+    assert len(db.query('SELECT * FROM memories WHERE pinned=1'))==1
     assert len(db.query('SELECT * FROM memory_sources'))>=1
-    assert 'Star' in db.query('SELECT content FROM memories WHERE pinned=0')[0]['content']
+    assert 'Star' in db.query('SELECT content FROM memories WHERE pinned=1')[0]['content']
     onboarding.resolve('call me Star',gen)
-    assert len(db.query('SELECT * FROM memories WHERE pinned=0'))==1
+    assert len(db.query('SELECT * FROM memories WHERE pinned=1'))==1
 
 
 def test_finish_requires_settled_title_and_never_reasks(monkeypatch):

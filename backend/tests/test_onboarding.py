@@ -101,8 +101,9 @@ def test_name_transaction_is_editable_and_idempotent(monkeypatch):
     assert "小羽" in instruction
     assert onboarding.status()["stage"] == "completed"
     rows = db.query("SELECT * FROM memories")
-    assert len(rows) == 1 and rows[0]["pinned"] == 0
+    assert len(rows) == 1 and rows[0]["pinned"] == 1
     assert "小羽" in rows[0]["content"]
+    assert any("小羽" in item for item in memory.pins())
     assert onboarding.resolve("叫我小羽", gen) is None
     assert len(db.query("SELECT * FROM memories")) == 1
     memory.delete_memory(rows[0]["id"])
@@ -322,3 +323,18 @@ def test_session_switch_during_prompt_build_cannot_land_old_turn(monkeypatch):
     )
     list(turn.run_turn("你好", first_meeting=True))
     assert len(checkpoint.live_messages()) == 2
+
+
+def test_legacy_name_pin_upgrade_is_once_and_does_not_recreate():
+    mid = memory.add_memory('玩家希望被称为「夜羽」。')['id']
+    with db.tx() as c:
+        c.execute('INSERT OR REPLACE INTO meta(key,value) VALUES(?,?)', (onboarding.KEY,json.dumps({'version':1,'stage':'completed','memoryId':mid})))
+    onboarding.status()
+    assert memory.is_pinned(mid)
+    with db.tx() as c:
+        c.execute('UPDATE memories SET pinned=0 WHERE id=?',(mid,))
+    onboarding.status()
+    assert not memory.is_pinned(mid)
+    memory.delete_memory(mid)
+    onboarding.status()
+    assert not db.query('SELECT * FROM memories WHERE id=?',(mid,))

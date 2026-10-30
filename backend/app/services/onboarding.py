@@ -117,6 +117,13 @@ def _get(c):
         )
         value = {"version": 1, "stage": "legacy" if existing else "new"}
         _save(c, value)
+    # Upgrade only the exact first-meeting memory once; never recreate deleted
+    # facts or repeatedly override the player's later pin choice.
+    if value.get("stage") == "completed" and not value.get("namePinVersion"):
+        if value.get("memoryId"):
+            c.execute("UPDATE memories SET pinned=1 WHERE id=?", (value["memoryId"],))
+        value["namePinVersion"] = 1
+        _save(c, value)
     gen = int(
         c.execute("SELECT generation FROM sessions WHERE id='live'").fetchone()[0]
     )
@@ -391,7 +398,7 @@ def resolve(text, gen, at=None, allow_new=False):
             if action == "name":
                 mid = db.new_id()
                 c.execute(
-                    "INSERT INTO memories(id,content,created_at,pinned) VALUES(?,?,?,0)",
+                    "INSERT INTO memories(id,content,created_at,pinned) VALUES(?,?,?,1)",
                     (mid, f"玩家希望被称为「{name}」。", db.now_iso()),
                 )
                 if at:
@@ -400,11 +407,11 @@ def resolve(text, gen, at=None, allow_new=False):
                             "INSERT OR IGNORE INTO memory_sources(memory_id,event_id) VALUES(?,?)",
                             (mid, event_id),
                         )
-                outcome.update(stage="completed", memoryId=mid)
+                outcome.update(stage="completed", memoryId=mid, namePinVersion=1)
                 if intro.restricted():
                     intro.name_saved(c,mid)
                 instruction = (
-                    "The preferred name is now durably saved as a normal editable memory: "
+                    "The preferred name is now durably saved as a pinned memory, already available in your known facts: "
                     + json.dumps(name, ensure_ascii=False)
                     + (". Acknowledge warmly using that name in one short sentence, then invite the player to return to the title to finish setup. Do not invite more conversation or call memory_add again." if intro.restricted() else ". Acknowledge warmly using that name, then invite natural conversation. Do not call memory_add for this fact again.")
                 )
