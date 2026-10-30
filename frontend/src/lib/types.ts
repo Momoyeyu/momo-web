@@ -32,6 +32,8 @@ export type StoredMessage = import("../api/types").StoredMessage & {
   eventId?: string;
   runId?: string;
   source?: string;
+  accountId?: string;
+  peerId?: string;
   externalMessageId?: string | null;
   seq?: number;
 };
@@ -138,6 +140,8 @@ export interface ChatMessage {
   eventId?: string;
   runId?: string;
   source?: string;
+  accountId?: string;
+  peerId?: string;
   externalMessageId?: string | null;
   seq?: number;
   role: "user" | "assistant";

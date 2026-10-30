@@ -88,6 +88,15 @@ def live_summary() -> str:
 
 
 def _message(r: sqlite3.Row) -> StoredMessage:
+    import json
+    channel = {}
+    if r['source'] == 'qq' and r['external_message_id']:
+        try:
+            parts = json.loads(r['external_message_id'])
+            if isinstance(parts, list) and len(parts) >= 2 and all(isinstance(v,str) for v in parts[:2]):
+                channel = {'accountId':parts[0], 'peerId':parts[1]}
+        except (TypeError, ValueError):
+            pass
     return {
         "role": r["role"],
         "text": r["display_text"] if r["display_text"] is not None else r["text"],
@@ -97,6 +106,7 @@ def _message(r: sqlite3.Row) -> StoredMessage:
         "runId": r["run_id"],
         "source": r["source"],
         "externalMessageId": r["external_message_id"],
+        **channel,
     }
 
 

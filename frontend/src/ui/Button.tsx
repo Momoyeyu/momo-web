@@ -20,6 +20,13 @@ export default function Button({
   /** md = 默认尺寸；sm = 卡片/行内小按钮（原 `small`）。 */
   size?: "md" | "sm";
 }) {
+  const toolbar=className?.split(/\s+/).includes('tb');
+  const tip=toolbar?rest['aria-label']??rest.title:undefined;
+  if(toolbar){
+    if(!('data-tip' in rest))Object.assign(rest,{'data-tip':tip});
+    if(!rest['aria-label'])rest['aria-label']=rest.title;
+    delete rest.title;
+  }
   const cls = [
     variant === "ghost" ? "ghost" : "",
     size === "sm" ? "small" : "",

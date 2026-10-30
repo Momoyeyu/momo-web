@@ -1,6 +1,7 @@
 // 中文（基准字典——key 结构的单一来源，其他语言需与之同形）。
 
 export const zh = {
+  phone: {"title": "手机", "back": "返回", "close": "收起手机", "home": "手机桌面", "group": "群聊", "earlier": "更早消息", "delivered": "已送达", "processing": "处理中", "pending": "待处理", "received": "已收到", "failed": "失败", "unknown": "结果未知", "standby": "待机", "focus": "专注对话", "empty": "这里还没有 App", "noMessages": "还没有消息", "unavailable": "暂时无法读取手机，稍后会自动重试"},
   intro: {"label": "初次启动引导", "settings": "先打开设置，让我们做好相遇的准备。", "language": "选择你喜欢的界面语言，然后继续。", "models": "接下来，打开模型设置。", "llm": "填写对话模型的 API 地址、密钥和模型名称，再点击「测试」。", "back": "模型已准备好。请返回标题。", "boot": "准备好了，点击启动，和 momo 打个招呼吧。", "name": "momo 想知道该怎么称呼你。在下方告诉她一个喜欢的昵称吧。", "finish": "这条记忆已经置顶。现在回到标题，开始你们的日常吧。", "loading": "正在读取引导进度……", "continue": "继续", "checking": "正在检查……", "error": "未能完成这一步，请检查配置或网络后重试。模型需要支持工具调用。", "tts": "也可以为 momo 配置声音。填写语音服务、上传参考音频后继续；暂时没有的话，可以跳过。", "skip": "暂时跳过", "ttsError": "语音尚未就绪，请检查配置，或暂时跳过。", "memorySettings": "momo 已记下你的称呼。打开设置，一起看看她的长期记忆。", "memoryTab": "打开「记忆」，看看刚刚留下的第一条记忆。", "pin": "点击这条称呼记忆旁的图钉。置顶后，momo 每次聊天都会带着它，不必重新回忆。", "celebrate": "初次相遇，已经成为记忆。\n准备都做好了，接下来可以自由和 momo 相处。", "confirm": "开始我们的日常"},
   social: {
   "login": {

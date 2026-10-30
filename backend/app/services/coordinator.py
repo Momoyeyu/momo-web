@@ -1022,7 +1022,8 @@ class Coordinator:
                 from .social import social
                 if self.phone_paused or self.interrupt_hold:
                     raise CoordinationError("Phone activity is paused")
-                social.authorize_send(params["accountId"], params["peerId"], params["policyRevision"], audience=params.get("audience"))
+                authorized_account = social.authorize_send(params["accountId"], params["peerId"], params["policyRevision"], audience=params.get("audience"))
+                params = {**params, "selfId": authorized_account["expectedSelfId"]}
             permit = self.host.permit(run_id)
             if method == "channels.action":
                 from .social import social
@@ -1037,10 +1038,16 @@ class Coordinator:
                 arguments = params.get("authorizationArguments",{})
                 payload.update({key:arguments[key] for key in ("operation","memberId","approve") if key in arguments})
             if "text" in params: payload["textHash"] = hashlib.sha256(params["text"].encode()).hexdigest()
+            if method == "channels.action" and params.get("action") in {"private.send", "group.send"}:
+                # Keep submitted text in the private command ledger. Phone views
+                # expose it only after an actual successful provider receipt.
+                payload["displayText"] = params.get("arguments", {}).get("text", "")
             with db.tx() as c:
                 c.execute("INSERT INTO outbox(command_id,run_id,epoch,status,payload,at) VALUES(?,?,?,?,?,?)", (permit["commandId"], run_id, permit["activityEpoch"], "pending", json.dumps(payload), db.now_iso()))
             if self.activity: self.activity["phase"] = "sending" if method == "channels.send" else "tool"
             if self.activity and method == "channels.action": self.activity["toolSource"] = "qq"
+            if self.activity and method in {"channels.send", "channels.action"}:
+                self.activity["peerId"] = params.get("peerId")
         try:
             result = self.host.request(method, {**params, "permit": permit}, timeout=35)
             receipt = result.get("receipt", result) if isinstance(result, dict) else {}

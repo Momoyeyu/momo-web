@@ -119,3 +119,9 @@ def continuous_transcript():
 @router.get("/api/life/history")
 def continuous_history(before: int | None = None, limit: int = 100):
     return checkpoint.history_page(before_seq=before, limit=limit)
+
+
+@router.get('/api/phone')
+def phone_surface(peer: str | None = None, before: int | None = None, app: str = "momo-qq"):
+    from ..services.phone import snapshot
+    return snapshot(peer, before, app)

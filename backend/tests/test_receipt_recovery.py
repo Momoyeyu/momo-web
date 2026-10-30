@@ -126,7 +126,7 @@ def test_rejected_channel_gate_is_known_unsent_not_an_unknown_outcome(monkeypatc
     core.mode = "meeting"
     core.owner = {"clientId": "client-one", "leaseId": "lease", "expiresAt": float("inf")}
     core.active = "run"
-    monkeypatch.setattr(social, "authorize_send", lambda *a, **k: None)
+    monkeypatch.setattr(social, "authorize_send", lambda *a, **k: {"expectedSelfId": "10001"})
 
     class Host:
         def permit(self, run_id):
@@ -142,6 +142,8 @@ def test_rejected_channel_gate_is_known_unsent_not_an_unknown_outcome(monkeypatc
             "policyRevision": 1, "audience": "owner", "text": "hello",
         }, "run")
     assert db.query("SELECT status FROM outbox WHERE command_id='rejected'")[0]["status"] == "failed"
+    import json
+    assert json.loads(db.query("SELECT payload FROM outbox WHERE command_id='rejected'")[0]["payload"])["selfId"] == "10001"
     assert core._unresolved_commands() == []
     assert core.mode == "meeting"
 
@@ -154,7 +156,7 @@ def test_late_unsent_error_code_cannot_downgrade_an_unknown_channel_receipt(monk
     core.mode = "meeting"
     core.owner = {"clientId": "client-one", "leaseId": "lease", "expiresAt": float("inf")}
     core.active = "run"
-    monkeypatch.setattr(social, "authorize_send", lambda *a, **k: None)
+    monkeypatch.setattr(social, "authorize_send", lambda *a, **k: {"expectedSelfId": "10001"})
 
     class Host:
         def permit(self, run_id):

@@ -535,3 +535,7 @@
   font-variant-numeric: tabular-nums;
   padding: 4px 12px;
 }
+
+.tooltip-bubble:has(.tooltip-help){pointer-events:auto}
+.tooltip-help{display:inline-grid;place-items:center;width:18px;height:18px;min-height:0;margin-left:8px;padding:0;border:1px solid var(--line-strong);border-radius:50%;background:transparent;color:var(--text-dim);font:inherit;font-size:11px}
+.tooltip-detail{margin:8px 0 0;padding-top:8px;border-top:1px solid var(--line-soft);font-size:12px;line-height:1.6;color:var(--text-dim)}

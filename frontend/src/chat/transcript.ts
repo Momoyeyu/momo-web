@@ -22,7 +22,7 @@ export function groupTranscript(messages: ChatMessage[]): {id:string;messages:Ch
   for (const message of messages) {
     const last = groups.at(-1);
     const previous = last?.messages.at(-1);
-    if (message.runId && previous?.runId === message.runId && previous.role === message.role && previous.source === message.source) last!.messages.push(message);
+    if (message.runId && previous?.runId === message.runId && previous.role === message.role && previous.source === message.source && previous.peerId === message.peerId && previous.accountId === message.accountId) last!.messages.push(message);
     else groups.push({id:message.id,messages:[message]});
   }
   return groups;

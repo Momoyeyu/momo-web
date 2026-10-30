@@ -22,6 +22,7 @@ import { getState, speakerName, subscribe } from "../lib/store";
 import { ttsConfigured } from "../lib/asr";
 import Button from "../ui/Button";
 import Icon from "../ui/Icon";
+import PhoneSurface from "../components/PhoneSurface";
 import FirstMeeting from "../components/FirstMeeting";
 import DialogBox from "../components/DialogBox";
 import "../styles/chat.css";
@@ -236,9 +237,10 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
           >
             {t(closeUp ? "performance.fullBody" : "performance.closeUp")}
           </Button>
-          <Button className={`tb tb-focus${attention.focus?' is-active':''}`} aria-pressed={attention.focus} disabled={controlling} onClick={()=>void control(attention.focus?'focus_off':'focus_on')} title={t('attention.focusHint')}><Icon name="focus" size={16}/><span>{t('attention.focus')}</span></Button>
+          <Button className={`tb tb-focus tip${attention.focus?' is-active':''}`} aria-pressed={attention.focus} disabled={controlling} onClick={()=>void control(attention.focus?'focus_off':'focus_on')} aria-label={t('attention.focus')} data-tip={t('attention.focus')} data-tip-detail={t('attention.focusHint')}><Icon name="focus" size={16}/></Button>
           {phoneBusy && <Button className="tb" disabled={controlling} onClick={()=>void control('stop')} aria-label={t('attention.stopPhone')} title={t('attention.stopPhone')}><Icon name="stop" size={15}/></Button>}
           {attention.phonePaused && !attention.focus && <Button className="tb" disabled={controlling} onClick={()=>void control('resume_phone')} title={t('attention.resumePhone')}><Icon name="phone" size={16}/><span>{t('attention.resumePhone')}</span></Button>}
+          {!introActive&&<PhoneSurface active={interactive} attention={attention}/>}
           <Button
             className="tb"
             aria-label={t("chat.backlog")}

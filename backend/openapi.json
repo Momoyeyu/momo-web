@@ -1460,6 +1460,10 @@
       "StoredMessage": {
         "description": "momo.db 里的一条会话消息（落库形态，不含指令）。\n\nrole 只会有两个值——begin_turn 写 user、append_sentence 写 assistant。",
         "properties": {
+          "accountId": {
+            "title": "Accountid",
+            "type": "string"
+          },
           "at": {
             "title": "At",
             "type": "string"
@@ -1478,6 +1482,10 @@
               }
             ],
             "title": "Externalmessageid"
+          },
+          "peerId": {
+            "title": "Peerid",
+            "type": "string"
           },
           "role": {
             "enum": [
@@ -2723,6 +2731,76 @@
           }
         },
         "summary": "Opening"
+      }
+    },
+    "/api/phone": {
+      "get": {
+        "operationId": "phone_surface_api_phone_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "peer",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Peer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          },
+          {
+            "in": "query",
+            "name": "app",
+            "required": false,
+            "schema": {
+              "default": "momo-qq",
+              "title": "App",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Phone Surface"
       }
     },
     "/api/probe/llm": {

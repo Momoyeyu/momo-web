@@ -132,8 +132,9 @@ export default function Backlog() {
             const m = group.messages[0]!;
             return <div key={group.id} className={`bl-item ${m.role}`} data-run-id={m.runId}>
               <div className="bl-name">
-                {m.role === "user" ? t("chat.you") : name}
-                {m.role === "assistant" && (
+                {m.source==='qq' ? (m.role==='user'?'QQ · '+(m.peerId?.startsWith('group:')?t('phone.group')+' ':'')+(m.peerId??t('phone.received')):'momo · QQ') : m.role === "user" ? t("chat.you") : name}
+                <small className="muted">{m.source==='meeting'?'chat':!m.source?t('phone.unknown'):m.source==='qq'?'':m.source}</small>
+                {m.role === "assistant" && m.source!=="qq" && (
                   <Button
                     className="bl-replay"
                     disabled={!idle || replaying !== null || !ttsConfigured || muted || !meetingIdentity() || !m.runId || !m.eventId}

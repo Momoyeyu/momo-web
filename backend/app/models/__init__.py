@@ -156,6 +156,8 @@ class StoredMessage(TypedDict):
     runId: NotRequired[str]
     source: NotRequired[str]
     externalMessageId: NotRequired[str | None]
+    accountId: NotRequired[str]
+    peerId: NotRequired[str]
 
 
 class CheckpointMeta(TypedDict):

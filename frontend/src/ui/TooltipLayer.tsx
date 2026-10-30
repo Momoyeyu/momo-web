@@ -4,22 +4,34 @@ import "../styles/controls.css";
 
 /** One transient layer, outside transformed pages and scroll containers. */
 export default function TooltipLayer() {
+  const [expanded, setExpanded] = useState(false);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const bubble = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const trigger = (target: EventTarget | null) => target instanceof Element
-      ? target.closest<HTMLElement>(".tip[data-tip]") : null;
-    const over = (event: MouseEvent) => setAnchor(trigger(event.target));
+      ? target.closest<HTMLElement>(".tip[data-tip],button[data-tip]") : null;
+    let timer:ReturnType<typeof setTimeout>;
+    const over = (event: MouseEvent) => {
+      clearTimeout(timer);
+      if(event.target instanceof Node&&bubble.current?.contains(event.target))return;
+      setAnchor(trigger(event.target));
+    };
     const out = (event: MouseEvent) => {
       const next = trigger(event.relatedTarget);
-      setAnchor(previous => next === previous ? previous : null);
+      if(event.relatedTarget instanceof Node&&bubble.current?.contains(event.relatedTarget))return;
+      if(next)return;
+      timer=setTimeout(()=>setAnchor(null),140);
     };
     const focus = (event: FocusEvent) => {
       const el = trigger(event.target);
       if (el?.matches(":focus-visible")) setAnchor(el);
     };
-    const hide = () => setAnchor(null);
-    const key = (event: KeyboardEvent) => { if (event.key === "Escape") hide(); };
+    const hide = (event?:Event) => {
+      if(event?.target instanceof Node&&bubble.current?.contains(event.target))return;
+      if(event instanceof FocusEvent&&event.relatedTarget instanceof Node&&bubble.current?.contains(event.relatedTarget))return;
+      setAnchor(null);
+    };
+    const key = (event: KeyboardEvent) => { if (event.key === "Escape") setAnchor(null); };
     document.addEventListener("mouseover", over);
     document.addEventListener("mouseout", out);
     document.addEventListener("focusin", focus);
@@ -29,6 +41,7 @@ export default function TooltipLayer() {
     document.addEventListener("keydown", key);
     window.addEventListener("resize", hide);
     return () => {
+      clearTimeout(timer);
       document.removeEventListener("mouseover", over);
       document.removeEventListener("mouseout", out);
       document.removeEventListener("focusin", focus);
@@ -39,6 +52,7 @@ export default function TooltipLayer() {
       window.removeEventListener("resize", hide);
     };
   }, []);
+  useEffect(()=>setExpanded(false),[anchor]);
   useLayoutEffect(() => {
     const el = bubble.current;
     if (!anchor || !el) return;
@@ -57,10 +71,12 @@ export default function TooltipLayer() {
     el.style.left = `${Math.max(bounds.left + 8, Math.min(left, bounds.right - b.width - 8))}px`;
     el.style.top = `${Math.max(bounds.top + 8, Math.min(top, bounds.bottom - b.height - 8))}px`;
     el.style.visibility = "visible";
-  }, [anchor]);
+  }, [anchor,expanded]);
   return anchor?.isConnected && anchor.dataset.tip ? createPortal(
-    <div key={anchor.dataset.tip} ref={bubble} role="tooltip" className="tooltip-bubble" style={{ visibility: "hidden" }}>
-      {anchor.dataset.tip}
+    <div key={anchor.dataset.tip} ref={bubble} role={anchor.dataset.tipDetail?"dialog":"tooltip"} aria-label={anchor.dataset.tip} className="tooltip-bubble" style={{ visibility: "hidden" }}>
+      <span>{anchor.dataset.tip}</span>
+      {anchor.dataset.tipDetail&&<button type="button" className="tooltip-help" aria-expanded={expanded} aria-label={anchor.dataset.tip} onClick={()=>setExpanded(v=>!v)}>?</button>}
+      {expanded&&<p className="tooltip-detail">{anchor.dataset.tipDetail}</p>}
     </div>, document.body,
   ) : null;
 }

@@ -663,6 +663,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/phone": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Phone Surface */
+        get: operations["phone_surface_api_phone_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/probe/llm": {
         parameters: {
             query?: never;
@@ -1560,12 +1577,16 @@ export interface components {
          *     role 只会有两个值——begin_turn 写 user、append_sentence 写 assistant。
          */
         StoredMessage: {
+            /** Accountid */
+            accountId?: string;
             /** At */
             at: string;
             /** Eventid */
             eventId?: string;
             /** Externalmessageid */
             externalMessageId?: string | null;
+            /** Peerid */
+            peerId?: string;
             /**
              * Role
              * @enum {string}
@@ -2676,6 +2697,39 @@ export interface operations {
                 "application/json": components["schemas"]["OpeningIn"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    phone_surface_api_phone_get: {
+        parameters: {
+            query?: {
+                peer?: string | null;
+                before?: number | null;
+                app?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
