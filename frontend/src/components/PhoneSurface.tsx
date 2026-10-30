@@ -3,6 +3,7 @@ import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {phoneSnapshot,type PhoneSnapshot,type PhoneMessage} from '../services/phoneClient';
 import {phoneApps,phoneRevision,subscribePhoneApps} from '../phone/registry';
 import '../phone/qqApp';
+import PhoneField from '../phone/PhoneField';
 import {mergePhoneMessages,phoneIdentityChanged} from '../phone/projection';
 import {autoPhone} from '../phone/visibility';
 import type {AttentionState} from '../services/meetingClient';
@@ -11,6 +12,7 @@ import {useT} from '../i18n';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
 import '../styles/phone.css';
+const signalGlyphs=Array.from({length:24},(_,i)=><span key={i} style={{'--i':i} as React.CSSProperties}>{i%3?'01':'10'}</span>);
 // Module state survives settings/backlog, but a new Boot resets visibility preference.
 let session={lease:'',open:false,suppressed:false};
 export default function PhoneSurface({active,attention}:{active:boolean;attention:AttentionState}){
@@ -62,9 +64,9 @@ export default function PhoneSurface({active,attention}:{active:boolean;attentio
   catch{setFailed(true);}finally{setLoading(false);}};
 
  return <>{createPortal(<section className={`phone-surface ${open&&active?'is-open':'is-closed'}`} inert={!open||!active} aria-hidden={!open||!active} aria-label={t('phone.title')}>
-  <div className="phone-signal" aria-hidden="true">{Array.from({length:24},(_,i)=><span key={i} style={{'--i':i} as React.CSSProperties}>{i%3?'01':'10'}</span>)}</div>
-  <div className="phone-glass"><div className="phone-top"><span>momo</span><span>{attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')}</span><Button variant="ghost" onClick={toggle} aria-label={t('phone.close')}>×</Button></div>
-   {failed?<div className="phone-empty" role="status">{t('phone.unavailable')}</div>:current?.render?current.render({data,peer,setPeer:changePeer,setApp:changeApp,choosePeer,messages,loading,cursor,earlier}):<div className="phone-home"><div className="phone-apps">{apps.map(a=><button className="phone-app" key={a.id} onClick={()=>{changeApp(a.id);}}><span className="phone-app-icon">{a.icon}{(data?.apps.find(p=>p.id===a.id)?.pending??0)>0&&<i className="phone-dot"/>}</span><span>{data?.apps.find(p=>p.id===a.id)?.name}</span></button>)}</div><div className="phone-home-trace" aria-hidden="true"/><p className="phone-empty">{current?t('phone.standby'):apps.length?'':t('phone.empty')}</p></div>}
+  <div className="phone-signal" aria-hidden="true">{signalGlyphs}</div>
+  <div className="phone-glass"><div className="phone-top"><span>momo</span><span>{attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')}</span><Button variant="ghost" className="phone-nav phone-close tip" data-tip={t('phone.close')} onClick={toggle} aria-label={t('phone.close')}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></Button></div>
+   {failed?<div className="phone-empty" role="status">{t('phone.unavailable')}</div>:current?.render?current.render({data,peer,setPeer:changePeer,setApp:changeApp,choosePeer,messages,loading,cursor,earlier}):<div className="phone-home"><PhoneField/><div className="phone-apps">{apps.map(a=><button className="phone-app" key={a.id} onClick={()=>{changeApp(a.id);}}><span className="phone-app-icon">{a.icon}{(data?.apps.find(p=>p.id===a.id)?.pending??0)>0&&<i className="phone-dot"/>}</span><span>{data?.apps.find(p=>p.id===a.id)?.name}</span></button>)}</div><p className="phone-empty">{current?t('phone.standby'):apps.length?'':t('phone.empty')}</p></div>}
    <button className="phone-home-bar" aria-label={t('phone.home')} onClick={()=>{changeApp(null);}}/>
   </div></section>,document.querySelector('.app-stage')??document.body)}
   <Button className={`tb phone-toggle tip${open?' is-active':''}`} data-tip={t('phone.title')} onClick={toggle} aria-label={t('phone.title')} aria-expanded={open}><Icon name="phone"/>{(data?.pending??0)>0&&<i className="phone-dot"/>}</Button></>;

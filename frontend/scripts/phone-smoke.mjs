@@ -18,7 +18,14 @@ try{
  await page.goto('http://127.0.0.1:5177/phone-fixture.html');
  const toggle=page.getByRole('button',{name:'手机',exact:true});await toggle.waitFor();
  if(await toggle.getAttribute('aria-expanded')!=='false')throw Error('Phone must start closed');
- await toggle.click();await page.getByRole('button',{name:'QQ',exact:true}).click();await page.getByRole('button',{name:/20001/}).click();
+ await toggle.click();
+ const appTile=page.getByRole('button',{name:'QQ',exact:true});await appTile.hover();
+ if(await appTile.evaluate(el=>getComputedStyle(el).backgroundColor)!=='rgba(0, 0, 0, 0)')throw Error('App hover must remain transparent');
+ await page.screenshot({path:new URL('phone-home-hover.png',out).pathname});
+ await appTile.click();
+ const back=page.getByRole('button',{name:'返回',exact:true});await back.hover();
+ if(!await back.locator('svg').count())throw Error('Back uses the shared light icon treatment');
+ await page.screenshot({path:new URL('phone-navigation.png',out).pathname});await page.getByRole('button',{name:/20001/}).click();
  await page.getByText('We can bring tea.',{exact:true}).waitFor();
  const scroller=page.locator('.phone-scroll');await scroller.evaluate(el=>el.scrollTop=el.scrollHeight);
  if(!await scroller.evaluate(el=>el.scrollTop+el.clientHeight>=el.scrollHeight-2))throw Error('Cannot reach scroll bottom');
