@@ -69,3 +69,15 @@ horizons are not counted as successes. Failed summaries back off on subsequent
 interaction events; no periodic task is required. Cache counters are optional;
 missing provider fields do not block chat. These mechanisms do not establish
 semantic quality, cache savings or a P99 guarantee without later evaluation.
+
+### Prepared QQ binding across development restarts
+
+After qualifying a managed QQ resource closure, local setup may save
+`qq-runtime-binding.json` in `MOMO_DATA_DIR`, owned by the current user with mode
+`0600`, containing only `{"configPath":"/absolute/canonical/private/runtime-config.json"}`.
+The target still passes the existing private-path, ownership and resource checks;
+the binding grants no login, messaging or account permission. `MOMO_QQ_RUNTIME_CONFIG`
+remains an explicit startup override. When neither exists, QQ stays optional.
+The app never searches installed QQ clients or downloads resources to repair a
+missing binding. Retain this local setup file when restarting the same developer
+profile; do not publish it or copy machine-specific paths into another install.

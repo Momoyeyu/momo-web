@@ -21,7 +21,30 @@ def managed_qq_runtime_config():
     """Read a fixed private startup binding, never an account request or model tool."""
     configured = os.environ.get("MOMO_QQ_RUNTIME_CONFIG")
     if not configured:
-        return None
+        # Installer/developer-owned local binding, not a browser/account setting.
+        # Preserve prepared resources across ordinary launcher restarts.
+        from .state import DATA_DIR
+        binding = DATA_DIR / "qq-runtime-binding.json"
+        try:
+            fd = os.open(binding, os.O_RDONLY | os.O_NOFOLLOW)
+        except FileNotFoundError:
+            return None
+        except OSError:
+            raise HostError("Managed QQ startup binding is invalid") from None
+        try:
+            with os.fdopen(fd, "rb") as stream:
+                info = os.fstat(stream.fileno())
+                if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid()
+                        or info.st_nlink != 1 or info.st_mode & 0o077 or info.st_size > 8192):
+                    raise ValueError()
+                value = json.loads(stream.read(8193))
+                if not isinstance(value, dict) or set(value) != {"configPath"} or not isinstance(value["configPath"], str):
+                    raise ValueError()
+                configured = value["configPath"]
+                if not configured:
+                    raise ValueError()
+        except (OSError, ValueError, TypeError):
+            raise HostError("Managed QQ startup binding is invalid") from None
     try:
         path = Path(configured)
         if not path.is_absolute() or str(path) != configured or path.resolve() != path:

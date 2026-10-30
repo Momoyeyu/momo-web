@@ -57,3 +57,26 @@ def test_untrusted_or_aliased_startup_file_is_rejected(tmp_path, monkeypatch, ki
     if kind != "relative": monkeypatch.setenv("MOMO_QQ_RUNTIME_CONFIG", str(path))
     with pytest.raises(plugin_host.HostError, match="Managed QQ startup configuration is invalid"):
         config_reader()()
+
+
+def test_prepared_binding_survives_launcher_without_environment(tmp_path, monkeypatch):
+    from app.core import state
+    path, config = private_config(tmp_path)
+    monkeypatch.delenv('MOMO_QQ_RUNTIME_CONFIG', raising=False)
+    binding = state.DATA_DIR / 'qq-runtime-binding.json'
+    binding.write_text(json.dumps({'configPath': str(path)})); binding.chmod(0o600)
+    assert config_reader()() == config
+
+
+@pytest.mark.parametrize('kind', ['public', 'symlink', 'unknown-fields'])
+def test_saved_binding_is_private_and_not_an_account_setting(tmp_path, monkeypatch, kind):
+    from app.core import state
+    path, _ = private_config(tmp_path)
+    monkeypatch.delenv('MOMO_QQ_RUNTIME_CONFIG', raising=False)
+    binding = state.DATA_DIR / 'qq-runtime-binding.json'
+    binding.write_text(json.dumps({'configPath':str(path)})); binding.chmod(0o600)
+    if kind == 'public': binding.chmod(0o644)
+    elif kind == 'symlink':
+        binding.unlink(); binding.symlink_to(path)
+    else: binding.write_text(json.dumps({'configPath': str(path), 'endpoint': 'untrusted'}))
+    with pytest.raises(plugin_host.HostError): config_reader()()
