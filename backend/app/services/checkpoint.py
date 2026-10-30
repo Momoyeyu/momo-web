@@ -22,6 +22,7 @@ _excluded_run = ContextVar("transcript_excluded_run", default="")
 
 
 def _scope_schema(c):
+    c.execute("CREATE TABLE IF NOT EXISTS intro_runs(run_id TEXT PRIMARY KEY)")
     c.execute("CREATE TABLE IF NOT EXISTS run_audiences(run_id TEXT PRIMARY KEY,audience TEXT NOT NULL)")
     c.execute("CREATE TABLE IF NOT EXISTS run_retries(run_id TEXT PRIMARY KEY,origin_run_id TEXT NOT NULL)")
     c.execute("CREATE TABLE IF NOT EXISTS audience_summaries(audience TEXT PRIMARY KEY,summary TEXT NOT NULL DEFAULT '',cursor INTEGER NOT NULL DEFAULT -1,version INTEGER NOT NULL DEFAULT 0)")
@@ -129,15 +130,18 @@ def context_rows(
     *, after_summary: bool = True, limit: int = 80, oldest: bool = True
 ) -> list[dict[str, Any]]:
     _ensure_scope()
+    from . import intro
+    include_intro = intro.restricted()
     cursor = summary_state()["cursor"] if after_summary else -1
     rows = db.query(
         """SELECT m.* FROM messages m WHERE m.session_id=? AND m.visible=1 AND m.seq>? AND m.run_id!=?
+        AND (? OR NOT EXISTS (SELECT 1 FROM intro_runs i WHERE i.run_id=m.run_id))
         AND COALESCE((SELECT a.audience FROM run_audiences a WHERE a.run_id=m.run_id),'owner')=?
         AND NOT EXISTS (SELECT 1 FROM messages excluded JOIN suppressed_sources s ON s.event_id=excluded.event_id
                         WHERE excluded.run_id=m.run_id AND excluded.session_id=?) ORDER BY m.seq """
         + ("ASC" if oldest else "DESC")
         + " LIMIT ?",
-        (LIVE_ID, cursor, _excluded_run.get(), audience(), LIVE_ID, max(1, min(limit, 200))),
+        (LIVE_ID, cursor, _excluded_run.get(), int(include_intro), audience(), LIVE_ID, max(1, min(limit, 200))),
     )
     if not oldest:
         rows = list(reversed(rows))
@@ -199,6 +203,10 @@ def _run(c, gen, at, run_id=None):
 def _insert(
     c, role, text, at, run_id, source="meeting", external_message_id=None, visible=False
 ):
+    from . import intro
+    if intro.restricted():
+        _scope_schema(c)
+        c.execute("INSERT OR IGNORE INTO intro_runs(run_id) VALUES(?)", (run_id,))
     eid = db.new_id(32)
     c.execute(
         """INSERT INTO messages(session_id,seq,role,text,at,event_id,run_id,source,external_message_id,status,visible)

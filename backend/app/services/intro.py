@@ -109,6 +109,8 @@ def finish():
             value=_read(c)
             if value['phase']=='completed':return {'phase':'completed'}
             if value['phase']!='return_title':raise ValueError('Remember the name first')
+            # Rebuild summaries from eligible ledger rows; invalidate in-flight compression.
+            c.execute("UPDATE sessions SET summary='',summary_cursor=-1,summary_version=summary_version+1 WHERE id='live'")
             value['phase']='completed';_save(c,value)
     return status()
 

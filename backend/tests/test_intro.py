@@ -114,3 +114,32 @@ def test_boot_rechecks_configuration_after_host_settlement(monkeypatch):
     monkeypatch.setattr(core,'_schedule_qq_restore',lambda:None)
     with pytest.raises(CoordinationError):core.enter('intro-race-owner')
     assert core.owner is None
+
+
+def test_intro_transcript_stays_in_ledger_but_not_normal_context(monkeypatch):
+    ready(monkeypatch);intro.did_boot()
+    add_turn('call me Star', 'Star, return to the title to finish setup.')
+    assert checkpoint.context_messages()
+    with db.tx() as c:
+        intro.name_saved(c,'saved-memory')
+    from app.services.coordinator import runtime
+    monkeypatch.setattr(runtime,'mode','dormant');monkeypatch.setattr(runtime,'owner',None)
+    with db.tx() as c:
+        c.execute("UPDATE sessions SET summary='Finish setup at title', summary_cursor=1 WHERE id='live'")
+    version = checkpoint.summary_state()['version']
+    intro.finish()
+    assert checkpoint.live_summary() == ''
+    assert checkpoint.summary_state()['version'] > version
+    assert checkpoint.context_messages() == []
+    assert db.query('SELECT * FROM messages WHERE session_id=?',(db.LIVE_ID,))
+    add_turn('I am back', 'Welcome back, Star.',at='2025-01-02T00:00:00+00:00')
+    assert [m['text'] for m in checkpoint.context_rows()] == ['I am back','Welcome back, Star.']
+
+
+def test_intro_does_not_enter_compression(monkeypatch):
+    from app.services import compress
+    ready(monkeypatch);intro.did_boot()
+    add_turn('call me Star','Return to title.')
+    add_turn('what now','Finish setup.',at='2025-01-02T00:00:00+00:00')
+    monkeypatch.setattr(llm,'chat_completion',lambda *a,**k:pytest.fail('intro must not be compressed'))
+    assert compress.compress_once() is False

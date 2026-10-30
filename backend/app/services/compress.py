@@ -73,6 +73,9 @@ def _fold_count(history: list[Any]) -> int:
 
 def compress_once() -> bool:
     """同步压缩一次（后台 worker 与测试共用）。成功写回 → True。"""
+    from . import intro
+    if intro.restricted():
+        return False
     state = load_state()
     from . import checkpoint
 
