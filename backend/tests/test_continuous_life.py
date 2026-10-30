@@ -39,6 +39,8 @@ def test_compaction_non_destructive_versioned(monkeypatch):
     assert checkpoint.live_messages() == before
     assert len(checkpoint.context_messages()) < len(before)
     version = checkpoint.summary_state()["version"]
+    for i in range(4):
+        add(f"new{i}", "reply", f"new{i}")
 
     def late(*a, **k):
         with db.tx() as c:

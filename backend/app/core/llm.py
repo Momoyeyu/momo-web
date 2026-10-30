@@ -57,6 +57,7 @@ def chat_completion(
     tools: list[dict[str, Any]] | None = None,
     usage_out: dict[str, Any] | None = None,
     reasoning_out: dict[str, Any] | None = None,
+    tool_choice: str = "auto",
 ) -> ChatMessage:
     """POST {url}/v1/chat/completions → choices[0].message（形状见 models.ChatMessage）。
 
@@ -75,8 +76,10 @@ def chat_completion(
     }
     if tools:
         payload["tools"] = tools
-        payload["tool_choice"] = "auto"
+        payload["tool_choice"] = tool_choice
 
+    from ..services.context_policy import Budget
+    payload['max_tokens'] = Budget.from_config(llm_cfg).output
     _thinking_payload(llm_cfg, payload)
     if usage_out is not None:
         usage_out.clear()
@@ -153,6 +156,8 @@ def chat_stream(
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
 
+    from ..services.context_policy import Budget
+    payload['max_tokens'] = Budget.from_config(llm_cfg).output
     _thinking_payload(llm_cfg, payload)
     if usage_out is not None:
         usage_out.clear()

@@ -40,3 +40,32 @@ Web 仓路径为 `frontend/`、`backend/`、`plugin-host/`；以下配置在根 
 受管 QQ 的运行绑定文件位于专用私有目录中，文件权限为 `0600`。它只包含 `privateRoot`、`resourceRoot`、`manifestPath`、`dataRoot`、`controlRoot`、`canaryPath` 六个绝对路径，所有内容都属于同一 QQ 私有根目录；不包含 LLM 密钥、外部桥凭据或日常 QQ 登录资料。账号界面的请求不能提供进程路径、参数、运行清单或环境变量。资源在安装 / 开发准备阶段固定并校验，点击登录不会下载资源、扫描系统 QQ 或运行厂商应用入口。未准备运行绑定时，QQ 登录明确显示资源不可用，其余功能仍可使用。
 
 `MOMO_RUNTIME_SMOKE=1` 单独启用 `21-runtime-meeting.spec.ts` 的真实 Python / Cordis 浏览器检查，必须连接隔离实例；错误模型拦截用全新未配置资料，子页刷新用已有合成对话的资料。默认浏览器回归会跳过这组场景，不能把跳过视为已验证。
+
+### Context management (v3-009)
+
+`settings.llm.contextWindow` optionally sets the provider's verified total context
+window in tokens; `settings.llm.maxOutputTokens` sets the output allowance sent
+as `max_tokens`. They are advanced configuration fields in `backend/data/momo.yaml`,
+not mandatory onboarding fields. Defaults for an unknown endpoint are a conservative
+32,768-token window and 4,096-token output allowance, **not** a DeepSeek capacity
+claim. OpenAI-compatible `/models` does not standardize a window-size field.
+Set the verified window for smaller/larger models; byte-based payload estimates
+are conservative and include tools. A provider rejecting `max_tokens` needs an
+adapter rather than silently dropping output reservation.
+
+Old exchanges are summarized asynchronously; latest complete exchanges and any
+new suffix remain verbatim. Publication revalidates generation, audience,
+summary version, source rows and model configuration atomically. The summarizer
+has no tool execution dispatcher. Normal requests do not wait for it; only a
+hard-capacity preflight can await maintenance with a deadline and bounded retries.
+Accepted inputs and permanent history are not deleted to fit a request.
+
+Per-model/audience numeric aggregates live under `context-policy-v1:*` in the
+private database `meta` table. Cold retention is four complete exchanges, bounded
+to 2–8. Candidate scores run in shadow first; sparse data cannot enable live
+exploration. Full no-risk feedback horizons and a conservative risk bound gate
+one-step adjustments. Configuration changes isolate statistics; interrupted
+horizons are not counted as successes. Failed summaries back off on subsequent
+interaction events; no periodic task is required. Cache counters are optional;
+missing provider fields do not block chat. These mechanisms do not establish
+semantic quality, cache savings or a P99 guarantee without later evaluation.

@@ -356,12 +356,18 @@ class Coordinator:
     def enqueue(self, source, account, external_id, text, *, peer_id="", sender_id="", self_id="", audience="owner", policy_revision=""):
         if source not in {"meeting", "qq", "virtual"}:
             raise CoordinationError("Unsupported message source")
+        if len(str(text).encode('utf-8')) > 262144:
+            raise CoordinationError("Message exceeds the input limit")
         self.schema()
         # Provider ids are local to an account AND peer, never globally unique.
         canonical = json.dumps([self_id, peer_id, external_id], ensure_ascii=False, separators=(",", ":")) if peer_id else str(external_id)
         with self.condition:
             pending_status = self._pending_status(source)
             with db.tx() as c:
+                duplicate = c.execute("SELECT id FROM inbox WHERE source=? AND account_id=? AND external_id=?", (source, account, canonical)).fetchone()
+                pending = c.execute("SELECT COUNT(*), COALESCE(SUM(length(CAST(text AS BLOB))),0) FROM inbox WHERE status IN ('queued','processing','held_inactive','held_focus','held_paused','held_interrupt')").fetchone()
+                if not duplicate and (pending[0] >= 128 or pending[1] + len(str(text).encode('utf-8')) > 2097152):
+                    raise CoordinationError("Message inbox is full; please retry later")
                 inserted = c.execute("INSERT OR IGNORE INTO inbox(id,source,account_id,external_id,text,status,run_id,at,peer_id,sender_id,self_id,audience,policy_revision,raw_external_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (uuid.uuid4().hex, source, account, canonical, text, pending_status, uuid.uuid4().hex, db.now_iso(), peer_id, sender_id, self_id, audience, str(policy_revision), str(external_id)))
                 row = c.execute("SELECT * FROM inbox WHERE source=? AND account_id=? AND external_id=?", (source, account, canonical)).fetchone()
             self.condition.notify_all()
@@ -844,6 +850,8 @@ class Coordinator:
             raise CoordinationError("Unsupported message source")
         with self.condition:
             if source == "meeting": self.require_meeting(client, lease)
+            if len(self.queue) >= 32:
+                raise CoordinationError("Too many pending conversations; please retry later")
             self.queue.append(run_id)
             try:
                 while True:

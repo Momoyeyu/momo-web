@@ -336,13 +336,13 @@ def test_recovery_without_valid_owner_never_boots_momo():
     assert core.recover_attention()["activation"] == "dormant"
 
 
-def test_summary_inference_waits_for_the_same_brain_lock(monkeypatch):
+def test_summary_inference_does_not_hold_the_brain_lock(monkeypatch):
     from app.core import llm
     from app.services import compress, coordinator
     core = Coordinator()
     monkeypatch.setattr(coordinator, "runtime", core)
     called = threading.Event()
-    for i in range(4):
+    for i in range(8):
         gen = checkpoint.generation()
         at = "summary-" + str(i)
         checkpoint.begin_turn("question", gen, at)
@@ -353,7 +353,7 @@ def test_summary_inference_waits_for_the_same_brain_lock(monkeypatch):
     with core.reasoning_lock:
         thread = threading.Thread(target=compress.compress_once)
         thread.start()
-        assert not called.wait(.1)
+        assert called.wait(1)
     thread.join(1)
     assert called.is_set()
 

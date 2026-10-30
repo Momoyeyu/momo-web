@@ -6,6 +6,8 @@ export interface LlmConfig {
   key: string;
   model: string;
   thinking: boolean;
+  contextWindow?: number;
+  maxOutputTokens?: number;
 }
 
 /** TTS 端点：GPT-SoVITS api_v2 服务地址（前端统一走 backend 的 /api/tts/speech）。 */

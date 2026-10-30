@@ -127,7 +127,7 @@ def history_page(before_seq: int | None = None, limit: int = 100) -> dict[str, A
 
 
 def context_rows(
-    *, after_summary: bool = True, limit: int = 80, oldest: bool = True
+    *, after_summary: bool = True, limit: int | None = 80, oldest: bool = True
 ) -> list[dict[str, Any]]:
     _ensure_scope()
     from . import intro
@@ -141,7 +141,7 @@ def context_rows(
                         WHERE excluded.run_id=m.run_id AND excluded.session_id=?) ORDER BY m.seq """
         + ("ASC" if oldest else "DESC")
         + " LIMIT ?",
-        (LIVE_ID, cursor, _excluded_run.get(), int(include_intro), audience(), LIVE_ID, max(1, min(limit, 200))),
+        (LIVE_ID, cursor, _excluded_run.get(), int(include_intro), audience(), LIVE_ID, -1 if limit is None else max(1, min(limit, 200))),
     )
     if not oldest:
         rows = list(reversed(rows))

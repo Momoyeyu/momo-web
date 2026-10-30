@@ -190,7 +190,7 @@ def test_interrupt_endpoint():
 
 def test_compress_rolls_old_summary(monkeypatch):
     """已有摘要时把旧摘要连同新折叠段一起滚入新摘要。"""
-    _seed(4)
+    _seed(8)
     _set_summary("旧摘要")
     got = []
 
@@ -202,7 +202,7 @@ def test_compress_rolls_old_summary(monkeypatch):
     assert compress.compress_once() is True
     assert "旧摘要" in got[-1]  # 旧摘要被喂给 LLM 滚入
     assert _live_summary() == "新摘要"
-    assert len(checkpoint.live_messages()) == 8
+    assert len(checkpoint.live_messages()) == 16
 
 
 def test_compress_below_threshold_noop(monkeypatch):

@@ -26,6 +26,8 @@ class LlmConfig(TypedDict):
     key: str
     model: str
     thinking: bool
+    contextWindow: NotRequired[int]
+    maxOutputTokens: NotRequired[int]
 
 
 class TtsConfig(TypedDict):
