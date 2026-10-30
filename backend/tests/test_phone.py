@@ -5,7 +5,7 @@ from app.services import phone
 
 def test_empty_phone_and_account_isolation(monkeypatch):
     runtime.schema()
-    monkeypatch.setattr(phone.social,'get',lambda p:{'accountId':'test','expectedSelfId':'10001','enabled':False})
+    monkeypatch.setattr(phone.social,'get',lambda p:{'accountId':'test','expectedSelfId':'10001','enabled':True})
     runtime.enqueue('qq','test','one','pending message',self_id='10001',peer_id='20001')
     runtime.enqueue('qq','test','two','other account secret',self_id='99999',peer_id='20002')
     a=phone.snapshot('20001')
@@ -34,10 +34,10 @@ def test_second_plugin_projection_and_disposal(monkeypatch):
     dispose=phone.register_app('test-notes',view)
     try:
         result=phone.snapshot(app='test-notes')
-        assert {a['id'] for a in result['apps']}=={'momo-qq','test-notes'}
+        assert {a['id'] for a in result['apps']}=={'test-notes'}
         assert result['accountKey']=='notes'
     finally:dispose()
-    assert {a['id'] for a in phone.snapshot()['apps']}=={'momo-qq'}
+    assert {a['id'] for a in phone.snapshot()['apps']}==set()
 
 
 def test_old_account_operation_does_not_leak(monkeypatch):
@@ -61,3 +61,27 @@ def test_proactive_text_requires_real_receipt(monkeypatch):
     result=phone.snapshot('20001')
     assert result['conversations'][0]['id']=='20001'
     assert result['messages'][0]['text']=='Actual submitted text'
+
+
+def test_disabled_plugin_has_no_tile_or_private_projection(monkeypatch):
+    runtime.schema()
+    monkeypatch.setattr(phone.social,'get',lambda p:{'accountId':'test','expectedSelfId':'10001','enabled':False})
+    runtime.enqueue('qq','test','one','private text',self_id='10001',peer_id='20001')
+    result=phone.snapshot('20001')
+    assert result['apps']==[]
+    assert result['messages']==[]
+    assert result['pending']==0
+
+
+def test_short_phone_work_hint_is_scoped_to_boot(monkeypatch):
+    from app.services.coordinator import Coordinator
+    from app.services import intro
+    monkeypatch.setattr(intro,'restricted',lambda:False)
+    core=Coordinator()
+    core.owner={'leaseId':'boot-one','expiresAt':float('inf')}
+    with core.run('short-run',source='qq',account_id='test'):
+        assert core.phone_activity()['runId']=='short-run'
+    assert core.activity is None
+    assert core.phone_activity()['runId']=='short-run'
+    core.owner={'leaseId':'boot-two','expiresAt':float('inf')}
+    assert core.phone_activity() is None

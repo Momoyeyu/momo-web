@@ -11,6 +11,8 @@ PENDING = ('queued','held_focus','held_inactive','held_paused','held_interrupt',
 def qq_snapshot(peer=None, before=None):
     runtime.schema()
     account = social.get('qq')
+    if not account['enabled']:
+        return {'apps':[], 'accountKey':'', 'pending':0, 'conversations':[], 'messages':[], 'operations':[], 'hasMore':False, 'nextBefore':None, 'activity':runtime.snapshot()['activity']}
     # Only the currently bound account; never merge a previous login's messages.
     identity = account.get('expectedSelfId') or ''
     clause = "source='qq' AND account_id=? AND self_id=?"
@@ -80,4 +82,12 @@ def snapshot(peer=None, before=None, app='momo-qq'):
         rows=db.query('SELECT peer_id FROM inbox WHERE run_id=?',(activity['runId'],))
         if rows: activity['peerId']=rows[0]['peer_id']
         elif runtime.activity and runtime.activity.get('peerId'):activity['peerId']=runtime.activity['peerId']
-    return {**selected,'apps':apps,'pending':total,'activity':activity}
+    last=runtime.phone_activity()
+    if last:
+        source=last.get('toolSource') or last['source']
+        if not any(a['provider']==source and a['enabled'] for a in apps):
+            last=None
+        else:
+            rows=db.query('SELECT peer_id FROM inbox WHERE run_id=?',(last['runId'],))
+            if rows and not last.get('peerId'):last['peerId']=rows[0]['peer_id']
+    return {**selected,'apps':apps,'pending':total,'activity':activity,'lastActivity':last}

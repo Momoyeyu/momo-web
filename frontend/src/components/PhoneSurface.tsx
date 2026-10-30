@@ -26,10 +26,16 @@ export default function PhoneSurface({active,attention}:{active:boolean;attentio
  const changePeer=(value:string|undefined)=>{revision.current++;setPeer(value);setOlder([]);setCursor(undefined);setData(old=>old?{...old,messages:[],operations:[]}:old);};
  const changeApp=(value:string|null)=>{if(value!==app){changePeer(undefined);setData(null);}setApp(value);};
  const lease=meetingSnapshot().lease?.leaseId??'';
- const activity=data?data.activity:attention.activity;
- const busyApp=phoneApps().find(a=>a.source===(activity?.toolSource??activity?.source));
+ const apps=phoneApps().filter(a=>data?.apps.some(p=>p.id===a.id&&p.enabled));
+ const phoneAppFor=(activity:PhoneSnapshot['activity'])=>apps.find(a=>a.source===(activity?.toolSource??activity?.source));
+ // The fast attention feed must not be hidden by a slower, idle phone snapshot.
+ const activity=phoneAppFor(attention.activity)?attention.activity:data?.activity;
+ const busyApp=phoneAppFor(activity??null);
+ const lastActivity=data?.lastActivity;
+ const lastApp=phoneAppFor(lastActivity??null);
+ const seenActivity=useRef('');
  useEffect(()=>{
-  if(session.lease!==lease){session={lease,open:false,suppressed:false};revision.current++;accountRef.current='';setOlder([]);setCursor(undefined);setOpen(false);setApp(null);setPeer(undefined);setData(null);}
+  if(session.lease!==lease){session={lease,open:false,suppressed:false};revision.current++;accountRef.current='';seenActivity.current='';setOlder([]);setCursor(undefined);setOpen(false);setApp(null);setPeer(undefined);setData(null);}
  },[lease]);
  useEffect(()=>{
   if(!active)return;
@@ -48,16 +54,21 @@ export default function PhoneSurface({active,attention}:{active:boolean;attentio
  },[active,peer,app]);
  useEffect(()=>{
   if(!active)return;
-  const next=autoPhone(session.open,session.suppressed,!!busyApp,attention.focus);
-  if(next&&!session.open){session.open=true;setOpen(true);setApp(busyApp?.id??null);}
- },[active,busyApp?.id,attention.focus]);
+  const event=lastActivity?.eventId??'';
+  const fresh=!!event&&seenActivity.current!==event;
+  if(event)seenActivity.current=event;
+  const target=busyApp??(fresh?lastApp:undefined);
+  const next=autoPhone(session.open,session.suppressed,!!target,attention.focus);
+  if(next&&!session.open){session.open=true;setOpen(true);changeApp(target?.id??null);const peerId=busyApp?activity?.peerId:lastActivity?.peerId;if(peerId)changePeer(peerId);}
+ },[active,busyApp?.id,attention.focus,lastActivity?.eventId,lastApp?.id]);
  useEffect(()=>{
   if(active&&open&&busyApp){changeApp(busyApp.id);if(activity?.peerId)changePeer(activity.peerId);}
  },[active,open,activity?.runId,activity?.peerId,busyApp?.id]);
  const choosePeer=(value:string)=>changePeer(value);
  const toggle=()=>{session.open=!open;if(!session.open)session.suppressed=true;setOpen(session.open);};
- const apps=phoneApps().filter(a=>data?.apps.some(p=>p.id===a.id));
  const current=apps.find(a=>a.id===app);
+ const appMissing=!!app&&!!data&&!current;
+ useEffect(()=>{if(appMissing)changeApp(null);},[appMissing]);
  const messages=[...new Map([...older,...(data?.messages??[])].map(m=>[m.id,m])).values()];
  const earlier=async()=>{const before=cursor===undefined?data?.nextBefore:cursor;if(before==null||loading)return;setLoading(true);const selected=peer,version=revision.current,identity=accountRef.current;
   try{const page=await phoneSnapshot(peer,before,undefined,app??undefined);if(peerRef.current!==selected||revision.current!==version||accountRef.current!==identity||JSON.stringify([app??'momo-qq',page.accountKey])!==identity)return;setOlder(old=>[...page.messages,...old]);setCursor(page.nextBefore);setData(old=>old?{...old,nextBefore:page.nextBefore,hasMore:page.hasMore}:old);}

@@ -3,6 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 const out=new URL('../../.autodev/runs/v3-011/',import.meta.url);await mkdir(out,{recursive:true});
 const browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1280,height:800}});
 const failures=[];page.on('pageerror',e=>failures.push(e.message));
+const scenario=process.argv[2];
 const data={apps:[{id:'momo-qq',provider:'qq',name:'QQ',enabled:true,pending:2}],accountKey:'test',pending:2,conversations:[{id:'20001',kind:'private',pending:2,preview:'Garden plans'}],messages:[{id:'a',text:'A long garden message. '.repeat(80),direction:'in',speaker:'20001',status:'held_focus',at:'now'},{id:'b',text:'We can bring tea.',direction:'out',speaker:'momo',status:'delivered',at:'now'}],operations:[],hasMore:false,nextBefore:null,activity:null};
 await page.route('**/api/**',route=>route.fulfill({json:data}));
 await page.route('**/phone-fixture.html',route=>route.fulfill({contentType:'text/html',body:`<html><head><meta charset="utf-8"></head><body style="margin:0"><div id="root"></div>
@@ -15,9 +16,25 @@ window.updatePhone=s=>{a={...a,...s};render()};
 function render(){root.render(React.createElement('div',{className:'app-stage',style:{width:'100vw',height:'100vh',background:'var(--bg)'}},React.createElement('div',{className:'live2d-home'}),React.createElement('div',{className:'chat-page'},React.createElement('div',{className:'chat-toolbar'},React.createElement('div',{className:'tb-side'},React.createElement(Button,{className:'tb', 'data-tip':'专注对话','data-tip-detail':'暂时不处理手机消息','aria-label':'专注对话'},React.createElement(Icon,{name:'focus'})),React.createElement(Phone,{active:true,attention:a})))),React.createElement(Tooltips)))}render();
 </script></body></html>`}));
 try{
+ if(scenario==='disabled')data.apps[0].enabled=false;
  await page.goto('http://127.0.0.1:5177/phone-fixture.html');
  const toggle=page.getByRole('button',{name:'手机',exact:true});await toggle.waitFor();
  if(await toggle.getAttribute('aria-expanded')!=='false')throw Error('Phone must start closed');
+ if(scenario==='auto'||scenario==='short'){
+  await page.waitForResponse(r=>r.url().includes('/api/phone'));
+  if(scenario==='short'){data.lastActivity={eventId:'short-work',runId:'work',source:'qq',peerId:'20001'};await page.evaluate(()=>window.updatePhone({focus:false,activity:null}));}
+  else await page.evaluate(()=>window.updatePhone({focus:false,activity:{runId:'work',source:'qq',phase:'thinking'}}));
+  await page.waitForFunction(()=>document.querySelector('.phone-toggle')?.getAttribute('aria-expanded')==='true',{},{timeout:5000});
+ }else if(scenario==='disabled-live'){
+  await toggle.click();await page.getByRole('button',{name:'QQ',exact:true}).click();
+  await page.getByRole('button',{name:/20001/}).click();await page.getByText('We can bring tea.',{exact:true}).waitFor();
+  data.apps[0].enabled=false;data.pending=0;
+  await page.waitForFunction(()=>!document.querySelector('.phone-app-header'),{},{timeout:5000});
+  if(await page.getByRole('button',{name:'QQ',exact:true}).count())throw Error('Disabled app must be removed from home');
+ }else if(scenario==='disabled'){
+  await toggle.click();await page.waitForResponse(r=>r.url().includes('/api/phone'));
+  if(await page.getByRole('button',{name:'QQ',exact:true}).count())throw Error('Disabled app must not appear');
+ }else{
  await toggle.click();
  const appTile=page.getByRole('button',{name:'QQ',exact:true});await appTile.hover();
  if(await appTile.evaluate(el=>getComputedStyle(el).backgroundColor)!=='rgba(0, 0, 0, 0)')throw Error('App hover must remain transparent');
@@ -39,6 +56,7 @@ try{
  await page.getByRole('dialog').getByRole('button').click();await page.getByText('暂时不处理手机消息',{exact:true}).waitFor();
  await page.screenshot({path:new URL('toolbar-help.png',out).pathname});
  await page.setViewportSize({width:960,height:650});await toggle.click();await page.screenshot({path:new URL('phone-narrow.png',out).pathname});
+ }
  if(failures.length)throw Error(failures.join('\n'));
- await writeFile(new URL('smoke.json',out),JSON.stringify({passed:true,checks:['manual visibility','plugin QQ view','long content scroll','explicit close suppresses auto','progressive tooltip','narrow viewport'],pageErrors:failures},null,2));console.log('Phone browser smoke passed');
+ await writeFile(new URL(`smoke-${scenario??'interaction'}.json`,out),JSON.stringify({passed:true,scenario:scenario??'interaction',checks:['manual visibility','plugin QQ view','long content scroll','explicit close suppresses auto','progressive tooltip','narrow viewport'],pageErrors:failures},null,2));console.log('Phone browser smoke passed');
 }catch(e){console.log('PAGE ERRORS',failures);console.log((await page.locator('body').innerText()).slice(0,1200));await page.screenshot({path:new URL('failure.png',out).pathname});throw e;}finally{await browser.close()}

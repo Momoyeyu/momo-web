@@ -40,6 +40,7 @@ class Coordinator:
         self.owner = None
         self.active = None
         self.activity = None
+        self.last_phone_activity = None
         self.presentation = None
         self.paused_presentations = {}
         self.focus = False
@@ -679,6 +680,18 @@ class Coordinator:
         finally:
             self.transition.release()
 
+    def _note_phone_activity(self):
+        """Retain a presentation hint for short work between UI polls, per Boot."""
+        if self.owner and self.activity and (self.activity['source']=='qq' or self.activity.get('toolSource')=='qq'):
+            self.last_phone_activity = {'lease':self.owner['leaseId'], 'activity':{**self.activity,'eventId':uuid.uuid4().hex}}
+
+    def phone_activity(self):
+        with self.condition:
+            record=self.last_phone_activity
+            if not record or not self.owner or record['lease']!=self.owner['leaseId']:
+                return None
+            return dict(record['activity'])
+
     def snapshot(self):
         with self.condition:
             self._expire()
@@ -872,6 +885,7 @@ class Coordinator:
                 self.queue.remove(run_id)
                 self.active = run_id
                 self.activity = {"runId": run_id, "source": source, "accountId": account_id, "phase": "thinking"}
+                self._note_phone_activity()
                 from . import checkpoint
                 admission = (self.epoch, checkpoint.generation())
             except BaseException:
@@ -1048,6 +1062,7 @@ class Coordinator:
             if self.activity and method == "channels.action": self.activity["toolSource"] = "qq"
             if self.activity and method in {"channels.send", "channels.action"}:
                 self.activity["peerId"] = params.get("peerId")
+                self._note_phone_activity()
         try:
             result = self.host.request(method, {**params, "permit": permit}, timeout=35)
             receipt = result.get("receipt", result) if isinstance(result, dict) else {}
