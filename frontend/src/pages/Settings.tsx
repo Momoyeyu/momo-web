@@ -8,6 +8,7 @@
 // 即改即生效：各控件直接 update() 落盘（localStorage + 防抖 PUT /api/state），
 // 无草稿/保存概念——语言切换等立即生效。
 
+import {useIntro} from "../services/introClient";
 import { useState } from "react";
 
 import { useT } from "../i18n";
@@ -36,8 +37,9 @@ const ROT_STEP = 70;
 
 export default function Settings() {
   const t = useT();
+  const intro=useIntro();
   const [tab, setTab] = useState<Section>("general");
-  const backRoute = fromRoute() === "chat" || storedMeetingIdentity() ? ("chat" as const) : ("title" as const);
+  const backRoute = intro.data?.phase==='return_title' ? ("title" as const) : fromRoute() === "chat" || storedMeetingIdentity() ? ("chat" as const) : ("title" as const);
   const backLabel =
     backRoute === "chat" ? t("common.backChat") : t("common.backTitle");
   const idx = TABS.indexOf(tab);

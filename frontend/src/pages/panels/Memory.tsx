@@ -2,6 +2,7 @@
 // （常驻注入 prompt），前端不分栏；检索 / 弹窗添加（可选 PIN）/
 // 编辑 / 删除 / pin 切换 / 分页（每页 5 条），卡片点开详情弹窗。
 
+import {useIntro,refreshIntro} from "../../services/introClient";
 import { useEffect, useMemo, useState } from "react";
 import type { Memory } from "../../lib/types";
 import {
@@ -40,6 +41,7 @@ function formatTime(iso: string): string {
 
 export default function MemoryPanel() {
   const t = useT();
+  const intro=useIntro();
 
   const [memories, setMemories] = useState<Memory[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -64,7 +66,8 @@ export default function MemoryPanel() {
 
   useEffect(() => {
     void refresh();
-  }, []);
+    if(intro.data?.phase==='memory'){const timer=setInterval(()=>void refresh(),1000);return()=>clearInterval(timer);}
+  }, [intro.data?.memoryId,intro.data?.phase]);
 
   // 检索 + 按创建时间倒序（命中集分页，越界钳回末页）
   const shown = useMemo<Memory[]>(() => {
@@ -116,6 +119,7 @@ export default function MemoryPanel() {
   const togglePin = async (m: Memory): Promise<void> => {
     try {
       await apiSetPinned(m.id, !m.pinned);
+      await refreshIntro();
       await refresh();
     } catch {
       setLoadFailed(true);
@@ -133,7 +137,7 @@ export default function MemoryPanel() {
 
   /** 非编辑态卡片可点开详情弹窗（操作钮 stopPropagation 不触发）。 */
   const memCard = (m: Memory) => (
-    <EditableItem
+    <div key={m.id} data-intro-memory={m.id===intro.data?.memoryId?"name":undefined}><EditableItem
       key={m.id}
       editing={editingId === m.id}
       onOpen={() => setDetail(m)}
@@ -143,6 +147,9 @@ export default function MemoryPanel() {
       // 图钉与编辑/删除同列：都是右侧图标操作，垂直居中对齐
       actions={
         <Button
+          aria-label="PIN"
+          data-intro={m.id===intro.data?.memoryId?"name-pin":undefined}
+          aria-pressed={m.pinned}
           className={`mem-pinicon${m.pinned ? " on" : ""}`}
 onClick={(e) => {
             e.stopPropagation();
@@ -186,7 +193,7 @@ onClick={(e) => {
       }
     >
       {m.content}
-    </EditableItem>
+    </EditableItem></div>
   );
 
   return (

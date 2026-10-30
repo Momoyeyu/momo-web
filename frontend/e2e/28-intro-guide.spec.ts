@@ -69,6 +69,9 @@ async function setup(page:Page,options={}){
  await model.locator('input').nth(0).fill('https://preview.test');
  await model.locator('input').nth(2).fill('test');
  await model.getByRole('button',{name:'测试',exact:true}).click();
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','tts');
+ if((options as {keepTts?:boolean}).keepTts)return;
+ await page.locator('.intro-guide').getByRole('button',{name:'暂时跳过'}).click();
  await expect(page.locator('.intro-guide')).toContainText('返回标题');
  await page.locator('[data-intro=settings-back]').click();
  await expect(page.locator('.intro-guide')).toContainText('启动');
@@ -89,12 +92,20 @@ test('settings spotlight persists CP1 and naming memory completes only after ret
  await expect.poll(async()=>JSON.parse((await call(directory,'/api/onboarding')).body).stage).toBe('clarifying');
  await expect(page.locator('.input-row input')).toBeEnabled();
  await page.locator('.input-row input').fill('叫我小星');await page.locator('.input-row input').press('Enter');
- await expect(page.locator('.intro-guide')).toContainText('返回标题');
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','chat-settings');
  await page.screenshot({path:info.outputPath('intro-name-saved.png')});
  const guideEnd=await page.locator('.intro-guide').boundingBox(),dialogEnd=await page.locator('.dialog-box').boundingBox();
  expect(guideEnd!.y+guideEnd!.height).toBeLessThanOrEqual(dialogEnd!.y-8);
- await page.locator('[data-intro=chat-back]').click();
+ await page.locator('[data-intro=chat-settings]').click();
+ await page.locator('[data-intro=tab-memory]').click();
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','name-pin');
+ await page.locator('[data-intro=name-pin]').click();
+ await page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true}).click();
+ await page.locator('[data-intro=settings-back]').click();
  await expect(page.locator('.title-screen')).toBeVisible();
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','celebration');
+ await page.screenshot({path:info.outputPath('intro-celebration.png')});
+ await page.locator('.intro-guide').getByRole('button',{name:'开始我们的日常'}).click();
  await expect(page.locator('.intro-guide')).toHaveCount(0);
  await expect.poll(async()=>JSON.parse((await call(directory,'/api/intro')).body).phase).toBe('completed');
  expect(JSON.stringify(JSON.parse((await call(directory,'/api/memories')).body))).toContain('小星');
@@ -135,7 +146,7 @@ test('failed model validation cannot advance or Boot; retry saves the same setti
  await expect(model.locator('input').nth(2)).toHaveValue('wrong');
  await page.unroute('**/api/intro/verify');await bridge(page,directory,{configured:false,intro:true});
  await model.locator('input').nth(2).fill('test');await model.locator('.probe-btn').click();
- await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','settings-back');
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','tts');
 });
 
 test('small PC window keeps spotlight and language dropdown inside the stage',async({page},info)=>{
@@ -161,14 +172,34 @@ test('small PC window keeps spotlight and language dropdown inside the stage',as
 });
 
 
-test('refresh after CP2 finishes at title without re-asking the name',async({page})=>{
+test('refresh after naming resumes memory pinning and celebration requires confirmation',async({page})=>{
  await setup(page);await page.locator('[data-intro=boot]').click();
  await expect(page.locator('.subtitle')).toHaveText('我该怎么称呼你呀？');
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','name-input');
  await page.locator('.input-row input').fill('叫我小星');await page.locator('.input-row input').press('Enter');
- await expect.poll(async()=>JSON.parse((await call(directory,'/api/intro')).body).phase).toBe('return_title');
+ await expect.poll(async()=>JSON.parse((await call(directory,'/api/intro')).body).phase).toBe('memory');
  await page.reload();await expect(page.locator('.title-screen')).toBeVisible();
- await expect(page.locator('.intro-guide')).toHaveCount(0);
+ await page.locator('[data-intro=settings]').click();await page.locator('[data-intro=tab-memory]').click();
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','name-pin');
+ await expect(page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true})).toBeDisabled();
+ await page.locator('[data-intro=name-pin]').click();
+ await page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true}).click();
+ await page.locator('[data-intro=settings-back]').click();
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','celebration');
+ await page.reload();await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','celebration');
+ await expect(page.locator('.intro-guide')).toContainText('初次相遇');
+ await page.locator('.intro-guide').getByRole('button',{name:'开始我们的日常'}).click();
  await expect.poll(async()=>JSON.parse((await call(directory,'/api/intro')).body).phase).toBe('completed');
+});
+
+test('optional TTS can be configured and continued, or skipped after failure',async({page})=>{
+ await setup(page,{keepTts:true});
+ await page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true}).click();
+ await expect(page.locator('.intro-guide [role=alert]')).toBeVisible();
+ await page.locator('[data-intro=tts] input').first().fill('https://voice.test');
+ await page.route('**/api/tts/status',route=>route.fulfill({json:{configured:true,reachable:true,detail:'ready'}}));
+ await page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true}).click();
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','settings-back');
 });
 
 test('real configured model completes settings health and durable first-name memory',async({page})=>{
@@ -178,15 +209,20 @@ test('real configured model completes settings health and durable first-name mem
  await page.locator('[data-intro=settings]').click();await page.locator('.intro-guide button').click();
  await page.locator('[data-intro=tab-models]').click();await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','llm');
  await page.locator('[data-intro=llm] .probe-btn').click();
- await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','settings-back',{timeout:90000});
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','tts',{timeout:90000});
+ await page.locator('.intro-guide').getByRole('button',{name:'暂时跳过'}).click();
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','settings-back');
  await page.locator('[data-intro=settings-back]').click();await page.locator('[data-intro=boot]').click();
  await expect(page.locator('.subtitle')).toHaveText('我该怎么称呼你呀？');
  await page.locator('.input-row input').fill('先聊聊天吧，我还没想好昵称。');await page.locator('.input-row input').press('Enter');
  await expect.poll(async()=>JSON.parse((await call(directory,'/api/onboarding')).body).stage,{timeout:90000}).toBe('clarifying');
  await expect(page.locator('.input-row input')).toBeEnabled({timeout:90000});
  await page.locator('.input-row input').fill('叫我小星就好。');await page.locator('.input-row input').press('Enter');
- await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','chat-back',{timeout:90000});
+ await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','chat-settings',{timeout:90000});
  await expect(page.locator('.intro-guide')).toHaveAttribute('data-ready','true',{timeout:90000});
- await page.locator('[data-intro=chat-back]').click();await expect.poll(async()=>JSON.parse((await call(directory,'/api/intro')).body).phase).toBe('completed');
+ await page.locator('[data-intro=chat-settings]').click();
+ await page.locator('[data-intro=tab-memory]').click();await page.locator('[data-intro=name-pin]').click();
+ await page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true}).click();await page.locator('[data-intro=settings-back]').click();
+ await page.locator('.intro-guide').getByRole('button',{name:'开始我们的日常'}).click();await expect.poll(async()=>JSON.parse((await call(directory,'/api/intro')).body).phase).toBe('completed');
  expect(JSON.stringify(JSON.parse((await call(directory,'/api/memories')).body))).toContain('小星');
 });

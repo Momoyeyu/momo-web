@@ -264,6 +264,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
           </Button>
           <Button
             className="tb"
+            data-intro="chat-settings"
             aria-label={t("settings.title")}
             title={t("settings.title")}
             onClick={() => navigate("settings")}

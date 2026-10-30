@@ -17,7 +17,7 @@ def health(monkeypatch):
 
 def ready(monkeypatch):
     assert intro.status()['phase']=='setup'
-    cfg=config();intro.confirm_language('en');health(monkeypatch);intro.verify(cfg)
+    cfg=config();intro.confirm_language('en');health(monkeypatch);intro.verify(cfg);intro.complete_tts()
     return cfg
 
 
@@ -66,24 +66,29 @@ def test_name_memory_checkpoint_survives_unobserved_reply(monkeypatch):
     gen=checkpoint.generation();at=db.now_iso();checkpoint.begin_turn('call me Star',gen,at)
     onboarding.resolve('call me Star',gen,at)
     onboarding.settle_reply(at)
-    assert intro.status()['phase']=='return_title'
-    assert len(db.query('SELECT * FROM memories WHERE pinned=1'))==1
+    assert intro.status()['phase']=='memory'
+    assert len(db.query('SELECT * FROM memories WHERE pinned=0'))==1
     assert len(db.query('SELECT * FROM memory_sources'))>=1
-    assert 'Star' in db.query('SELECT content FROM memories WHERE pinned=1')[0]['content']
+    from app.services import memory
+    assert any('Star' in m['content'] for m in memory.list_memories())
+    assert 'Star' in db.query('SELECT content FROM memories WHERE pinned=0')[0]['content']
     onboarding.resolve('call me Star',gen)
-    assert len(db.query('SELECT * FROM memories WHERE pinned=1'))==1
+    assert len(db.query('SELECT * FROM memories WHERE pinned=0'))==1
 
 
 def test_finish_requires_settled_title_and_never_reasks(monkeypatch):
     ready(monkeypatch)
     with pytest.raises(ValueError):intro.finish()
     with db.tx() as c:
+        c.execute("INSERT INTO memories(id,content,created_at,pinned) VALUES('saved-memory','name','now',1)")
         intro.name_saved(c,'saved-memory')
+    intro.confirm_memory()
     from app.services.coordinator import runtime
     monkeypatch.setattr(runtime,'mode','meeting')
     with pytest.raises(ValueError):intro.finish()
     monkeypatch.setattr(runtime,'mode','dormant');monkeypatch.setattr(runtime,'owner',None)
-    intro.finish();assert intro.status()['phase']=='completed'
+    intro.finish();assert intro.status()['phase']=='celebration'
+    intro.acknowledge();assert intro.status()['phase']=='completed'
 
 
 def test_existing_relationship_is_grandfathered():
@@ -121,13 +126,15 @@ def test_intro_transcript_stays_in_ledger_but_not_normal_context(monkeypatch):
     add_turn('call me Star', 'Star, return to the title to finish setup.')
     assert checkpoint.context_messages()
     with db.tx() as c:
+        c.execute("INSERT INTO memories(id,content,created_at,pinned) VALUES('saved-memory','name','now',1)")
         intro.name_saved(c,'saved-memory')
+    intro.confirm_memory()
     from app.services.coordinator import runtime
     monkeypatch.setattr(runtime,'mode','dormant');monkeypatch.setattr(runtime,'owner',None)
     with db.tx() as c:
         c.execute("UPDATE sessions SET summary='Finish setup at title', summary_cursor=1 WHERE id='live'")
     version = checkpoint.summary_state()['version']
-    intro.finish()
+    intro.finish();intro.acknowledge()
     assert checkpoint.live_summary() == ''
     assert checkpoint.summary_state()['version'] > version
     assert checkpoint.context_messages() == []
@@ -143,3 +150,28 @@ def test_intro_does_not_enter_compression(monkeypatch):
     add_turn('what now','Finish setup.',at='2025-01-02T00:00:00+00:00')
     monkeypatch.setattr(llm,'chat_completion',lambda *a,**k:pytest.fail('intro must not be compressed'))
     assert compress.compress_once() is False
+
+
+def test_optional_tts_is_durable_and_blocks_boot_until_dismissed(monkeypatch):
+    intro.status();cfg=config();intro.confirm_language('zh');health(monkeypatch);intro.verify(cfg)
+    assert intro.status()['phase']=='tts'
+    assert not intro.can_boot()
+    intro.initialize();assert intro.status()['phase']=='tts'
+    intro.complete_tts();assert intro.can_boot()
+
+
+def test_memory_tutorial_requires_real_pin_then_celebration_ack(monkeypatch):
+    ready(monkeypatch)
+    from app.services import memory
+    mid=memory.add_memory('玩家希望被称为「星」。')['id']
+    with db.tx() as c:intro.name_saved(c,mid)
+    with pytest.raises(ValueError,match='Pin'):intro.confirm_memory()
+    assert not intro.can_boot()
+    memory.set_pinned(mid,True)
+    intro.confirm_memory();assert intro.status()['phase']=='return_title'
+    from app.services.coordinator import runtime
+    monkeypatch.setattr(runtime,'mode','dormant');monkeypatch.setattr(runtime,'owner',None)
+    intro.finish();assert intro.status()['phase']=='celebration'
+    assert not intro.can_boot()
+    intro.initialize();assert intro.status()['phase']=='celebration'
+    intro.acknowledge();assert intro.can_boot()

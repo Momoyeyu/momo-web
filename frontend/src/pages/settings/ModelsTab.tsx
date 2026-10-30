@@ -237,7 +237,7 @@ export default function ModelsTab() {
     />
   </FieldRow>
 </div></section>
-<section className="panel settings-col opt-list">
+<section data-intro="tts" className="panel settings-col opt-list">
   <h3 className="opt-group">
     {t("settings.groups.tts")}
     <Hint text={t("settings.ttsHint")} side="down" />

@@ -73,7 +73,7 @@ def verify(config):
     with db.tx() as c:
         value=_read(c)
         if not value.get('languageConfirmed'):raise ValueError('Confirm interface language first')
-        if value['phase'] not in {'setup','await_boot','naming'}:raise ValueError('Configuration step is not active')
+        if value['phase'] not in {'setup','tts','await_boot','naming'}:raise ValueError('Configuration step is not active')
     if not config.get('url','').strip() or not config.get('model','').strip():raise ValueError('Configure model API and model name')
     stamp=fingerprint(config)
     if stamp!=fingerprint(state.load()['settings']['llm']):raise ValueError('Save the current configuration first')
@@ -86,9 +86,9 @@ def verify(config):
         raise ValueError('Model must support tool calls') from error
     with db.tx() as c, state.configuration_lock:
         value=_read(c)
-        if stamp!=fingerprint(state.load()['settings']['llm']) or value['phase'] not in {'setup','await_boot','naming'}:raise ValueError('Configuration changed; check again')
+        if stamp!=fingerprint(state.load()['settings']['llm']) or value['phase'] not in {'setup','tts','await_boot','naming'}:raise ValueError('Configuration changed; check again')
         value['configuration']=stamp
-        if value['phase']=='setup':value['phase']='await_boot'
+        if value['phase']=='setup':value['phase']='tts'
         _save(c,value)
     return status()
 
@@ -96,7 +96,7 @@ def verify(config):
 def name_saved(c,memory_id):
     value=_read(c)
     if value is None or value['phase']=='completed':return
-    value.update(phase='return_title',memoryId=memory_id)
+    value.update(phase='memory',memoryId=memory_id)
     _save(c,value)
 
 
@@ -111,7 +111,7 @@ def finish():
             if value['phase']!='return_title':raise ValueError('Remember the name first')
             # Rebuild summaries from eligible ledger rows; invalidate in-flight compression.
             c.execute("UPDATE sessions SET summary='',summary_cursor=-1,summary_version=summary_version+1 WHERE id='live'")
-            value['phase']='completed';_save(c,value)
+            value['phase']='celebration';_save(c,value)
     return status()
 
 
@@ -127,3 +127,29 @@ def invalidate_configuration(attempted_config):
         value=_read(c)
         if value and value['phase'] in {'await_boot','naming'} and value.get('configuration')==fingerprint(attempted_config):
             value.pop('configuration',None);_save(c,value)
+
+
+def complete_tts():
+    with db.tx() as c:
+        value=_read(c)
+        if value['phase']!='tts':raise ValueError('TTS step is not active')
+        value['phase']='await_boot';_save(c,value)
+    return status()
+
+
+def confirm_memory():
+    with db.tx() as c:
+        value=_read(c)
+        if value['phase']!='memory':raise ValueError('Memory step is not active')
+        row=c.execute('SELECT pinned FROM memories WHERE id=?',(value.get('memoryId'),)).fetchone()
+        if not row or not row['pinned']:raise ValueError('Pin the name memory first')
+        value['phase']='return_title';_save(c,value)
+    return status()
+
+
+def acknowledge():
+    with db.tx() as c:
+        value=_read(c)
+        if value['phase']!='celebration':raise ValueError('Finish the introduction first')
+        value['phase']='completed';_save(c,value)
+    return status()

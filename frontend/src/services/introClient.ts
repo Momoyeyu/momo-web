@@ -1,7 +1,7 @@
 import {useSyncExternalStore} from 'react';
 import {apiJson,jsonInit} from './http';
 import {getState,pausePersistence,update} from '../lib/store';
-export interface IntroState {phase:'setup'|'await_boot'|'naming'|'return_title'|'completed';languageConfirmed:boolean;configurationValid:boolean;legacy?:boolean}
+export interface IntroState {phase:'setup'|'tts'|'await_boot'|'naming'|'memory'|'return_title'|'celebration'|'completed';memoryId?:string;languageConfirmed:boolean;configurationValid:boolean;legacy?:boolean}
 interface Snapshot {data:IntroState|null;failed:boolean;busy:boolean;error:boolean}
 let current:Snapshot={data:null,failed:false,busy:false,error:false};
 let serial=0;
@@ -28,3 +28,7 @@ export async function verifyIntro(){
   try{return await action('verify',{...getState().settings.llm});}finally{resume();}
 }
 export const finishIntro=()=>action('finish',{});
+
+export const completeIntroTts=()=>action('tts',{});
+export const confirmIntroMemory=()=>action('memory',{});
+export const acknowledgeIntro=()=>action('acknowledge',{});

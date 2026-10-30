@@ -30,3 +30,19 @@ def verify(body:Probe):
 def finish():
     try:return intro.finish()
     except ValueError as error:raise HTTPException(409,str(error)) from error
+
+
+@router.post('/api/intro/tts')
+def tts():
+    try:return intro.complete_tts()
+    except ValueError as error:raise HTTPException(409,str(error)) from error
+
+@router.post('/api/intro/memory')
+def memory():
+    try:return intro.confirm_memory()
+    except ValueError as error:raise HTTPException(409,str(error)) from error
+
+@router.post('/api/intro/acknowledge')
+def acknowledge():
+    try:return intro.acknowledge()
+    except ValueError as error:raise HTTPException(409,str(error)) from error

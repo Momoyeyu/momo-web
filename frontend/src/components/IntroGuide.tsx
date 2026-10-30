@@ -1,10 +1,12 @@
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
-import {useIntro,refreshIntro,confirmIntroLanguage,finishIntro} from '../services/introClient';
+import {useIntro,refreshIntro,confirmIntroLanguage,finishIntro,completeIntroTts,confirmIntroMemory,acknowledgeIntro} from '../services/introClient';
 import {navigate,useRoute} from '../router';
 import {getChatEngine} from '../chat/engineInstance';
 import {leaveMeeting,meetingSnapshot,subscribeMeeting} from '../services/meetingClient';
 import {useT} from '../i18n';
 import Button from '../ui/Button';
+import {probeTts} from '../services/probe';
+import {getState,pausePersistence} from '../lib/store';
 import '../styles/intro.css';
 
 type Box={x:number;y:number;width:number;height:number;stageWidth:number;stageHeight:number;dialog?:{x:number;y:number;width:number;height:number}};
@@ -14,6 +16,9 @@ export default function IntroGuide({ready}:{ready:boolean}){
  const [box,setBox]=useState<Box|null>(null);
  const [helpOpen,setHelpOpen]=useState(false);
  const [models,setModels]=useState(false);
+ const [memoryTab,setMemoryTab]=useState(false);
+ const [ttsError,setTtsError]=useState(false);
+ const [ttsBusy,setTtsBusy]=useState(false);
  const panel=useRef<HTMLDivElement>(null),target=useRef<HTMLElement|null>(null);
  const finishing=useRef(false);
  const lastGuide=useRef<{box:Box;message:string;anchor:string;confirm:boolean}|null>(null);
@@ -22,7 +27,7 @@ export default function IntroGuide({ready}:{ready:boolean}){
  const restricted=phase!=='completed';
  useEffect(()=>subscribeMeeting(()=>{if(phase==='return_title'&&route==='chat'&&meetingSnapshot().state==='failed')navigate('title');}),[phase,route]);
  useLayoutEffect(()=>{const el=panel.current;if(!el)return;const observer=new ResizeObserver(()=>setGuideHeight(el.offsetHeight));observer.observe(el);return()=>observer.disconnect();},[restricted,ready]);
- const setup=phase==='setup'||(phase==='await_boot'||phase==='naming')&&!intro.data?.configurationValid;
+ const setup=phase==='setup'||(phase==='await_boot'||phase==='naming'||phase==='tts')&&!intro.data?.configurationValid;
  let anchor='',message='',confirm=false;
  if(setup){
    if(route==='title'){anchor='settings';message='settings';}
@@ -31,12 +36,23 @@ export default function IntroGuide({ready}:{ready:boolean}){
      else if(!models){anchor='tab-models';message='models';}
      else{anchor='llm';message='llm';}
    }
+ }else if(phase==='tts'){
+   if(route==='title'){anchor='settings';message='settings';}
+   else if(!models){anchor='tab-models';message='models';}
+   else{anchor='tts';message='tts';}
+ }else if(phase==='memory'){
+   if(route==='chat'){anchor='chat-settings';message='memorySettings';}
+   else if(route==='title'){anchor='settings';message='memorySettings';}
+   else if(!memoryTab){anchor='tab-memory';message='memoryTab';}
+   else{anchor='name-pin';message='pin';}
+ }else if(phase==='celebration'){anchor='celebration';message='celebrate';
  }else if(phase==='await_boot'||phase==='naming'){
    if(route==='settings'){anchor='settings-back';message='back';}
    else if(route==='title'){anchor='boot';message='boot';}
    else if(route==='chat'){anchor='name-input';message='name';}
  }else if(phase==='return_title'){
-   if(route==='chat'){anchor='chat-back';message='finish';}
+   if(route==='settings'){anchor='settings-back';message='finish';}
+   else if(route==='chat'){anchor='chat-back';message='finish';}
    else message='';
  }
  useEffect(()=>{
@@ -48,19 +64,23 @@ export default function IntroGuide({ready}:{ready:boolean}){
  },[restricted,intro.busy]);
  useEffect(()=>{
    if(!phase||!restricted)return;
+   if(phase==='memory'&&route==='chat'&&meetingSnapshot().state!=='active')navigate('title');
+   if(phase==='celebration'&&route!=='title')navigate('title');
+   if((phase==='tts'||phase==='memory')&&!['title','settings','chat'].includes(route))navigate('title');
    if(setup && route!=='title'&&route!=='settings')navigate('title');
-   if(!setup && phase==='return_title' && (!['title','chat'].includes(route)||route==='chat'&&meetingSnapshot().state!=='active'))navigate('title');
+   if(!setup && phase==='return_title' && (!['title','chat','settings'].includes(route)||route==='chat'&&meetingSnapshot().state!=='active'))navigate('title');
    if(!setup && ['await_boot','naming'].includes(phase) && route==='backlog')navigate('title');
  },[phase,restricted,route,setup]);
  useEffect(()=>{
    if(!ready||!restricted)return;
    let previous:HTMLElement|null=null;
    const fit=()=>{
+     setMemoryTab(!!document.querySelector('.page-wrap:not([aria-hidden]) [data-intro="tab-memory"].active'));
      setModels(!!document.querySelector('.page-wrap:not([aria-hidden]) [data-intro="tab-models"].active'));
      const stage=document.querySelector('.app-stage')?.getBoundingClientRect();
      const el=document.querySelector<HTMLElement>(`.page-wrap:not([aria-hidden]) [data-intro="${anchor}"]`);
      const sliding=el?.closest('.settings-page')?.querySelector('.settings-track')?.getAnimations().some(a=>a.playState==='running');
-     if(!stage||!el||sliding||el.closest('[inert]:not([data-intro-inert])')||anchor==='chat-back'&&getChatEngine().status!=='idle') {target.current=null;setBox(null);return;}
+     if(!stage||!el||sliding||el.closest('[inert]:not([data-intro-inert])')||['chat-back','chat-settings'].includes(anchor)&&getChatEngine().status!=='idle') {target.current=null;setBox(null);return;}
      if(el!==previous){
        const pane=el.closest<HTMLElement>('.settings-pane');
        if(pane){const bounds=pane.getBoundingClientRect(),r=el.getBoundingClientRect();if(r.bottom>bounds.bottom)pane.scrollTop+=r.bottom-bounds.bottom+12;if(r.top<bounds.top)pane.scrollTop+=r.top-bounds.top-12;}
@@ -70,6 +90,7 @@ export default function IntroGuide({ready}:{ready:boolean}){
      const raw=el.getBoundingClientRect(),list=el.querySelector('.sel-list')?.getBoundingClientRect();
      const r=list?{x:Math.min(raw.x,list.x),y:Math.min(raw.y,list.y),width:Math.max(raw.right,list.right)-Math.min(raw.x,list.x),height:Math.max(raw.bottom,list.bottom)-Math.min(raw.y,list.y)}:raw;
      const next={x:Math.max(0,r.x-stage.x-7),y:Math.max(0,r.y-stage.y-7),width:Math.min(stage.width,r.width+14),height:Math.min(stage.height,r.height+14),stageWidth:stage.width,stageHeight:stage.height,dialog:undefined as Box['dialog']};
+     if(anchor==='name-pin'){const card=el.closest('[data-intro-memory]')?.getBoundingClientRect();if(card)next.dialog={x:card.x-stage.x-4,y:card.y-stage.y-4,width:card.width+8,height:card.height+8};}
      if(route==='chat'){
        const dialogue=document.querySelector('.page-wrap:not([aria-hidden]) .dialog-box')?.getBoundingClientRect();
        if(dialogue)next.dialog={x:dialogue.x-stage.x-4,y:dialogue.y-stage.y-4,width:dialogue.width+8,height:dialogue.height+8};
@@ -83,8 +104,8 @@ export default function IntroGuide({ready}:{ready:boolean}){
    if(!ready||!restricted)return;
    const activeTarget=target.current;
    const structuralTarget=document.querySelector<HTMLElement>(`.page-wrap:not([aria-hidden]) [data-intro="${anchor}"]`);
-   const protectedNodes=[structuralTarget,panel.current].filter((el):el is HTMLElement=>!!el);
-   const allowed=[activeTarget,panel.current].filter((el):el is HTMLElement=>!!el);
+   const protectedNodes=[phase==='celebration'?null:structuralTarget,panel.current].filter((el):el is HTMLElement=>!!el);
+   const allowed=[phase==='celebration'?null:activeTarget,panel.current].filter((el):el is HTMLElement=>!!el);
    const changed=new Map<HTMLElement,boolean>();
    // Inert siblings at every fork, never an ancestor containing the target.
    for(const leaf of protectedNodes){for(let p=leaf.parentElement;p&&p!==document.body;p=p.parentElement){for(const child of p.children){if(child instanceof HTMLElement && !protectedNodes.some(a=>child===a||child.contains(a))&&!child.hasAttribute('inert')){changed.set(child,child.inert);child.dataset.introInert='true';child.inert=true;}}}}
@@ -108,7 +129,8 @@ export default function IntroGuide({ready}:{ready:boolean}){
    return()=>{cancelled=true;clearTimeout(timer);};
  },[ready,phase,route,intro.busy,intro.data]);
  if(!ready||!restricted)return null;
- const shown=box?{box,message,anchor,confirm}:lastGuide.current;
+ const continueTts=async()=>{setTtsBusy(true);setTtsError(false);const resume=await pausePersistence();try{const result=await probeTts(getState().settings.tts);if(!result.ok){setTtsError(true);return;}await completeIntroTts();}finally{resume();setTtsBusy(false);}};
+ const shown=phase==='celebration'?{box:box??lastGuide.current?.box,message:'celebrate',anchor:'celebration',confirm:false}:box?{box,message,anchor,confirm}:lastGuide.current;
  const placement=shown?.box;
  const displayedAnchor=shown?.anchor??anchor;
  let style:React.CSSProperties={left:'50%',top:'40%',transform:'translateX(-50%)'};
@@ -122,25 +144,30 @@ export default function IntroGuide({ready}:{ready:boolean}){
    style={left:Math.max(16,Math.min(placement.stageWidth-w-16,left)),top:Math.max(16,Math.min(placement.stageHeight-h-16,top))};
  }
 
+ if(phase==='celebration')style={left:'50%',top:'50%',transform:'translate(-50%,-50%)'};
  const rectangle=(r:{x:number;y:number;width:number;height:number})=>`M${r.x} ${r.y} h${r.width} v${r.height} h-${r.width} Z`;
- let holes=box?rectangle(box):'';
+ let holes=box&&phase!=='celebration'?rectangle(box):'';
  if(box?.dialog){
    const d=box.dialog;
    // Input is inside the dialogue: use one union hole, not overlapping XOR cuts.
-   if(anchor==='name-input'){
+   if(anchor==='name-input'||anchor==='name-pin'){
      const x=Math.min(d.x,box.x),y=Math.min(d.y,box.y);
      holes=rectangle({x,y,width:Math.max(d.x+d.width,box.x+box.width)-x,height:Math.max(d.y+d.height,box.y+box.height)-y});
    }else holes+=rectangle(d);
  }
  return <div className="intro-layer">
    <svg className="intro-shade" width="100%" height="100%" aria-hidden="true"><path fillRule="evenodd" d={box?`M0 0 H${box.stageWidth} V${box.stageHeight} H0 Z ${holes}`:'M0 0 H10000 V10000 H0 Z'}/></svg>
-   {box&&<div className="intro-ring" style={{left:box.x,top:box.y,width:box.width,height:box.height}}/>}
-   <div className="intro-guide" data-step={anchor} data-ready={!!box} style={style} ref={panel} tabIndex={-1} role="region" aria-label={t('intro.label')} aria-live="polite">
+   {box&&phase!=='celebration'&&<div className="intro-ring" style={{left:box.x,top:box.y,width:box.width,height:box.height}}/>}
+   <div className={`intro-guide${phase==='celebration'?' intro-celebration':''}`} data-step={anchor} data-ready={!!box} style={style} ref={panel} tabIndex={-1} role="region" aria-label={t('intro.label')} aria-live="polite">
+     {phase==='celebration'&&<div className="intro-fireworks" aria-hidden="true">{Array.from({length:24},(_,i)=><i key={i} style={{'--angle':`${i*137.5}deg`,'--delay':`${i%6*.12}s`,'--distance':`${65+i%5*22}px`} as React.CSSProperties}/>)}</div>}
      <span className="intro-guide-mark" aria-hidden="true">✦</span>
      {displayedAnchor==='llm'&&<button className="intro-help hint" aria-label={t('meeting.helpLabel')} aria-expanded={helpOpen} onClick={()=>setHelpOpen(value=>!value)}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.01"/></svg></button>}
      {displayedAnchor==='llm'&&helpOpen&&<div className="intro-model-help"><p>{t('meeting.connectBody')}</p><a href="https://platform.deepseek.com/" target="_blank" rel="noopener noreferrer">{t('meeting.providerLink')}</a></div>}
 
      <p>{t(!phase||intro.failed?'intro.loading':`intro.${shown?.message||message||'loading'}`)}</p>
+     {displayedAnchor==='tts'&&<><Button size="sm" disabled={intro.busy||ttsBusy||!box} onClick={()=>void continueTts().catch(()=>setTtsError(true))}>{t('intro.continue')}</Button><Button size="sm" variant="ghost" disabled={intro.busy||ttsBusy||!box} onClick={()=>void completeIntroTts().catch(()=>{})}>{t('intro.skip')}</Button>{ttsError&&<p role="alert">{t('intro.ttsError')}</p>}</>}
+     {displayedAnchor==='name-pin'&&<Button size="sm" disabled={intro.busy||!box||!document.querySelector('[data-intro="name-pin"][aria-pressed="true"]')} onClick={()=>void confirmIntroMemory().catch(()=>{})}>{t('intro.continue')}</Button>}
+     {phase==='celebration'&&<Button size="sm" disabled={intro.busy} onClick={()=>void acknowledgeIntro().catch(()=>{})}>{t('intro.confirm')}</Button>}
      {intro.error&&<p role="alert" className="intro-error">{t('intro.error')}</p>}
      {shown?.confirm&&<Button size="sm" disabled={intro.busy||!box} onClick={()=>void confirmIntroLanguage().catch(()=>{})}>{t(intro.busy?'intro.checking':'intro.continue')}</Button>}
      {(!phase||intro.failed||intro.error)&&<Button size="sm" variant="ghost" disabled={intro.busy} onClick={()=>void refreshIntro()}>{t('meeting.retry')}</Button>}

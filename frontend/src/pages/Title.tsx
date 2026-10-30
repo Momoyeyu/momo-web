@@ -21,7 +21,7 @@ export default function Title() {
   ];
 
   return (
-    <div className="title-screen">
+    <div data-intro="celebration" className="title-screen">
       <EcgCanvas />
       <img className="title-presence" src={PRESENCE_URL} style={{left:`${TITLE_PRESENCE.left*100}%`,top:`${TITLE_PRESENCE.top*100}%`,width:`${TITLE_PRESENCE.width*100}%`}} width="1024" height="1536" alt="" aria-hidden="true" decoding="async" />
       <header className="title-brand">

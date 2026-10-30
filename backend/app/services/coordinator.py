@@ -854,7 +854,7 @@ class Coordinator:
                     from . import intro
                     if source != "meeting" and intro.restricted():
                         raise CoordinationError("Phone work is held during intro")
-                    if source == "meeting" and intro.phase() == "return_title":
+                    if source == "meeting" and intro.phase() in {"memory", "return_title", "celebration"}:
                         raise CoordinationError("Return to title to complete intro")
                     blocked = self.active or self.presentation or self.queue[0] != run_id
                     if source != "meeting": blocked = blocked or self.focus or self.phone_paused or self.interrupt_hold

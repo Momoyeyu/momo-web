@@ -2045,6 +2045,22 @@
         "summary": "Status"
       }
     },
+    "/api/intro/acknowledge": {
+      "post": {
+        "operationId": "acknowledge_api_intro_acknowledge_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Acknowledge"
+      }
+    },
     "/api/intro/finish": {
       "post": {
         "operationId": "finish_api_intro_finish_post",
@@ -2095,6 +2111,38 @@
           }
         },
         "summary": "Language"
+      }
+    },
+    "/api/intro/memory": {
+      "post": {
+        "operationId": "memory_api_intro_memory_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Memory"
+      }
+    },
+    "/api/intro/tts": {
+      "post": {
+        "operationId": "tts_api_intro_tts_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Tts"
       }
     },
     "/api/intro/verify": {

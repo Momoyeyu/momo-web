@@ -10,3 +10,11 @@
 .intro-help {position:absolute;right:18px;top:18px;padding:0;border:0;background:transparent;color:var(--text-dim);width:18px;height:18px;}
 .intro-help svg {width:100%;height:100%;}.intro-model-help {padding:12px 0;margin-bottom:12px;border-bottom:1px solid var(--line);font-size:12px;}
 .intro-model-help a {color:var(--accent);text-decoration:underline;text-underline-offset:3px;}
+
+.intro-celebration {text-align:center;width:min(420px,calc(100% - 32px));padding:34px 28px;isolation:isolate;}
+.intro-celebration p {white-space:pre-line;}
+.intro-celebration .intro-guide-mark {font-size:32px;}
+.intro-fireworks {position:absolute;inset:0;pointer-events:none;z-index:-1;overflow:visible;}
+.intro-fireworks i {position:absolute;left:50%;top:35%;width:4px;height:4px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:intro-spark 1.8s ease-out var(--delay) both;transform:rotate(var(--angle));}
+@keyframes intro-spark {0%{opacity:0;transform:rotate(var(--angle)) translateX(12px) scale(.2)}20%{opacity:1}100%{opacity:0;transform:rotate(var(--angle)) translateX(var(--distance)) scale(.3)}}
+@media(prefers-reduced-motion:reduce){.intro-fireworks{display:none}}
