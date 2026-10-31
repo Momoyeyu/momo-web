@@ -1,3 +1,4 @@
+import DialogHandle from '../phone/DialogHandle';
 import {useIntro} from "../services/introClient";
 // 对话页：VN 式对话框（铭牌 + 字幕 + 输入 + 快捷栏）。
 // 历史不在本页展示，走 backlog 子页（#/backlog）。
@@ -174,7 +175,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
       {interactive && <FirstMeeting connectionFailed={modelError} />}
       {error && <div className="chat-error">{error}</div>}
 
-      {phoneOpen&&<Button className="dialog-reopen" aria-label={t('phone.returnChat')} onClick={()=>setPhoneClose(v=>v+1)}>{name}<span>{t('phone.returnChat')}</span></Button>}
+      {phoneOpen&&<DialogHandle onClick={()=>setPhoneClose(v=>v+1)}/>}
       <div className="dialog-zone" ref={dialog} inert={phoneOpen}>
         <DialogBox
           lang={resolveChatLang(getState().settings.general)}

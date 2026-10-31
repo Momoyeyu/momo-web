@@ -10,17 +10,44 @@ await page.route('**/phone-fixture.html',route=>route.fulfill({contentType:'text
 <script type="module">import R from '/@react-refresh';R.injectIntoGlobalHook(window);window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>t=>t;window.__vite_plugin_react_preamble_installed__=true;</script>
 <script type="module">
 import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js';const {createRoot}=ReactDOM;
-import Phone from '/src/components/PhoneSurface.tsx';import Tooltips from '/src/ui/TooltipLayer.tsx';import Button from '/src/ui/Button.tsx';import Icon from '/src/ui/Icon.tsx';import '/src/styles/base.css';import '/src/styles/chat.css';
-const root=createRoot(document.getElementById('root'));let a={activation:'active',focus:true,phonePaused:false,busy:false,activity:null,presentation:null};
+import Handle from '/src/phone/DialogHandle.tsx';import Phone from '/src/components/PhoneSurface.tsx';import Tooltips from '/src/ui/TooltipLayer.tsx';import Button from '/src/ui/Button.tsx';import Icon from '/src/ui/Icon.tsx';import '/src/styles/base.css';import '/src/styles/chat.css';
+const root=createRoot(document.getElementById('root'));let closeSignal=0;window.closePhone=()=>{closeSignal++;render()};let a={activation:'active',focus:true,phonePaused:false,busy:false,activity:null,presentation:null};
 window.updatePhone=s=>{a={...a,...s};render()};
-function render(){root.render(React.createElement('div',{className:'app-stage',style:{width:'100vw',height:'100vh',background:'var(--bg)'}},React.createElement('div',{className:'live2d-home'}),React.createElement('div',{className:'chat-page'},React.createElement('div',{className:'chat-toolbar'},React.createElement('div',{className:'tb-side'},React.createElement(Button,{className:'tb', 'data-tip':'专注对话','data-tip-detail':'暂时不处理手机消息','aria-label':'专注对话'},React.createElement(Icon,{name:'focus'})),React.createElement(Phone,{active:true,attention:a})))),React.createElement(Tooltips)))}render();
+function render(){root.render(React.createElement('div',{className:'app-stage',style:{width:'100vw',height:'100vh',background:'var(--bg)'}},React.createElement('div',{className:'live2d-home'}),React.createElement('div',{className:'chat-page'},React.createElement(Handle,{onClick:()=>window.closePhone()}),React.createElement('div',{className:'chat-toolbar'},React.createElement('div',{className:'tb-side'},React.createElement(Button,{className:'tb', 'data-tip':'专注对话','data-tip-detail':'暂时不处理手机消息','aria-label':'专注对话'},React.createElement(Icon,{name:'focus'})),React.createElement(Phone,{active:true,attention:a,closeSignal,onVisibilityChange:show=>document.querySelector('.chat-page')?.classList.toggle('has-phone',show)})))),React.createElement(Tooltips)))}render();
 </script></body></html>`}));
 try{
  if(scenario==='disabled')data.apps[0].enabled=false;
+ if(scenario==='layout'){data.conversations[0].id='group:20001234567890123456';data.conversations[0].kind='group';data.hasMore=true;data.nextBefore=1;data.operations=[{id:'failed-long',status:'failed',action:'groups.manage.longOperationName'}];}
  await page.goto('http://127.0.0.1:5177/phone-fixture.html');
  const toggle=page.getByRole('button',{name:'手机',exact:true});await toggle.waitFor();
  if(await toggle.getAttribute('aria-expanded')!=='false')throw Error('Phone must start closed');
- if(scenario==='auto'||scenario==='short'){
+ if(scenario==='layout'){
+  const checks=[];
+  for(const size of [{width:1280,height:800},{width:960,height:650},{width:1920,height:1080}])for(const lang of ['zh','en','ja']){
+   await page.setViewportSize(size);
+   await page.evaluate(async lang=>{const store=await import('/src/lib/store.ts');store.update({settings:{...store.getSettings(),general:{...store.getSettings().general,lang}}});},lang);
+   if(await page.locator('.phone-toggle').getAttribute('aria-expanded')==='false')await page.locator('.phone-toggle').click();
+   await page.locator('.phone-home-bar').click();await page.locator('.phone-app').waitFor();
+   await page.waitForFunction(()=>document.querySelector('.phone-glass').getAnimations().every(a=>a.playState==='finished'));
+   const metrics=await page.evaluate(()=>{
+    const box=el=>el.getBoundingClientRect();const phone=box(document.querySelector('.phone-surface')),tile=document.querySelector('.phone-app'),icon=box(tile.querySelector('.phone-app-icon')),label=box(tile.lastElementChild),handle=box(document.querySelector('.dialog-reopen'));
+    return {ratio:phone.height/phone.width,inside:phone.top>=0&&phone.bottom<=innerHeight,centers:Math.abs(icon.x+icon.width/2-label.x-label.width/2),handleCenter:Math.abs(handle.x+handle.width/2-innerWidth/2),handleBottom:innerHeight-handle.bottom,overflow:document.querySelector('.phone-home').scrollWidth>document.querySelector('.phone-home').clientWidth+1};
+   });
+   if(Math.abs(metrics.ratio-19.5/9)>.03||!metrics.inside||metrics.centers>1||metrics.handleCenter>1||metrics.handleBottom>12||metrics.overflow)throw Error(JSON.stringify(metrics));
+   await page.screenshot({path:new URL(`layout-${lang}-${size.width}.png`,out).pathname});
+   await page.locator('.phone-app').click();await page.getByRole('button',{name:/20001/}).click();
+   await page.getByText('We can bring tea.',{exact:true}).waitFor();
+   const title=await page.locator('.phone-app-title').boundingBox(),back=await page.locator('.phone-app-header .phone-nav').boundingBox();
+   if(back.x+back.width>title.x)throw Error('Header overlaps');
+   if(await page.locator('.phone-scroll').evaluate(el=>el.scrollWidth>el.clientWidth+1))throw Error('Messages overflow horizontally');
+   const button=await page.locator('.phone-earlier').boundingBox(),screen=await page.locator('.phone-scroll').boundingBox();
+   if(Math.abs(button.x+button.width/2-screen.x-screen.width/2)>2)throw Error('Earlier control is off axis');
+   await page.locator('.dialog-reopen').click();
+   await page.waitForFunction(()=>document.querySelector('.phone-toggle').getAttribute('aria-expanded')==='false');
+  }
+  await page.emulateMedia({reducedMotion:'reduce'});await page.locator('.phone-toggle').click();await page.locator('.phone-home-bar').click();
+  if(await page.locator('.phone-field').evaluate(el=>getComputedStyle(el).animationName)!=='none')throw Error('Reduced motion wallpaper must stop');
+ }else if(scenario==='auto'||scenario==='short'){
   await page.waitForResponse(r=>r.url().includes('/api/phone'));
   if(scenario==='short'){data.lastActivity={eventId:'short-work',runId:'work',source:'qq',peerId:'20001'};await page.evaluate(()=>window.updatePhone({focus:false,activity:null}));}
   else await page.evaluate(()=>window.updatePhone({focus:false,activity:{runId:'work',source:'qq',phase:'thinking'}}));

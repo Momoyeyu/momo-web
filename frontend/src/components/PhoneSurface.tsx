@@ -1,9 +1,10 @@
 import {createPortal} from 'react-dom';
-import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
+import {useEffect,useMemo,useRef,useState,useSyncExternalStore} from 'react';
 import {phoneSnapshot,type PhoneSnapshot,type PhoneMessage} from '../services/phoneClient';
 import {phoneApps,phoneRevision,subscribePhoneApps} from '../phone/registry';
 import '../phone/qqApp';
 import PhoneField from '../phone/PhoneField';
+import {cloakTiles} from '../phone/cloak';
 import {mergePhoneMessages,phoneIdentityChanged} from '../phone/projection';
 import {autoPhone} from '../phone/visibility';
 import type {AttentionState} from '../services/meetingClient';
@@ -12,8 +13,6 @@ import {useT} from '../i18n';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
 import '../styles/phone.css';
-const cloakTiles=Array.from({length:48},(_,i)=><i key={i} style={{'--col':i%6,'--row':Math.floor(i/6),'--delay':`${((i*17)%11)*15}ms`} as React.CSSProperties}/>);
-const signalGlyphs=Array.from({length:24},(_,i)=><span key={i} style={{'--i':i} as React.CSSProperties}>{i%3?'01':'10'}</span>);
 // Module state survives settings/backlog, but a new Boot resets visibility preference.
 let session={lease:'',open:false,suppressed:false};
 export default function PhoneSurface({active,attention,onVisibilityChange,closeSignal=0}:{active:boolean;attention:AttentionState;onVisibilityChange?:(open:boolean)=>void;closeSignal?:number}){
@@ -23,6 +22,7 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const [open,setOpen]=useState(session.open),[app,setApp]=useState<string|null>(null),[peer,setPeer]=useState<string>();
  useEffect(()=>{onVisibilityChange?.(open&&active);},[open,active,onVisibilityChange]);
  useEffect(()=>{if(closeSignal){session.open=false;session.suppressed=true;setOpen(false);}},[closeSignal]);
+ const mosaic=useMemo(()=>cloakTiles(Math.floor(Math.random()*4294967296)),[open]);
  const [older,setOlder]=useState<PhoneMessage[]>([]),[loading,setLoading]=useState(false);
  const [cursor,setCursor]=useState<number|null|undefined>();
  const peerRef=useRef(peer);peerRef.current=peer;
@@ -79,9 +79,9 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
   catch{setFailed(true);}finally{setLoading(false);}};
 
  return <>{createPortal(<section className={`phone-surface ${open&&active?'is-open':'is-closed'}`} inert={!open||!active} aria-hidden={!open||!active} aria-label={t('phone.title')}>
-  <div className="phone-signal" aria-hidden="true">{signalGlyphs}</div><div className="phone-cloak" aria-hidden="true">{cloakTiles}</div>
-  <div className="phone-glass"><div className="phone-top"><span>momo</span><span>{attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')}</span><Button variant="ghost" className="phone-nav phone-close tip" data-tip={t('phone.close')} onClick={toggle} aria-label={t('phone.close')}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></Button></div>
-   {failed?<div className="phone-empty" role="status">{t('phone.unavailable')}</div>:current?.render?current.render({data,peer,setPeer:changePeer,setApp:changeApp,choosePeer,messages,loading,cursor,earlier}):<div className="phone-home"><PhoneField/><div className="phone-apps">{apps.map(a=><button className="phone-app" key={a.id} onClick={()=>{changeApp(a.id);}}><span className="phone-app-icon">{a.icon}{(data?.apps.find(p=>p.id===a.id)?.pending??0)>0&&<i className="phone-dot"/>}</span><span>{data?.apps.find(p=>p.id===a.id)?.name}</span></button>)}</div><p className="phone-empty">{current?t('phone.standby'):apps.length?'':t('phone.empty')}</p></div>}
+  <div className="phone-cloak" aria-hidden="true">{mosaic.map((tile,i)=><i key={i} style={{'--x':tile.x,'--y':tile.y,'--w':tile.width,'--h':tile.height,'--angle':`${tile.angle}deg`,'--skew':`${tile.skew}deg`,'--dx':`${tile.dx}px`,'--dy':`${tile.dy}px`,'--delay':`${tile.delay}ms`,'--duration':`${tile.duration}ms`,'--light':tile.light} as React.CSSProperties}/>)}</div>
+  <div className="phone-glass"><div className="phone-top"><span>momo</span><span className={`phone-activity tip${busyApp?' is-busy':''}`} role="img" aria-label={attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')} data-tip={attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')}><Icon name={attention.focus?'focus':busyApp?'phone':'message'} size={14}/></span><Button variant="ghost" className="phone-nav phone-close tip" data-tip={t('phone.close')} onClick={toggle} aria-label={t('phone.close')}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></Button></div>
+   {failed?<div className="phone-empty" role="status">{t('phone.unavailable')}</div>:current?.render?current.render({data,peer,setPeer:changePeer,setApp:changeApp,choosePeer,messages,loading,cursor,earlier}):<div className="phone-home"><div className="phone-wallpaper" aria-hidden="true"><PhoneField/></div><div className="phone-apps">{apps.map(a=><button className="phone-app" key={a.id} onClick={()=>{changeApp(a.id);}}><span className="phone-app-icon">{a.icon}{(data?.apps.find(p=>p.id===a.id)?.pending??0)>0&&<i className="phone-dot"/>}</span><span>{data?.apps.find(p=>p.id===a.id)?.name}</span></button>)}</div><p className="phone-empty">{current?t('phone.standby'):apps.length?'':t('phone.empty')}</p></div>}
    <button className="phone-home-bar" aria-label={t('phone.home')} onClick={()=>{changeApp(null);}}/>
   </div></section>,document.querySelector('.app-stage')??document.body)}
   <Button className={`tb phone-toggle tip${open?' is-active':''}`} data-tip={t('phone.title')} onClick={toggle} aria-label={t('phone.title')} aria-expanded={open}><Icon name="phone"/>{(data?.pending??0)>0&&<i className="phone-dot"/>}</Button></>;
