@@ -25,6 +25,11 @@ def test_phone_does_not_show_unacknowledged_reply(monkeypatch):
     checkpoint.begin_turn('question',gen,'t',run_id=row['run_id'],source='qq')
     checkpoint.append_sentence('not sent',gen,'t')
     assert len(phone.snapshot('20001')['messages'])==1
+    import json,hashlib
+    with db.tx() as c:
+        c.execute('INSERT INTO outbox(command_id,run_id,epoch,status,payload,at) VALUES(?,?,?,?,?,?)',('test-receipt',row['run_id'],1,'delivered',json.dumps({'method':'channels.send','textHash':hashlib.sha256(b'not sent').hexdigest()}),'t'))
+    assert checkpoint.acknowledge_external(row['run_id'],'not sent','test-receipt')
+    assert phone.snapshot()['conversations'][0]['preview']=='not sent'
 
 
 def test_second_plugin_projection_and_disposal(monkeypatch):

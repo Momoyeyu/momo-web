@@ -1,3 +1,4 @@
+import DialogDrawer from '../phone/DialogDrawer';
 import DialogHandle from '../phone/DialogHandle';
 import {useIntro} from "../services/introClient";
 // 对话页：VN 式对话框（铭牌 + 字幕 + 输入 + 快捷栏）。
@@ -175,9 +176,11 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
       {interactive && <FirstMeeting connectionFailed={modelError} />}
       {error && <div className="chat-error">{error}</div>}
 
-      {phoneOpen&&<DialogHandle onClick={()=>setPhoneClose(v=>v+1)}/>}
-      <div className="dialog-zone" ref={dialog} inert={phoneOpen}>
+      <DialogDrawer>
+      <div className="dialog-zone" ref={dialog}>
         <DialogBox
+          collapsed={phoneOpen}
+          handle={<DialogHandle active={phoneOpen} onClick={()=>setPhoneClose(v=>v+1)}/>}
           lang={resolveChatLang(getState().settings.general)}
           name={name}
           text={subtitle || <span className="muted">……</span>}
@@ -191,7 +194,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
             ) : undefined
           }
         >
-          <div data-intro="name-input" className="input-row">
+          <div data-intro="name-input" className="input-row" inert={phoneOpen}>
             <input
               value={input}
               placeholder={t("chat.placeholder", { name })}
@@ -229,6 +232,8 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
           </div>
         </DialogBox>
       </div>
+
+      </DialogDrawer>
 
       {/* 底部工具条：对照 VN 底部 icon 栏，操作聚拢右侧，返回标题收尾 */}
       <div className="chat-toolbar">

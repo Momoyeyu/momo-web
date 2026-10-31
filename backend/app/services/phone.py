@@ -20,9 +20,13 @@ def qq_snapshot(peer=None, before=None):
     latest = db.query(f"SELECT peer_id,MAX(seq) AS newest,SUM(status IN ('queued','held_focus','held_inactive','held_paused','held_interrupt','processing')) AS pending FROM inbox WHERE {clause} GROUP BY peer_id ORDER BY newest DESC LIMIT 100",params) if identity else []
     conversations = {}
     for c in latest:
-        row = db.query('SELECT text FROM inbox WHERE seq=?',(c['newest'],))[0]
+        row = db.query('SELECT text,at,run_id FROM inbox WHERE seq=?',(c['newest'],))[0]
         key=c['peer_id']
-        conversations[key]={'id':key,'kind':'group' if key.startswith('group:') else 'private','pending':int(c['pending']),'preview':row['text'][:120]}
+        latest_reply=db.query("SELECT m.run_id FROM messages m JOIN inbox i ON i.run_id=m.run_id WHERE i.source='qq' AND i.account_id=? AND i.self_id=? AND i.peer_id=? AND m.role='assistant' AND m.visible=1 ORDER BY m.seq DESC LIMIT 1",(*params,key))
+        reply=db.query("SELECT text,display_text,at FROM messages WHERE run_id=? AND role='assistant' AND visible=1 ORDER BY seq",(latest_reply[0]['run_id'],)) if latest_reply else []
+        if reply and reply[-1]['at']<row['at']:reply=[]
+        preview=''.join(r['display_text'] or r['text'] for r in reply) if reply else row['text']
+        conversations[key]={'id':key,'kind':'group' if key.startswith('group:') else 'private','pending':int(c['pending']),'preview':preview[:120], '_at':reply[-1]['at'] if reply else row['at']}
     outgoing=[]
     if identity:
         for row in db.query("SELECT command_id,payload,at FROM outbox WHERE status IN ('completed','delivered') ORDER BY at DESC LIMIT 100"):
@@ -30,7 +34,9 @@ def qq_snapshot(peer=None, before=None):
             if (payload.get('accountId')==account['accountId'] and payload.get('selfId')==identity
                 and payload.get('displayText') and payload.get('peerId')):
                 key=payload['peerId']
-                conversations.setdefault(key,{'id':key,'kind':'group' if key.startswith('group:') else 'private','pending':0,'preview':payload['displayText'][:120]})
+                existing=conversations.get(key)
+                if not existing or row['at']>=existing['_at']:
+                    conversations[key]={'id':key,'kind':'group' if key.startswith('group:') else 'private','pending':existing['pending'] if existing else 0,'preview':payload['displayText'][:120],'_at':row['at']}
                 if key==peer and before is None:
                     outgoing.append({'id':row['command_id'],'text':payload['displayText'],'direction':'out','speaker':'momo','status':'delivered','at':row['at']})
     pending = db.query(f"SELECT COUNT(*) AS n FROM inbox WHERE {clause} AND status IN ('queued','held_focus','held_inactive','held_paused','held_interrupt','processing')",params)[0]['n'] if identity else 0
@@ -52,7 +58,7 @@ def qq_snapshot(peer=None, before=None):
                 operations.append({'id':row['command_id'],'status':row['status'],'action':payload.get('action',payload.get('method',''))})
     return {'apps':[{'id':'momo-qq','provider':'qq','name':'QQ','enabled':account['enabled'],'pending':int(pending)}],
             'accountKey':identity,'pending':int(pending),
-            'conversations':list(conversations.values())[:100], 'messages':messages,
+            'conversations':[{k:v for k,v in c.items() if k!='_at'} for c in sorted(conversations.values(),key=lambda c:c['_at'],reverse=True)][:100], 'messages':messages,
             'operations':operations[:10], 'hasMore':len(selected)>30,
             'nextBefore':page[-1]['seq'] if len(selected)>30 else None,
             'activity':runtime.snapshot()['activity']}
