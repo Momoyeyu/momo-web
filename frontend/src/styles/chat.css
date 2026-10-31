@@ -4,10 +4,10 @@
 /* 对话区高度：StageCanvas 用它定位人物底边。
    无条件定义在 :root（不随 .chat-page 挂载出现/消失）——
    否则切页瞬间可用高度变化，Live2D 会重算尺寸产生跳变。
-   = 对话框区域 208 + 底部留白 56；工具栏在固定右侧轨道。 */
+   舞台构图预留保持稳定；对白底部只留 16px，加上区内 8px 内距。 */
 :root {
   --dialog-zone-h: 264px;
-  --dialog-bottom-gap: 56px;
+  --dialog-bottom-gap: 16px;
 }
 
 .scene-ambient,
