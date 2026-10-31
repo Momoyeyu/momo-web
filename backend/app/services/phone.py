@@ -39,8 +39,9 @@ def qq_snapshot(peer=None, before=None):
     messages=[]
     for row in reversed(page):
         messages.append({'id':row['id'],'text':row['text'],'direction':'in','speaker':row['sender_id'] or row['peer_id'],'status':row['status'],'at':row['at']})
-        for out in db.query("SELECT * FROM messages WHERE run_id=? AND role='assistant' AND visible=1 ORDER BY seq",(row['run_id'],)):
-            messages.append({'id':out['event_id'],'text':out['display_text'] or out['text'],'direction':'out','speaker':'momo','status':'delivered','at':out['at']})
+        outs=db.query("SELECT * FROM messages WHERE run_id=? AND role='assistant' AND visible=1 ORDER BY seq",(row['run_id'],))
+        if outs:
+            messages.append({'id':'out:'+row['run_id'],'text':''.join(out['display_text'] or out['text'] for out in outs),'direction':'out','speaker':'momo','status':'delivered','at':outs[-1]['at']})
     messages.extend(reversed(outgoing))
     messages.sort(key=lambda m:m["at"])
     operations=[]
@@ -90,4 +91,11 @@ def snapshot(peer=None, before=None, app='momo-qq'):
         else:
             rows=db.query('SELECT peer_id FROM inbox WHERE run_id=?',(last['runId'],))
             if rows and not last.get('peerId'):last['peerId']=rows[0]['peer_id']
-    return {**selected,'apps':apps,'pending':total,'activity':activity,'lastActivity':last}
+    draft=None
+    with runtime.condition:
+        current=runtime.phone_draft
+        if current and any(a['provider']=='qq' and a['enabled'] for a in apps):
+            rows=db.query("SELECT peer_id,self_id FROM inbox WHERE run_id=?",(current['runId'],))
+            if rows and rows[0]['peer_id']==peer and rows[0]['self_id']==selected['accountKey']:
+                draft={'runId':current['runId'],'text':current['text']}
+    return {**selected,'apps':apps,'pending':total,'activity':activity,'lastActivity':last,'draft':draft}

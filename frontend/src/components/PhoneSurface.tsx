@@ -12,13 +12,17 @@ import {useT} from '../i18n';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
 import '../styles/phone.css';
+const cloakTiles=Array.from({length:48},(_,i)=><i key={i} style={{'--col':i%6,'--row':Math.floor(i/6),'--delay':`${((i*17)%11)*15}ms`} as React.CSSProperties}/>);
 const signalGlyphs=Array.from({length:24},(_,i)=><span key={i} style={{'--i':i} as React.CSSProperties}>{i%3?'01':'10'}</span>);
 // Module state survives settings/backlog, but a new Boot resets visibility preference.
 let session={lease:'',open:false,suppressed:false};
-export default function PhoneSurface({active,attention}:{active:boolean;attention:AttentionState}){
- const t=useT();useSyncExternalStore(subscribePhoneApps,phoneRevision);
+export default function PhoneSurface({active,attention,onVisibilityChange,closeSignal=0}:{active:boolean;attention:AttentionState;onVisibilityChange?:(open:boolean)=>void;closeSignal?:number}){
+ const t=useT();
+useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const [data,setData]=useState<PhoneSnapshot|null>(null),[failed,setFailed]=useState(false);
  const [open,setOpen]=useState(session.open),[app,setApp]=useState<string|null>(null),[peer,setPeer]=useState<string>();
+ useEffect(()=>{onVisibilityChange?.(open&&active);},[open,active,onVisibilityChange]);
+ useEffect(()=>{if(closeSignal){session.open=false;session.suppressed=true;setOpen(false);}},[closeSignal]);
  const [older,setOlder]=useState<PhoneMessage[]>([]),[loading,setLoading]=useState(false);
  const [cursor,setCursor]=useState<number|null|undefined>();
  const peerRef=useRef(peer);peerRef.current=peer;
@@ -49,7 +53,7 @@ export default function PhoneSurface({active,attention}:{active:boolean;attentio
     if(changed){revision.current++;setPeer(undefined);setOlder([]);setCursor(undefined);}
     accountRef.current=identity;setData(old=>({...next,messages:changed?[]:mergePhoneMessages(old?.messages??[],next.messages)}));setFailed(false);
    }catch{if(!stopped){setFailed(true);setData(null);}}
-   clearTimeout(timeout);if(!stopped)timer=setTimeout(poll,1500);
+   clearTimeout(timeout);if(!stopped)timer=setTimeout(poll,session.open?300:1000);
   };void poll();return()=>{stopped=true;clearTimeout(timer);request?.abort();};
  },[active,peer,app]);
  useEffect(()=>{
@@ -75,7 +79,7 @@ export default function PhoneSurface({active,attention}:{active:boolean;attentio
   catch{setFailed(true);}finally{setLoading(false);}};
 
  return <>{createPortal(<section className={`phone-surface ${open&&active?'is-open':'is-closed'}`} inert={!open||!active} aria-hidden={!open||!active} aria-label={t('phone.title')}>
-  <div className="phone-signal" aria-hidden="true">{signalGlyphs}</div>
+  <div className="phone-signal" aria-hidden="true">{signalGlyphs}</div><div className="phone-cloak" aria-hidden="true">{cloakTiles}</div>
   <div className="phone-glass"><div className="phone-top"><span>momo</span><span>{attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')}</span><Button variant="ghost" className="phone-nav phone-close tip" data-tip={t('phone.close')} onClick={toggle} aria-label={t('phone.close')}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></Button></div>
    {failed?<div className="phone-empty" role="status">{t('phone.unavailable')}</div>:current?.render?current.render({data,peer,setPeer:changePeer,setApp:changeApp,choosePeer,messages,loading,cursor,earlier}):<div className="phone-home"><PhoneField/><div className="phone-apps">{apps.map(a=><button className="phone-app" key={a.id} onClick={()=>{changeApp(a.id);}}><span className="phone-app-icon">{a.icon}{(data?.apps.find(p=>p.id===a.id)?.pending??0)>0&&<i className="phone-dot"/>}</span><span>{data?.apps.find(p=>p.id===a.id)?.name}</span></button>)}</div><p className="phone-empty">{current?t('phone.standby'):apps.length?'':t('phone.empty')}</p></div>}
    <button className="phone-home-bar" aria-label={t('phone.home')} onClick={()=>{changeApp(null);}}/>

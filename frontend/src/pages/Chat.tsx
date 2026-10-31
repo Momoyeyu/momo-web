@@ -37,6 +37,7 @@ const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
 
 export default function Chat({active,attention}: {active: boolean;attention:AttentionState}) {
   const t = useT();
+  const [phoneOpen,setPhoneOpen]=useState(false),[phoneClose,setPhoneClose]=useState(0);
   const intro=useIntro();
   const introActive=!!intro.data && intro.data.phase!=="completed";
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
@@ -169,11 +170,12 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
   };
 
   return (
-    <div className="chat-page" inert={!interactive}>
+    <div className={`chat-page${phoneOpen?' has-phone':''}`} inert={!interactive}>
       {interactive && <FirstMeeting connectionFailed={modelError} />}
       {error && <div className="chat-error">{error}</div>}
 
-      <div className="dialog-zone" ref={dialog}>
+      {phoneOpen&&<Button className="dialog-reopen" aria-label={t('phone.returnChat')} onClick={()=>setPhoneClose(v=>v+1)}>{name}<span>{t('phone.returnChat')}</span></Button>}
+      <div className="dialog-zone" ref={dialog} inert={phoneOpen}>
         <DialogBox
           lang={resolveChatLang(getState().settings.general)}
           name={name}
@@ -240,7 +242,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
           <Button className={`tb tb-focus tip${attention.focus?' is-active':''}`} aria-pressed={attention.focus} disabled={controlling} onClick={()=>void control(attention.focus?'focus_off':'focus_on')} aria-label={t('attention.focus')} data-tip={t('attention.focus')} data-tip-detail={t('attention.focusHint')}><Icon name="focus" size={16}/></Button>
           {phoneBusy && <Button className="tb" disabled={controlling} onClick={()=>void control('stop')} aria-label={t('attention.stopPhone')} title={t('attention.stopPhone')}><Icon name="stop" size={15}/></Button>}
           {attention.phonePaused && !attention.focus && <Button className="tb" disabled={controlling} onClick={()=>void control('resume_phone')} title={t('attention.resumePhone')}><Icon name="phone" size={16}/><span>{t('attention.resumePhone')}</span></Button>}
-          {!introActive&&<PhoneSurface active={interactive} attention={attention}/>}
+          {!introActive&&<PhoneSurface active={interactive} attention={attention} onVisibilityChange={setPhoneOpen} closeSignal={phoneClose}/>}
           <Button
             className="tb"
             aria-label={t("chat.backlog")}

@@ -41,6 +41,7 @@ class Coordinator:
         self.active = None
         self.activity = None
         self.last_phone_activity = None
+        self.phone_draft = None
         self.presentation = None
         self.paused_presentations = {}
         self.focus = False
@@ -680,6 +681,14 @@ class Coordinator:
         finally:
             self.transition.release()
 
+    def append_phone_draft(self, run_id, delta):
+        with self.condition:
+            if self.active != run_id or not self.activity or self.activity['source'] != 'qq':
+                return
+            if not self.phone_draft or self.phone_draft['runId'] != run_id:
+                self.phone_draft={'runId':run_id,'text':'','startedAt':time.monotonic()}
+            self.phone_draft['text'] += delta
+
     def _note_phone_activity(self):
         """Retain a presentation hint for short work between UI polls, per Boot."""
         if self.owner and self.activity and (self.activity['source']=='qq' or self.activity.get('toolSource')=='qq'):
@@ -899,6 +908,7 @@ class Coordinator:
                 if self.active == run_id:
                     self.active = None
                     self.activity = None
+                    self.phone_draft = None
                 if source == "meeting" and not self.presentation:
                     self.interrupt_hold = False
                     self._release_held()
@@ -1177,6 +1187,14 @@ class Coordinator:
                     finally:
                         current_run.reset(token)
                     reply = "".join(e.get("text", "") for e in events if e["t"] == "sentence")
+                    # Pace actual dispatch too; a phone draft does not claim delivery.
+                    if reply and first['source']=='qq' and self.phone_draft:
+                        from ..core import state
+                        speed=max(0,min(100,state.get_state().get('settings',{}).get('general',{}).get('textSpeed',60)))
+                        duration=0 if speed>=100 else len(reply)/(15*8**(speed/100))
+                        until=self.phone_draft['startedAt']+duration
+                        while not self.closed.is_set() and time.monotonic()<until and self.valid_run(rid) and not self.focus and not self.phone_paused:
+                            self.closed.wait(min(.05,max(0,until-time.monotonic())))
                     if reply and self.valid_run(rid):
                         method = "channels.send" if first["source"] in {"qq"} else "virtual.deliver"
                         params = {"text": reply, "accountId": first["account_id"]}

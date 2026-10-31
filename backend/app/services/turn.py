@@ -277,7 +277,7 @@ def react(
         if checkpoint.generation() != gen:
             return
         try:
-            from .coordinator import runtime
+            from .coordinator import runtime, current_run
             with runtime.reasoning_lock:
                 # A competing inference/compaction may have held this lock
                 # while the user revoked this run's captured generation.
@@ -297,6 +297,7 @@ def react(
                     if ev["type"] == "text":
                         delta = str(ev["delta"])
                         round_text += delta
+                        if source == "qq": runtime.append_phone_draft(current_run.get(), delta)
                         for sent in splitter.push(delta):
                             out = take(sent)
                             if out is None:

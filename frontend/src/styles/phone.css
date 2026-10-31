@@ -61,3 +61,26 @@
 .phone-field-waves{transition:opacity .25s}
 .phone-field-waves polyline:nth-child(4){opacity:.45}
 @media(prefers-reduced-motion:reduce){.phone-field-waves{transition:none}}
+
+/* The digital device occupies the conversational half of the stage. */
+.phone-surface{right:23%;top:7%;bottom:11%;width:clamp(280px,31vw,440px);filter:drop-shadow(0 18px 32px var(--backdrop));transition:opacity .25s,transform .46s cubic-bezier(.16,.8,.2,1),visibility 0s}
+.phone-surface.is-closed{transform:translate(18px,12px) skewY(-2deg) scale(.98);transition:opacity .36s,transform .4s,visibility 0s .44s}
+.phone-signal{display:none}
+.phone-cloak{position:absolute;inset:0;z-index:4;pointer-events:none;overflow:hidden;border-radius:28px}
+.phone-cloak i{position:absolute;left:calc(var(--col)*100%/6);top:calc(var(--row)*100%/8);width:calc(100%/6 + 2px);height:calc(100%/8 + 2px);background:linear-gradient(135deg,var(--accent-soft),var(--line-strong),var(--chrome));border-top:1px solid var(--accent);transform:skewX(-18deg);opacity:0}
+.is-open .phone-cloak i{animation:phone-decloak .62s cubic-bezier(.2,.8,.2,1) both;animation-delay:var(--delay)}
+.is-closed .phone-cloak i{animation:phone-recloak .4s ease both;animation-delay:var(--delay)}
+.is-open .phone-glass{animation:phone-image-resolve .5s steps(6,end) both}
+@keyframes phone-decloak{0%{opacity:.85;transform:translate(36px,-10px) skewX(-18deg) scaleX(.4)}40%{opacity:.65}100%{opacity:0;transform:translate(-20px,8px) skewX(-18deg) scaleX(1.15)}}
+@keyframes phone-recloak{0%{opacity:0;transform:translate(-20px,8px) skewX(-18deg)}40%{opacity:.85}100%{opacity:0;transform:translate(40px,-12px) skewX(-18deg) scaleX(.3)}}
+@keyframes phone-image-resolve{from{opacity:.1;clip-path:inset(0 0 85% 0)}to{opacity:1;clip-path:inset(0)}}
+.phone-typing{position:sticky;bottom:0;padding:10px;background:var(--panel-solid);border:1px solid var(--line);border-radius:12px;margin-top:10px}
+.phone-typing textarea{display:block;width:100%;min-height:56px;resize:none;border:0;background:transparent;color:var(--text-dim);font:inherit;font-size:12px;padding:4px;line-height:1.6;box-shadow:none}
+.phone-typing-dots{color:var(--accent);letter-spacing:3px}
+.chat-page .dialog-zone{transition:transform .4s cubic-bezier(.2,.8,.2,1),opacity .3s}
+.chat-page.has-phone .dialog-zone{transform:translateY(110%);opacity:0;pointer-events:none}
+.dialog-reopen{position:absolute;left:8%;bottom:calc(var(--toolbar-h) + 10px);z-index:13;display:flex;gap:20px;align-items:center;padding:12px 20px;background:var(--panel);border:1px solid var(--line);color:var(--accent);backdrop-filter:blur(16px)}
+.dialog-reopen span{font-size:12px;color:var(--text-dim)}.dialog-reopen:hover{background:var(--panel-solid)}
+@media(max-width:1000px){.phone-surface{right:17%;width:clamp(250px,34vw,340px);top:6%;bottom:12%}}
+@media(prefers-reduced-motion:reduce){.phone-cloak{display:none}.is-open .phone-glass{animation:none}.phone-surface,.chat-page .dialog-zone{transition:none}}
+.chat-page.has-phone .dialog-zone{animation:none}

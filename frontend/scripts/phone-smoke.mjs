@@ -46,6 +46,26 @@ try{
  await page.getByText('We can bring tea.',{exact:true}).waitFor();
  const scroller=page.locator('.phone-scroll');await scroller.evaluate(el=>el.scrollTop=el.scrollHeight);
  if(!await scroller.evaluate(el=>el.scrollTop+el.clientHeight>=el.scrollHeight-2))throw Error('Cannot reach scroll bottom');
+ if(scenario==='typing'){
+  const full='A paced phone reply '.repeat(8);
+  data.draft={runId:'typing-run',text:full.slice(0,45)};
+  const draft=page.getByRole('textbox',{name:'momo 正在输入'});await draft.waitFor();
+  await page.waitForFunction(()=>document.querySelector('.phone-typing textarea')?.value.length>0);
+  if((await draft.inputValue()).length>=full.length)throw Error('Draft must be paced');
+  data.draft={runId:'typing-run',text:full};
+  data.messages.push({id:'out:typing-run',text:full,direction:'out',speaker:'momo',status:'delivered',at:'now'});data.draft=null;
+  await page.locator('.phone-message.out p').filter({hasText:full}).waitFor({timeout:10000});
+  if(await draft.count())throw Error('Finished reply must leave the draft');
+ }
+ if(scenario==='scroll'){
+  data.messages.push({id:'follow-1',text:'Latest incoming',direction:'in',speaker:'20001',status:'received',at:'now'});
+  await page.getByText('Latest incoming',{exact:true}).waitFor();
+  if(!await scroller.evaluate(el=>el.scrollTop+el.clientHeight>=el.scrollHeight-2))throw Error('Bottom must follow new messages');
+  await scroller.evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'))});
+  data.messages.push({id:'follow-2',text:'Do not jump',direction:'in',speaker:'20001',status:'received',at:'now'});
+  await page.getByText('Do not jump',{exact:true}).waitFor();
+  if(await scroller.evaluate(el=>el.scrollTop)>5)throw Error('Reading history must not jump');
+ }
  await page.screenshot({path:new URL('phone-chat.png',out).pathname});
  await page.getByRole('button',{name:'收起手机'}).click();
  await page.evaluate(()=>window.updatePhone({focus:false,activity:{runId:'work',source:'qq',phase:'thinking'}}));

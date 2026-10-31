@@ -85,3 +85,16 @@ def test_short_phone_work_hint_is_scoped_to_boot(monkeypatch):
     assert core.phone_activity()['runId']=='short-run'
     core.owner={'leaseId':'boot-two','expiresAt':float('inf')}
     assert core.phone_activity() is None
+
+
+def test_phone_draft_is_private_and_only_current_remote_run(monkeypatch):
+    from app.services.coordinator import Coordinator
+    core=Coordinator()
+    core.active='one';core.activity={'runId':'one','source':'qq'}
+    core.append_phone_draft('other','secret')
+    assert core.phone_draft is None
+    core.append_phone_draft('one','hello ');core.append_phone_draft('one','world')
+    assert core.phone_draft['text']=='hello world'
+    core.activity={'runId':'one','source':'meeting'}
+    core.append_phone_draft('one','not a phone message')
+    assert core.phone_draft['text']=='hello world'

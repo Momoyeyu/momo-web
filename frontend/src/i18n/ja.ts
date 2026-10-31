@@ -1,7 +1,7 @@
 import type { Dict } from "./zh";
 
 export const ja: Dict = {
-  phone: {"title": "スマホ", "back": "戻る", "close": "スマホを閉じる", "home": "ホーム", "group": "グループ", "earlier": "以前のメッセージ", "delivered": "送信済み", "processing": "処理中", "pending": "未処理", "received": "受信済み", "failed": "失敗", "unknown": "結果不明", "standby": "待機", "focus": "会話に集中", "empty": "アプリはまだありません", "noMessages": "メッセージはまだありません", "unavailable": "読み込めません。まもなく再試行します。"},
+  phone: {"typing": "momoが入力中", "returnChat": "会話に戻る","title": "スマホ", "back": "戻る", "close": "スマホを閉じる", "home": "ホーム", "group": "グループ", "earlier": "以前のメッセージ", "delivered": "送信済み", "processing": "処理中", "pending": "未処理", "received": "受信済み", "failed": "失敗", "unknown": "結果不明", "standby": "待機", "focus": "会話に集中", "empty": "アプリはまだありません", "noMessages": "メッセージはまだありません", "unavailable": "読み込めません。まもなく再試行します。"},
   intro: {"label": "はじめての起動", "settings": "まず設定を開いて、出会いの準備をしましょう。", "language": "画面の言語を選んで、次へ進みましょう。", "models": "次に、モデルの設定を開いてください。", "llm": "会話モデルのAPIアドレス、キー、モデル名を入力して「テスト」を押してください。", "back": "モデルの準備ができました。タイトルに戻りましょう。", "boot": "準備完了です。起動して、momoに挨拶しましょう。", "name": "momoはあなたをどう呼べばいいか知りたいようです。好きなニックネームを教えてあげてください。", "finish": "記憶を固定しました。タイトルに戻って、ふたりの日常を始めましょう。", "loading": "進み具合を読み込み中……", "continue": "次へ", "checking": "確認中……", "error": "完了できませんでした。設定と接続を確認してください。ツール呼び出し対応のモデルが必要です。", "tts": "momoの声も設定できます。音声サービスと参照音声を設定するか、今はスキップしてください。", "skip": "今はスキップ", "ttsError": "音声の準備ができていません。設定を確認するかスキップしてください。", "memorySettings": "momoは呼び名を覚えました。設定を開いて長期記憶を見てみましょう。", "memoryTab": "「記憶」を開いて、最初の思い出を見てみましょう。", "pin": "呼び名の記憶の横にあるピンを押してください。固定した記憶は、いつもmomoと一緒です。", "celebrate": "初めての出会いが、思い出になりました。\nこれからは自由にmomoと過ごせます。", "confirm": "日常を始める"},
   social: {
   "login": {

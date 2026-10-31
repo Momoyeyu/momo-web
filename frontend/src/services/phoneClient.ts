@@ -7,6 +7,7 @@ export interface PhoneSnapshot {
  messages:PhoneMessage[];operations:{id:string;status:string;action:string}[];hasMore:boolean;nextBefore:number|null;
  activity:PhoneActivity|null;
  lastActivity?:PhoneActivity|null;
+ draft?:{runId:string;text:string}|null;
 }
 export function phoneSnapshot(peer?:string,before?:number,signal?:AbortSignal,app='momo-qq'):Promise<PhoneSnapshot>{
  const params=new URLSearchParams({app});if(peer)params.set('peer',peer);if(before!==undefined)params.set('before',String(before));
