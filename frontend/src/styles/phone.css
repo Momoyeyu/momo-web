@@ -1,6 +1,6 @@
 /* A height-led 9:19.5 device, independent of the screenshot's annotation box. */
 .phone-surface{
- position:fixed;right:22%;top:50%;--phone-h:min(78cqh,720px);height:var(--phone-h);width:calc(var(--phone-h) * 6 / 13);min-width:0;max-width:calc(var(--phone-h) * 6 / 13);aspect-ratio:9/19.5;
+ position:fixed;right:22%;top:calc(50% - 24px);--phone-h:min(78cqh,720px);height:var(--phone-h);width:calc(var(--phone-h) * 6 / 13);min-width:0;max-width:calc(var(--phone-h) * 6 / 13);aspect-ratio:9/19.5;
  z-index:12;pointer-events:auto;transform:translateY(-50%);transform-origin:center;
  filter:drop-shadow(0 18px 30px var(--backdrop));
  transition:opacity .22s,transform .28s cubic-bezier(.16,.8,.2,1),visibility 0s;
@@ -89,3 +89,12 @@
 .chat-page.has-phone .dialog-box{pointer-events:none}
 /* Clip the withdrawn body without creating a programmatically scrollable page. */
 .chat-page{overflow:clip}
+
+/* Keep the toolbar in its own dock above the withdrawn panel edge. During
+   travel it fades out before the panel crosses that row, then settles back. */
+.chat-page.has-phone .chat-toolbar{bottom:42px;animation:phone-dock-raise .72s both}
+.chat-page.phone-dock-used:not(.has-phone) .chat-toolbar{animation:phone-dock-lower .72s both}
+.dialog-drawer{transition-delay:.12s}
+@keyframes phone-dock-raise{0%{opacity:1;transform:translate(-50%,42px)}18%{opacity:0;transform:translate(-50%,42px)}82%{opacity:0;transform:translate(-50%,0)}100%{opacity:1;transform:translate(-50%,0)}}
+@keyframes phone-dock-lower{0%{opacity:1;transform:translate(-50%,-42px)}18%{opacity:0;transform:translate(-50%,-42px)}82%{opacity:0;transform:translate(-50%,0)}100%{opacity:1;transform:translate(-50%,0)}}
+@media(prefers-reduced-motion:reduce){.chat-page.has-phone .chat-toolbar,.chat-page.phone-dock-used:not(.has-phone) .chat-toolbar{animation:none}.dialog-drawer{transition:none}}

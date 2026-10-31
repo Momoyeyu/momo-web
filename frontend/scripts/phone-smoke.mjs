@@ -13,8 +13,18 @@ import React from '/node_modules/.vite/deps/react.js';import ReactDOM from '/nod
 import Drawer from '/src/phone/DialogDrawer.tsx';import Box from '/src/components/DialogBox.tsx';import Handle from '/src/phone/DialogHandle.tsx';import Phone from '/src/components/PhoneSurface.tsx';import Tooltips from '/src/ui/TooltipLayer.tsx';import Button from '/src/ui/Button.tsx';import Icon from '/src/ui/Icon.tsx';import '/src/styles/base.css';import '/src/styles/chat.css';
 const root=createRoot(document.getElementById('root'));let closeSignal=0;window.closePhone=()=>{closeSignal++;render()};let a={activation:'active',focus:true,phonePaused:false,busy:false,activity:null,presentation:null};
 window.updatePhone=s=>{a={...a,...s};render()};
-function render(){root.render(React.createElement('div',{className:'app-stage',style:{width:'100vw',height:'100vh',background:'var(--bg)'}},React.createElement('div',{className:'live2d-home'}),React.createElement('div',{className:'chat-page'},React.createElement(Drawer,null,React.createElement('div',{className:'dialog-zone'},React.createElement(Box,{name:'momo',text:'A shared panel returns along its original path.',handle:React.createElement(Handle,{onClick:()=>window.closePhone()})},React.createElement('input',{placeholder:'Chat'})))),React.createElement('div',{className:'chat-toolbar'},React.createElement('div',{className:'tb-side'},React.createElement(Button,{className:'tb', 'data-tip':'专注对话','data-tip-detail':'暂时不处理手机消息','aria-label':'专注对话'},React.createElement(Icon,{name:'focus'})),React.createElement(Phone,{active:true,attention:a,closeSignal,onVisibilityChange:show=>document.querySelector('.chat-page')?.classList.toggle('has-phone',show)})))),React.createElement(Tooltips)))}render();
+function render(){root.render(React.createElement('div',{className:'app-stage',style:{width:'100vw',height:'100vh',background:'var(--bg)'}},React.createElement('div',{className:'live2d-home'}),React.createElement('div',{className:'chat-page'},React.createElement(Drawer,null,React.createElement('div',{className:'dialog-zone'},React.createElement(Box,{name:'momo',text:'A shared panel returns along its original path.',handle:React.createElement(Handle,{onClick:()=>window.closePhone()})},React.createElement('input',{placeholder:'Chat'})))),React.createElement('div',{className:'chat-toolbar'},React.createElement('div',{className:'tb-side'},React.createElement(Button,{className:'tb tb-framing'},'全身'),React.createElement(Button,{className:'tb', 'data-tip':'专注对话','data-tip-detail':'暂时不处理手机消息','aria-label':'专注对话'},React.createElement(Icon,{name:'focus'})),React.createElement(Phone,{active:true,attention:a,closeSignal,onVisibilityChange:show=>{const el=document.querySelector('.chat-page');el?.classList.toggle('has-phone',show);if(show)el?.classList.add('phone-dock-used')}}),...['backlog','voice','gear','home'].map(name=>React.createElement(Button,{className:'tb',key:name,'aria-label':name},React.createElement(Icon,{name})))))),React.createElement(Tooltips)))}render();
 </script></body></html>`}));
+async function checkDockMotion(){
+ await page.evaluate(async()=>{
+  const until=performance.now()+850;
+  while(performance.now()<until){
+   const toolbar=document.querySelector('.chat-toolbar'),panel=document.querySelector('.dialog-box').getBoundingClientRect();
+   if(+getComputedStyle(toolbar).opacity>.15){for(const button of toolbar.querySelectorAll('button')){const b=button.getBoundingClientRect();if(panel.top>=b.top-1&&panel.top<=b.bottom+1&&b.right>panel.left&&b.left<panel.right)throw Error('Visible toolbar crosses panel edge');}}
+   await new Promise(requestAnimationFrame);
+  }
+ });
+}
 try{
  if(scenario==='disabled')data.apps[0].enabled=false;
  if(scenario==='layout'){data.conversations[0].id='group:20001234567890123456';data.conversations[0].kind='group';data.hasMore=true;data.nextBefore=1;data.operations=[{id:'failed-long',status:'failed',action:'groups.manage.longOperationName'}];}
@@ -30,8 +40,10 @@ try{
    await page.locator('.phone-home-bar').click();await page.locator('.phone-app').waitFor();
    await page.waitForFunction(()=>document.querySelector('.phone-glass').getAnimations().every(a=>a.playState==='finished'));
    await page.waitForFunction(()=>document.querySelector('.dialog-drawer').getAnimations().every(a=>a.playState==='finished'));
+   await page.waitForFunction(()=>document.querySelector('.chat-toolbar').getAnimations().every(a=>a.playState==='finished'));
    const metrics=await page.evaluate(()=>{
     const box=el=>el.getBoundingClientRect();const phone=box(document.querySelector('.phone-surface')),tile=document.querySelector('.phone-app'),icon=box(tile.querySelector('.phone-app-icon')),label=box(tile.lastElementChild),handle=box(document.querySelector('.dialog-reopen'));
+    const toolbar=box(document.querySelector('.chat-toolbar')),rim=box(document.querySelector('.dialog-box'));if(toolbar.bottom+10>rim.top)throw Error('Toolbar overlaps withdrawn edge');for(const button of document.querySelectorAll('.chat-toolbar button')){const b=box(button);if(b.bottom>rim.top-8)throw Error('Footer button lacks clearance');}
     return {phoneTop:phone.top,phoneBottom:phone.bottom,stageScroll:document.querySelector('.app-stage').scrollTop,ratio:phone.height/phone.width,inside:phone.top>=0&&phone.bottom<=innerHeight,centers:Math.abs(icon.x+icon.width/2-label.x-label.width/2),handleCenter:Math.abs(handle.x+handle.width/2-innerWidth/2),handleBottom:innerHeight-handle.bottom,overflow:document.querySelector('.phone-home').scrollWidth>document.querySelector('.phone-home').clientWidth+1};
    });
    if(Math.abs(metrics.ratio-19.5/9)>.03||!metrics.inside||metrics.centers>1||metrics.handleCenter>1||metrics.handleBottom>12||metrics.overflow)throw Error(JSON.stringify(metrics));
@@ -73,6 +85,7 @@ try{
   if(await page.getByRole('button',{name:'QQ',exact:true}).count())throw Error('Disabled app must not appear');
  }else{
  await toggle.click();
+ if(scenario==='dock-motion')await checkDockMotion();
  const appTile=page.getByRole('button',{name:'QQ',exact:true});await appTile.hover();
  if(await appTile.evaluate(el=>getComputedStyle(el).backgroundColor)!=='rgba(0, 0, 0, 0)')throw Error('App hover must remain transparent');
  await page.screenshot({path:new URL('phone-home-hover.png',out).pathname});
@@ -105,6 +118,7 @@ try{
  }
  await page.screenshot({path:new URL('phone-chat.png',out).pathname});
  await page.getByRole('button',{name:'收起手机'}).click();
+ if(scenario==='dock-motion')await checkDockMotion();
  await page.evaluate(()=>window.updatePhone({focus:false,activity:{runId:'work',source:'qq',phase:'thinking'}}));
  if(await toggle.getAttribute('aria-expanded')!=='false')throw Error('Explicit close must suppress auto-open');
  await page.getByRole('button',{name:'专注对话',exact:true}).hover();
