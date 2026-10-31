@@ -39,8 +39,7 @@ const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
 
 export default function Chat({active,attention}: {active: boolean;attention:AttentionState}) {
   const t = useT();
-  const [phoneOpen,setPhoneOpen]=useState(false),[phoneClose,setPhoneClose]=useState(0),[phoneDockUsed,setPhoneDockUsed]=useState(false);
-  useEffect(()=>{if(phoneOpen)setPhoneDockUsed(true);},[phoneOpen]);
+  const [phoneOpen,setPhoneOpen]=useState(false),[phoneClose,setPhoneClose]=useState(0);
   const intro=useIntro();
   const introActive=!!intro.data && intro.data.phase!=="completed";
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
@@ -173,7 +172,7 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
   };
 
   return (
-    <div className={`chat-page${phoneOpen?' has-phone':''}${phoneDockUsed?' phone-dock-used':''}`} inert={!interactive}>
+    <div className={`chat-page${phoneOpen?' has-phone':''}`} inert={!interactive}>
       {interactive && <FirstMeeting connectionFailed={modelError} />}
       {error && <div className="chat-error">{error}</div>}
 
@@ -236,19 +235,19 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
 
       </DialogDrawer>
 
-      {/* 底部工具条：对照 VN 底部 icon 栏，操作聚拢右侧，返回标题收尾 */}
+      {/* 固定右侧竖轨，与对话框及手机的显隐独立。 */}
       <div className="chat-toolbar">
         <div className="tb-side">
           <Button
             className="tb tb-framing"
-            title={t(closeUp ? "performance.fullBody" : "performance.closeUp")}
+            aria-label={t(closeUp ? "performance.fullBody" : "performance.closeUp")}
             onClick={() => { const next = !getStage().getCloseUp(); getStage().setCloseUp(next); setCloseUp(next); }}
           >
-            {t(closeUp ? "performance.fullBody" : "performance.closeUp")}
+            <Icon name={closeUp ? "frameFull" : "frameClose"} />
           </Button>
           <Button className={`tb tb-focus tip${attention.focus?' is-active':''}`} aria-pressed={attention.focus} disabled={controlling} onClick={()=>void control(attention.focus?'focus_off':'focus_on')} aria-label={t('attention.focus')} data-tip={t('attention.focus')} data-tip-detail={t('attention.focusHint')}><Icon name="focus" size={16}/></Button>
           {phoneBusy && <Button className="tb" disabled={controlling} onClick={()=>void control('stop')} aria-label={t('attention.stopPhone')} title={t('attention.stopPhone')}><Icon name="stop" size={15}/></Button>}
-          {attention.phonePaused && !attention.focus && <Button className="tb" disabled={controlling} onClick={()=>void control('resume_phone')} title={t('attention.resumePhone')}><Icon name="phone" size={16}/><span>{t('attention.resumePhone')}</span></Button>}
+          {attention.phonePaused && !attention.focus && <Button className="tb" disabled={controlling} onClick={()=>void control('resume_phone')} title={t('attention.resumePhone')}><Icon name="play" size={16}/></Button>}
           {!introActive&&<PhoneSurface active={interactive} attention={attention} onVisibilityChange={setPhoneOpen} closeSignal={phoneClose}/>}
           <Button
             className="tb"

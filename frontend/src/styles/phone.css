@@ -90,11 +90,4 @@
 /* Clip the withdrawn body without creating a programmatically scrollable page. */
 .chat-page{overflow:clip}
 
-/* Keep the toolbar in its own dock above the withdrawn panel edge. During
-   travel it fades out before the panel crosses that row, then settles back. */
-.chat-page.has-phone .chat-toolbar{bottom:42px;animation:phone-dock-raise .72s both}
-.chat-page.phone-dock-used:not(.has-phone) .chat-toolbar{animation:phone-dock-lower .72s both}
 .dialog-drawer{transition-delay:.12s}
-@keyframes phone-dock-raise{0%{opacity:1;transform:translate(-50%,42px)}18%{opacity:0;transform:translate(-50%,42px)}82%{opacity:0;transform:translate(-50%,0)}100%{opacity:1;transform:translate(-50%,0)}}
-@keyframes phone-dock-lower{0%{opacity:1;transform:translate(-50%,-42px)}18%{opacity:0;transform:translate(-50%,-42px)}82%{opacity:0;transform:translate(-50%,0)}100%{opacity:1;transform:translate(-50%,0)}}
-@media(prefers-reduced-motion:reduce){.chat-page.has-phone .chat-toolbar,.chat-page.phone-dock-used:not(.has-phone) .chat-toolbar{animation:none}.dialog-drawer{transition:none}}

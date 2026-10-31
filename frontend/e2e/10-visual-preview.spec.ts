@@ -18,8 +18,11 @@ for (const lang of ['zh', 'en', 'ja']) {
       await page.setViewportSize(viewport);
       const dialog = await page.locator('.dialog-box').boundingBox();
       const toolbar = await page.locator('.chat-toolbar').boundingBox();
-      expect(Math.abs(dialog!.x - toolbar!.x)).toBeLessThan(1);
-      expect(Math.abs(dialog!.width - toolbar!.width)).toBeLessThan(1);
+      expect(toolbar!.width).toBeLessThan(60);
+      expect(toolbar!.height).toBeGreaterThan(toolbar!.width);
+      expect(dialog!.x + dialog!.width + 12).toBeLessThan(toolbar!.x);
+      expect(toolbar!.y).toBeGreaterThanOrEqual(0);
+      expect(toolbar!.y + toolbar!.height).toBeLessThanOrEqual(viewport.height);
       const input = await page.locator('.input-row input').boundingBox();
       expect(input!.width).toBeGreaterThan(100);
       expect(input!.y + input!.height).toBeLessThanOrEqual(viewport.height);

@@ -66,10 +66,12 @@ export default function TooltipLayer() {
     const top = preferBelow
       ? (below + b.height <= bounds.bottom - 8 ? below : above)
       : (above >= bounds.top + 8 ? above : below);
-    const left = anchor.classList.contains("tip-l") ? a.left
+    const sideRail = !!anchor.closest(".chat-toolbar");
+    const railTop = a.top + (a.height - b.height) / 2;
+    const left = sideRail ? a.left - b.width - 12 : anchor.classList.contains("tip-l") ? a.left
       : anchor.classList.contains("tip-r") ? a.right - b.width : a.left + (a.width - b.width) / 2;
     el.style.left = `${Math.max(bounds.left + 8, Math.min(left, bounds.right - b.width - 8))}px`;
-    el.style.top = `${Math.max(bounds.top + 8, Math.min(top, bounds.bottom - b.height - 8))}px`;
+    el.style.top = `${Math.max(bounds.top + 8, Math.min(sideRail ? railTop : top, bounds.bottom - b.height - 8))}px`;
     el.style.visibility = "visible";
   }, [anchor,expanded]);
   return anchor?.isConnected && anchor.dataset.tip ? createPortal(
