@@ -67,6 +67,10 @@
 }
 
 .title-tagline {
+  display: grid;
+  width: max-content;
+  max-width: calc(88cqw - 16px);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, var(--font-ui);
   margin: 0 0 0 8cqw;
   font-size: clamp(14px, 1.5cqw, 18px);
   letter-spacing: 0.1em;
@@ -192,3 +196,11 @@
   .title-presence { animation: none; }
 }
 .title-boot-error { position:absolute;left:12%;bottom:6%;font-size:13px;color:var(--danger); }
+
+/* Reserve the complete line, so typing never moves the title/menu composition. */
+.terminal-reserve,.terminal-line{grid-area:1/1;white-space:pre-wrap;overflow-wrap:anywhere}
+.terminal-reserve{visibility:hidden}
+.terminal-prompt{color:var(--accent)}
+.terminal-cursor{display:inline-block;width:.48em;height:1.05em;margin-left:.2em;vertical-align:-.12em;background:var(--accent);animation:terminal-blink 1s steps(1,end) infinite}
+@keyframes terminal-blink{0%,49%{opacity:.9}50%,100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.terminal-cursor{animation:none;opacity:.65}}

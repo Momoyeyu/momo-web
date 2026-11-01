@@ -1,6 +1,7 @@
 // 回到同一个 momo。进入见面不清空记录，也不恢复另一条时间线。
 import {navigate} from "../router";
 import {useT} from "../i18n";
+import TerminalTagline from "../components/TerminalTagline";
 import EcgCanvas from "../components/EcgCanvas";
 import Button from "../ui/Button";
 import {PRESENCE_URL,TITLE_PRESENCE} from "../lib/presenceTransition";
@@ -10,7 +11,7 @@ import {useState} from "react";
 import {enterMeeting,leaveMeeting,meetingSnapshot} from "../services/meetingClient";
 import {getChatEngine} from "../chat/engineInstance";
 
-export default function Title() {
+export default function Title({active}: {active:boolean}) {
   const t = useT();
   const [starting,setStarting]=useState(false);
   const [failed,setFailed]=useState(false);
@@ -27,7 +28,7 @@ export default function Title() {
       <header className="title-brand">
         <h1 className="title-logo" aria-label="momo"><img className="title-brand-mark" src="/brand/momo-mark.svg" alt="" /><img className="title-brand-wordmark" src="/brand/momo-wordmark.svg" alt="momo" /></h1>
         <div className="title-rule" />
-        <p className="title-tagline">{t("title.tagline")}</p>
+        <TerminalTagline key={t("title.tagline")} text={t("title.tagline")} active={active}/>
       </header>
 
       <nav className="title-menu">

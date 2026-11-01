@@ -41,7 +41,7 @@ interface PageEntry {
 function renderPage(route: Route, active: boolean, attention:AttentionState) {
   switch (route) {
     case "title":
-      return <Title />;
+      return <Title active={active} />;
     case "chat":
       return <Chat active={active} attention={attention} />;
     case "settings":
