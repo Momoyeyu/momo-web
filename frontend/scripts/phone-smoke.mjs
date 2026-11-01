@@ -61,7 +61,8 @@ try{
    const button=await page.locator('.phone-earlier').boundingBox(),screen=await page.locator('.phone-scroll').boundingBox();
    if(Math.abs(button.x+button.width/2-screen.x-screen.width/2)>2)throw Error('Earlier control is off axis');
    await page.locator('.dialog-reopen').click();
-   await page.waitForFunction(()=>{const opacity=+getComputedStyle(document.querySelector('.phone-surface')).opacity;return opacity>0&&opacity<1;});
+   await page.waitForFunction(()=>{return document.querySelector('.digital-materialize')?.dataset.phase==='disappearing';});
+   await page.waitForFunction(()=>document.querySelector('.dialog-drawer').getAnimations().some(a=>a.playState==='running'));
    const drawerMotion=await page.locator('.dialog-drawer').evaluate(el=>el.getAnimations().some(a=>a.playState==='running'));if(!drawerMotion)throw Error('Dialog must pull out continuously');
    await page.screenshot({path:new URL(`close-mid-${lang}-${size.width}.png`,out).pathname});
    await page.waitForFunction(()=>document.querySelector('.phone-toggle').getAttribute('aria-expanded')==='false');
