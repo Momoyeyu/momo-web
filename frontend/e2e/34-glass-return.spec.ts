@@ -13,12 +13,12 @@ test('Home fractures the actual scene, reveals live title and releases all resou
  await bootChat(page);
  await page.locator('.input-row input').fill('玻璃后面是 title');
  await page.screenshot({path:info.outputPath('before-home.png')});
- // Sample transient pixels atomically. Do not race screenshots against a <1s FX.
+ // Sample prepared texture pixels atomically; the live crack overlay is transparent.
  await page.evaluate(()=>{
   const scope=window as unknown as {glassFrames:{progress:number;png:string;solid:number}[]};scope.glassFrames=[];
   const sample=()=>{
    const c=document.querySelector<HTMLCanvasElement>('.glass-return-canvas');
-   if(c?.width){const p=Number(c.dataset.progress||0);const next=[.08,.35,.65][scope.glassFrames.length];
+   if(c?.width&&c.dataset.textured==='true'){const p=Number(c.dataset.progress||0);const next=[.08,.35,.65][scope.glassFrames.length];
     if(next!==undefined&&p>=next){const pixels=c.getContext('2d')!.getImageData(0,0,c.width,c.height).data;let solid=0;for(let i=3;i<pixels.length;i+=4)if(pixels[i]>200)solid++;scope.glassFrames.push({progress:p,png:c.toDataURL(),solid:solid/(c.width*c.height)});}
    }
    if(scope.glassFrames.length<3)requestAnimationFrame(sample);
@@ -46,15 +46,35 @@ test('Home fractures the actual scene, reveals live title and releases all resou
 test('glass composition holds title behind the falling scene',async({page},info)=>{
  await bootChat(page);await page.clock.install();
  await page.locator('[data-intro=chat-back]').click();
- await expect(page.locator('.glass-return-canvas')).toBeVisible();
+ await expect(page.locator('.glass-return-canvas')).toHaveAttribute('data-textured','true');
  // html-to-image itself uses RAF to finish image decoding; pause only once
  // the capture is complete, then advance the independent fragment timeline.
- await page.clock.pauseAt(await page.evaluate(()=>Date.now())+20);
+ await page.clock.pauseAt(await page.evaluate(()=>Date.now())+150);
  await page.clock.runFor(80);await page.screenshot({path:info.outputPath('glass-assembled.png')});
  await page.clock.runFor(270);await page.screenshot({path:info.outputPath('glass-falling.png')});
  await page.clock.runFor(350);await page.screenshot({path:info.outputPath('glass-clearing.png')});
  await page.clock.runFor(1000);await page.clock.resume();
  await expect(page.locator('.glass-return-canvas')).toHaveCount(0);
+});
+
+test('crack, separation and fall are observable in order, with preparation behind cracks',async({page},info)=>{
+ await bootChat(page);
+ await page.evaluate(()=>{
+  const scope=window as unknown as {glassPhases:string[];crackedDuringCapture:boolean;splitFrame?:string};scope.glassPhases=[];scope.crackedDuringCapture=false;
+  new MutationObserver(()=>{
+   const c=document.querySelector<HTMLCanvasElement>('.glass-return-canvas'),phase=c?.dataset.phase;
+   if(phase&&scope.glassPhases.at(-1)!==phase)scope.glassPhases.push(phase);
+   if(phase==='cracking'&&document.querySelector('.app-stage')?.getAttribute('data-home-phase')==='preparing')scope.crackedDuringCapture=true;
+   if(c&&phase==='breaking'&&Number(c.dataset.progress)>.35&&!scope.splitFrame)scope.splitFrame=c.toDataURL();
+  }).observe(document.querySelector('.app-stage')!,{subtree:true,attributes:true,childList:true,attributeFilter:['data-phase','data-home-phase']});
+ });
+ await page.locator('[data-intro=chat-back]').click();
+ await expect(page.locator('.glass-return-canvas')).toBeVisible();
+ await expect(page.locator('.glass-return-canvas')).toHaveCount(0);
+ const observed=await page.evaluate(()=>{const scope=window as unknown as {glassPhases:string[];crackedDuringCapture:boolean;splitFrame?:string};return {glassPhases:scope.glassPhases,crackedDuringCapture:scope.crackedDuringCapture,splitFrame:scope.splitFrame};});
+ expect(observed.glassPhases).toEqual(['cracking','breaking','falling']);expect(observed.crackedDuringCapture).toBe(true);
+ expect(observed.splitFrame).toBeTruthy();
+ await writeFile(info.outputPath('separated-glass.png'),Buffer.from(observed.splitFrame!.split(',')[1],'base64'));
 });
 
 test('phone-open Home, resize cancellation and reduced motion cannot trap the title',async({page})=>{

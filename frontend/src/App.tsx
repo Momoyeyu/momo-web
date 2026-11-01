@@ -14,7 +14,7 @@ import Backlog from "./pages/Backlog";
 import GridBackdrop from "./components/GridBackdrop";
 import ChatEntryTransition from "./components/ChatEntryTransition";
 import GlassReturn from "./effects/GlassReturn";
-import {captureStage} from "./effects/captureStage";
+import {captureStage,prepareTitle} from "./effects/captureStage";
 import { blobForward } from "./lib/blobMask";
 import { setRopeFrom } from "./lib/ropeAngle";
 import { navigate,useRoute, type Route } from "./router";
@@ -121,6 +121,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   const [fx, setFx] = useState(false);
   const [entry, setEntry] = useState<number | null>(null);
   const [exitFrame,setExitFrame]=useState<HTMLCanvasElement|null>(null);
+  const [exitScene,setExitScene]=useState<{seed:number;start:number}|null>(null);
   const [capturing,setCapturing]=useState(false);
   const stageRef=useRef<HTMLDivElement>(null),captureToken=useRef(0),capturePending=useRef(false);
   const curRef = useRef<Route>(route);
@@ -137,11 +138,17 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     if(curRef.current!=='chat'||capturePending.current)return;
     if(matchMedia('(prefers-reduced-motion: reduce)').matches||document.hidden||!stageRef.current){navigate('title');return;}
     const token=++captureToken.current;capturePending.current=true;setCapturing(true);
+    setExitScene({seed:crypto.getRandomValues(new Uint32Array(1))[0],start:performance.now()});
+    // The intact pane can crack immediately while its texture/title decode.
+    const title=prepareTitle();
     const frame=await captureStage(stageRef.current);
     if(token!==captureToken.current||curRef.current!=='chat'){
       if(frame){frame.width=0;frame.height=0;}return;
     }
-    capturePending.current=false;setCapturing(false);setExitFrame(frame);navigate('title');
+    // Decoding is only a visual optimization; unavailable art cannot block Home.
+    await Promise.race([title,new Promise(resolve=>setTimeout(resolve,120))]);
+    if(token!==captureToken.current||curRef.current!=='chat'){if(frame){frame.width=0;frame.height=0;}return;}
+    capturePending.current=false;setCapturing(false);setExitFrame(frame);if(!frame)setExitScene(null);navigate('title');
   };
 
   // 对话框不透明度 → CSS 变量，保存后即时生效。
@@ -162,7 +169,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     const prevRoute = curRef.current;
     curRef.current = route;
     captureToken.current++;capturePending.current=false;setCapturing(false);
-    if(route!=='title')setExitFrame(null);
+    if(route!=='title'){setExitFrame(null);setExitScene(null);}
     // 把被离开页的角度交给 ropeAngle 通道：新页挂载时从这里旋转过来
     setRopeFrom(ROUTE_ANGLE[prevRoute]);
 
@@ -180,6 +187,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
       setFx(false);
       setEntry(null);
       setExitFrame(null);
+      setExitScene(null);
       return;
     }
     const titleEntry = prevRoute === "title" && route === "chat";
@@ -267,7 +275,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
             aria-hidden={top ? undefined : true}
             inert={!top || p.route !== route || front || booting || !ready || !meetingReady}
           >
-            {renderPage(p.route, top && p.route === route && !front && !booting && !exitFrame && ready && meetingReady,meeting.attention,()=>void home())}
+            {renderPage(p.route, top && p.route === route && !front && !booting && (!exitFrame||route==='chat') && ready && meetingReady,meeting.attention,()=>void home())}
           </div>
         );
       })}
@@ -277,7 +285,10 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
         setEntry(null);setBooting(false);setStack(previous => previous.slice(-1));
       }} />}
 
-      {route==='title'&&exitFrame&&<GlassReturn frame={exitFrame} onComplete={()=>setExitFrame(null)}/>}
+      {exitScene&&(route==='chat'||route==='title')&&<GlassReturn frame={exitFrame} seed={exitScene.seed} start={exitScene.start} onComplete={()=>{
+        setExitFrame(null);setExitScene(null);
+        if(capturePending.current){captureToken.current++;capturePending.current=false;setCapturing(false);navigate('title');}
+      }}/>}
 
       {route === "chat" && (meeting.state === "failed" || historyFailed || meeting.state !== "active" || !historyReady || attentionFault) && <div className="meeting-gate" role="status" aria-live="polite">
         <div className="meeting-gate-panel">
