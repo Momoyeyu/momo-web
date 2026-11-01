@@ -1,3 +1,4 @@
+.app-stage{--phone-motion-duration:350ms;--phone-motion-ease:cubic-bezier(.2,.75,.2,1)}
 /* A height-led 9:19.5 device, independent of the screenshot's annotation box. */
 .phone-surface{
  position:fixed;right:22%;top:calc(50% - 24px);--phone-h:min(78cqh,720px);height:var(--phone-h);width:calc(var(--phone-h) * 6 / 13);min-width:0;max-width:calc(var(--phone-h) * 6 / 13);aspect-ratio:9/19.5;
@@ -60,9 +61,9 @@
 .phone-home:has(.phone-app:hover) .phone-field-waves{opacity:.7}
 @keyframes phone-wallpaper-drift{from{transform:translate(-1%,1%) scale(1.02)}to{transform:translate(1%,-1%) scale(1.055)}}
 @keyframes phone-field-drift{from{transform:translateY(3px) rotate(-4deg)}to{transform:translateY(-5px) rotate(5deg)}}
-.live2d-home{transition:translate .28s cubic-bezier(.2,.75,.2,1)}
+.live2d-home{transition:translate var(--phone-motion-duration) var(--phone-motion-ease)}
 .app-stage[data-phone-present="true"] .live2d-home{translate:-11% 0}
-.dialog-drawer{position:absolute;inset:0;pointer-events:none;transform:translateY(0);transition:transform .3s cubic-bezier(.22,.75,.2,1)}
+.dialog-drawer{position:absolute;inset:0;pointer-events:none;transform:translateY(0);transition:transform var(--phone-motion-duration) var(--phone-motion-ease)}
 .chat-page.has-phone .dialog-drawer{transition-delay:0s;transform:translateY(var(--drawer-travel,236px))}
 .dialog-drawer .dialog-box{overflow:visible}
 .dialog-drawer .dialog-box>.nameplate-row,.dialog-drawer .dialog-box>.subtitle,.dialog-drawer .dialog-box>.input-row{transition:opacity .2s}
@@ -82,4 +83,4 @@
 /* Clip the withdrawn body without creating a programmatically scrollable page. */
 .chat-page{overflow:clip}
 
-.dialog-drawer{transition-delay:.12s}
+.dialog-drawer{transition-delay:0s}
