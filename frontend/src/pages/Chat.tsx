@@ -29,6 +29,7 @@ import FirstMeeting from "../components/FirstMeeting";
 import DialogBox from "../components/DialogBox";
 import "../styles/chat.css";
 import {controlAttention,type AttentionState} from '../services/meetingClient';
+import {warmCapture} from '../effects/captureStage';
 
 const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
   idle: "chat.idle",
@@ -37,7 +38,7 @@ const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
   speaking: "chat.speaking",
 };
 
-export default function Chat({active,attention}: {active: boolean;attention:AttentionState}) {
+export default function Chat({active,attention,onHome}: {active: boolean;attention:AttentionState;onHome:()=>void}) {
   const t = useT();
   const [phoneOpen,setPhoneOpen]=useState(false),[phoneClose,setPhoneClose]=useState(0);
   const intro=useIntro();
@@ -61,6 +62,12 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
   const [closeUp, setCloseUp] = useState(() => getStage().getCloseUp());
   const [controlling,setControlling]=useState(false);
   const dialog = useRef<HTMLDivElement>(null);
+  useEffect(()=>{
+    if(!active)return;
+    // Warm only static fonts/library, never a user's conversation screenshot.
+    const timer=setTimeout(()=>{const stage=dialog.current?.closest<HTMLElement>('.app-stage');if(stage)void warmCapture(stage);},200);
+    return()=>clearTimeout(timer);
+  },[active]);
   const [entered, setEntered] = useState(false);
   // Follow the actual CSS animation rather than a second, competing timer.
   // No animations (reduced motion) resolves immediately; cancelled entries
@@ -286,9 +293,9 @@ export default function Chat({active,attention}: {active: boolean;attention:Atte
             data-intro="chat-back"
             aria-label={t("common.backTitle")}
             title={t("common.backTitle")}
-            onClick={() => {
-              navigate("title");
-            }}
+            onPointerEnter={()=>{const stage=dialog.current?.closest<HTMLElement>('.app-stage');if(stage)void warmCapture(stage);}}
+            onFocus={()=>{const stage=dialog.current?.closest<HTMLElement>('.app-stage');if(stage)void warmCapture(stage);}}
+            onClick={onHome}
           >
             <Icon name="home" />
           </Button>

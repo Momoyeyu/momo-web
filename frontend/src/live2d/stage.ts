@@ -145,6 +145,9 @@ export class Live2DStage {
     this.app.renderer.on("resize", () => this.fitModel());
   }
 
+  /** Explicit same-task repaint for an ephemeral transition screenshot. */
+  renderForSnapshot(): void { this.app?.render(); }
+
   /** One canvas/context/ticker; only its host and viewport change. */
   setChatHost(host: HTMLElement): void {
     this.chatHost = host;

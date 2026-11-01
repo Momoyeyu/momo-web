@@ -13,12 +13,14 @@ import Settings from "./pages/Settings";
 import Backlog from "./pages/Backlog";
 import GridBackdrop from "./components/GridBackdrop";
 import ChatEntryTransition from "./components/ChatEntryTransition";
+import GlassReturn from "./effects/GlassReturn";
+import {captureStage} from "./effects/captureStage";
 import { blobForward } from "./lib/blobMask";
 import { setRopeFrom } from "./lib/ropeAngle";
-import { useRoute, type Route } from "./router";
+import { navigate,useRoute, type Route } from "./router";
 import { getSettings, subscribe } from "./lib/store";
 
-// Only title → chat uses the ink/ASCII entry. All other navigation keeps RoPE.
+// Boot uses ink/ASCII; chat's Home fractures the captured scene. Subpages keep RoPE.
 const BLOOM_MS = 560; // RoPE 页之间的边缘漫开
 const RIPPLE_MS = 1000; // 涟漪散尽（特效层生命周期）
 // 每个页面一个坐标系角度（RoPE）。**按层级单调递增**：
@@ -38,12 +40,12 @@ interface PageEntry {
   leaving?: boolean;
 }
 
-function renderPage(route: Route, active: boolean, attention:AttentionState) {
+function renderPage(route: Route, active: boolean, attention:AttentionState,onHome:()=>void) {
   switch (route) {
     case "title":
       return <Title active={active} />;
     case "chat":
-      return <Chat active={active} attention={attention} />;
+      return <Chat active={active} attention={attention} onHome={onHome} />;
     case "settings":
       return <Settings />;
     case "backlog":
@@ -118,6 +120,9 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   const [booting, setBooting] = useState(false);
   const [fx, setFx] = useState(false);
   const [entry, setEntry] = useState<number | null>(null);
+  const [exitFrame,setExitFrame]=useState<HTMLCanvasElement|null>(null);
+  const [capturing,setCapturing]=useState(false);
+  const stageRef=useRef<HTMLDivElement>(null),captureToken=useRef(0),capturePending=useRef(false);
   const curRef = useRef<Route>(route);
   const seq = useRef(1);
   // 访问历史：判断"这一次是往里走还是往回走"。返回目标若正好是上一页，
@@ -125,6 +130,19 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   // 层级本身：title 是根，chat / settings 挂在 title 下，
   // backlog 挂在 chat 下——回退按钮都指向各自父级，所以历史栈足够判定。
   const histRef = useRef<Route[]>([route]);
+
+  useEffect(()=>()=>{captureToken.current++;},[]);
+  useEffect(()=>()=>{if(exitFrame){exitFrame.width=0;exitFrame.height=0;}},[exitFrame]);
+  const home=async()=>{
+    if(curRef.current!=='chat'||capturePending.current)return;
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches||document.hidden||!stageRef.current){navigate('title');return;}
+    const token=++captureToken.current;capturePending.current=true;setCapturing(true);
+    const frame=await captureStage(stageRef.current);
+    if(token!==captureToken.current||curRef.current!=='chat'){
+      if(frame){frame.width=0;frame.height=0;}return;
+    }
+    capturePending.current=false;setCapturing(false);setExitFrame(frame);navigate('title');
+  };
 
   // 对话框不透明度 → CSS 变量，保存后即时生效。
   useEffect(() => {
@@ -143,6 +161,8 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     if (route === curRef.current) return;
     const prevRoute = curRef.current;
     curRef.current = route;
+    captureToken.current++;capturePending.current=false;setCapturing(false);
+    if(route!=='title')setExitFrame(null);
     // 把被离开页的角度交给 ropeAngle 通道：新页挂载时从这里旋转过来
     setRopeFrom(ROUTE_ANGLE[prevRoute]);
 
@@ -159,11 +179,13 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
       setBooting(false);
       setFx(false);
       setEntry(null);
+      setExitFrame(null);
       return;
     }
     const titleEntry = prevRoute === "title" && route === "chat";
+    const glassExit = prevRoute === 'chat' && route === 'title' && exitFrame !== null;
     setRev(back);
-    setFx(!titleEntry);
+    setFx(!titleEntry&&!glassExit);
 
     let t1: number | undefined;
     const t2 = window.setTimeout(() => setFx(false), RIPPLE_MS);
@@ -173,7 +195,10 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     const withoutSame = (prev: PageEntry[]): PageEntry[] =>
       prev.filter((p) => p.route !== route);
 
-    if (titleEntry) {
+    if(glassExit){
+      setEntry(null);setBooting(false);setFront(false);
+      setStack([{id:seq.current++,route}]);
+    } else if (titleEntry) {
       // The ink plate releases the real scene; other routes keep their RoPE.
       setStack((prev) => [
         ...withoutSame(prev).map((p) => ({ ...p, leaving: true })),
@@ -211,7 +236,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
 
   // 全部内容锁在 16:9 舞台内（.app-stage）：窗口比例任意，画面比例恒定。
   return (
-    <div className={`app-stage${fx ? " tx-active" : ""}`} style={stageStyle}>
+    <div ref={stageRef} className={`app-stage${fx ? " tx-active" : ""}`} style={stageStyle} inert={capturing||exitFrame!==null} data-home-phase={capturing?'preparing':exitFrame?'shattering':undefined}>
       {/* 舞台级网格：常驻、不参与页面变换、随页面坐标系旋转（RoPE） */}
       {/* sweep 放长到 900ms：遮幕/漫开盖住的时段之外仍能看到旋转 */}
       <GridBackdrop angle={ROUTE_ANGLE[route]} sweepMs={900} />
@@ -242,7 +267,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
             aria-hidden={top ? undefined : true}
             inert={!top || p.route !== route || front || booting || !ready || !meetingReady}
           >
-            {renderPage(p.route, top && p.route === route && !front && !booting && ready && meetingReady,meeting.attention)}
+            {renderPage(p.route, top && p.route === route && !front && !booting && !exitFrame && ready && meetingReady,meeting.attention,()=>void home())}
           </div>
         );
       })}
@@ -251,6 +276,8 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
         if(curRef.current !== "chat")return;
         setEntry(null);setBooting(false);setStack(previous => previous.slice(-1));
       }} />}
+
+      {route==='title'&&exitFrame&&<GlassReturn frame={exitFrame} onComplete={()=>setExitFrame(null)}/>}
 
       {route === "chat" && (meeting.state === "failed" || historyFailed || meeting.state !== "active" || !historyReady || attentionFault) && <div className="meeting-gate" role="status" aria-live="polite">
         <div className="meeting-gate-panel">
