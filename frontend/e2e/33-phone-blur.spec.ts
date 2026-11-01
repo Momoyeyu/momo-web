@@ -19,7 +19,13 @@ test('blur and avatar share a 350ms clock in both directions',async({page},info)
   expect(timing.phone.duration).toBe(350);expect(timing.avatar.duration).toBe(350);
   expect(timing.phone.easing).toBe(timing.avatar.easing);expect(timing.startDelta).toBeLessThan(20);
   expect(timing.opacity).toBeGreaterThan(0);expect(timing.opacity).toBeLessThan(1);expect(timing.filter).toContain('blur(');
+  // Freeze both CSS clocks at the same sampled point; avoid racing a 350ms window.
+  await page.evaluate(()=>{for(const selector of ['.blur-presence-source','.live2d-home'])for(const a of document.querySelector(selector)!.getAnimations()){a.pause();a.currentTime=50;}});
+  await page.waitForFunction(()=>{const p=Number(document.querySelector('.blur-presence')?.getAttribute('data-grid-progress'));return p>.3&&p<.6;},{},{polling:'raf'});
+  const grid=await page.locator('.phone-grid-defs clipPath').evaluate(el=>({count:el.children.length,top:Number(el.firstElementChild?.getAttribute('width')),bottom:Number(el.lastElementChild?.getAttribute('width'))}));
+  expect(grid.count).toBeGreaterThan(100);expect(grid.top).toBe(0);expect(grid.bottom).toBeGreaterThan(0);
   await page.screenshot({path:info.outputPath(opening?'blur-in.png':'blur-out.png')});
+  await page.evaluate(()=>{for(const selector of ['.blur-presence-source','.live2d-home'])for(const a of document.querySelector(selector)!.getAnimations())a.play();});
   await expect(fx).toHaveAttribute('data-phase',opening?'visible':'hidden');
   await expect.poll(()=>page.locator('.live2d-home').evaluate(el=>el.getAnimations().filter(a=>a.playState==='running').length)).toBe(0);
  }

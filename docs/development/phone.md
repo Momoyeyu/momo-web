@@ -32,7 +32,7 @@
 
 ## 手机显隐
 
-当前使用 `effects/BlurPresence.tsx`：真实DOM在透明度0→1、blur(12px)→blur(0px)之间切换，关闭反向。无需Worker、控制纹理、逐帧JavaScript或预加载。此前数字马赛克版本保存在Git历史 `aed68ba` 中，当前运行路径已移除。
+当前使用 `effects/BlurPresence.tsx`：真实DOM在透明度0→1、blur(12px)→blur(0px)之间切换，同时通过18px小正方形裁切逐格展开；出现时从底向上，关闭时从顶向下反向收拢。方格复用title→chat后半程的print-front展开曲线，公共算法位于`lib/gridReveal.ts`；title仍保留原来的斜向顺序和时机。无需Worker、图片纹理或预加载；过渡期间RAF只更新几百个裁切矩形，进度读取现有CSS透明度，不增加第二个计时器。稳定后解除裁切并取消RAF，快速反向与离场清理旧回调。此前数字马赛克版本保存在Git历史 `aed68ba` 中，当前运行路径已移除。
 
 手机、momo横移和对白抽屉共用 `--phone-motion-duration:350ms` 与同一个缓动函数。旧人物横移280ms，速度降低20%按280/0.8=350ms换算；出现和消失都在起点同步通知场景，不再顺序等待。CSS负责快速反向，完成后的visibility由实际动画finished驱动，旧回调不能关闭新动画。
 

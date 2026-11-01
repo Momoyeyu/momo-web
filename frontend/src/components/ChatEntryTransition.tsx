@@ -1,6 +1,7 @@
 import {useEffect,useRef} from 'react';
 import {ENTRY_MS,PRESENCE_URL,INKS,GLYPHS,ease,inkCells,inkFrame,presenceRect} from '../lib/presenceTransition';
 import '../styles/presence-entry.css';
+import {gridReveal} from '../lib/gridReveal';
 
 /** Only the decoration owns a clock; the real room and avatar stay underneath. */
 export default function ChatEntryTransition({onComplete}:{onComplete:()=>void}) {
@@ -59,7 +60,7 @@ export default function ChatEntryTransition({onComplete}:{onComplete:()=>void}) 
           const columns=64,rows=36,bw=width/columns,bh=height/rows;
           if(p>.34)for(let row=0;row<rows;row++)for(let col=0;col<columns;col++){
             const order=(col/columns)*.58+(row/rows)*.42;
-            const reveal=ease(.34+order*.36,.46+order*.36,p);
+            const reveal=gridReveal(order,p,.34,.36,.12);
             if(reveal)context.clearRect(col*bw,row*bh,bw*reveal+1/ratio,bh*reveal+1/ratio);
           }
           const source=presenceRect(width,height);
