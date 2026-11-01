@@ -43,3 +43,28 @@ for(const lang of ['zh','en','ja'])test(`side rail stays fixed across phone and 
  }
  expect(failures).toEqual([]);
 });
+
+test('help stays reachable when the pointer crosses the gap slowly',async({page})=>{
+ await page.route('**/api/intro',route=>route.fulfill({json:{phase:'completed',languageConfirmed:true,configurationValid:true}}));
+ await bootChat(page);
+ const trigger=page.locator('.tb-focus');await trigger.hover();
+ const bubble=page.locator('.tooltip-bubble'),help=bubble.locator('.tooltip-help');
+ await expect(help).toBeVisible();
+ const a=(await trigger.boundingBox())!,b=(await bubble.boundingBox())!;
+ // Pause in the visible gap, rather than teleporting straight into the card.
+ await page.mouse.move((a.x+b.x+b.width)/2,a.y+a.height/2);
+ await page.waitForTimeout(450);
+ await expect(bubble).toBeVisible();
+ await help.hover();await help.click();
+ await expect(bubble.locator('.tooltip-detail')).toBeVisible();
+ await page.screenshot({path:'../target/tooltip-help-expanded.png'});
+ await page.keyboard.press('Escape');await expect(bubble).toHaveCount(0);
+ // Keyboard users can also move focus into the help without losing the card.
+ await trigger.focus();await expect(help).toBeVisible();
+ await help.focus();await page.keyboard.press('Enter');
+ await expect(bubble.locator('.tooltip-detail')).toBeVisible();
+ await page.mouse.move(20,20);await trigger.focus();
+ await page.keyboard.press('Escape');await expect(bubble).toHaveCount(0);
+ await trigger.hover();await expect(bubble).toBeVisible();
+ await page.mouse.move(20,20);await expect(bubble).toHaveCount(0);
+});

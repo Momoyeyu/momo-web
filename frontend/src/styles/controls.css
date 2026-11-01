@@ -537,5 +537,10 @@
 }
 
 .tooltip-bubble:has(.tooltip-help){pointer-events:auto}
+/* Invisible hit area bridges the 8/12px visual gap; no need to rush the cursor. */
+.tooltip-bubble:has(.tooltip-help)::before{content:"";position:absolute}
+.tooltip-bubble[data-side="left"]:has(.tooltip-help)::before{left:100%;top:0;width:14px;height:100%}
+.tooltip-bubble[data-side="top"]:has(.tooltip-help)::before{top:100%;left:0;height:10px;width:100%}
+.tooltip-bubble[data-side="bottom"]:has(.tooltip-help)::before{bottom:100%;left:0;height:10px;width:100%}
 .tooltip-help{display:inline-grid;place-items:center;width:18px;height:18px;min-height:0;margin-left:8px;padding:0;border:1px solid var(--line-strong);border-radius:50%;background:transparent;color:var(--text-dim);font:inherit;font-size:11px}
 .tooltip-detail{margin:8px 0 0;padding-top:8px;border-top:1px solid var(--line-soft);font-size:12px;line-height:1.6;color:var(--text-dim)}

@@ -11,24 +11,36 @@ export default function TooltipLayer() {
     const trigger = (target: EventTarget | null) => target instanceof Element
       ? target.closest<HTMLElement>(".tip[data-tip],button[data-tip]") : null;
     let timer:ReturnType<typeof setTimeout>;
-    const over = (event: MouseEvent) => {
+    // Treat the trigger, the card and its transparent bridge as one hover region.
+    // A background mouseover must not bypass the delayed close on mouseout.
+    const closeSoon = () => {
       clearTimeout(timer);
-      if(event.target instanceof Node&&bubble.current?.contains(event.target))return;
-      setAnchor(trigger(event.target));
+      timer = setTimeout(() => setAnchor(null), 300);
+    };
+    const over = (event: MouseEvent) => {
+      if(event.target instanceof Node&&bubble.current?.contains(event.target)){
+        clearTimeout(timer);
+        return;
+      }
+      const next = trigger(event.target);
+      if(next){ clearTimeout(timer); setAnchor(next); }
+      else closeSoon();
     };
     const out = (event: MouseEvent) => {
       const next = trigger(event.relatedTarget);
       if(event.relatedTarget instanceof Node&&bubble.current?.contains(event.relatedTarget))return;
       if(next)return;
-      timer=setTimeout(()=>setAnchor(null),140);
+      closeSoon();
     };
     const focus = (event: FocusEvent) => {
+      clearTimeout(timer);
       const el = trigger(event.target);
       if (el?.matches(":focus-visible")) setAnchor(el);
     };
     const hide = (event?:Event) => {
       if(event?.target instanceof Node&&bubble.current?.contains(event.target))return;
       if(event instanceof FocusEvent&&event.relatedTarget instanceof Node&&bubble.current?.contains(event.relatedTarget))return;
+      clearTimeout(timer);
       setAnchor(null);
     };
     const key = (event: KeyboardEvent) => { if (event.key === "Escape") setAnchor(null); };
@@ -72,6 +84,7 @@ export default function TooltipLayer() {
       : anchor.classList.contains("tip-r") ? a.right - b.width : a.left + (a.width - b.width) / 2;
     el.style.left = `${Math.max(bounds.left + 8, Math.min(left, bounds.right - b.width - 8))}px`;
     el.style.top = `${Math.max(bounds.top + 8, Math.min(sideRail ? railTop : top, bounds.bottom - b.height - 8))}px`;
+    el.dataset.side = sideRail ? "left" : top >= a.bottom ? "bottom" : "top";
     el.style.visibility = "visible";
   }, [anchor,expanded]);
   return anchor?.isConnected && anchor.dataset.tip ? createPortal(
