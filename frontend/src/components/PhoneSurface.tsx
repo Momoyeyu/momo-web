@@ -68,6 +68,12 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
  },[active,open,activity?.runId,activity?.peerId,busyApp?.id]);
  useEffect(()=>{if(session.lease===lease){session.app=app;session.peer=peer;}},[lease,app,peer]);
  const present=(value:boolean)=>{onVisibilityChange?.(value);document.querySelector('.app-stage')?.setAttribute('data-phone-present',String(value));};
+ const enterPhone=async()=>{
+  await new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve())));
+  const stage=document.querySelector('.app-stage');
+  const animations=[...(stage?.querySelector('.live2d-home')?.getAnimations()??[]),...(stage?.querySelector('.dialog-drawer')?.getAnimations()??[])];
+  await Promise.allSettled(animations.map(a=>a.finished));
+ };
  const choosePeer=(value:string)=>changePeer(value);
  const toggle=()=>{session.open=!open;if(!session.open)session.suppressed=true;setOpen(session.open);};
  const current=apps.find(a=>a.id===app);
@@ -79,7 +85,7 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
   catch{setFailed(true);}finally{setLoading(false);}};
 
  return <>{createPortal(<section className={`phone-surface ${open?'is-open':'is-closed'}${active?'':' is-suspended'}`} inert={!open||!active} aria-hidden={!open||!active} aria-label={t('phone.title')}>
-  <DigitalMaterialize visible={open} initialVisible={session.open} animate={active} onPresenceChange={present}>
+  <DigitalMaterialize visible={open} initialVisible={session.open} animate={active} beforeEnter={enterPhone} onPresenceChange={present}>
   <div className="phone-glass"><div className="phone-top"><span>momo</span><span className={`phone-activity tip${busyApp?' is-busy':''}`} role="img" aria-label={attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')} data-tip={attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')}><Icon name={attention.focus?'focus':busyApp?'phone':'message'} size={14}/></span><Button variant="ghost" className="phone-nav phone-close tip" data-tip={t('phone.close')} onClick={toggle} aria-label={t('phone.close')}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></Button></div>
    {failed?<div className="phone-empty" role="status">{t('phone.unavailable')}</div>:current?.render?current.render({data,peer,setPeer:changePeer,setApp:changeApp,choosePeer,messages,loading,cursor,earlier}):<div className="phone-home"><div className="phone-wallpaper" aria-hidden="true"><PhoneField/></div><div className="phone-apps">{apps.map(a=><button className="phone-app" key={a.id} onClick={()=>{changeApp(a.id);}}><span className="phone-app-icon">{a.icon}{(data?.apps.find(p=>p.id===a.id)?.pending??0)>0&&<i className="phone-dot"/>}</span><span>{data?.apps.find(p=>p.id===a.id)?.name}</span></button>)}</div><p className="phone-empty">{current?t('phone.standby'):apps.length?'':t('phone.empty')}</p></div>}
    <button className="phone-home-bar" aria-label={t('phone.home')} onClick={()=>{changeApp(null);}}/>

@@ -5,11 +5,14 @@ test('the live phone itself reconstructs and dissolves, including interrupted tr
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('**/api/intro',r=>r.fulfill({json:{phase:'completed',languageConfirmed:true,configurationValid:true}}));
  await page.route('**/api/phone?**',r=>r.fulfill({json:{apps:[{id:'momo-qq',provider:'qq',name:'QQ',enabled:true,pending:0}],accountKey:'fx',pending:0,conversations:[],messages:[],operations:[],hasMore:false,nextBefore:null,activity:null}}));
+ await page.route('**/api/meeting**',r=>r.fulfill({json:{leaseId:'materialize-visual',epoch:1,expiresIn:3600,activation:'active',focus:false,phonePaused:false,busy:false,activity:null,presentation:null}}));
  await bootChat(page);
  const effect=page.locator('.phone-surface .digital-materialize'),content=effect.locator('.digital-materialize-source');
  await expect(effect).toHaveAttribute('data-phase','hidden');
+ await expect(effect).toHaveAttribute('data-ready','true');
  await page.clock.install();await page.clock.pauseAt(new Date());
  const toggle=page.locator('.phone-toggle');await toggle.click();
+ await page.clock.runFor(50);await expect(effect).toHaveAttribute('data-phase','appearing');
  for(const [index,step] of [100,120,160,260].entries()){
   await page.clock.runFor(step);
   if(index<3){await expect(effect).toHaveAttribute('data-phase','appearing');expect(await content.evaluate(e=>getComputedStyle(e).filter)).toContain('url(');}
@@ -26,7 +29,8 @@ test('the live phone itself reconstructs and dissolves, including interrupted tr
  await expect(effect).toHaveAttribute('data-phase','hidden');
  await expect(page.locator('.app-stage')).toHaveAttribute('data-phone-present','false');
  await expect(content).toBeHidden();
- await toggle.click();await page.clock.runFor(220);await toggle.click();await page.clock.runFor(100);await toggle.click();await page.clock.runFor(700);
+ await page.clock.resume();
+ await toggle.click();await page.waitForFunction(()=>document.querySelector('.digital-materialize')?.getAttribute('data-phase')==='appearing',{},{polling:'raf'});await page.waitForTimeout(120);await toggle.click();await page.waitForTimeout(80);await toggle.click();
  await expect(effect).toHaveAttribute('data-phase','visible');
  await page.emulateMedia({reducedMotion:'reduce'});await toggle.click();
  await expect(effect).toHaveAttribute('data-phase','hidden');
@@ -47,5 +51,7 @@ test('the live phone itself reconstructs and dissolves, including interrupted tr
  }
  const replayed=await page.evaluate(()=>(window as unknown as {mosaicPhases:string[]}).mosaicPhases.filter(p=>p==='appearing'||p==='disappearing'));
  expect(replayed).toEqual([]);
+ const left=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/meeting/leave');
+ await page.locator('[data-intro=chat-back]').click();await left;
  expect(errors).toEqual([]);
 });
