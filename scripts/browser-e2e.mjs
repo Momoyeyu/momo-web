@@ -77,10 +77,17 @@ const provider=createServer(async(req,res)=>{
   try{
     let body='';for await(const chunk of req){body+=chunk;if(body.length>1024*1024)throw new Error('Synthetic request is too large');}
     const input=JSON.parse(body||'{}');
+    const imageParts=(input.messages??[]).flatMap(message=>Array.isArray(message.content)?message.content:[]).filter(part=>part.type==='image_url');
+    let imageReply='';
+    if(imageParts.length&&input.model!=='no-vision'){
+      const fixture=spawnSync(python,[path.join(app,'scripts/vision-fixture.py')],{input:body,encoding:'utf8',maxBuffer:1024*1024});
+      if(fixture.status!==0)throw new Error('Synthetic image content was not recognized');
+      imageReply=fixture.stdout.trim();
+    }
     if(input.stream){
       res.writeHead(200,{'content-type':'text/event-stream'});
-      res.end('data: '+JSON.stringify({choices:[{delta:{content:'测试通过。'},index:0}]})+'\n\ndata: [DONE]\n\n');
-    }else{res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({choices:[{message:{content:'[]'}}]}));}
+      res.end('data: '+JSON.stringify({choices:[{delta:{content:imageReply?`The image is ${imageReply}.`:'测试通过。'},index:0}]})+'\n\ndata: [DONE]\n\n');
+    }else{res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify({choices:[{message:{content:imageReply||'[]'}}]}));}
   }catch{res.writeHead(400);res.end();}
 });
 let interrupted;

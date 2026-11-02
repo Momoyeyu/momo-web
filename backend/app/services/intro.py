@@ -18,6 +18,8 @@ def _save(c,value):
 
 
 def fingerprint(config):
+    # Vision is separately verified and does not change the intro tool handshake.
+    config = {key:value for key,value in config.items() if key != 'vision'}
     return hashlib.sha256(json.dumps(config,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 
 

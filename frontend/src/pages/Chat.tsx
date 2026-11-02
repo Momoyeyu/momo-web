@@ -1,3 +1,5 @@
+import {useImageDraft} from '../chat/useImageDraft';
+import '../styles/images.css';
 import DialogDrawer from '../phone/DialogDrawer';
 import DialogHandle from '../phone/DialogHandle';
 import {useIntro} from "../services/introClient";
@@ -60,6 +62,9 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   const [error, setError] = useState<string | null>(null);
   const [modelError, setModelError] = useState(false);
   const [input, setInput] = useState("");
+  const drafts=useImageDraft();
+  const [imageSending,setImageSending]=useState(false);
+  const imagesEnabled=!!getState().settings.llm.vision&&!introActive;
   const [closeUp, setCloseUp] = useState(() => getStage().getCloseUp());
   const [controlling,setControlling]=useState(false);
   const dialog = useRef<HTMLDivElement>(null);
@@ -92,6 +97,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
     const engine = getChatEngine();
     const showErr = (e: Error): void => {
       let msg = e.message || t("chat.errDefault");
+      if(msg.startsWith("vision."))msg=t(msg);
       if (e instanceof ServiceError) {
         if (e.service === "llm") setModelError(true);
         const detail =
@@ -99,7 +105,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
             ? t("chat.errCfg")
             : e.failure === "unreachable"
               ? t("chat.errConn")
-              : e.detail || `HTTP ${e.status}`;
+              : e.detail?.startsWith("vision.") ? t(e.detail) : e.detail || `HTTP ${e.status}`;
         msg = t(`chat.errSvc.${e.service}`, { detail });
       }
       setError(msg);
@@ -142,9 +148,17 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
 
   const send = (): void => {
     const text = input.trim();
-    if (!text) return;
+    if ((!text&&!drafts.items.length)||imageSending||drafts.items.length&&!drafts.ready) return;
+    if(drafts.items.length&&!imagesEnabled){setError(t('vision.disabled'));return;}
     setModelError(false);
-    getChatEngine().sendText(text);
+    if(drafts.items.length){
+      setImageSending(true);
+      getChatEngine().sendText(text,drafts.items.flatMap(item=>item.image?[item.image]:[]),ok=>{
+        setImageSending(false);
+        if(ok)drafts.accepted();
+        else setInput(current=>current||text);
+      });
+    }else getChatEngine().sendText(text);
     setInput("");
   };
 
@@ -203,12 +217,29 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
             ) : undefined
           }
         >
+          {drafts.items.length>0&&<div className="image-drafts" aria-label={t('vision.draft')}>
+            {drafts.items.map(item=><div key={item.key} className={`image-draft${item.error?' has-error':''}`}>
+              <img src={item.url} alt={t('vision.image')}/>
+              <button type="button" disabled={imageSending} aria-label={t('vision.remove')} onClick={()=>drafts.remove(item.key)}>×</button>
+              {item.pending?<small>{t('vision.loading')}</small>:item.error?<button className="image-retry" title={t(item.error)} onClick={()=>drafts.retry(item)}>{t('vision.retry')}</button>:item.image?.animated?<small>{t('vision.still')}</small>:null}
+            </div>)}
+          </div>}
+          {drafts.error&&<p className="image-draft-error" role="alert">{t(drafts.error)}</p>}
           <div data-intro="name-input" className="input-row" inert={phoneOpen}>
             <span className="terminal-input-prompt" aria-hidden="true"><TerminalPrompt/></span>
             <input
               value={input}
               placeholder={t("chat.placeholder", { name })}
               onChange={(e) => setInput(e.target.value)}
+              onPaste={e=>{
+                const files=Array.from(e.clipboardData.items).filter(item=>item.kind==='file'&&item.type.startsWith('image/')).flatMap(item=>{const file=item.getAsFile();return file?[file]:[];});
+                if(!files.length)return;
+                e.preventDefault();
+                if(!imagesEnabled){setError(t('vision.disabled'));return;}
+                if(imageSending)return;
+                drafts.add(files);
+                const text=e.clipboardData.getData('text/plain');if(text)setInput(current=>current+text);
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) send();
               }}
@@ -233,7 +264,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
               variant="solid"
               className={`send-btn${busy ? " is-stopping" : ""}`}
               onClick={busy ? () => getChatEngine().interrupt() : send}
-              disabled={!busy && !input.trim()}
+              disabled={!busy && (imageSending||(!input.trim()&&!drafts.items.length)||(drafts.items.length>0&&!drafts.ready))}
               aria-label={t(busy ? "chat.stop" : "chat.send")}
               title={t(busy ? "chat.stop" : "chat.send")}
             >

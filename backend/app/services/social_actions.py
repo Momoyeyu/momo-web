@@ -14,7 +14,7 @@ from .social import SocialError
 ACTIONS = {
     'contacts.list': ('contacts',), 'history.list': ('history',),
     'private.send': ('proactive',), 'group.send': ('groups','proactive'),
-    'media.send': ('media',), 'media.fetch': ('media','history'),
+    'media.send': ('media',), 'media.fetch': ('media','history'), 'media.incoming': ('media',),
     'friends.listRequests': ('friendRequests',), 'friends.respond': ('friendRequests',),
     'groups.list': ('groups',), 'groups.members': ('groups','contacts'),
     'groups.manage': ('groups','groupManagement'),
@@ -55,7 +55,7 @@ def _params(action, values):
         'contacts.list': {'limit','cursor'}, 'history.list': {'peerId','groupId','limit','beforeMessageId'},
         'private.send': {'peerId','text'}, 'group.send': {'peerId','groupId','text'},
         'media.send': {'peerId','groupId','mediaId','text'},
-        'media.fetch': {'peerId','groupId','messageId','elementId'},
+        'media.fetch': {'peerId','groupId','messageId','elementId'}, 'media.incoming': {'peerId','messageId','elementId'},
         'friends.listRequests': {'limit','cursor'}, 'friends.respond': {'requestId','peerId','approve','reason'},
         'groups.list': {'limit','cursor'}, 'groups.members': {'peerId','groupId','limit','cursor'},
         'groups.manage': {'peerId','groupId','operation','memberId','name','durationSeconds','enabled'},
@@ -64,7 +64,7 @@ def _params(action, values):
         raise SocialError('Unreviewed QQ operation argument')
     params=copy.deepcopy(values)
     peer=None
-    scoped=action in {'private.send','group.send','history.list','media.send','media.fetch','groups.members','groups.manage'}
+    scoped=action in {'private.send','group.send','history.list','media.send','media.fetch','media.incoming','groups.members','groups.manage'}
     if scoped:
         if bool(params.get('peerId')) == bool(params.get('groupId')):
             raise SocialError('Choose exactly one QQ conversation')
@@ -87,7 +87,7 @@ def _params(action, values):
         params['mediaId']=_token(params.get('mediaId'),'media reference')
         if 'text' in params:
             params['text']=_text(params['text'],'caption',1000)
-    if action=='media.fetch':
+    if action in {'media.fetch','media.incoming'}:
         params['messageId']=_token(params.get('messageId'),'message reference')
         params['elementId']=_token(params.get('elementId'),'element reference')
     if action.endswith('.list') or action.endswith('.listRequests') or action=='groups.members':
@@ -183,6 +183,21 @@ def authorize_action(store, action, params, *, account_id=None, revision=None, a
                 raise SocialError('QQ conversation is outside the authorized scope')
             if not local_owner and store._audience(account,peer)!=audience:
                 raise SocialError('QQ operation cannot access another conversation')
+        if action == 'media.incoming':
+            from .coordinator import current_run
+            from ..core import db
+            import json
+            rows = db.query('SELECT * FROM inbox WHERE run_id=?', (current_run.get(),))
+            if local_owner or not rows:
+                raise SocialError('Incoming images require their admitted QQ event')
+            incoming = rows[0]
+            refs = json.loads(incoming['attachments'])
+            if (incoming['source'] != 'qq' or incoming['account_id'] != account['accountId']
+                or incoming['self_id'] != account['expectedSelfId'] or incoming['peer_id'] != peer
+                or incoming['audience'] != audience or str(account['policyRevision']) != incoming['policy_revision']
+                or not any(item.get('kind') == 'image' and item.get('elementId') == params['elementId']
+                    and str(item.get('messageId') or incoming['raw_external_id']) == params['messageId'] for item in refs)):
+                raise SocialError('Image is not part of the current admitted event')
         if action=='media.send':
             if not local_owner:
                 # A remote reply may attach only within its same proven scope;
@@ -296,7 +311,7 @@ def filter_action_result(store, authorization, result):
                     clean['attachments']=refs
                 items.append(clean)
             key='messages'
-        elif action=='media.fetch':
+        elif action in {'media.fetch','media.incoming'}:
             encoded=result.get('dataBase64')
             if not isinstance(encoded,str) or len(encoded)>14*1024*1024:
                 raise SocialError('Invalid QQ media result')

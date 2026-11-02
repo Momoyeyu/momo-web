@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ConfigDict
 
-from ..services import checkpoint, turn, onboarding
+from ..services import checkpoint, turn, onboarding, vision
 from ..models import SseEvent
 from ..services.coordinator import runtime, CoordinationError, current_run
 
@@ -45,7 +45,8 @@ class PresentationIn(BaseModel):
 
 
 class ChatIn(BaseModel):
-    text: str
+    text: str = Field(default="", max_length=65536)
+    images: list[str] = Field(default_factory=list, max_length=4)
     firstMeeting: bool = False
     presentation: PresentationIn | None = None
     clientId: str | None = Field(default=None, max_length=128)
@@ -70,12 +71,18 @@ def _sse(ev: SseEvent) -> str:
 
 @router.post("/api/chat")
 def chat(req: ChatIn) -> StreamingResponse:
-    if not req.text.strip():
+    if not req.text.strip() and not req.images:
         raise HTTPException(status_code=400, detail="empty text")
     try:
         runtime.require_meeting(req.clientId, req.leaseId)
     except CoordinationError as error:
         raise HTTPException(409, str(error)) from error
+    try:
+        if req.images:
+            vision.require_enabled()
+            vision.validate_ids(req.images, local=True)
+    except vision.VisionError as error:
+        raise HTTPException(400, str(error)) from error
     inbox = runtime.enqueue(
         "meeting", req.clientId or "local", req.messageId or uuid.uuid4().hex, req.text
     )
@@ -106,6 +113,7 @@ def chat(req: ChatIn) -> StreamingResponse:
                         req.presentation.model_dump() if req.presentation else None,
                         first_meeting=req.firstMeeting,
                         run_id=inbox["run_id"],
+                        image_ids=req.images,
                     )
                 )
                 while True:

@@ -361,7 +361,7 @@ export class PluginHost {
 
   async actionChannel({ pluginId, accountId, action, arguments: args = {}, policyRevision, permit, replyMode = false }) {
     this.checkPermit(permit);
-    const reads = new Set(['contacts.list','history.list','media.fetch','friends.listRequests','groups.list','groups.members']);
+    const reads = new Set(['contacts.list','history.list','media.fetch','media.incoming','friends.listRequests','groups.list','groups.members']);
     const writes = new Set(['private.send','group.send','media.send','friends.respond','groups.manage']);
     if (!reads.has(action) && !writes.has(action)) fail('INPUT', 'Unknown reviewed QQ action');
     const mutation = writes.has(action);

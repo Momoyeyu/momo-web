@@ -17,6 +17,7 @@ import {historyPage} from "../services/lifeClient";
 import {meetingIdentity} from "../services/meetingClient";
 import {groupTranscript, mergeHistory, storedMessage} from "../chat/transcript";
 import type {ChatMessage} from "../lib/types";
+import ImageAttachments from "../components/ImageAttachments";
 import PageHeader from "../ui/PageHeader";
 import "../styles/backlog.css";
 
@@ -152,7 +153,7 @@ export default function Backlog() {
                   </Button>
                 )}
               </div>
-              <div className="bl-text">{group.messages.map(message => message.text).join("")}</div>
+              <ImageAttachments images={group.messages.flatMap(message=>message.images??[])}/><div className="bl-text">{group.messages.map(message => message.text).join("")}</div>
             </div>;
           })}
         </div>

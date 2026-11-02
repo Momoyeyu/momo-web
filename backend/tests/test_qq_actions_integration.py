@@ -172,3 +172,52 @@ def test_local_qq_activity_indicator_does_not_change_owner_attention_authority(f
         core.activity['toolSource']='qq'
         result=core.control('fixture-client','fixture-lease','local-control-stop','stop',item['run_id'],from_run=True)
         assert result['phonePaused'] is True
+
+
+def test_current_image_crosses_cordis_and_native_without_history(full_chain,monkeypatch):
+    from app.core import state
+    from app.services import vision
+    core,trace=full_chain
+    social.put('qq',{'permissions':{'history':False}})
+    core.configure_host_plugins([])
+    cfg=state.load()['settings']['llm'];cfg.update(url='http://vision.test',model='vision',vision=True)
+    vision.schema()
+    with db.tx() as c:c.execute('INSERT INTO vision_proofs VALUES(?,?)',(vision.fingerprint(cfg),0))
+    values=state.load();values['settings']['llm']=cfg;state.write_state(values)
+    account=social._account('qq');audience=social._audience(account,'20002')
+    item=core.enqueue('qq',account['accountId'],'90001','What color?',self_id='10001',peer_id='20002',sender_id='20002',audience=audience,policy_revision=str(account['policyRevision']),attachments=[{'kind':'image','elementId':'70002','messageId':'90001','name':'fixture.png','size':70}])
+    with checkpoint.audience_scope(audience),core.run(item['run_id'],'qq',account_id=account['accountId']):
+        token=coordinator.current_run.set(item['run_id'])
+        try:
+            ids=vision.qq_images(core,item)
+            assert len(ids)==1
+            parts=vision.parts('color?',ids,audience=audience,cfg=cfg)
+            assert vision.materialize([{'role':'user','content':parts}],cfg,audience)[0]['content'][-1]['image_url']['url'].startswith('data:image/jpeg;')
+        finally:coordinator.current_run.reset(token)
+    assert 'downloadRichMedia' in trace.read_text()
+    assert social._account('qq')['permissions']['history'] is False
+
+
+def test_grant_change_during_image_fetch_cannot_reach_model(full_chain,monkeypatch):
+    import threading
+    from app.core import llm
+    from app.services import vision
+    core,_=full_chain
+    called=[]
+    def revoked(*args):
+        social.put('qq',{'permissions':{'media':False}})
+        return []
+    monkeypatch.setattr(vision,'qq_images',revoked)
+    monkeypatch.setattr(llm,'chat_stream',lambda *a,**k:called.append(True) or iter([]))
+    account=social._account('qq')
+    core.event('inbox',{'source':'qq','accountId':account['accountId'],'selfId':'10001','peerId':'20002','senderId':'20002','conversationKind':'private','externalMessageId':'90001','text':'image','attachments':[{'kind':'image','elementId':'70002','messageId':'90001','size':70}],'policyRevision':account['policyRevision']})
+    worker=threading.Thread(target=core._worker,daemon=True);worker.start()
+    try:
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline:
+            rows=db.query("SELECT status FROM inbox WHERE raw_external_id='90001'")
+            if rows and rows[0]['status']=='held_scope':break
+            time.sleep(.02)
+        assert rows[0]['status']=='held_scope'
+        assert called==[]
+    finally:core.closed.set();worker.join(2)

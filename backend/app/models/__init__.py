@@ -26,6 +26,7 @@ class LlmConfig(TypedDict):
     key: str
     model: str
     thinking: bool
+    vision: NotRequired[bool]
     contextWindow: NotRequired[int]
     maxOutputTokens: NotRequired[int]
 
@@ -150,6 +151,7 @@ class StoredMessage(TypedDict):
 
     role: Role
     text: str
+    images: NotRequired[list[dict[str, Any]]]
     at: str
     seq: NotRequired[int]
     eventId: NotRequired[str]
@@ -229,7 +231,7 @@ class ChatMessage(TypedDict):
     """
 
     role: ChatRole
-    content: str | None
+    content: str | list[dict[str, Any]] | None
     reasoning_content: NotRequired[str]  # Ephemeral provider context, never stored.
     tool_calls: NotRequired[list[ToolCall]]
     tool_call_id: NotRequired[str]

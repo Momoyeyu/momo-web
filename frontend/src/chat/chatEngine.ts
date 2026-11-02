@@ -14,6 +14,7 @@ import type { Live2DStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
 import { getSettings, newId, subscribe } from "../lib/store";
 import type {
+  ImageRef,
   ChatMessage,
   ChatStatus,
   StoredMessage,
@@ -80,6 +81,8 @@ interface DisplayState {
 }
 
 interface Turn {
+  images?: ImageRef[];
+  imageResult?: (ok:boolean)=>void;
   presentation: PresentationSnapshot | null;
   id: string;
   abort: AbortController;
@@ -322,13 +325,13 @@ export class ChatEngine {
 
   /** 发送一条用户文本并跑一回合（thinking→speaking→idle）。
    *  走串行队列：在途回合先等打断回传落地，再发新回合请求。 */
-  sendText(text: string): void {
+  sendText(text: string, images: ImageRef[] = [], imageResult?: (ok:boolean)=>void): void {
     if (this.disposed) return;
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed && !images.length) return;
     // catch 保底：单次发送异常不毒化队列（否则后续发送全部静默丢失）。
     this.sendQueue = this.sendQueue.then(
-      () => this.doSend(trimmed).catch(() => {}),
+      () => this.doSend(trimmed, false, images, imageResult).catch(() => {imageResult?.(false);}),
     );
   }
 
@@ -339,7 +342,7 @@ export class ChatEngine {
     this.sendQueue = this.sendQueue.then(() => this.doSend("", true)).catch(() => {});
   }
 
-  private async doSend(trimmed: string, opening = false): Promise<void> {
+  private async doSend(trimmed: string, opening = false, images: ImageRef[] = [], imageResult?: (ok:boolean)=>void): Promise<void> {
     if (this.disposed) return;
     await this.stopReplay();
     // 新输入隐式打断在途回合（绕过防抖，保证打断一定生效）；
@@ -349,6 +352,7 @@ export class ChatEngine {
 
     const cfg = getSettings();
     if (!cfg.llm.url) {
+      imageResult?.(false);
       this.events.onError(new ServiceError("llm", "unconfigured"));
       return;
     }
@@ -360,10 +364,12 @@ export class ChatEngine {
       id: newId("m"),
       role: "user",
       text: trimmed,
+      ...(images.length ? {images} : {}),
       at: new Date().toISOString(),
     };
 
     const turn: Turn = {
+      images, imageResult,
       presentation: null,
       id: newId("m"),
       abort: new AbortController(),
@@ -632,6 +638,7 @@ export class ChatEngine {
       return Promise.resolve();
     }
     turn.finished = true;
+    turn.imageResult?.(false);turn.imageResult=undefined;
     turn.abort.abort();
     clearInterval(turn.timer);
     turn.inflight = 0;
@@ -661,9 +668,10 @@ export class ChatEngine {
 
   private async runTurn(turn: Turn, cfg: Settings, userText: string): Promise<void> {
     try {
-      for await (const ev of chat(userText, turn.abort.signal, turn.presentation, turn.opening, turn.id)) {
+      for await (const ev of chat(userText, turn.abort.signal, turn.presentation, turn.opening, turn.id, turn.images?.map(image=>image.id))) {
         if (this.turn !== turn) return; // 已被打断
         if (ev.t === "sentence") {
+          if(ev.text.trim()){turn.imageResult?.(true);turn.imageResult=undefined;}
           if (ev.generation != null) turn.generation = ev.generation;
           if(ev.presentationToken)turn.presentationToken=ev.presentationToken;
           if (ev.runId) {
@@ -687,10 +695,11 @@ export class ChatEngine {
         }
       }
     } catch (err) {
-      if (this.turn === turn) this.events.onError(toError(err));
+      if (this.turn === turn) {turn.imageResult?.(false);turn.imageResult=undefined;this.events.onError(toError(err));}
     }
     if (this.turn !== turn) return; // 已被打断，已落句子由 interruptNow 对齐
     if (!turn.text.trim()) {
+      turn.imageResult?.(false);turn.imageResult=undefined;
       // A send is provisional until a real reply arrives. Remove by identity,
       // not text: retries may contain exactly the same words as earlier turns.
       const index = this.history.findIndex((m) => m.id === turn.userMessageId);

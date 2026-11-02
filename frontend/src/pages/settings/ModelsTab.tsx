@@ -13,6 +13,7 @@ import FieldRow from "../../ui/FieldRow";
 import Hint from "../../ui/Hint";
 import Switch from "../../ui/Switch";
 import {introRestricted,verifyIntro,useIntro} from "../../services/introClient";
+import {probeVision,visionStatus} from "../../services/visionClient";
 import { supportsThinking } from "../../lib/thinking";
 
 type EndpointSection = "llm" | "tts";
@@ -38,6 +39,23 @@ export default function ModelsTab() {
   const t = useT();
   const intro=useIntro();
   const settings = useSyncExternalStore(subscribe, getState).settings;
+
+  const signature=JSON.stringify([settings.llm.url,settings.llm.key,settings.llm.model]);
+  const [visionCheck,setVisionCheck]=useState({signature:'',verified:false,running:false,detail:''});
+  useEffect(()=>{
+    const abort=new AbortController();
+    setVisionCheck({signature,verified:false,running:false,detail:''});
+    void visionStatus(settings.llm,abort.signal).then(result=>{if(!abort.signal.aborted)setVisionCheck(value=>value.signature===signature?{...value,verified:result.verified}:value);}).catch(()=>{});
+    return()=>abort.abort();
+  },[signature]);
+  const checkVision=async()=>{
+    const captured=signature,cfg={...settings.llm};
+    setVisionCheck(value=>({...value,running:true,detail:''}));
+    try{
+      const result=await probeVision(cfg);
+      setVisionCheck(value=>value.signature===captured?{...value,verified:result.ok,detail:result.ok?'vision.verified':result.detail==='not verified'?'vision.notVerified':'vision.checkFailed',running:false}:value);
+    }catch{setVisionCheck(value=>value.signature===captured?{...value,detail:'vision.checkFailed',running:false}:value);}
+  };
 
   const [showKey, setShowKey] = useState<Record<EndpointSection, boolean>>({
     llm: false,
@@ -184,7 +202,7 @@ export default function ModelsTab() {
   // 返回目标与来源页一致：chat 进来回 chat，其余回 title。
   const patchEndpoint = (sec: EndpointSection, key: string, v: string): void => {
     update({
-      settings: { ...settings, [sec]: { ...settings[sec], [key]: v, ...(sec === "llm" && key === "url" && !supportsThinking(v) ? { thinking: false } : {}) } },
+      settings: { ...settings, [sec]: { ...settings[sec], [key]: v, ...(sec === "llm" ? {vision:false} : {}), ...(sec === "llm" && key === "url" && !supportsThinking(v) ? { thinking: false } : {}) } },
     });
   };
 
@@ -236,7 +254,17 @@ export default function ModelsTab() {
       })}
     />
   </FieldRow>
-</div></section>
+</div>
+  <div inert={!!intro.data && intro.data.phase!=="completed"}>
+    <FieldRow label={t('vision.label')} hint={t('vision.hint')}>
+      <div className="vision-status">
+        <Switch on={!!settings.llm.vision} disabled={!settings.llm.vision&&(!visionCheck.verified||visionCheck.running)} title={t('vision.label')} onChange={vision=>update({settings:{...settings,llm:{...settings.llm,vision}}})}/>
+        <Button variant="ghost" size="sm" disabled={visionCheck.running||!settings.llm.url.trim()||!settings.llm.model.trim()} onClick={()=>void checkVision()} title={visionCheck.detail?t(visionCheck.detail):t('vision.verify')} aria-label={t('vision.verify')}>{visionCheck.running?'…':visionCheck.verified?'✓':t('settings.test')}</Button>
+        {visionCheck.detail&&<Hint text={t(visionCheck.detail)} side="down"/>}
+      </div>
+    </FieldRow>
+  </div>
+</section>
 <section data-intro="tts" className="panel settings-col opt-list">
   <h3 className="opt-group">
     {t("settings.groups.tts")}

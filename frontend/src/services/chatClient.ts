@@ -128,20 +128,25 @@ export async function* chat(
   presentation: PresentationSnapshot | null = null,
   opening = false,
   messageId: string = crypto.randomUUID(),
+  images: string[] = [],
 ): AsyncGenerator<ChatEvent> {
   let res: Response;
   try {
     res = await runtimeFetch(opening ? "/api/onboarding/opening" : "/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, messageId, presentation, firstMeeting: firstMeetingPending(), ...meetingIdentity() }),
+      body: JSON.stringify({ text, images, messageId, presentation, firstMeeting: firstMeetingPending(), ...meetingIdentity() }),
       signal: signal ?? null,
     });
   } catch (e) {
     if (isAbortError(e) || signal?.aborted) return;
     throw new ServiceError("llm", "unreachable");
   }
-  if (!res.ok) throw new ServiceError("llm", "http", res.status);
+  if (!res.ok) {
+    let detail: string | undefined;
+    try {const body=await res.json();if(typeof body.detail==='string'&&body.detail.startsWith('vision.'))detail=body.detail;}catch{/* No provider body is shown. */}
+    throw new ServiceError("llm", "http", res.status,detail);
+  }
   if (!res.body) return;
 
   const reader = res.body.getReader();

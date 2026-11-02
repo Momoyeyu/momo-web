@@ -1,5 +1,6 @@
+import type {ImageRef} from '../lib/types';
 import {apiJson} from './http';
-export interface PhoneMessage {id:string;text:string;direction:'in'|'out';speaker:string;status:string;at:string}
+export interface PhoneMessage {id:string;text:string;images?:ImageRef[];direction:'in'|'out';speaker:string;status:string;at:string}
 export interface PhoneActivity {eventId?:string;runId?:string;peerId?:string;source:string;toolSource?:string;accountId?:string}
 export interface PhoneSnapshot {
  apps:{id:string;provider:string;name:string;enabled:boolean;pending:number}[];accountKey:string;pending:number;

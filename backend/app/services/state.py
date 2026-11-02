@@ -22,6 +22,10 @@ def read() -> dict[str, Any]:
 
 def replace(payload: dict[str, Any]) -> None:
     """整体替换配置。"""
+    from . import vision
+    cfg = payload.get("settings", {}).get("llm", {})
+    if cfg.get("vision") and not vision.verified(cfg):
+        raise ValueError("vision.notVerified")
     config.write_state(payload)
     from .coordinator import runtime
 

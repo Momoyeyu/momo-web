@@ -15,7 +15,22 @@ from ..core import db
 def estimate(messages, tools=None):
     if messages and 'text' in messages[0]:
         messages = [{'role': r['role'], 'content': r['text']} for r in messages]
-    return len(json.dumps({'messages': messages, 'tools': tools or []}, ensure_ascii=False).encode('utf-8')) + 64
+    image_tokens = 0
+    clean = []
+    for message in messages or []:
+        item = dict(message)
+        if isinstance(item.get('content'), list):
+            parts = []
+            for part in item['content']:
+                if part.get('type') == 'image_url':
+                    # Private refs carry a bounded conservative pixel estimate.
+                    # Never count base64 characters as text tokens.
+                    image_tokens += max(1024, int(part.get('vision_tokens', 16384)))
+                    parts.append({'type':'text','text':'[Image]'})
+                else: parts.append(part)
+            item['content'] = parts
+        clean.append(item)
+    return len(json.dumps({'messages': clean, 'tools': tools or []}, ensure_ascii=False).encode('utf-8')) + image_tokens + 64
 
 
 @dataclass(frozen=True)

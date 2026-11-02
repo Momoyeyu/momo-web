@@ -111,3 +111,6 @@ app.include_router(social_media.router)
 
 from .api import intro
 app.include_router(intro.router)
+
+from .api import vision
+app.include_router(vision.router)

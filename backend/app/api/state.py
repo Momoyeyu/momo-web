@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Body, Response
+from fastapi import APIRouter, Body, Response, HTTPException
 
 from ..services import state
 
@@ -19,5 +19,8 @@ def get_state() -> dict[str, Any]:
 @router.put("/api/state", status_code=204)
 def put_state(payload: dict[str, Any] = Body(...)) -> Response:
     """整体替换 state。"""
-    state.replace(payload)
+    try:
+        state.replace(payload)
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
     return Response(status_code=204)

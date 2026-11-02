@@ -460,17 +460,17 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
       }else throw issue('INPUT');
       requireConnection();sdkResult(result);reply(echo,{operationStatus:'provider_accepted'});return;
     }
-    if(action==='media.fetch'){
+    if(action==='media.fetch'||action==='media.incoming'){
       if(abandonedDownloads.size>=64)throw issue('INBOX_CAPACITY');
       if(typeof p.messageId!=='string'||!p.messageId||p.messageId.length>200||typeof p.elementId!=='string'||!p.elementId||p.elementId.length>200)throw issue('INPUT');
       const result=sdkResult(await session.getMsgService().getMsgsByMsgId(peerArgument(peer),[p.messageId]));requireConnection();
       const record=result.msgList?.find(row=>row.chatType===peer.chatType&&row.peerUid===peer.peerUid&&row.msgId===p.messageId);const element=record?.elements?.find(item=>item.elementId===p.elementId&&[2,3,4,5].includes(item.elementType));if(!element)throw issue('PEER_UNVERIFIED');
-      const metadata=normalizedElements([element]).attachments[0];if(!metadata||metadata.size<=0||metadata.size>8*1024*1024)throw issue('INPUT');
+      const metadata=normalizedElements([element]).attachments[0];if(!metadata||metadata.size<=0||metadata.size>(action==='media.incoming'?10:8)*1024*1024)throw issue('INPUT');
       const dir=privateMediaDir('downloads');const output=path.join(dir,'momo-media-'+require('node:crypto').randomUUID());
       let completed=false;try{
       const complete=await nativeWait(downloadWaiters,()=>session.getMsgService().downloadRichMedia({fileModelId:'0',downSourceType:0,downloadSourceType:0,triggerType:1,msgId:p.messageId,chatType:peer.chatType,peerUid:peer.peerUid,elementId:p.elementId,thumbSize:0,downloadType:1,filePath:output}),value=>value?.msgId===p.messageId&&value?.msgElementId===p.elementId);
       completed=true;requireConnection();if(String(complete.fileErrCode)!=='0'||complete.filePath!==output)throw issue('PROVIDER_REJECTED');
-      const handle=fs.openSync(output,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);try{const stat=fs.fstatSync(handle);if(!stat.isFile()||stat.size>8*1024*1024||stat.nlink!==1)throw issue('INPUT');const bytes=Buffer.alloc(stat.size);if(fs.readSync(handle,bytes,0,bytes.length,0)!==bytes.length||fs.fstatSync(handle).size!==stat.size)throw issue('INPUT');reply(echo,{name:metadata.name,mime:imageInfo(bytes)?.mime??'application/octet-stream',dataBase64:bytes.toString('base64')});}finally{fs.closeSync(handle);}
+      const handle=fs.openSync(output,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);try{const stat=fs.fstatSync(handle);if(!stat.isFile()||stat.size>(action==='media.incoming'?10:8)*1024*1024||stat.nlink!==1)throw issue('INPUT');const bytes=Buffer.alloc(stat.size);if(fs.readSync(handle,bytes,0,bytes.length,0)!==bytes.length||fs.fstatSync(handle).size!==stat.size)throw issue('INPUT');reply(echo,{name:metadata.name,mime:imageInfo(bytes)?.mime??'application/octet-stream',dataBase64:bytes.toString('base64')});}finally{fs.closeSync(handle);}
       }finally{if(!completed)abandonedDownloads.add(output);try{fs.rmSync(output,{force:true});}catch{}}return;
     }
     if(!['private.send','group.send','media.send'].includes(action))throw issue('INPUT');
@@ -504,7 +504,7 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     if(operationStates.has(echo))throw issue('INPUT');operation={echo,submitted:false,cancelled:false};operationStates.set(echo,operation);
     try{
     if (action === 'get_login_info') { await verifyLiveIdentity(); requireConnection(); reply(echo, { user_id: self.uin }); return { attemptId }; }
-    if (['contacts.list','history.list','private.send','group.send','media.send','media.fetch','friends.listRequests','friends.respond','groups.list','groups.members','groups.manage'].includes(action)) { const admission=operation;try{await fullAction(action,params.params??{},echo,requireConnection,admission);}catch(cause){if(!admission.submitted&&['INPUT','FORBIDDEN','PEER_UNVERIFIED','PROVIDER_REJECTED','ATTEMPT_CANCELLED'].includes(cause?.code)){reply(echo,{errorCode:cause.code},true);}else throw cause;}return {attemptId}; }
+    if (['contacts.list','history.list','private.send','group.send','media.send','media.fetch','media.incoming','friends.listRequests','friends.respond','groups.list','groups.members','groups.manage'].includes(action)) { const admission=operation;try{await fullAction(action,params.params??{},echo,requireConnection,admission);}catch(cause){if(!admission.submitted&&['INPUT','FORBIDDEN','PEER_UNVERIFIED','PROVIDER_REJECTED','ATTEMPT_CANCELLED'].includes(cause?.code)){reply(echo,{errorCode:cause.code},true);}else throw cause;}return {attemptId}; }
     if (action !== 'send_private_msg' || !isId(params.params?.user_id) || params.params.user_id === self.uin || typeof params.params.message !== 'string' || !params.params.message.trim() || params.params.message.length > 32000) throw issue('INPUT');
     if (seen.has('send:' + echo)) return { attemptId };
     if (seen.size >= 10000 || outgoing.size >= 512) throw issue('INBOX_CAPACITY');
