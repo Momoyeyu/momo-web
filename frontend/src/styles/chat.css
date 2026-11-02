@@ -209,6 +209,7 @@
   caret-shape: block;
 }
 .input-row input:focus{outline:none;box-shadow:none}
+.input-row input::placeholder{text-indent:1.5ch}
 
 .input-row button {
   flex: none;

@@ -12,6 +12,8 @@ for(const lang of ['zh','en','ja'])test(`terminal dialog aligns its prompts and 
   await page.setViewportSize(size);
   const input=page.locator('.input-row input'),prompt=page.locator('.terminal-input-prompt svg');
   const before=(await prompt.boundingBox())!;
+  await input.fill('');await input.focus();
+  await page.screenshot({path:info.outputPath(`terminal-placeholder-${lang}-${size.width}.png`),caret:'initial'});
   await input.fill(lang==='zh'?'今天过得怎么样？':lang==='ja'?'今日はどんな一日だった？':'How was your day?');
   expect(await input.evaluate(el=>getComputedStyle(el).getPropertyValue('caret-shape'))).toBe('block');
   const after=(await prompt.boundingBox())!,field=(await input.boundingBox())!;
