@@ -1,4 +1,4 @@
-/* 对话页：底部视觉小说式对话框（铭牌 + 字幕 + 快捷栏 + 输入行），
+/* 对话页：底部终端式对话框（身份与状态 + 输出 + 命令提示输入行），
    不遮挡 Live2D 人物主体。历史在 backlog 子页，不在本页展开。 */
 
 /* 对话区高度：StageCanvas 用它定位人物底边。
@@ -28,18 +28,14 @@
   pointer-events: auto;
 }
 
-/* 状态标注：与铭牌同排、压在对话框上缘（见 .nameplate-row）。
-   比铭牌轻一档——无描边、暗底、暗字，圆点带状态色。 */
+/* 身份行中的真实状态，以轻量终端标记显示。 */
 .chat-status {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 3px 12px;
-  border-radius: var(--r-md);
-  background: rgba(16, 12, 20, 0.72);
-  backdrop-filter: blur(8px);
-  font-size: 12px;
-  letter-spacing: 0.06em;
+  padding: 0;
+  font: 11px/1.4 var(--font-terminal);
+  letter-spacing: .02em;
   color: var(--text-dim);
 }
 
@@ -131,95 +127,106 @@
 }
 
 .dialog-box {
+  --font-terminal: ui-monospace, "SFMono-Regular", Menlo, Consolas, var(--font-ui);
   position: relative;
   width: var(--content-width);
   min-height: 148px;
   display: flex;
   flex-direction: column;
-  padding: 24px 28px 18px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
-  background: rgba(var(--panel-rgb), var(--dialog-alpha, 0.66));
+  padding: 12px 24px;
+  border: 1px solid rgba(208,198,219,.24);
+  border-radius: 6px;
+  background: rgba(20,18,27,var(--dialog-alpha,.66));
   backdrop-filter: blur(6px);
-  font-family: var(--font-ui);
+  font-family: var(--font-terminal);
   pointer-events: auto;
-  /* VN 式内描边：外侧细金线内侧再一线。 */
-  box-shadow:
-    inset 0 1px 0 var(--line-faint),
-    0 12px 32px rgba(0, 0, 0, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.045),0 8px 28px rgba(0,0,0,.18);
 }
 
-/* 角色铭牌：压在对话框上缘。 */
-/* 角色铭牌：压在对话框上缘；状态标注与它同排，故这排统一负责定位。 */
+/* 名称和真实状态内收为终端首行，与抽屉边缘独立。 */
 .nameplate-row {
-  position: absolute;
-  top: -13px;
-  left: 20px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
+  min-width: 0;
+  min-height: 22px;
+  padding-bottom: 6px;
 }
-
 .nameplate {
-  padding: 3px 16px;
-  border: 1px solid var(--accent-soft);
-  border-radius: var(--r-md);
-  background: var(--panel-solid);
+  min-width: 0;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--accent);
-  font-family: var(--font-brand);
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  font: 600 14px/1.5 var(--font-terminal);
+  letter-spacing: .02em;
 }
+.nameplate::before{content:'[';opacity:.5;margin-right:.35em}
+.nameplate::after{content:']';opacity:.5;margin-left:.35em}
 
-/* 字幕：左侧对齐的台词区，占两行高度。 */
 .subtitle {
+  display: grid;
+  grid-template-columns: 14px minmax(0,1fr);
+  column-gap: 12px;
+  align-content: start;
   flex: 1;
   min-height: 3.4em;
-  padding: 2px 4px 10px;
+  padding: 0 0 8px;
   font-size: 18px;
-  line-height: 1.8;
+  line-height: 1.7;
   letter-spacing: 0;
   white-space: pre-wrap;
   word-break: break-word;
 }
+.terminal-output-prompt{display:grid;place-items:center;height:1lh;color:var(--accent);opacity:.5}
+.terminal-output-text{min-width:0}
+.dialog-terminal-cursor{display:inline-block;width:.45em;height:.95em;margin-left:.3em;vertical-align:-.08em;background:var(--accent);opacity:.7;animation:dialog-cursor-blink 1s steps(1,end) infinite}
+@keyframes dialog-cursor-blink{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.dialog-terminal-cursor{animation:none;opacity:.65}}
 
-/* 输入行：与字幕间一道发丝线。 */
+/* 输入行：同轴提示符与原生输入，保留 IME、选区和键盘行为。 */
 .input-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding-top: 12px;
+  gap: 12px;
+  padding-top: 8px;
   border-top: 1px solid var(--line-soft);
 }
 
+.input-row:focus-within{border-top-color:rgba(232,190,114,.45)}
+.terminal-input-prompt{display:grid;place-items:center;flex:none;width:14px;height:40px;color:var(--accent)}
 .input-row input {
   flex: 1;
   min-width: 0;
   height: 40px;
-  background: var(--input-bg);
-  border-radius: var(--r-md);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: 15px/1.5 var(--font-terminal);
+  caret-color: var(--accent);
 }
+.input-row input:focus{outline:none;box-shadow:none}
 
 .input-row button {
   flex: none;
 }
 
-/* 输入行两枚圆形图标按钮：左麦克风、右发送（对照参考截图的强调圆按钮）。
-   发送用 variant="solid"，这里只负责把它压成圆形。 */
-/* 圆里的图标必须几何居中：inline SVG 默认按文字基线排布，会偏上约 2.5px，
-   所以这两枚圆形按钮用 flex 居中（实测修正前 dy=-2.5，修正后 0）。 */
+/* 行尾图标按几何居中，与终端的小圆角边框呼应。 */
 .input-row .mic-btn,
 .input-row .send-btn {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
   padding: 0;
-  border-radius: 50%;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
+.input-row .send-btn{background:rgba(232,190,114,.09);color:var(--accent);border-color:var(--line)}
+.input-row .send-btn:hover:not(:disabled){background:rgba(232,190,114,.18);border-color:var(--accent-soft)}
 
 .input-row .mic-on {
   background: var(--accent);

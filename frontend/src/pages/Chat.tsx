@@ -30,6 +30,7 @@ import DialogBox from "../components/DialogBox";
 import "../styles/chat.css";
 import {controlAttention,type AttentionState} from '../services/meetingClient';
 import {warmCapture} from '../effects/captureStage';
+import TerminalPrompt from '../ui/TerminalPrompt';
 
 const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
   idle: "chat.idle",
@@ -191,6 +192,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
           lang={resolveChatLang(getState().settings.general)}
           name={name}
           text={subtitle || <span className="muted">……</span>}
+          typing={busy&&streamActive}
           // 状态并进对话框（铭牌右侧），不再是页面左上角的浮标
           status={
             phoneBusy ? <div className="chat-status chat-phone-status" role="status"><span className="phone-status-icon"><Icon name="phone" size={14}/></span>{t('attention.qq')}</div> : showStatus ? (
@@ -202,6 +204,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
           }
         >
           <div data-intro="name-input" className="input-row" inert={phoneOpen}>
+            <span className="terminal-input-prompt" aria-hidden="true"><TerminalPrompt/></span>
             <input
               value={input}
               placeholder={t("chat.placeholder", { name })}
