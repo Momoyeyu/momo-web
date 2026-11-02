@@ -251,7 +251,9 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
 
       {/* 对话场景的房间底图 + Live2D：不随路由重挂载 */}
       <div className="chat-layer">
-        <StageCanvas visible={route === "chat"} onReady={scenePrepared} />
+        <StageCanvas visible={route === 'chat'||route !== 'title'&&activeLease !== null}
+          interactive={route === 'chat'&&curRef.current===route&&!front&&!booting&&ready&&meetingReady}
+          onReady={scenePrepared} />
       </div>
 
       {stack.map((p, i) => {

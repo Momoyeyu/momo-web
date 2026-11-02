@@ -110,6 +110,7 @@ export class Live2DStage {
   private requestedAvatar = "";
   private chatHost: HTMLElement | null = null;
   private chatVisible = false;
+  private chatInteractive = false;
   private previewHost: HTMLElement | null = null;
   private previewAvatarId: string | null = null;
   private previewLease = 0;
@@ -153,12 +154,13 @@ export class Live2DStage {
     this.chatHost = host;
     if (!this.previewHost) this.attachViewport(host);
   }
-  setChatVisible(visible: boolean): void {
+  setChatVisible(visible: boolean, interactive=visible): void {
     this.chatVisible = visible;
+    this.chatInteractive = interactive;
     if (!this.app) return;
     const canvas = this.app.view as HTMLCanvasElement;
     canvas.style.opacity = visible || this.previewHost ? "1" : "0";
-    canvas.style.pointerEvents = visible && !this.previewHost ? "auto" : "none";
+    canvas.style.pointerEvents = visible && interactive && !this.previewHost ? "auto" : "none";
   }
   private attachViewport(host: HTMLElement): void {
     if (!this.app) return;
@@ -170,7 +172,7 @@ export class Live2DStage {
     this.viewportObserver = new ResizeObserver(resize);
     this.viewportObserver.observe(host);
     resize();
-    this.setChatVisible(this.chatVisible);
+    this.setChatVisible(this.chatVisible,this.chatInteractive);
   }
   openResourcePreview(host: HTMLElement, avatarId: string): { ready: Promise<void>; release: () => void } {
     const lease = ++this.previewLease;
