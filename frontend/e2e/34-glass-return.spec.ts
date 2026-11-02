@@ -65,7 +65,7 @@ test('crack, separation and fall are observable in order, with preparation behin
    const c=document.querySelector<HTMLCanvasElement>('.glass-return-canvas'),phase=c?.dataset.phase;
    if(phase&&scope.glassPhases.at(-1)!==phase)scope.glassPhases.push(phase);
    if(phase==='cracking'&&document.querySelector('.app-stage')?.getAttribute('data-home-phase')==='preparing')scope.crackedDuringCapture=true;
-   if(c&&phase==='breaking'&&Number(c.dataset.progress)>.49&&!scope.splitFrame)scope.splitFrame=c.toDataURL();
+   if(c&&phase==='breaking'&&Number(c.dataset.progress)>.35&&!scope.splitFrame)scope.splitFrame=c.toDataURL();
   }).observe(document.querySelector('.app-stage')!,{subtree:true,attributes:true,childList:true,attributeFilter:['data-phase','data-home-phase']});
  });
  await page.locator('[data-intro=chat-back]').click();
