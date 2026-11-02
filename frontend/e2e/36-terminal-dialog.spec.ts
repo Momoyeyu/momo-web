@@ -13,6 +13,7 @@ for(const lang of ['zh','en','ja'])test(`terminal dialog aligns its prompts and 
   const input=page.locator('.input-row input'),prompt=page.locator('.terminal-input-prompt svg');
   const before=(await prompt.boundingBox())!;
   await input.fill(lang==='zh'?'今天过得怎么样？':lang==='ja'?'今日はどんな一日だった？':'How was your day?');
+  expect(await input.evaluate(el=>getComputedStyle(el).getPropertyValue('caret-shape'))).toBe('block');
   const after=(await prompt.boundingBox())!,field=(await input.boundingBox())!;
   expect(Math.abs(before.y-after.y)).toBeLessThan(.5);
   expect(Math.abs(after.y+after.height/2-field.y-field.height/2)).toBeLessThan(1);
@@ -22,7 +23,7 @@ for(const lang of ['zh','en','ja'])test(`terminal dialog aligns its prompts and 
   });
   expect(rects.header.bottom).toBeLessThanOrEqual(rects.output.top+1);expect(rects.output.bottom).toBeLessThanOrEqual(rects.input.top+1);
   expect(rects.dialog.bottom).toBeLessThanOrEqual(rects.stage.bottom-12);expect(rects.dialog.right+12).toBeLessThan(rects.rail.left);
-  await page.screenshot({path:info.outputPath(`terminal-${lang}-${size.width}.png`)});
+  await page.screenshot({path:info.outputPath(`terminal-${lang}-${size.width}.png`),caret:'initial'});
  }
  // Layout-only fixture: exercise wrapped output independently of model wording.
  await page.locator('.terminal-output-text').evaluate((el,text)=>{el.textContent=text;},lang==='en'?'I kept a little space for the things you wanted to tell me. '.repeat(4):lang==='ja'?'今日の小さな出来事も、ゆっくり聞かせてね。'.repeat(5):'今天遇到的小事也可以慢慢告诉我，我会在这里听你说。'.repeat(5));

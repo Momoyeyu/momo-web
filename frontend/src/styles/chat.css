@@ -206,6 +206,7 @@
   background: transparent;
   font: 15px/1.5 var(--font-terminal);
   caret-color: var(--accent);
+  caret-shape: block;
 }
 .input-row input:focus{outline:none;box-shadow:none}
 
