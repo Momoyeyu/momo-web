@@ -209,11 +209,20 @@ function remoteSave(): void {
   if (!inBrowser()) return;
   if (persistencePaused) { saveQueued = true; return; }
   if (saveTimer !== null) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    const snapshot = { ...passthrough, ...state };
-    saveInFlight = saveInFlight.then(() => putState(snapshot));
-  }, 300);
+  saveTimer = setTimeout(writePendingState, 300);
+}
+
+function writePendingState(): void {
+  if (saveTimer === null) return;
+  clearTimeout(saveTimer);
+  saveTimer = null;
+  const snapshot = { ...passthrough, ...state };
+  saveInFlight = saveInFlight.then(() => putState(snapshot));
+}
+
+export async function flushPendingState(): Promise<void> {
+  writePendingState();
+  if (!await saveInFlight) throw new Error("Could not save configuration");
 }
 
 /** Hold debounced writes across a consistent backup or destructive restore.

@@ -9,13 +9,14 @@ import "../styles/title.css";
 import {introSnapshot,verifyIntro} from "../services/introClient";
 import {useState} from "react";
 import {enterMeeting,leaveMeeting,meetingSnapshot} from "../services/meetingClient";
+import {warmVoice} from "../services/ttsWarmup";
 import {getChatEngine} from "../chat/engineInstance";
 
 export default function Title({active}: {active:boolean}) {
   const t = useT();
   const [starting,setStarting]=useState(false);
   const [failed,setFailed]=useState(false);
-  const boot=async()=>{setStarting(true);setFailed(false);try{if(introSnapshot().data?.phase!=="completed")await verifyIntro();await leaveMeeting(getChatEngine().finishMeeting());await enterMeeting();navigate('chat');}catch{setFailed(true);}finally{setStarting(false);}};
+  const boot=async()=>{setStarting(true);setFailed(false);try{if(introSnapshot().data?.phase!=="completed")await verifyIntro();await leaveMeeting(getChatEngine().finishMeeting());await enterMeeting();if(!getChatEngine().muted)warmVoice();navigate('chat');}catch{setFailed(true);}finally{setStarting(false);}};
   const items = [
     {key: "boot", labelKey: "title.start", hint: "boot", onClick: () => void boot()},
     {key: "config", labelKey: "title.config", hint: "config", onClick: () => navigate("settings")},

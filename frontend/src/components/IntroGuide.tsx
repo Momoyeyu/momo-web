@@ -80,7 +80,7 @@ export default function IntroGuide({ready}:{ready:boolean}){
      const stage=document.querySelector('.app-stage')?.getBoundingClientRect();
      const el=document.querySelector<HTMLElement>(`.page-wrap:not([aria-hidden]) [data-intro="${anchor}"]`);
      const sliding=el?.closest('.settings-page')?.querySelector('.settings-track')?.getAnimations().some(a=>a.playState==='running');
-     if(!stage||!el||sliding||el.closest('[inert]:not([data-intro-inert])')||['chat-back','chat-settings'].includes(anchor)&&getChatEngine().status!=='idle') {target.current=null;setBox(null);return;}
+     if(!stage||!el||sliding||el.closest('[inert]:not([data-intro-inert])')||(anchor==='chat-settings'&&!getChatEngine().replyTextShown || anchor==='chat-back'&&getChatEngine().status!=='idle')) {target.current=null;setBox(null);return;}
      if(el!==previous){
        const pane=el.closest<HTMLElement>('.settings-pane');
        if(pane){const bounds=pane.getBoundingClientRect(),r=el.getBoundingClientRect();if(r.bottom>bounds.bottom)pane.scrollTop+=r.bottom-bounds.bottom+12;if(r.top<bounds.top)pane.scrollTop+=r.top-bounds.top-12;}

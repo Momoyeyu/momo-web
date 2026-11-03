@@ -90,7 +90,7 @@ export default function Settings() {
           >
             <div className="settings-content">
               <div className="settings-body">
-                <ModelsTab />
+                <ModelsTab active={tab === "models"} />
               </div>
             </div>
           </section>

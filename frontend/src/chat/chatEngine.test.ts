@@ -483,3 +483,35 @@ it('stops each capability delivered while hidden and resumes the newest one',asy
   expect(vi.mocked(acknowledgePresentation).mock.calls.filter(call=>call[3]==='resume').map(call=>call[1])).toEqual(['token-b']);
   eng.dispose();
 });
+
+it("confirmation text is ready before voice and a late first sentence is skipped", async () => {
+  const { streamSpeech } = await import("../services/ttsClient");
+  const settings = getSettings();
+  update({ settings: { ...settings, general: { ...settings.general, textSpeed: 100 },
+    tts: { ...settings.tts, voice: "ref.wav" } } });
+  let cancelled = false;
+  vi.mocked(streamSpeech).mockImplementationOnce((_text, {signal}) => new Promise(resolve => {
+    signal!.addEventListener("abort", () => { cancelled = true; resolve(); });
+  }));
+  chatMock.mockImplementation(async function* () {
+    yield { t: "sentence", no: 0, text: "记住了。", cues: [], at: "" };
+    yield { t: "done" };
+  });
+  const { eng } = makeEngine();
+  try {
+    eng.sendText("叫我夜羽");
+    await tick();
+    const turn = internals(eng).turn!;
+    const now = performance.now();
+    internals(eng).displayTick(turn);
+    expect(eng.replyTextShown).toBe(true);
+    expect(cancelled).toBe(false);
+    vi.spyOn(performance,"now").mockReturnValue(now + 1600);
+    internals(eng).displayTick(turn);
+    expect(cancelled).toBe(true);
+  } finally {
+    vi.restoreAllMocks();
+    eng.dispose();
+    update({settings});
+  }
+});

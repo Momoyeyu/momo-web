@@ -21,6 +21,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import wave
@@ -159,7 +160,7 @@ async def synthesize(text: str, lang: str | None = None):
         if len(buf) >= 44 and buf[:4] == b"RIFF":
             sample_rate = int.from_bytes(buf[24:28], "little") or FALLBACK_SR
         head_rest = buf[44:] if len(buf) > 44 else b""
-    except TtsError:
+    except (TtsError, asyncio.CancelledError):
         await client.aclose()
         raise
     except httpx.HTTPError as e:

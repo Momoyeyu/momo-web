@@ -71,3 +71,30 @@ test("TTS 请求的 lang = 对话语言（日语/英语/auto 三种）", async (
     expect(bodies.at(-1)?.input).toBeTruthy();
   }
 });
+
+test("保存音色配置后静默预热，点击试听复用在途音频", async ({page,request}) => {
+  const state = await readState(request);
+  const { tts } = state.settings as {tts: {url:string; voice:string}};
+  Object.assign(tts, {url:"http://tts.test", voice:"ref.wav"});
+  await writeState(request, state);
+  let requests = 0;
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  await page.route("**/api/tts/speech", async route => {
+    requests++;
+    await gate;
+    await route.fulfill({contentType:"audio/pcm",headers:{"X-Sample-Rate":"32000"},body:Buffer.alloc(6400)});
+  });
+  await gotoRoute(page,"settings");
+  await page.locator(".stab",{hasText:"模型"}).click();
+  const card = page.locator('[data-intro="tts"]');
+  const prompt = card.locator("input").last();
+  await prompt.fill("试听参考文本");
+  await prompt.press("Tab");
+  try {
+    await expect.poll(() => requests).toBe(1);
+    await card.getByRole("button",{name:"试听",exact:true}).click();
+  } finally {release();}
+  await expect(card.locator(".probe-btn")).toHaveText("✓");
+  expect(requests).toBe(1);
+});

@@ -381,6 +381,7 @@ export const ja: Dict = {
     builtinRecallUnavailable: "意味検索を利用できないため、文字による検索を使用しています。",
     llmHint: "会話に使う大規模言語モデルサービスに接続します。OpenAI 互換のインターフェースが必要です。URL、API キー、モデル名を入力してください。",
     ttsUrlPh: "http://127.0.0.1:9880",
+    audition: "試聴",
     ttsHint: "音声合成サービスに接続します。GPT-SoVITS の api_v2 インターフェースが必要です。URL を入力し、クリアな参照音声をアップロードして声を設定します。参照テキストはその音声の内容で、空でも構いません。",
     ttsNeedRef: "未アップ",
     asrNeedModel: "モデルなし",

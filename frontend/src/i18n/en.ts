@@ -381,6 +381,7 @@ export const en: Dict = {
     builtinRecallUnavailable: "Semantic recall is unavailable. Text matching remains active.",
     llmHint: "Connect the language model service used for conversation. It must be an OpenAI-compatible API. Enter its URL, key and model name.",
     ttsUrlPh: "http://127.0.0.1:9880",
+    audition: "Listen",
     ttsHint: "Connect a speech synthesis service. It must expose GPT-SoVITS api_v2. Enter the URL and upload a clear reference clip to set the voice; the reference text is what the clip says and can be left empty.",
     ttsNeedRef: "no ref",
     asrNeedModel: "Model missing",

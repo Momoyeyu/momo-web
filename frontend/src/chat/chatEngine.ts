@@ -21,6 +21,7 @@ import type {
   Settings,
 } from "../lib/types";
 import { resolveChatLang } from "../i18n";
+import { cancelWarmup } from "../services/ttsWarmup";
 import { streamSpeech } from "../services/ttsClient";
 import { chat, acknowledgeDisplay, interrupt as sendInterrupt } from "../services/chatClient";
 import type { PerformanceCue, PresentationSnapshot } from "../live2d/performanceTypes";
@@ -48,6 +49,7 @@ type Phase = "idle" | "thinking" | "speaking";
 
 /** 一句的 TTS 合成项：合成可并发，块先攒本地，轮到该句展示时才供 player。 */
 interface TtsItem {
+  controller: AbortController;
   chunks: Uint8Array[];
   pushed: number;
   /** streamSpeech 流结束（成败都算——失败句直接跳过不占位）。 */
@@ -88,6 +90,7 @@ interface Turn {
   abort: AbortController;
   /** 只杀 TTS 合成不杀 LLM：静音时 abort 在途 speech 请求并跳过新句子。 */
   audioAbort: AbortController;
+  firstAudio?: Promise<void>;
   userText: string;
   userMessageId: string;
   userMessage: ChatMessage | null;
@@ -203,7 +206,15 @@ export class ChatEngine {
     return this.micOn ? "listening" : "idle";
   }
 
-  /** 麦克风是否开着（持续监听形态，与回合状态正交）。 */
+  /** The full reply is visible even if the player is still speaking. */
+  get replyTextShown(): boolean {
+    const turn = this.turn;
+    if (!turn) return true;
+    const last = turn.sentences.length - 1;
+    return turn.llmDone && last >= 0 && (turn.disp.idx > last ||
+      (turn.disp.idx === last && turn.disp.emitted === turn.sentences[last].text));
+  }
+
   get listening(): boolean {
     return this.micOn;
   }
@@ -522,6 +533,11 @@ export class ChatEngine {
   }
 
   setSceneActive(active:boolean):void {
+    if (!active && this.turn && this.replyTextShown) {
+      this.turn.audioAbort.abort();
+      for (const item of this.turn.sentences) item.tts = null;
+      this.safe(() => this.player.stop());
+    }
     this.sceneActive=active;this.applyPresentationVisibility();
   }
 
@@ -732,11 +748,17 @@ export class ChatEngine {
     if (this.voiceMuted || turn.audioAbort.signal.aborted) return;
     // Voice is optional; missing configuration is a valid text-only mode.
     if (!ttsConfigured(cfg.tts)) return;
-    const tts: TtsItem = { chunks: [], pushed: 0, done: false };
+    cancelWarmup();
+    const tts: TtsItem = { controller: new AbortController(), chunks: [], pushed: 0, done: false };
     item.tts = tts;
     turn.inflight += 1;
 
+    const firstAudio = turn.firstAudio;
+    let releaseFirst: (() => void) | undefined;
+    if (!firstAudio) turn.firstAudio = new Promise(resolve => { releaseFirst = resolve; });
+
     const settle = (err?: unknown): void => {
+      releaseFirst?.();
       tts.done = true;
       turn.inflight -= 1;
       if (err !== undefined) this.reportTtsOnce(turn, toError(err));
@@ -745,24 +767,24 @@ export class ChatEngine {
     };
 
     // 任一条件触发即取消：回合被打断（abort）或语音被关掉（audioAbort）。
-    const signal = AbortSignal.any([turn.abort.signal, turn.audioAbort.signal]);
+    const signal = AbortSignal.any([turn.abort.signal, turn.audioAbort.signal, tts.controller.signal]);
 
-    let req: Promise<void>;
-    try {
-      req = streamSpeech(sentence, {
+    const speak = async () => {
+      if (firstAudio) await firstAudio;
+      if (signal.aborted) return;
+      await streamSpeech(sentence, {
         lang: resolveChatLang(cfg.general),
         signal,
         onSampleRate: (hz) => this.safe(() => this.player.setSampleRate(hz)),
         onChunk: (pcm) => {
+          if (signal.aborted) return;
+          releaseFirst?.();
           tts.chunks.push(pcm);
           this.flushTts(turn);
         },
       });
-    } catch (err) {
-      settle(err);
-      return;
-    }
-    req.then(() => settle(), (err: unknown) => settle(err));
+    };
+    void speak().then(() => settle(), (err: unknown) => settle(err));
   }
 
   private reportTtsOnce(turn: Turn, err: Error): void {
@@ -842,6 +864,13 @@ export class ChatEngine {
     for (const cue of due.cues) this.fireCue(cue, turn);
 
     // 完整句的播完判定：TTS 开 = 音频播完；TTS 关/本句无音频 = 上屏完 + 按句长驻留。
+    // Give a fully visible sentence a short grace period for its first PCM.
+    // Once skipped, its audio must never interrupt the following sentence.
+    if (active.tts && !active.tts.done && !active.tts.chunks.length &&
+        turn.disp.doneAt > 0 && now - turn.disp.doneAt >= 1500) {
+      active.tts.controller.abort();
+      active.tts = null;
+    }
     const tts = active.tts;
     const hasAudio = !!tts && !(tts.done && tts.chunks.length === 0);
     let ended = false;

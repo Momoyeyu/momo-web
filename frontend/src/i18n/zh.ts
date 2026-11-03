@@ -383,6 +383,7 @@ export const zh = {
     builtinRecallUnavailable: "记忆语义检索暂不可用，当前使用文字匹配。",
     llmHint: "接入对话使用的大语言模型服务。需要 OpenAI 兼容的接口，填写服务地址、密钥和模型名称。",
     ttsUrlPh: "http://127.0.0.1:9880",
+    audition: "试听",
     ttsHint: "接入语音合成服务。需要 GPT-SoVITS 的 api_v2 接口，填写服务地址，并上传一段清晰的参考音频作为角色音色。参考文本是这段音频的内容，可以留空。",
     ttsNeedRef: "未上传",
     asrNeedModel: "缺模型",

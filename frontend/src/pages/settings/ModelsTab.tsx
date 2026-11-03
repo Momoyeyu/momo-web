@@ -5,8 +5,10 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useT } from "../../i18n";
 import { getState, subscribe, update } from "../../lib/store";
 import type { Settings as SettingsData } from "../../lib/types";
-import { probeLlm, probeTts } from "../../services/probe";
+import { probeLlm } from "../../services/probe";
 import { uploadRefAudio } from "../../services/ttsClient";
+import { auditionVoice, invalidateWarmup, warmVoice } from "../../services/ttsWarmup";
+import { useRoute } from "../../router";
 import type { ProbeResult } from "../../services/probe";
 import Button from "../../ui/Button";
 import FieldRow from "../../ui/FieldRow";
@@ -35,10 +37,15 @@ function urlError(sec: EndpointSection, url: string): boolean {
 }
 
 
-export default function ModelsTab() {
+export default function ModelsTab({ active }: { active: boolean }) {
   const t = useT();
   const intro=useIntro();
   const settings = useSyncExternalStore(subscribe, getState).settings;
+
+  const audition = useRef<AbortController | null>(null);
+  const voiceEdited = useRef(false);
+  const route = useRoute();
+  useEffect(() => () => audition.current?.abort(), [route, active]);
 
   const signature=JSON.stringify([settings.llm.url,settings.llm.key,settings.llm.model]);
   const [visionCheck,setVisionCheck]=useState({signature:'',verified:false,running:false,detail:''});
@@ -75,7 +82,11 @@ export default function ModelsTab() {
       if(!introRestricted())return probeLlm(s.llm);
       try{await verifyIntro();return {ok:true,detail:"1ms"};}catch{return {ok:false,detail:"invalid response"};}
     },
-    tts: (s) => probeTts(s.tts),
+    tts: () => {
+      audition.current?.abort();
+      audition.current = new AbortController();
+      return auditionVoice(audition.current.signal).catch(() => ({ ok: false, detail: "failed" }));
+    },
   };
 
   // 探测结果直接显示在按钮上，固定展示 PROBE_HOLD_MS 后复原；期间不可再点。
@@ -118,7 +129,7 @@ export default function ModelsTab() {
       既不透传后端的原始错误串，也不显示 provider 名（"gpt-sovits" 之类属于内部实现）。 */
   const probeLabel = (sec: EndpointSection): { text: string; cls: string } => {
     const r = probes[sec];
-    if (!r) return { text: t("settings.test"), cls: "" };
+    if (!r) return { text: t(sec === "tts" ? "settings.audition" : "settings.test"), cls: "" };
     if (r === "running") return { text: "…", cls: "probe-info" };
     if (r.ok) {
       const ms = /^(\d+)ms$/.exec(r.detail);
@@ -151,9 +162,11 @@ export default function ModelsTab() {
     setUploadErr("");
     try {
       const res = await uploadRefAudio(file);
-      update({
-        settings: { ...settings, tts: { ...settings.tts, voice: res.name } },
-      });
+      const current = getState().settings;
+      audition.current?.abort();
+      invalidateWarmup();
+      update({settings: { ...current, tts: { ...current.tts, voice: res.name } }});
+      warmVoice();
     } catch (err) {
       setUploadErr((err as Error).message || String(err));
     } finally {
@@ -201,6 +214,11 @@ export default function ModelsTab() {
 
   // 返回目标与来源页一致：chat 进来回 chat，其余回 title。
   const patchEndpoint = (sec: EndpointSection, key: string, v: string): void => {
+    if (sec === "tts") {
+      audition.current?.abort();
+      invalidateWarmup();
+      voiceEdited.current = true;
+    }
     update({
       settings: { ...settings, [sec]: { ...settings[sec], [key]: v, ...(sec === "llm" ? {vision:false} : {}), ...(sec === "llm" && key === "url" && !supportsThinking(v) ? { thinking: false } : {}) } },
     });
@@ -265,7 +283,9 @@ export default function ModelsTab() {
     </FieldRow>
   </div>
 </section>
-<section data-intro="tts" className="panel settings-col opt-list">
+<section onBlur={() => {
+  if (voiceEdited.current) { voiceEdited.current = false; warmVoice(); }
+}} data-intro="tts" className="panel settings-col opt-list">
   <h3 className="opt-group">
     {t("settings.groups.tts")}
     <Hint text={t("settings.ttsHint")} side="down" />
