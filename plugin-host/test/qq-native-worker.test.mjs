@@ -175,10 +175,10 @@ test('native transport and generic session notifications alone cannot authentica
   assert.equal(f.frames.find(f=>f.event==='connected').data.selfId,'123456');
   assert.equal(f.calls.find(c=>c[0]==='session')[1].desktopPathConfig.account_path,'/private/tmp/momo-worker-test');
 });
-test('private text ingress rejects groups, self echoes and mixed or mismatched audiences', async () => {
+test('private ingress rejects mismatched audiences but retains an unreadable file notice', async () => {
   const f=fixture(); await f.auth(); const base={chatType:1,peerUin:'654321',senderUin:'654321',peerUid:'u_peer',senderUid:'u_peer',msgId:'100',msgTime:'1',elements:[{elementType:1,textElement:{content:'hello'}}]};
   f.messages().onRecvMsg([base,{...base,msgId:'101',chatType:2},{...base,msgId:'102',senderUin:'123456'},{...base,msgId:'103',elements:[{elementType:3}]}]);
-  const inbox=f.frames.filter(f=>f.event==='onebot'&&f.data.post_type==='message'); assert.equal(inbox.length,1); assert.equal(inbox[0].data.raw_message,'hello');
+  const inbox=f.frames.filter(f=>f.event==='onebot'&&f.data.post_type==='message'); assert.equal(inbox.length,2); assert.equal(inbox[0].data.raw_message,'hello');assert.match(inbox[1].data.raw_message,/QQ文件/);
 });
 test('native message listener supplies stable harmless callbacks for unused SDK slots', async () => {
   const f=fixture();await f.auth();
@@ -637,4 +637,23 @@ test('native preparation alone cannot dispatch; cancellation ACK rejects a later
  await assert.rejects(f.worker.request('commitChannel',{attemptId:'a',echo:'prepare-not-send'}),{code:'ATTEMPT_CANCELLED'});
  assert.equal(f.calls.filter(row=>row[0]==='send').length,0);
  const failure=f.frames.find(frame=>frame.event==='onebot'&&frame.data.echo==='prepare-not-send');assert.equal(failure.data.status,'failed');
+});
+
+test('faces, stickers, unknown elements and mixed media are delivered as visible messages',async()=>{
+ const f=fixture();await f.auth();
+ const elements=[
+  [{elementType:6,elementId:'face',faceElement:{faceIndex:14,faceText:'微笑'}}],
+  [{elementType:11,elementId:'sticker',marketFaceElement:{faceName:'比心'}}],
+  [{elementType:99,elementId:'unknown',privatePath:'/never/expose'}],
+  [{elementType:1,textElement:{content:'before'}},{elementType:6,faceElement:{faceIndex:14}},{elementType:2,elementId:'pic',picElement:{fileName:'photo.png'}},{elementType:1,textElement:{content:'after'}}],
+ ];
+ elements.forEach((parts,index)=>f.messages().onRecvMsg([inboundRecord({msgId:'visible-'+index,elements:parts})]));
+ await new Promise(resolve=>setImmediate(resolve));await new Promise(resolve=>setImmediate(resolve));
+ const events=inboundEvents(f);assert.equal(events.length,4);
+ assert.match(JSON.stringify(events[0].data.message),/微笑/);
+ assert.match(JSON.stringify(events[1].data.message),/比心/);
+ assert.match(JSON.stringify(events[2].data.message),/99/);assert.ok(!JSON.stringify(events).includes('/never/expose'));
+ assert.equal(events[3].data.message[0].data.text,'before');
+ assert.equal(events[3].data.message.at(-1).data.text,'after');
+ assert.ok(events[3].data.message.some(part=>part.type==='image'));
 });

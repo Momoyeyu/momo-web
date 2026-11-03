@@ -450,15 +450,13 @@ class SocialAccounts:
             if not isinstance(attachments, list) or len(attachments) > 10:
                 return None
             if attachments:
-                if not account["permissions"].get("media"):
-                    return None
                 for item in attachments:
                     if (not isinstance(item, dict) or set(item) - {"mediaId", "elementId", "messageId", "kind", "name", "size", "mime"}
                         or not any(isinstance(item.get(key), str) and re.fullmatch(r"[A-Za-z0-9_-]{1,160}", item[key]) for key in ("mediaId", "elementId"))
                         or any(key in item and (not isinstance(item[key], str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", item[key])) for key in ("mediaId", "elementId", "messageId"))
                         or item.get("kind") not in {"image", "audio", "video", "file"}
                         or not isinstance(item.get("name", ""), str) or len(item.get("name", "")) > 160
-                        or type(item.get("size", 0)) is not int or not 0 <= item.get("size", 0) <= 10 * 1024 * 1024):
+                        or type(item.get("size", 0)) is not int or not 0 <= item.get("size", 0) <= 9007199254740991):
                         return None
             if not event["text"].strip() and not attachments:
                 return None

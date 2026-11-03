@@ -121,7 +121,7 @@ export const zh = {
   "checkBinding": "检查核验结果",
   "messagePermissions": "QQ 使用权限",
   "permissionGroups": {"messages": "消息", "account": "账号能力", "groups": "群聊"},
-  "permissionHints": {"receive": "允许接收符合联系人范围的私聊。", "reply": "允许在当前会话回复文字，不包含主动联系他人。", "proactive": "允许 momo 在你指定的对象、频率和时段内主动私信。", "contacts": "允许按当前联系人范围查看好友资料，不获得其他人的私密记忆。", "history": "允许读取当前授权会话的历史，不跨联系人或群共享。", "media": "允许在授权会话收发附件与媒体；不会开放任意本机文件。", "friendRequests": "允许查看和处理收到的好友申请，不自动扩大白名单。", "groups": "只允许使用下方明确添加的群；空列表不允许任何群。", "groupManagement": "允许在指定群内管理成员；仍受账号的实际群权限约束。"},
+  "permissionHints": {"receive": "允许接收符合联系人范围的私聊。", "reply": "允许在当前会话回复文字，不包含主动联系他人。", "proactive": "允许 momo 在你指定的对象、频率和时段内主动私信。", "contacts": "允许按当前联系人范围查看好友资料，不获得其他人的私密记忆。", "history": "允许读取当前授权会话的历史，不跨联系人或群共享。", "media": "允许在授权会话读取或发送附件原始内容；关闭时仍接收图片、表情等消息的类型与提示，不开放任意本机文件。", "friendRequests": "允许查看和处理收到的好友申请，不自动扩大白名单。", "groups": "只允许使用下方明确添加的群；空列表不允许任何群。", "groupManagement": "允许在指定群内管理成员；仍受账号的实际群权限约束。"},
   "proactiveSettings": "主动私信范围",
   "proactiveSettingsHint": "只可主动联系这里指定的 QQ 号；私聊白名单、频率和免打扰时段仍会同时校验。",
   "proactiveRecipients": "允许主动联系",

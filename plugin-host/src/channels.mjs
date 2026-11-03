@@ -169,10 +169,21 @@ export class QQChannel extends PersonalChannel {
     if(event.message_type==='group'&&!/^[1-9]\d{0,19}$/.test(String(event.group_id??'')))return;
     const peerId=event.message_type==='group'?`group:${event.group_id}`:String(event.user_id),senderId=String(event.user_id);
     const parts=Array.isArray(event.message)?event.message:[];
-    const text=parts.filter(item=>item?.type==='text'&&typeof item.data?.text==='string').map(item=>item.data.text).join('');
-    const attachments=this.config.permissions?.media===true?parts.filter(item=>['image','audio','video','file'].includes(item?.type)&&typeof item.data?.element_id==='string'&&typeof item.data?.message_id==='string').slice(0,10).map(item=>({kind:item.type,elementId:item.data.element_id,messageId:item.data.message_id,name:String(item.data.name??item.type).slice(0,160),size:Number.isSafeInteger(item.data.size)?item.data.size:0})):[];
-    if(!text.trim()&&!attachments.length)return;
-    this.receive({selfId:this.actualSelfId,peerId,senderId,conversationKind:event.message_type,...(qqGroup(peerId)?{groupId:qqGroup(peerId)}:{}),externalMessageId:`qq:${this.actualSelfId}:${peerId}:${event.time}:${id}`,text:[text,...attachments.map(item=>`[${item.kind}: ${item.name}; messageId=${item.messageId}; elementId=${item.elementId}]`)].filter(Boolean).join('\n'),...(attachments.length?{attachments}:{} )});
+    const attachments=[],visible=[];
+    const labels={image:'图片',audio:'语音',record:'语音',video:'视频',file:'文件',mface:'表情包',face:'表情',reply:'回复引用',at:'提及',json:'卡片',xml:'卡片',forward:'转发消息',unknown:'未知消息'};
+    for(const item of parts.slice(0,256)){
+      if(item?.type==='text'&&typeof item.data?.text==='string'){visible.push(item.data.text);continue;}
+      const kind=item?.type,info=item?.data??{},label=labels[kind]??('消息类型 '+String(kind??'未知').slice(0,60));
+      const name=typeof info.name==='string'?info.name.slice(0,160):'';
+      const id=(typeof info.id==='string'||typeof info.id==='number')?String(info.id).slice(0,24):'';
+      visible.push('[QQ'+label+(name?': '+name:id?' #'+id:'')+(this.config.permissions?.media!==true&&['image','audio','record','video','file'].includes(kind)?'；原始内容未授权读取':'; 内容以实际读取结果为准')+']');
+      if(['image','audio','video','file'].includes(kind)&&/^[A-Za-z0-9_-]{1,160}$/.test(info.element_id??'')&&/^[A-Za-z0-9_-]{1,160}$/.test(info.message_id??'')&&attachments.length<10)
+        attachments.push({kind,elementId:info.element_id,messageId:info.message_id,name:name||label,size:Number.isSafeInteger(info.size)&&info.size>=0?info.size:0});
+    }
+    if(!visible.length)visible.push('[QQ消息：内容暂无法读取]');
+    let text=visible.join('');if(text.length>15900||parts.length>256)text=text.slice(0,15900)+'[QQ消息较长，部分内容未展开]';
+    if(!text.trim())text='[QQ空白消息]';
+    this.receive({selfId:this.actualSelfId,peerId,senderId,conversationKind:event.message_type,...(qqGroup(peerId)?{groupId:qqGroup(peerId)}:{}),externalMessageId:`qq:${this.actualSelfId}:${peerId}:${event.time}:${id}`,text,...(attachments.length?{attachments}:{} )});
   }
   async send({ peerId, text, commandId, signal, beforeDispatch }) {
     if(qqGroup(peerId)){

@@ -36,10 +36,10 @@ def test_groups_require_explicit_group_scope_and_never_inherit_owner_memory():
     assert store.authorize_event(group) is None
 
 
-def test_media_ingress_requires_media_and_valid_opaque_attachments():
+def test_media_metadata_is_received_without_byte_permission_but_ids_stay_validated():
     store=SocialAccounts();account(store)
     media={**event(),'text':'','attachments':[{'mediaId':'opaque-media-id','kind':'image','name':'photo.png','size':123}]}
-    assert store.authorize_event(media) is None
+    assert store.authorize_event(media) is not None
     store.put('qq',{'permissions':{'media':True}})
     admitted=store.authorize_event(media)
     assert admitted and admitted['text']

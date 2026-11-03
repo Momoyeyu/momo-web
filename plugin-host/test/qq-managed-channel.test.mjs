@@ -68,7 +68,7 @@ test('QQ refuses legacy external connection settings before creating a socket or
   assert.equal(socketAttempts, 0);
 });
 
-test('managed private ingress preserves text-only scope, identity and the optional empty allowlist', async t => {
+test('managed private ingress preserves visible text and metadata, identity and the optional empty allowlist', async t => {
   const { native, adapter, inbox } = await channel(t);
   const event = { post_type: 'message', message_type: 'private', sub_type: 'friend', self_id: '123456', user_id: '456789', message_id: 'native-message', time: 1770000000, message: [{ type: 'text', data: { text: 'hello momo' } }, { type: 'image', data: { file: 'ignored' } }] };
   native.event({ ...event, self_id: '99999' });
@@ -77,7 +77,7 @@ test('managed private ingress preserves text-only scope, identity and the option
   assert.equal(inbox.length, 0);
   native.event(event);
   assert.equal(inbox.length, 1);
-  assert.equal(inbox[0].text, 'hello momo');
+  assert.match(inbox[0].text, /^hello momo/);assert.match(inbox[0].text,/QQ图片/);
   assert.equal(inbox[0].policyRevision, 2);
   await adapter.ack(inbox[0].inboxId);
   adapter.config.allowlistEnabled = true;
@@ -169,7 +169,7 @@ test('group and media ingress are separately scoped and carry exact fetch identi
  const event={post_type:'message',message_type:'group',self_id:'123456',user_id:'456789',group_id:'777777',message_id:'media-msg',time:100,message:[{type:'image',data:{message_id:'media-msg',element_id:'5',name:'photo.png',size:200}}]};
  native.event({...event,group_id:'888888'});assert.equal(inbox.length,0);
  native.event(event);assert.equal(inbox.length,1);assert.equal(inbox[0].peerId,'group:777777');assert.equal(inbox[0].groupId,'777777');assert.equal(inbox[0].senderId,'456789');assert.equal(inbox[0].attachments[0].elementId,'5');
- adapter.config.permissions.media=false;native.event({...event,message_id:'media-2'});assert.equal(inbox.length,1);
+ adapter.config.permissions.media=false;native.event({...event,message_id:'media-2'});assert.equal(inbox.length,2);
 });
 
 test('a proactive action rechecks quiet time after identity lookup and never dispatches late',async t=>{
@@ -206,4 +206,13 @@ test('minimum intervals longer than the hourly quota window retain the last disp
  let now=12000;const {adapter}=await channel(t,{now:()=>now,settings:{permissions:{receive:true,reply:true,proactive:true},proactivePolicy:{recipientIds:['456789'],maxPerHour:6,minIntervalSeconds:10800,quietStart:0,quietEnd:0}}});
  await adapter.action('private.send',{peerId:'456789',text:'first'});now+=7200000;
  await assert.rejects(adapter.action('private.send',{peerId:'456789',text:'within three hour interval'}),{code:'FORBIDDEN'});
+});
+
+test('media permission gates byte access, never receipt of image or unsupported message metadata',async t=>{
+ const {native,inbox}=await channel(t,{settings:{permissions:{receive:true,reply:true,media:false}}});
+ const base={post_type:'message',message_type:'private',self_id:'123456',user_id:'456789',sub_type:'friend',time:100};
+ native.event({...base,message_id:'pic-no-grant',message:[{type:'image',data:{message_id:'pic-no-grant',element_id:'e1',name:'photo.png',size:100}}]});
+ native.event({...base,message_id:'unsupported',message:[{type:'face',data:{id:14}},{type:'new_kind',data:{privatePath:'/not-forwarded'}}]});
+ assert.equal(inbox.length,2);assert.equal(inbox[0].attachments.length,1);assert.match(inbox[0].text,/图片|image/);
+ assert.match(inbox[1].text,/14/);assert.match(inbox[1].text,/new_kind/);assert.ok(!inbox[1].text.includes('/not-forwarded'));
 });

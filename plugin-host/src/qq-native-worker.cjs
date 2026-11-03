@@ -95,7 +95,7 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
           if(!incomingCurrent(value))continue;
           if(seen.size>=10000){inboundQueue.length=0;fail('INBOX_CAPACITY');return;}
           seen.add(incomingKey(value));
-          const parts=[...(value.text?[{type:'text',data:{text:value.text}}]:[]),...value.attachments.map(item=>({type:item.kind,data:{element_id:item.elementId,name:item.name,size:item.size,message_id:value.msgId}}))];
+          const parts=value.segments.map(item=>item.type==='text'?item:{...item,data:{...item.data,message_id:value.msgId}});
           wire({post_type:'message',message_type:value.chatType===2?'group':'private',sub_type:value.chatType===2?'normal':'friend',time:value.timestamp,self_id:self.uin,user_id:sender,...(value.chatType===2?{group_id:value.peerUin}:{}),sender:{user_id:sender},message_id:value.msgId,raw_message:value.text,message:parts});
           continue;
         }
@@ -137,7 +137,7 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
       // a burst cannot retain arbitrary native arrays or an unlimited backlog.
       if (inboundQueue.length + (inboundRunning ? 1 : 0) >= 64) { diagnostic('inbound_rejected', 12); break; }
       try {
-        if(record&&(record.chatType===2||record.chatType===1&&Array.isArray(record.elements)&&record.elements.some(item=>[2,3,4,5].includes(item?.elementType)))){
+        if(record&&(record.chatType===2||record.chatType===1&&(!Array.isArray(record.elements)||!record.elements.length||record.elements.some(item=>item?.elementType!==1)))){
           const chatType=record.chatType,uid=record.peerUid,senderUid=record.senderUid;
           if(!isUid(senderUid)||senderUid===self.uid||chatType===2&&!isId(uid)||chatType===1&&(!isUid(uid)||uid!==senderUid||!isFriend(uid)))continue;
           const peerUin=chatType===2?uid:record.peerUin;if(!isId(peerUin)&&!(chatType===1&&missingUin(peerUin)))continue;
@@ -339,16 +339,41 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
   }
   const peerArgument = peer => ({chatType:peer.chatType,peerUid:peer.peerUid,guildId:''});
   function normalizedElements(elements) {
-    if(!Array.isArray(elements)||elements.length>256)return{ text:'', attachments:[] };
-    let text='';const attachments=[];
-    for(const item of elements){
-      if(item?.elementType===1&&typeof item.textElement?.content==='string')text+=item.textElement.content;
-      else if([2,3,4,5].includes(item?.elementType)&&typeof item.elementId==='string'&&item.elementId.length<=200){
-        const kind=({2:'image',3:'file',4:'audio',5:'video'})[item.elementType];const data=item.picElement??item.fileElement??item.pttElement??item.videoElement??{};
-        const size=Number(data.fileSize??0);attachments.push({elementId:item.elementId,kind,name:trimText(data.fileName||kind,160),size:Number.isSafeInteger(size)&&size>=0?size:0});
+    const attachments=[],segments=[],summary=[];let remaining=15000,truncated=false;
+    const add=text=>{
+      const bounded=trimText(text,remaining);remaining-=bounded.length;
+      if(bounded)segments.push({type:'text',data:{text:bounded}});
+      if(bounded.length<String(text).length)truncated=true;
+      summary.push(bounded);
+    };
+    const labels={2:'图片',3:'文件',4:'语音',5:'视频',7:'回复引用',8:'系统提示',9:'红包或支付消息',10:'卡片',12:'礼物',13:'长消息',14:'Markdown',15:'动图',16:'转发消息',17:'按钮消息',18:'礼物',19:'日程',20:'互动游戏',21:'通话记录',22:'动态',23:'在线文件',24:'表情气泡',27:'表情气泡',28:'位置',29:'任务',30:'在线文件夹'};
+    if(!Array.isArray(elements)||!elements.length)add('[QQ消息：内容暂无法读取]');
+    for(const item of (Array.isArray(elements)?elements.slice(0,256):[])){
+      const type=item?.elementType;
+      if(type===1){add(typeof item.textElement?.content==='string'?item.textElement.content:'[QQ文本：内容暂无法读取]');continue;}
+      if([2,3,4,5].includes(type)){
+        const kind=({2:'image',3:'file',4:'audio',5:'video'})[type],data=item.picElement??item.fileElement??item.pttElement??item.videoElement??{};
+        const name=trimText(data.fileName||labels[type],160),size=Number(data.fileSize??0);
+        if(typeof item.elementId==='string'&&/^[A-Za-z0-9_-]{1,160}$/.test(item.elementId)&&attachments.length<10){
+          const attachment={elementId:item.elementId,kind,name,size:Number.isSafeInteger(size)&&size>=0?size:0};attachments.push(attachment);
+          segments.push({type:kind,data:{element_id:attachment.elementId,name,size:attachment.size}});summary.push('[QQ'+labels[type]+': '+name+']');
+        }else add('[QQ'+labels[type]+': '+name+'；内容暂无法读取]');
+        continue;
       }
+      if(type===6){
+        const face=item.faceElement??{},name=typeof face.faceText==='string'?trimText(face.faceText,120):'';
+        const index=typeof face.faceIndex==='number'||typeof face.faceIndex==='string'?trimText(String(face.faceIndex),24):'';
+        add('[QQ表情'+(name?': '+name:index?' #'+index:'')+']');continue;
+      }
+      if(type===11){
+        const name=typeof item.marketFaceElement?.faceName==='string'?trimText(item.marketFaceElement.faceName,120):'';
+        add('[QQ表情包'+(name?': '+name:'')+'；画面暂无法读取]');continue;
+      }
+      add('[QQ'+(labels[type]||'消息类型 '+(Number.isInteger(type)?type:'未知'))+'：内容暂无法读取]');
     }
-    return{text:text.slice(0,32000),attachments:attachments.slice(0,10)};
+    if(truncated||Array.isArray(elements)&&elements.length>256)segments.push({type:'text',data:{text:'[QQ消息较长，部分内容未展开]'}});
+    if(!segments.length)segments.push({type:'text',data:{text:'[QQ空白消息]'}});
+    return {text:summary.join('').slice(0,16000)||'[QQ消息]',attachments,segments};
   }
   async function normalizedHistory(rows,peer,requireConnection){
     if(!Array.isArray(rows)||rows.length>1000)throw issue('INPUT');const out=[];
@@ -465,7 +490,7 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
       if(typeof p.messageId!=='string'||!p.messageId||p.messageId.length>200||typeof p.elementId!=='string'||!p.elementId||p.elementId.length>200)throw issue('INPUT');
       const result=sdkResult(await session.getMsgService().getMsgsByMsgId(peerArgument(peer),[p.messageId]));requireConnection();
       const record=result.msgList?.find(row=>row.chatType===peer.chatType&&row.peerUid===peer.peerUid&&row.msgId===p.messageId);const element=record?.elements?.find(item=>item.elementId===p.elementId&&[2,3,4,5].includes(item.elementType));if(!element)throw issue('PEER_UNVERIFIED');
-      const metadata=normalizedElements([element]).attachments[0];if(!metadata||metadata.size<=0||metadata.size>(action==='media.incoming'?10:8)*1024*1024)throw issue('INPUT');
+      const metadata=normalizedElements([element]).attachments[0];if(!metadata||metadata.size<0||metadata.size>(action==='media.incoming'?10:8)*1024*1024)throw issue('INPUT');
       const dir=privateMediaDir('downloads');const output=path.join(dir,'momo-media-'+require('node:crypto').randomUUID());
       let completed=false;try{
       const complete=await nativeWait(downloadWaiters,()=>session.getMsgService().downloadRichMedia({fileModelId:'0',downSourceType:0,downloadSourceType:0,triggerType:1,msgId:p.messageId,chatType:peer.chatType,peerUid:peer.peerUid,elementId:p.elementId,thumbSize:0,downloadType:1,filePath:output}),value=>value?.msgId===p.messageId&&value?.msgElementId===p.elementId);

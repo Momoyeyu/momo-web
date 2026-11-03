@@ -57,7 +57,8 @@ def test_six_capabilities_cross_real_coordinator_cordis_and_native_worker(full_c
     core,trace=full_chain
     assert success(core,'qq_contacts',{'limit':10})['result']['contacts']==[{'peerId':'20002','name':'Fixture u_peer','remark':''}]
     history=success(core,'qq_history',{'peerId':'20002','limit':10})
-    assert history['result']['messages'][0]['text']=='Synthetic history'
+    assert history['result']['messages'][0]['text'].startswith('Synthetic history')
+    assert 'QQ图片' in history['result']['messages'][0]['text']
     assert history['result']['messages'][0]['attachments'][0]['elementId']=='70001'
     private=success(core,'qq_send_private',{'peerId':'20002','text':'Synthetic proactive hello'})
     assert private['receipt']['deliveryStatus']=='provider_accepted'
