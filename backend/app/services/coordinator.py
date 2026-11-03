@@ -1185,16 +1185,8 @@ class Coordinator:
                         self.inbox_status(first["id"], "processing")
                     token = current_run.set(rid)
                     try:
-                        from . import vision
-                        image_ids, image_note = [], None
-                        if first['source'] == 'qq':
-                            try:
-                                image_ids = vision.qq_images(self, first)
-                                if image_ids and not vision.enabled():
-                                    image_ids = []
-                                    image_note = 'The image was received and saved, but model vision is disabled. Do not claim to have seen its content.'
-                            except (vision.VisionError, HostError, CoordinationError, ValueError):
-                                image_note = 'The image could not be loaded for this reply. Briefly say that its content was unavailable. Do not guess its content or invent a permissions/format diagnosis.'
+                        from .dialogue_input import from_inbox
+                        content = from_inbox(self, first)
                         # Media IO can outlive focus, account or grant changes.
                         # Re-admit the original event before any provider call.
                         with self.condition:
@@ -1207,7 +1199,7 @@ class Coordinator:
                                 if normalized is None or normalized['audience'] != first['audience'] or not normalized['allowReply']:
                                     self.inbox_status(first['id'], 'held_scope')
                                     continue
-                        events = list(turn.run_turn(first["text"], image_ids=image_ids, image_note=image_note, run_id=rid, source=first["source"], external_message_id=json.dumps([first["account_id"], first["peer_id"], first["external_id"]]), audience=first["audience"], retry_of=first["retry_of"] or None, plugin_context=plugin_context, expected_generation=run_generation))
+                        events = list(turn.run_turn(content, run_id=rid, source=first["source"], external_message_id=json.dumps([first["account_id"], first["peer_id"], first["external_id"]]), audience=first["audience"], retry_of=first["retry_of"] or None, plugin_context=plugin_context, expected_generation=run_generation))
                     finally:
                         current_run.reset(token)
                     reply = "".join(e.get("text", "") for e in events if e["t"] == "sentence")

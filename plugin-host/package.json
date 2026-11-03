@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node src/index.mjs",
     "test": "node --test --test-concurrency=1 test/*.test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",
-    "cordis": "4.0.0-rc.12"
+    "cordis": "4.0.0-rc.12",
+    "silk-wasm": "3.7.1"
   }
 }

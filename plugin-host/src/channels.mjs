@@ -1,3 +1,4 @@
+import {decodeIncomingVoice} from './qq-voice.mjs';
 import { QQ_MUTATIONS, QQ_OPERATIONS, qqGroup, qqOperationParams } from './qq-operations.mjs';
 import { randomUUID } from 'node:crypto';
 
@@ -238,6 +239,7 @@ export class QQChannel extends PersonalChannel {
       if(operation==='contacts.list'&&Array.isArray(data.contacts)&&this.config.allowlistEnabled)data.contacts=data.contacts.filter(row=>this.config.allowlist.includes(row.peerId));
       if(operation==='friends.listRequests'&&Array.isArray(data.requests)&&this.config.allowlistEnabled)data.requests=data.requests.filter(row=>this.config.allowlist.includes(row.peerId));
       if(operation==='groups.list'&&Array.isArray(data.groups)){const ids=(this.config.groupAllowlist??[]).map(value=>typeof value==='string'?value:value?.peerId);data.groups=data.groups.filter(row=>ids.includes(row.peerId)||ids.includes(qqGroup(row.peerId)));}
+      if(operation==='media.incoming'&&data.mime==='audio/silk')return decodeIncomingVoice(data);
       return mutating?{...data,deliveryStatus:'provider_accepted',...(data.message_id?{externalMessageId:String(data.message_id)}:{})}:data;
     }finally{if(mutating)this.activeSends--;}
   }

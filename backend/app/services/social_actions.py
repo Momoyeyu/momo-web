@@ -189,15 +189,15 @@ def authorize_action(store, action, params, *, account_id=None, revision=None, a
             import json
             rows = db.query('SELECT * FROM inbox WHERE run_id=?', (current_run.get(),))
             if local_owner or not rows:
-                raise SocialError('Incoming images require their admitted QQ event')
+                raise SocialError('Incoming media require their admitted QQ event')
             incoming = rows[0]
             refs = json.loads(incoming['attachments'])
             if (incoming['source'] != 'qq' or incoming['account_id'] != account['accountId']
                 or incoming['self_id'] != account['expectedSelfId'] or incoming['peer_id'] != peer
                 or incoming['audience'] != audience or str(account['policyRevision']) != incoming['policy_revision']
-                or not any(item.get('kind') == 'image' and item.get('elementId') == params['elementId']
+                or not any(item.get('kind') in {'image','audio'} and item.get('elementId') == params['elementId']
                     and str(item.get('messageId') or incoming['raw_external_id']) == params['messageId'] for item in refs)):
-                raise SocialError('Image is not part of the current admitted event')
+                raise SocialError('Media is not part of the current admitted event')
         if action=='media.send':
             if not local_owner:
                 # A remote reply may attach only within its same proven scope;

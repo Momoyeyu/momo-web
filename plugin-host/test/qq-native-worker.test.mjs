@@ -674,3 +674,26 @@ test('native image download accepts the verified message cache path returned by 
  f.msg.downloadRichMedia=args=>{queueMicrotask(()=>f.messages().onRichMediaDownloadComplete({msgId:args.msgId,msgElementId:args.elementId,fileErrCode:'0',filePath:other}));};
  await expectNativeRejected(f,{action:'media.incoming',params:{peerId:'654321',messageId:'received',elementId:'elem'},echo:'wrong-cache'},'PROVIDER_REJECTED');
 });
+
+test('market and system faces resolve authenticated element artwork, ignoring arbitrary URLs', async t=>{
+  const f=fixture();await f.auth();
+  const pixels=Buffer.from('GIF89a');
+  const urls=[];
+  t.mock.method(globalThis,'fetch',async url=>{urls.push(url);return new Response(pixels);});
+  const hash='a'.repeat(32);
+  const elements=[
+    {elementType:11, elementId:'market', marketFaceElement:{emojiId:hash,url:'https://evil.test'}},
+    {elementType:6, elementId:'face', faceElement:{faceIndex:14}},
+    {elementType:27, elementId:'bubble', faceBubbleElement:{yellowFaceInfo:{index:14}}},
+    {elementType:15, elementId:'gif', giphyElement:{id:'synthetic123'}},
+  ];
+  f.msg.getMsgsByMsgId=async()=>({result:0,msgList:[{chatType:1,peerUid:'u_peer',msgId:'received',elements}]});
+  for (const {elementId} of elements) {
+    await f.worker.request('onebot',{action:'media.incoming',params:{peerId:'654321',messageId:'received',elementId},echo:elementId});
+    const result=f.frames.find(frame=>frame.event==='onebot'&&frame.data.echo===elementId);
+    assert.equal(result?.data.data.dataBase64,pixels.toString('base64'));
+  }
+  assert.deepEqual(urls,[`https://gxh.vip.qq.com/club/item/parcel/item/aa/${hash}/raw300.gif`,
+    'https://qzonestyle.gtimg.cn/qzone/em/e100.gif','https://qzonestyle.gtimg.cn/qzone/em/e100.gif',
+    'https://media.giphy.com/media/synthetic123/giphy.gif']);
+});

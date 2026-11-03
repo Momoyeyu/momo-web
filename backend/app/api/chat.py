@@ -10,6 +10,7 @@ import json
 import uuid
 from typing import Iterator
 
+from ..services.dialogue_input import DialogueInput
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ConfigDict
@@ -109,11 +110,10 @@ def chat(req: ChatIn) -> StreamingResponse:
                 runtime.inbox_status(inbox["id"], "processing")
                 iterator = iter(
                     turn.run_turn(
-                        req.text,
+                        DialogueInput(req.text, req.images or []),
                         req.presentation.model_dump() if req.presentation else None,
                         first_meeting=req.firstMeeting,
                         run_id=inbox["run_id"],
-                        image_ids=req.images,
                     )
                 )
                 while True:
@@ -178,3 +178,12 @@ def interrupt(req: InterruptIn) -> Response:
         req.user, req.assistant, req.generation, run_id=req.runId
     )
     return Response(status_code=204, headers={"X-Momo-Generation": str(generation)})
+
+
+@router.get("/api/chat/voice/{clip_id}")
+def voice_clip(clip_id: str):
+    from ..services.dialogue_input import voice_wav
+    try:
+        return Response(voice_wav(clip_id), media_type="audio/wav", headers={"Cache-Control": "no-store"})
+    except ValueError:
+        raise HTTPException(404, "unavailable") from None

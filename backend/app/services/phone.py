@@ -3,7 +3,7 @@ import json
 
 from ..core import db
 from .social import social
-from . import vision, message_display
+from . import dialogue_input, message_display
 from .coordinator import runtime
 
 PENDING = ('queued','held_focus','held_inactive','held_paused','held_interrupt','processing')
@@ -45,7 +45,7 @@ def qq_snapshot(peer=None, before=None):
     page=selected[:30]
     messages=[]
     for row in reversed(page):
-        messages.append({'id':row['id'],'text':message_display.incoming(row),'direction':'in','speaker':row['sender_id'] or row['peer_id'],'status':row['status'],'at':row['at'],'images':vision.for_run(row['run_id'])})
+        messages.append({'id':row['id'],'text':message_display.incoming(row),'direction':'in','speaker':row['sender_id'] or row['peer_id'],'status':row['status'],'at':row['at'],**dialogue_input.media_for_run(row['run_id'])})
         outs=db.query("SELECT * FROM messages WHERE run_id=? AND role='assistant' AND visible=1 ORDER BY seq",(row['run_id'],))
         if outs:
             messages.append({'id':'out:'+row['run_id'],'text':''.join(out['display_text'] or out['text'] for out in outs),'direction':'out','speaker':'momo','status':'delivered','at':outs[-1]['at']})

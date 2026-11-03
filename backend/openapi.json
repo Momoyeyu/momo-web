@@ -1539,6 +1539,13 @@
           "text": {
             "title": "Text",
             "type": "string"
+          },
+          "voices": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Voices",
+            "type": "array"
           }
         },
         "required": [
@@ -1684,6 +1691,43 @@
           }
         },
         "summary": "Interrupt"
+      }
+    },
+    "/api/chat/voice/{clip_id}": {
+      "get": {
+        "operationId": "voice_clip_api_chat_voice__clip_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "clip_id",
+            "required": true,
+            "schema": {
+              "title": "Clip Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Voice Clip"
       }
     },
     "/api/checkpoints": {

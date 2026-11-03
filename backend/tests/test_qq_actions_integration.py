@@ -125,14 +125,18 @@ def test_local_chat_interruption_hold_does_not_disable_its_own_authorized_qq_too
     assert success(core,'qq_contacts',{})['result']['contacts']
 
 
-def test_group_inbox_uses_separate_audience_and_replies_through_real_worker(full_chain,monkeypatch):
+@pytest.mark.parametrize('model_result', ['success', 'error', 'empty'])
+def test_group_inbox_uses_separate_audience_and_replies_through_real_worker(full_chain,monkeypatch,model_result):
     import threading
     from app.core import llm
     core,trace=full_chain
     def model(_config,messages,**kwargs):
         content='\n'.join(str(m.get('content','')) for m in messages)
         assert 'QQ group' in content or 'QQ 群' in content
-        yield {'type':'text','delta':'Synthetic group reply.'}
+        if model_result == 'error':
+            raise llm.LlmError('synthetic upstream failure')
+        if model_result == 'success':
+            yield {'type':'text','delta':'Synthetic group reply.'}
     monkeypatch.setattr(llm,'chat_stream',model)
     account=social._account('qq')
     core.event('inbox',{'source':'qq','pluginId':'momo-qq','accountId':account['accountId'],'selfId':'10001','peerId':'group:30003','groupId':'30003','senderId':'20002','conversationKind':'group','externalMessageId':'group-live-inbox','text':'Synthetic group incoming','policyRevision':account['policyRevision']})
@@ -145,6 +149,9 @@ def test_group_inbox_uses_separate_audience_and_replies_through_real_worker(full
             time.sleep(.02)
         assert rows and rows[0]['audience']!='owner'
         assert rows[0]['status']=='completed',dict(rows[0])
+        replies = db.query("SELECT text FROM messages WHERE run_id=? AND role='assistant' AND visible=1", (rows[0]['run_id'],))
+        assert len(replies)==1 and replies[0]['text']
+        assert 'synthetic upstream failure' not in replies[0]['text']
         assert any(json.loads(row['payload']).get('peerId')=='group:30003' and row['status']=='completed' for row in db.query('SELECT * FROM outbox'))
     finally:
         core.closed.set();worker.join(2)
@@ -178,7 +185,8 @@ def test_local_qq_activity_indicator_does_not_change_owner_attention_authority(f
 @pytest.mark.parametrize('vision_on',[True,False])
 def test_current_image_crosses_cordis_and_native_without_history(full_chain,monkeypatch,vision_on):
     from app.core import state
-    from app.services import vision
+    from app.services import dialogue_input, vision
+    import base64
     core,trace=full_chain
     social.put('qq',{'permissions':{'history':False}})
     core.configure_host_plugins([])
@@ -187,11 +195,22 @@ def test_current_image_crosses_cordis_and_native_without_history(full_chain,monk
     with db.tx() as c:c.execute('INSERT INTO vision_proofs VALUES(?,?)',(vision.fingerprint(cfg),0))
     values=state.load();values['settings']['llm']=cfg;state.write_state(values)
     account=social._account('qq');audience=social._audience(account,'20002')
-    item=core.enqueue('qq',account['accountId'],'90001','What color?',self_id='10001',peer_id='20002',sender_id='20002',audience=audience,policy_revision=str(account['policyRevision']),attachments=[{'kind':'image','elementId':'70002','messageId':'90001','name':'fixture.png','size':70}])
+    item=core.enqueue('qq',account['accountId'],'90001','What color?',self_id='10001',peer_id='20002',sender_id='20002',audience=audience,policy_revision=str(account['policyRevision']),attachments=[{'kind':'image','elementId':'70002','messageId':'90001','name':'fixture.png','size':70},{'kind':'audio','elementId':'voice','messageId':'90001'}])
     with checkpoint.audience_scope(audience),core.run(item['run_id'],'qq',account_id=account['accountId']):
         token=coordinator.current_run.set(item['run_id'])
         try:
-            ids=vision.qq_images(core,item)
+            original_action = core.social_action
+            pcm = b'\x01\x00' * 1600
+            def media_action(name, args):
+                if args.get('elementId') == 'voice':
+                    return {'result': {'dataBase64': base64.b64encode(pcm), 'mime': 'audio/x-momo-pcm16'}}
+                return original_action(name, args)
+            monkeypatch.setattr(core, 'social_action', media_action)
+            monkeypatch.setattr(dialogue_input, 'transcribe', lambda raw, lang: 'voice fixture' if raw == pcm else '')
+            content = dialogue_input.from_inbox(core, item)
+            assert content.speech == ['voice fixture']
+            ids = [image['id'] for image in vision.for_run(item['run_id'])]
+            assert content.images == (ids if vision_on else [])
             assert len(ids)==1
             parts=vision.parts('color?',ids,audience=audience,cfg=cfg)
             if vision_on:
@@ -206,6 +225,11 @@ def test_current_image_crosses_cordis_and_native_without_history(full_chain,monk
             assert projected[0]['id']==ids[0]
             stored=db.query("SELECT * FROM messages WHERE run_id=? AND role='user'",(item['run_id'],))[0]
             assert checkpoint._message(stored)['images'][0]['id']==ids[0]
+            clip = phone.qq_snapshot('20002')['messages'][0]['voices'][0]
+            assert checkpoint._message(stored)['voices'] == [clip]
+            assert dialogue_input.voice_wav(clip).endswith(pcm)
+            assert 'voice fixture' in checkpoint.context_message(stored)['text']
+            assert 'voice fixture' not in checkpoint._message(stored)['text']
             assert vision.body(ids[0])[0][:2]==b'\xff\xd8'
         finally:coordinator.current_run.reset(token)
     assert 'downloadRichMedia' in trace.read_text()

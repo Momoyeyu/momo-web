@@ -34,7 +34,14 @@ SUMMARY_PREFIX = "以下是本次对话此前部分的摘要，其后的最新�
 def run_turn(text, presentation=None, first_meeting=False, *, run_id=None, source="meeting", external_message_id=None, audience="owner", retry_of=None, plugin_context=None, expected_generation=None, image_ids=None, image_note=None):
     # ASGI may resume successive next() calls under different Context objects.
     # Bind privacy for each step, not across a suspended generator yield.
-    iterator = _run_turn(text, presentation, first_meeting, run_id=run_id, source=source, external_message_id=external_message_id, retry_of=retry_of, plugin_context=plugin_context, expected_generation=expected_generation, image_ids=image_ids, image_note=image_note)
+    from .dialogue_input import DialogueInput
+    speech = []
+    if isinstance(text, DialogueInput):
+        speech = text.speech
+        image_ids = text.images
+        image_note = '\n'.join(text.notes)
+        text = text.text
+    iterator = _run_turn(text, presentation, first_meeting, run_id=run_id, source=source, external_message_id=external_message_id, retry_of=retry_of, plugin_context=plugin_context, expected_generation=expected_generation, image_ids=image_ids, image_note=image_note, speech=speech)
     try:
         while True:
             with checkpoint.audience_scope(audience, exclude_run=retry_of), memory.audience_scope(audience):
@@ -62,6 +69,7 @@ def _run_turn(
     expected_generation: int | None = None,
     image_ids=None,
     image_note=None,
+    speech=None,
 ) -> Iterator[TurnEvent]:
     """一回合：yield 增量/错误事件（结束即返回）。流程见 services/turn.py。"""
     gen = checkpoint.generation() if expected_generation is None else expected_generation
@@ -80,10 +88,15 @@ def _run_turn(
         if image_ids:
             vision.require_enabled(state["settings"]["llm"])
             vision.validate_ids(image_ids, audience=checkpoint.audience())
-        messages = build_messages(state, text, presentation, source=source, plugin_context=plugin_context, image_ids=image_ids, image_note=image_note)
+        messages = build_messages(state, "\n".join([text, *(speech or [])]), presentation, source=source, plugin_context=plugin_context, image_ids=image_ids, image_note=image_note)
     except vision.VisionError as error:
-        yield _error(str(error))
-        return
+        if source != 'qq':
+            yield _error(str(error))
+            return
+        image_ids = []
+        messages = build_messages(state, "\n".join([text, *(speech or [])]), source=source,
+                                  plugin_context=plugin_context, presentation=None,
+                                  image_note='Image content is unavailable. Do not guess its contents.')
     if not checkpoint.begin_turn(
         text,
         gen,
@@ -96,6 +109,7 @@ def _run_turn(
         return  # 会话已被读档/重置 → 本回合静默作废
 
     errored = False
+    spoken = False
     try:
         if image_ids:
             vision.bind(checkpoint.current_run(gen, at), image_ids, checkpoint.audience())
@@ -106,16 +120,25 @@ def _run_turn(
             state["settings"]["extensions"] if checkpoint.audience() == "owner" and not intro.restricted() else [], [] if intro.restricted() else builtin_names()
         ) as ext_tools:
             for event in react(messages, ext_tools, state, gen, at, presentation, source=source):
+                if source == 'qq' and event['t'] == 'error' and not spoken:
+                    break
+                if event['t'] == 'sentence' and event.get('text'):
+                    spoken = True
                 if event["t"] == "error":
                     errored = True
                     # Roll back before publishing the error so a retry's prompt
                     # cannot pick up an unanswered, failed input.
                     checkpoint.discard_unanswered_turn(gen, at)
                 yield event
+            if source == 'qq' and not spoken:
+                yield from _remote_fallback(state, gen, at)
     except (llm.LlmError, vision.VisionError) as e:
-        errored = True
-        checkpoint.discard_unanswered_turn(gen, at)
-        yield _error(str(e))
+        if source == 'qq' and not spoken:
+            yield from _remote_fallback(state, gen, at)
+        else:
+            errored = True
+            checkpoint.discard_unanswered_turn(gen, at)
+            yield _error(str(e))
     finally:
         if source == "meeting":
             onboarding.settle_reply(at)
@@ -132,6 +155,19 @@ def _run_turn(
 
 
 # ==================== 节点实现 ====================
+
+
+def _remote_fallback(state, gen, at):
+    """Stage a reply exactly like generated speech; delivery still needs a live permit."""
+    from .prompt import conversation_lang
+    text = {
+        'zh': '收到你的消息了。刚才回复时出了点问题，可以再试一次吗？',
+        'en': 'I got your message. Something went wrong with my reply. Could we try again?',
+        'ja': 'メッセージは届いたよ。うまく返せなかったから、もう一度お願いしてもいい？',
+    }[conversation_lang(state)]
+    if checkpoint.append_sentence(text, gen, at):
+        yield {'t':'sentence', 'generation':gen, 'no':0, 'text':text, 'at':at,
+               'cues':[], **checkpoint.event_metadata(gen, at)}
 
 
 class ContextMessages(list):
@@ -167,7 +203,7 @@ def build_messages(
         rows = checkpoint.context_rows(limit=None) if history_rows is None else history_rows
     if summary:
         messages.append({"role": "system", "content": SUMMARY_PREFIX + summary})
-    history = [checkpoint._message(r) for r in rows]
+    history = [checkpoint.context_message(r) for r in rows]
     all_ids = [item['id'] for m in history for item in m.get('images', [])] + (image_ids or [])
     recent = set(all_ids[-vision.MAX_COUNT:])
     previous_run = None

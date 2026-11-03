@@ -10,7 +10,49 @@ const isUid = value => typeof value === 'string' && /^u_[A-Za-z0-9_-]{1,128}$/.t
 const issue = code => Object.assign(new Error(code), { code });
 const safeAttempt = value => typeof value === 'string' && /^[A-Za-z0-9-]{1,100}$/.test(value);
 
-function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = () => {} }) {
+// Only derive public artwork addresses from identifiers on the verified native
+// element. A message-supplied URL or filename is never a fetch destination.
+async function stickerBytes(element, emojiDir) {
+  let urls;
+  if(element.elementType===11){
+    const id=element.marketFaceElement?.emojiId;
+    if(typeof id!=='string'||!/^[a-f0-9]{32}$/i.test(id))throw issue('INPUT');
+    urls=[`https://gxh.vip.qq.com/club/item/parcel/item/${id.slice(0,2)}/${id}/raw300.gif`];
+  }else if(element.elementType===15){
+    const id=element.giphyElement?.id;
+    if(typeof id!=='string'||!/^[a-zA-Z0-9]{1,80}$/.test(id))throw issue('INPUT');
+    urls=[`https://media.giphy.com/media/${id}/giphy.gif`];
+  }else{
+    const id=String(element.faceElement?.faceIndex??element.faceBubbleElement?.yellowFaceInfo?.index);
+    if(!/^\d{1,4}$/.test(id))throw issue('INPUT');
+    if(emojiDir){
+      const local=path.join(emojiDir,id+'.png');
+      try{return fs.readFileSync(local);}catch(error){if(error.code!=='ENOENT'&&error.code!=='ENOTDIR')throw error;}
+    }
+    // Numeric artwork IDs from QQ's default_config.json (legacy ordering differs).
+    const legacy={0:114,14:100,41:193,42:190,43:192,46:162,49:178,53:168,56:171,59:174,74:176,76:179,77:180,78:181,79:182,85:191,86:194,89:156,96:117,97:140,98:141,99:142,100:143,101:144,102:145,103:146,104:147,105:148,106:149,107:150,108:151,109:152,110:153,111:154,112:155,114:158,116:165,118:183,119:184,120:185,121:186,123:188,124:189,125:195,129:199,137:121002,144:121009,146:121011,147:121012,169:121034,171:241,172:242,173:243,174:244,175:245,176:246,177:247,178:248,179:249,181:251,182:252,183:253,185:255,187:257,201:271,212:282};
+    const code=legacy[id]??(Number(id)<100?100+Number(id):10000+Number(id));
+    urls=[`https://qzonestyle.gtimg.cn/qzone/em/e${code}.gif`,`https://koishi.js.org/QFace/gif/s${id}.gif`,`https://koishi.js.org/QFace/static/s${id}.png`];
+  }
+  const signal=AbortSignal.timeout(8000);
+  for(const url of urls){
+    let res;
+    try{res=await fetch(url,{redirect:'error',signal});}catch(error){if(signal.aborted)throw error;continue;}
+    if(!res.ok){await res.body?.cancel();continue;}
+    const chunks=[];let total=0;
+    for await(const chunk of res.body){
+      total+=chunk.length;
+      if(total>10*1024*1024)throw issue('INPUT');
+      chunks.push(chunk);
+    }
+    const bytes=Buffer.concat(chunks);
+    if(!total)continue;
+    if(bytes.subarray(0,3).toString()==='GIF'||bytes.subarray(1,4).toString()==='PNG'||(bytes[0]===0xff && bytes[1]===0xd8)||(bytes.toString('ascii',0,4)==='RIFF' && bytes.toString('ascii',8,12)==='WEBP'))return bytes;
+  }
+  throw issue('PROVIDER_REJECTED');
+}
+
+function createNativeWorker({ api, dataRoot, send, emojiDir, now = Date.now, onIdentity = () => {} }) {
   const startedAt=now();
   let attemptId = null, expectedSelfId = null, active = false, prepared = false, sessionReady = false, startupComplete = false;
   let nativeDisconnected = false, everMsfConnected = false;
@@ -351,23 +393,18 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     for(const item of (Array.isArray(elements)?elements.slice(0,256):[])){
       const type=item?.elementType;
       if(type===1){add(typeof item.textElement?.content==='string'?item.textElement.content:'[QQ文本：内容暂无法读取]');continue;}
-      if([2,3,4,5].includes(type)){
-        const kind=({2:'image',3:'file',4:'audio',5:'video'})[type],data=item.picElement??item.fileElement??item.pttElement??item.videoElement??{};
-        const name=trimText(data.fileName||labels[type],160),size=Number(data.fileSize??0);
+      if([2,3,4,5,6,11,15,27].includes(type)){
+        const isImageFile=type===3&&/\.(png|jpe?g|gif|webp)$/i.test(item.fileElement?.fileName??'');
+        const kind=isImageFile?'image':({2:'image',3:'file',4:'audio',5:'video',6:'image',11:'image',15:'image',27:'image'})[type];
+        const data=item.picElement??item.fileElement??item.pttElement??item.videoElement??{};
+        const label=labels[type]||'表情';
+        const name=trimText(data.fileName||item.marketFaceElement?.faceName||item.faceElement?.faceText||label,160);
+        const size=Number(data.fileSize??0);
         if(typeof item.elementId==='string'&&/^[A-Za-z0-9_-]{1,160}$/.test(item.elementId)&&attachments.length<10){
           const attachment={elementId:item.elementId,kind,name,size:Number.isSafeInteger(size)&&size>=0?size:0};attachments.push(attachment);
-          segments.push({type:kind,data:{element_id:attachment.elementId,name,size:attachment.size}});summary.push('[QQ'+labels[type]+': '+name+']');
-        }else add('[QQ'+labels[type]+': '+name+'；内容暂无法读取]');
+          segments.push({type:kind,data:{element_id:attachment.elementId,name,size:attachment.size}});summary.push('[QQ'+label+': '+name+']');
+        }else add('[QQ'+label+': '+name+']');
         continue;
-      }
-      if(type===6){
-        const face=item.faceElement??{},name=typeof face.faceText==='string'?trimText(face.faceText,120):'';
-        const index=typeof face.faceIndex==='number'||typeof face.faceIndex==='string'?trimText(String(face.faceIndex),24):'';
-        add('[QQ表情'+(name?': '+name:index?' #'+index:'')+']');continue;
-      }
-      if(type===11){
-        const name=typeof item.marketFaceElement?.faceName==='string'?trimText(item.marketFaceElement.faceName,120):'';
-        add('[QQ表情包'+(name?': '+name:'')+'；画面暂无法读取]');continue;
       }
       add('[QQ'+(labels[type]||'消息类型 '+(Number.isInteger(type)?type:'未知'))+'：内容暂无法读取]');
     }
@@ -489,8 +526,14 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
       if(abandonedDownloads.size>=64)throw issue('INBOX_CAPACITY');
       if(typeof p.messageId!=='string'||!p.messageId||p.messageId.length>200||typeof p.elementId!=='string'||!p.elementId||p.elementId.length>200)throw issue('INPUT');
       diagnostic('media_lookup_begin');const result=sdkResult(await session.getMsgService().getMsgsByMsgId(peerArgument(peer),[p.messageId]));requireConnection();diagnostic('media_lookup_ready');
-      const record=result.msgList?.find(row=>row.chatType===peer.chatType&&row.peerUid===peer.peerUid&&row.msgId===p.messageId);const element=record?.elements?.find(item=>item.elementId===p.elementId&&[2,3,4,5].includes(item.elementType));if(!element)throw issue('PEER_UNVERIFIED');
+      const record=result.msgList?.find(row=>row.chatType===peer.chatType&&row.peerUid===peer.peerUid&&row.msgId===p.messageId);const element=record?.elements?.find(item=>item.elementId===p.elementId&&[2,3,4,5,6,11,15,27].includes(item.elementType));if(!element)throw issue('PEER_UNVERIFIED');
       const metadata=normalizedElements([element]).attachments[0];if(!metadata||metadata.size<0||metadata.size>(action==='media.incoming'?10:8)*1024*1024)throw issue('INPUT');
+      if([6,11,15,27].includes(element.elementType)){
+        const bytes=await stickerBytes(element, emojiDir);
+        requireConnection();
+        reply(echo,{name:metadata.name,mime:'application/octet-stream',dataBase64:bytes.toString('base64')});
+        return;
+      }
       const dir=privateMediaDir('downloads');const output=path.join(dir,'momo-media-'+require('node:crypto').randomUUID());
       let completed=false;try{
       const complete=await nativeWait(downloadWaiters,()=>session.getMsgService().downloadRichMedia({fileModelId:'0',downSourceType:0,downloadSourceType:0,triggerType:1,msgId:p.messageId,chatType:peer.chatType,peerUid:peer.peerUid,elementId:p.elementId,thumbSize:0,downloadType:1,filePath:output}),value=>value?.msgId===p.messageId&&value?.msgElementId===p.elementId);
@@ -505,7 +548,7 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
       const handle=fs.openSync(actual,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);try{
         const stat=fs.fstatSync(handle);if(!stat.isFile()||stat.size>(action==='media.incoming'?10:8)*1024*1024||stat.nlink!==1||typeof process.getuid==='function'&&stat.uid!==process.getuid())throw issue('INPUT');
         const bytes=Buffer.alloc(stat.size);if(fs.readSync(handle,bytes,0,bytes.length,0)!==bytes.length||fs.fstatSync(handle).size!==stat.size)throw issue('INPUT');
-        reply(echo,{name:metadata.name,mime:imageInfo(bytes)?.mime??'application/octet-stream',dataBase64:bytes.toString('base64')});
+        reply(echo,{name:metadata.name,mime:element.elementType===4?'audio/silk':imageInfo(bytes)?.mime??'application/octet-stream',dataBase64:bytes.toString('base64')});
       }finally{fs.closeSync(handle);}
       }finally{if(!completed)abandonedDownloads.add(output);try{fs.rmSync(output,{force:true});}catch{}}return;
     }
@@ -618,7 +661,7 @@ function boot() {
   os.homedir = () => path.join(config.dataRoot, 'home'); syncBuiltinESMExports();
   const native = { exports: {} }; process.dlopen(native, config.wrapperPath);
   const write = value => process.stdout.write('MOMO_QQ_IPC ' + JSON.stringify(value) + '\n');
-  const worker = createNativeWorker({ api: native.exports, dataRoot: config.dataRoot, send: write });
+  const worker = createNativeWorker({ api: native.exports, dataRoot: config.dataRoot, emojiDir:path.join(path.dirname(process.execPath),"../Resources/app/resource/default-emojis"), send: write });
   let buffer = '', inflight = 0;
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', chunk => {

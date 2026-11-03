@@ -112,7 +112,7 @@ def _summary_messages(state, seg, request, snapshot):
     # Same system/header and tools as the actual foreground prefix. Only retain
     # matching source rows; no recalled content or late plugin facts from another turn.
     first = next((i for i, m in enumerate(request) if m['role'] != 'system'), len(request))
-    return [dict(m) for m in request[:first]] + turn._merge_assistant([checkpoint._message(r) for r in seg])
+    return [dict(m) for m in request[:first]] + turn._merge_assistant([checkpoint.context_message(r) for r in seg])
 
 
 def compress_once(request=None, tools=None) -> bool:

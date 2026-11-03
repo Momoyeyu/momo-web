@@ -12,4 +12,4 @@ export async function uploadImage(file:File,signal:AbortSignal):Promise<ImageRef
  if(!response.ok){let key='vision.uploadFailed';try{const data=await response.json();if(typeof data.detail==='string'&&data.detail.startsWith('vision.'))key=data.detail;}catch{/* bounded error */}throw new Error(key);}
  return response.json();
 }
-export function deleteImage(id:string,forget=false):Promise<void>{return runtimeFetch('/api/vision/images/'+id+(forget?'?forget=true':''),{method:'DELETE'}).then(response=>{if(!response.ok)throw new Error('vision.unavailable');});}
+export function deleteImage(id:string,forget=false):Promise<void>{return runtimeFetch('/api/vision/images/'+id+(forget?'?forget=true':''),{method:'DELETE'}).then(response=>{if(!response.ok)throw new Error('vision.unavailable');window.dispatchEvent(new CustomEvent('momo:image-deleted',{detail:id}));});}

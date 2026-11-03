@@ -111,7 +111,11 @@ def _row(image_id, audience=None):
     if not rows or audience is not None and rows[0]['audience'] != audience:
         raise VisionError('vision.unavailable')
     row = dict(rows[0])
-    scope = json.loads(row['scope'])
+    check_media_scope(json.loads(row['scope']), row['audience'])
+    return row
+
+
+def check_media_scope(scope, audience):
     if scope.get('source') == 'qq':
         from .social import social
         with social.lock:
@@ -120,9 +124,8 @@ def _row(image_id, audience=None):
                 or account['accountId'] != scope.get('accountId')
                 or account.get('expectedSelfId') != scope.get('selfId')
                 or not social._scope_allowed(account, scope.get('peerId', ''))
-                or social._audience(account, scope.get('peerId', '')) != row['audience']):
+                or social._audience(account, scope.get('peerId', '')) != audience):
                 raise VisionError('vision.unavailable')
-    return row
 
 
 def metadata(image_id, audience=None):
@@ -275,27 +278,26 @@ def qq_images(coordinator, incoming):
     """Fetch only image elements in this already admitted event, not history."""
     refs = [item for item in json.loads(incoming['attachments']) if item.get('kind') == 'image']
     if not refs: return []
-    if len(refs) > MAX_COUNT: raise VisionError('vision.count')
     from . import checkpoint
+    from .coordinator import CoordinationError
+    from ..core.plugin_host import HostError
     with checkpoint.audience_scope(incoming['audience']):
         cached = for_run(incoming['run_id'])
-        if len(cached) == len(refs): return [item['id'] for item in cached]
+        if cached:
+            return [item['id'] for item in cached if not item.get('unavailable')]
         ids = []
-        try:
-            for ref in refs:
+        for ref in refs:
+            try:
                 result = coordinator.social_action('media.incoming', {
                     'peerId':incoming['peer_id'], 'messageId':ref.get('messageId') or incoming['raw_external_id'], 'elementId':ref['elementId']})['result']
                 raw = base64.b64decode(result['dataBase64'], validate=True)
                 image = store(raw, audience=incoming['audience'], scope={'source':'qq','accountId':incoming['account_id'],
                               'selfId':incoming['self_id'],'peerId':incoming['peer_id']})
+                bind(incoming['run_id'], [image['id']], incoming['audience'])
                 ids.append(image['id'])
-            # No images attach until every image in the batch was fetched.
-            bind(incoming['run_id'],ids,incoming['audience'])
-            return ids
-        except Exception:
-            with db.tx() as c:
-                for image_id in ids: c.execute('DELETE FROM vision_images WHERE id=?', (image_id,))
-            raise
+            except (ValueError, HostError, CoordinationError):
+                continue
+        return ids
 
 
 def read_tool(args):

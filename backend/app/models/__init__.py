@@ -151,6 +151,7 @@ class StoredMessage(TypedDict):
 
     role: Role
     text: str
+    voices: NotRequired[list[str]]
     images: NotRequired[list[dict[str, Any]]]
     at: str
     seq: NotRequired[int]

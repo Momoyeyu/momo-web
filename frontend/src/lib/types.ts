@@ -11,7 +11,7 @@ export interface LlmConfig {
   maxOutputTokens?: number;
 }
 
-export interface ImageRef {id:string;mime:string;width:number;height:number;animated?:boolean}
+export interface ImageRef {id:string;mime:string;width:number;height:number;animated?:boolean;unavailable?:boolean}
 
 /** TTS 端点：GPT-SoVITS api_v2 服务地址（前端统一走 backend 的 /api/tts/speech）。 */
 export interface TtsConfig {
@@ -39,7 +39,7 @@ export type StoredMessage = import("../api/types").StoredMessage & {
   peerId?: string;
   externalMessageId?: string | null;
   seq?: number;
-  images?: ImageRef[];
+  voices?:string[]; images?: ImageRef[];
 };
 
 export type Lang = "zh" | "ja" | "en";
@@ -148,7 +148,7 @@ export interface ChatMessage {
   peerId?: string;
   externalMessageId?: string | null;
   seq?: number;
-  images?: ImageRef[];
+  voices?:string[]; images?: ImageRef[];
   role: "user" | "assistant";
   text: string;
   at: string;

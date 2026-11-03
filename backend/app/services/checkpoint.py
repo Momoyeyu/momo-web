@@ -87,6 +87,18 @@ def live_summary() -> str:
     return str(summary_state()["summary"])
 
 
+def context_message(row):
+    message = _message(row)
+    if row['source'] == 'qq' and row['role'] == 'user':
+        speech = []
+        for clip_id in message.get('voices', []):
+            clip = db.query('SELECT transcript FROM dialogue_voice WHERE id=?', (clip_id,))
+            if clip and clip[0]['transcript']:
+                speech.append(clip[0]['transcript'])
+        message['text'] = '\n'.join([row['text'], *speech])
+    return message
+
+
 def _message(r: sqlite3.Row) -> StoredMessage:
     import json
     channel = {}
@@ -97,10 +109,10 @@ def _message(r: sqlite3.Row) -> StoredMessage:
                 channel = {'accountId':parts[0], 'peerId':parts[1]}
         except (TypeError, ValueError):
             pass
-    from . import vision, message_display
-    images = vision.for_run(r["run_id"]) if r["role"] == "user" else []
+    from . import dialogue_input, message_display
+    media = dialogue_input.media_for_run(r["run_id"]) if r["role"] == "user" else {}
     return {
-        **({"images": images} if images else {}),
+        **media,
         "role": r["role"],
         "text": message_display.for_run(r["run_id"],r["text"]) if r["source"]=="qq" and r["role"]=="user" else r["display_text"] if r["display_text"] is not None else r["text"],
         "at": r["at"],
