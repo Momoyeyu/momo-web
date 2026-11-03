@@ -196,6 +196,23 @@ def image_cost(width, height):
     return 1024 + math.ceil(width/512)*math.ceil(height/512)*1024
 
 
+def fit_history(messages, cfg, tools=None):
+    """Retain current pixels; shed optional old pixels before hard capacity checks.
+
+    Text observations and image references remain intact. Only the transient
+    request changes, never the gallery or persisted history. Current images
+    alone exceeding capacity still fail through the normal hard guard.
+    """
+    from .context_policy import Budget, estimate
+    safe = Budget.from_config(cfg).safe
+    latest_user = max((i for i,m in enumerate(messages) if m.get('role')=='user'),default=-1)
+    for index,message in enumerate(messages):
+        if index==latest_user or not isinstance(message.get('content'),list): continue
+        for part in list(message['content']):
+            if estimate(messages,tools)<=safe: return
+            if part.get('type')=='image_url': message['content'].remove(part)
+
+
 def materialize(messages, cfg, audience):
     output = copy.deepcopy(messages)
     for message in output:
@@ -258,7 +275,6 @@ def qq_images(coordinator, incoming):
     """Fetch only image elements in this already admitted event, not history."""
     refs = [item for item in json.loads(incoming['attachments']) if item.get('kind') == 'image']
     if not refs: return []
-    require_enabled()
     if len(refs) > MAX_COUNT: raise VisionError('vision.count')
     from . import checkpoint
     with checkpoint.audience_scope(incoming['audience']):
@@ -269,7 +285,6 @@ def qq_images(coordinator, incoming):
             for ref in refs:
                 result = coordinator.social_action('media.incoming', {
                     'peerId':incoming['peer_id'], 'messageId':ref.get('messageId') or incoming['raw_external_id'], 'elementId':ref['elementId']})['result']
-                require_enabled()
                 raw = base64.b64decode(result['dataBase64'], validate=True)
                 image = store(raw, audience=incoming['audience'], scope={'source':'qq','accountId':incoming['account_id'],
                               'selfId':incoming['self_id'],'peerId':incoming['peer_id']})

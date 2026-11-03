@@ -446,6 +446,8 @@ class SocialAccounts:
                     return None
             else:
                 return None
+            if "displayText" in event and (not isinstance(event["displayText"],str) or len(event["displayText"])>16000):
+                return None
             attachments = event.get("attachments", [])
             if not isinstance(attachments, list) or len(attachments) > 10:
                 return None

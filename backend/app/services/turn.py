@@ -141,6 +141,7 @@ class ContextMessages(list):
         fresh = self.rebuild()
         self[:] = fresh + suffix
         self.base_count = len(fresh)
+        if hasattr(self, "fit_images"): self.fit_images()
 
 
 def build_messages(
@@ -310,6 +311,9 @@ def react(
                 # while the user revoked this run's captured generation.
                 if checkpoint.generation() != gen:
                     return
+                if isinstance(messages, ContextMessages):
+                    messages.fit_images = lambda: vision.fit_history(messages, llm_cfg, tools)
+                vision.fit_history(messages, llm_cfg, tools)
                 compress.guard_request(llm_cfg, messages, tools, cancelled=lambda: checkpoint.generation() != gen)
                 for ev in llm.chat_stream(
                     llm_cfg,

@@ -175,13 +175,14 @@ def test_local_qq_activity_indicator_does_not_change_owner_attention_authority(f
         assert result['phonePaused'] is True
 
 
-def test_current_image_crosses_cordis_and_native_without_history(full_chain,monkeypatch):
+@pytest.mark.parametrize('vision_on',[True,False])
+def test_current_image_crosses_cordis_and_native_without_history(full_chain,monkeypatch,vision_on):
     from app.core import state
     from app.services import vision
     core,trace=full_chain
     social.put('qq',{'permissions':{'history':False}})
     core.configure_host_plugins([])
-    cfg=state.load()['settings']['llm'];cfg.update(url='http://vision.test',model='vision',vision=True)
+    cfg=state.load()['settings']['llm'];cfg.update(url='http://vision.test',model='vision',vision=vision_on)
     vision.schema()
     with db.tx() as c:c.execute('INSERT INTO vision_proofs VALUES(?,?)',(vision.fingerprint(cfg),0))
     values=state.load();values['settings']['llm']=cfg;state.write_state(values)
@@ -193,7 +194,19 @@ def test_current_image_crosses_cordis_and_native_without_history(full_chain,monk
             ids=vision.qq_images(core,item)
             assert len(ids)==1
             parts=vision.parts('color?',ids,audience=audience,cfg=cfg)
-            assert vision.materialize([{'role':'user','content':parts}],cfg,audience)[0]['content'][-1]['image_url']['url'].startswith('data:image/jpeg;')
+            if vision_on:
+                assert vision.materialize([{'role':'user','content':parts}],cfg,audience)[0]['content'][-1]['image_url']['url'].startswith('data:image/jpeg;')
+            else:
+                assert all(part['type']!='image_url' for part in parts)
+            # Receiving and displaying bytes does not depend on model vision.
+            checkpoint.begin_turn('What color?',checkpoint.generation(),db.now_iso(),run_id=item['run_id'],source='qq',external_message_id=json.dumps([account['accountId'],'20002','90001']))
+            from app.services import phone
+            monkeypatch.setattr(phone,'runtime',core)
+            projected=phone.qq_snapshot('20002')['messages'][0]['images']
+            assert projected[0]['id']==ids[0]
+            stored=db.query("SELECT * FROM messages WHERE run_id=? AND role='user'",(item['run_id'],))[0]
+            assert checkpoint._message(stored)['images'][0]['id']==ids[0]
+            assert vision.body(ids[0])[0][:2]==b'\xff\xd8'
         finally:coordinator.current_run.reset(token)
     assert 'downloadRichMedia' in trace.read_text()
     assert social._account('qq')['permissions']['history'] is False

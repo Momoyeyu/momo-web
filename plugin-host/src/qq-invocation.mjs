@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, mkdir, open, realpath, rename, rm } from 'node:fs/promises';
 import { homedir } from 'node:os';
@@ -41,8 +41,8 @@ async function validatedPaths(config) {
   // the launcher's read of them before the native framework can be loaded.
   await privateFile(config.canaryPath, 1024);
 }
-async function writeRunConfig(path, value) {
-  try { await lstat(path); await privateFile(path, 64 * 1024); }
+async function writeRunConfig(path, value, limit = 64 * 1024) {
+  try { await lstat(path); await privateFile(path, limit); }
   catch (cause) { if (cause.code !== 'ENOENT') throw cause; }
   const temporary = join(dirname(path), `.run-${randomUUID()}.json`);
   const handle = await open(temporary, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
@@ -50,6 +50,44 @@ async function writeRunConfig(path, value) {
   finally { await handle.close(); }
   try { await rename(temporary, path); }
   finally { await rm(temporary, { force: true }); }
+}
+
+/** Developer launcher only: update momo's own adapter, never native vendor bytes.
+ * Qualify the old closure first so a refresh cannot bless unrelated tampering.
+ * A failure between the two atomic renames remains fail-closed at qualification.
+ */
+export async function refreshQQDevelopmentWorker(input) {
+  const config = trustedConfig(input);
+  await validatedPaths(config);
+  const manifest = JSON.parse((await privateFile(config.manifestPath)).toString('utf8'));
+  const qualified = await qualifyQQResources({root:config.resourceRoot, manifest});
+  const {readFile} = await import('node:fs/promises');
+  const source = await readFile(new URL('./qq-native-worker.cjs', import.meta.url));
+  const current = await privateFile(qualified.paths.worker);
+  if (source.equals(current)) return;
+  const entry = manifest.entries.find(item => item.path === manifest.roles.worker);
+  valid(!!entry);
+  const temporary = join(dirname(qualified.paths.worker), `.worker-${randomUUID()}.cjs`);
+  const handle = await open(temporary, constants.O_CREAT|constants.O_EXCL|constants.O_WRONLY|constants.O_NOFOLLOW, 0o600);
+  try { await handle.writeFile(source); await handle.sync(); } finally { await handle.close(); }
+  try { await rename(temporary, qualified.paths.worker); } finally { await rm(temporary,{force:true}); }
+  entry.sha256 = createHash('sha256').update(source).digest('hex');
+  await writeRunConfig(config.manifestPath, manifest, 4 * 1024 * 1024);
+  await qualifyQQResources({root:config.resourceRoot, manifest});
+}
+
+export async function refreshQQDevelopmentBinding(dataDirectory, configured) {
+  let configPath = configured;
+  if (!configPath) {
+    try {
+      const binding = JSON.parse((await privateFile(join(dataDirectory,'qq-runtime-binding.json'),8192)).toString('utf8'));
+      valid(Object.keys(binding).length===1 && typeof binding.configPath==='string');
+      configPath = binding.configPath;
+    } catch (error) { if (error.code==='ENOENT') return; throw error; }
+  }
+  valid(typeof configPath==='string' && isAbsolute(configPath));
+  const config = JSON.parse((await privateFile(configPath,16384)).toString('utf8'));
+  await refreshQQDevelopmentWorker(config);
 }
 
 /** Prepare only preinstalled, fully qualified resources; never download or scan QQ. */

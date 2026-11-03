@@ -142,3 +142,16 @@ def test_binding_revocation_finishes_the_started_turn(monkeypatch):
     assert events[-1]['t']=='error' and events[-1]['message']=='vision.unavailable'
     assert db.query('SELECT status FROM runs')[-1]['status']=='failed'
     assert checkpoint.live_messages()==[]
+
+def test_historical_pixels_yield_to_current_image_and_real_tool_budget():
+    from app.services.context_policy import Budget
+    cfg=configured();image=vision.store(png((1026,1026)));iid=image['id']
+    messages=[{'role':'user','content':vision.parts('old',[iid],audience='owner',cfg=cfg)} for _ in range(4)]
+    messages.append({'role':'user','content':vision.parts('current',[iid],audience='owner',cfg=cfg)})
+    tools=[{'description':'tool specification '*200}]
+    assert estimate(messages,tools)>Budget.from_config(cfg).safe
+    vision.fit_history(messages,cfg,tools)
+    assert estimate(messages,tools)<=Budget.from_config(cfg).safe
+    assert any(p['type']=='image_url' for p in messages[-1]['content'])
+    assert all(any(iid in p.get('text','') for p in m['content']) for m in messages)
+    assert sum(p['type']=='image_url' for m in messages for p in m['content'])<5

@@ -3,7 +3,7 @@ import json
 
 from ..core import db
 from .social import social
-from . import vision
+from . import vision, message_display
 from .coordinator import runtime
 
 PENDING = ('queued','held_focus','held_inactive','held_paused','held_interrupt','processing')
@@ -21,12 +21,12 @@ def qq_snapshot(peer=None, before=None):
     latest = db.query(f"SELECT peer_id,MAX(seq) AS newest,SUM(status IN ('queued','held_focus','held_inactive','held_paused','held_interrupt','processing')) AS pending FROM inbox WHERE {clause} GROUP BY peer_id ORDER BY newest DESC LIMIT 100",params) if identity else []
     conversations = {}
     for c in latest:
-        row = db.query('SELECT text,at,run_id FROM inbox WHERE seq=?',(c['newest'],))[0]
+        row = db.query('SELECT * FROM inbox WHERE seq=?',(c['newest'],))[0]
         key=c['peer_id']
         latest_reply=db.query("SELECT m.run_id FROM messages m JOIN inbox i ON i.run_id=m.run_id WHERE i.source='qq' AND i.account_id=? AND i.self_id=? AND i.peer_id=? AND m.role='assistant' AND m.visible=1 ORDER BY m.seq DESC LIMIT 1",(*params,key))
         reply=db.query("SELECT text,display_text,at FROM messages WHERE run_id=? AND role='assistant' AND visible=1 ORDER BY seq",(latest_reply[0]['run_id'],)) if latest_reply else []
         if reply and reply[-1]['at']<row['at']:reply=[]
-        preview=''.join(r['display_text'] or r['text'] for r in reply) if reply else row['text']
+        preview=''.join(r['display_text'] or r['text'] for r in reply) if reply else message_display.incoming(row)
         conversations[key]={'id':key,'kind':'group' if key.startswith('group:') else 'private','pending':int(c['pending']),'preview':preview[:120], '_at':reply[-1]['at'] if reply else row['at']}
     outgoing=[]
     if identity:
@@ -45,7 +45,7 @@ def qq_snapshot(peer=None, before=None):
     page=selected[:30]
     messages=[]
     for row in reversed(page):
-        messages.append({'id':row['id'],'text':row['text'],'direction':'in','speaker':row['sender_id'] or row['peer_id'],'status':row['status'],'at':row['at'],'images':vision.for_run(row['run_id'])})
+        messages.append({'id':row['id'],'text':message_display.incoming(row),'direction':'in','speaker':row['sender_id'] or row['peer_id'],'status':row['status'],'at':row['at'],'images':vision.for_run(row['run_id'])})
         outs=db.query("SELECT * FROM messages WHERE run_id=? AND role='assistant' AND visible=1 ORDER BY seq",(row['run_id'],))
         if outs:
             messages.append({'id':'out:'+row['run_id'],'text':''.join(out['display_text'] or out['text'] for out in outs),'direction':'out','speaker':'momo','status':'delivered','at':outs[-1]['at']})

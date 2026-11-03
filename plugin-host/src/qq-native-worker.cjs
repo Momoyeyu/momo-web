@@ -488,14 +488,25 @@ function createNativeWorker({ api, dataRoot, send, now = Date.now, onIdentity = 
     if(action==='media.fetch'||action==='media.incoming'){
       if(abandonedDownloads.size>=64)throw issue('INBOX_CAPACITY');
       if(typeof p.messageId!=='string'||!p.messageId||p.messageId.length>200||typeof p.elementId!=='string'||!p.elementId||p.elementId.length>200)throw issue('INPUT');
-      const result=sdkResult(await session.getMsgService().getMsgsByMsgId(peerArgument(peer),[p.messageId]));requireConnection();
+      diagnostic('media_lookup_begin');const result=sdkResult(await session.getMsgService().getMsgsByMsgId(peerArgument(peer),[p.messageId]));requireConnection();diagnostic('media_lookup_ready');
       const record=result.msgList?.find(row=>row.chatType===peer.chatType&&row.peerUid===peer.peerUid&&row.msgId===p.messageId);const element=record?.elements?.find(item=>item.elementId===p.elementId&&[2,3,4,5].includes(item.elementType));if(!element)throw issue('PEER_UNVERIFIED');
       const metadata=normalizedElements([element]).attachments[0];if(!metadata||metadata.size<0||metadata.size>(action==='media.incoming'?10:8)*1024*1024)throw issue('INPUT');
       const dir=privateMediaDir('downloads');const output=path.join(dir,'momo-media-'+require('node:crypto').randomUUID());
       let completed=false;try{
       const complete=await nativeWait(downloadWaiters,()=>session.getMsgService().downloadRichMedia({fileModelId:'0',downSourceType:0,downloadSourceType:0,triggerType:1,msgId:p.messageId,chatType:peer.chatType,peerUid:peer.peerUid,elementId:p.elementId,thumbSize:0,downloadType:1,filePath:output}),value=>value?.msgId===p.messageId&&value?.msgElementId===p.elementId);
-      completed=true;requireConnection();if(String(complete.fileErrCode)!=='0'||complete.filePath!==output)throw issue('PROVIDER_REJECTED');
-      const handle=fs.openSync(output,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);try{const stat=fs.fstatSync(handle);if(!stat.isFile()||stat.size>(action==='media.incoming'?10:8)*1024*1024||stat.nlink!==1)throw issue('INPUT');const bytes=Buffer.alloc(stat.size);if(fs.readSync(handle,bytes,0,bytes.length,0)!==bytes.length||fs.fstatSync(handle).size!==stat.size)throw issue('INPUT');reply(echo,{name:metadata.name,mime:imageInfo(bytes)?.mime??'application/octet-stream',dataBase64:bytes.toString('base64')});}finally{fs.closeSync(handle);}
+      completed=true;requireConnection();diagnostic('media_download_result',Number.isSafeInteger(Number(complete.fileErrCode))?Number(complete.fileErrCode):-1);
+      // QQNT can ignore the requested path and return its own existing cache.
+      // Bind that path to the exact authenticated message element, never to an
+      // arbitrary callback path, and confine reads to the isolated account root.
+      const cached=element.picElement?.sourcePath??element.fileElement?.filePath??element.pttElement?.filePath??element.videoElement?.filePath;
+      const actual=complete.filePath;
+      diagnostic('media_download_path',actual===output?1:actual===cached?2:0);
+      if(String(complete.fileErrCode)!=='0'||typeof actual!=='string'||!path.isAbsolute(actual)||path.normalize(actual)!==actual||!actual.startsWith(dataRoot+path.sep)||(actual!==output&&actual!==cached)||fs.realpathSync(actual)!==actual)throw issue('PROVIDER_REJECTED');
+      const handle=fs.openSync(actual,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);try{
+        const stat=fs.fstatSync(handle);if(!stat.isFile()||stat.size>(action==='media.incoming'?10:8)*1024*1024||stat.nlink!==1||typeof process.getuid==='function'&&stat.uid!==process.getuid())throw issue('INPUT');
+        const bytes=Buffer.alloc(stat.size);if(fs.readSync(handle,bytes,0,bytes.length,0)!==bytes.length||fs.fstatSync(handle).size!==stat.size)throw issue('INPUT');
+        reply(echo,{name:metadata.name,mime:imageInfo(bytes)?.mime??'application/octet-stream',dataBase64:bytes.toString('base64')});
+      }finally{fs.closeSync(handle);}
       }finally{if(!completed)abandonedDownloads.add(output);try{fs.rmSync(output,{force:true});}catch{}}return;
     }
     if(!['private.send','group.send','media.send'].includes(action))throw issue('INPUT');

@@ -103,3 +103,23 @@ def test_phone_draft_is_private_and_only_current_remote_run(monkeypatch):
     core.activity={'runId':'one','source':'meeting'}
     core.append_phone_draft('one','not a phone message')
     assert core.phone_draft['text']=='hello world'
+
+def test_phone_and_log_show_original_text_not_generated_image_notes(monkeypatch):
+    from app.services import checkpoint
+    runtime.schema()
+    monkeypatch.setattr(phone.social,'get',lambda p:{'accountId':'test','expectedSelfId':'10001','enabled':True})
+    note='[QQ图片: photo.png; 内容以实际读取结果为准]'
+    row=runtime.enqueue('qq','test','image','Look!'+note,self_id='10001',peer_id='20001',attachments=[{'kind':'image','elementId':'img','name':'photo.png'}])
+    checkpoint.begin_turn('Look!'+note,checkpoint.generation(),'t',run_id=row['run_id'],source='qq')
+    assert phone.snapshot('20001')['messages'][0]['text']=='Look!'
+    msg=db.query("SELECT * FROM messages WHERE run_id=? AND role='user'",(row['run_id'],))[0]
+    assert checkpoint._message(msg)['text']=='Look!'
+    assert db.query('SELECT text FROM inbox WHERE id=?',(row['id'],))[0]['text']=='Look!'+note
+
+
+def test_explicit_original_text_is_preserved_verbatim(monkeypatch):
+    from app.services import message_display
+    runtime.schema()
+    literal='[QQ图片: photo.png; 内容以实际读取结果为准]'
+    row=runtime.enqueue('qq','test','literal',literal,self_id='10001',peer_id='20001',display_text=literal,attachments=[{'kind':'image','elementId':'img','name':'photo.png'}])
+    assert message_display.incoming(row)==literal

@@ -5,6 +5,7 @@ import {existsSync, mkdirSync, openSync, readFileSync, unlinkSync, writeFileSync
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import net from 'node:net';
+import {refreshQQDevelopmentBinding} from '../plugin-host/src/qq-invocation.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const data = path.resolve(process.env.MOMO_DATA_DIR || path.join(root, '.workbuddy/dev-data'));
@@ -55,6 +56,7 @@ try {
   }
   const fd=openSync(lock,'wx',0o600); writeFileSync(fd,String(process.pid));closeSync(fd);
   ownsLock=true;
+  await refreshQQDevelopmentBinding(data,process.env.MOMO_QQ_RUNTIME_CONFIG);
   const token=randomBytes(32).toString('hex');
   const origin=`http://127.0.0.1:${webPort}`;
   const env={...process.env,MOMO_DATA_DIR:data,MOMO_RESOURCES_DIR:resources,MOMO_DESKTOP_TOKEN:token,MOMO_WEB_ORIGIN:origin,MOMO_WEB_API_UPSTREAM:`http://127.0.0.1:${apiPort}`};

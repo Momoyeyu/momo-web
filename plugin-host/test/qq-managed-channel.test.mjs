@@ -213,6 +213,6 @@ test('media permission gates byte access, never receipt of image or unsupported 
  const base={post_type:'message',message_type:'private',self_id:'123456',user_id:'456789',sub_type:'friend',time:100};
  native.event({...base,message_id:'pic-no-grant',message:[{type:'image',data:{message_id:'pic-no-grant',element_id:'e1',name:'photo.png',size:100}}]});
  native.event({...base,message_id:'unsupported',message:[{type:'face',data:{id:14}},{type:'new_kind',data:{privatePath:'/not-forwarded'}}]});
- assert.equal(inbox.length,2);assert.equal(inbox[0].attachments.length,1);assert.match(inbox[0].text,/图片|image/);
+ assert.equal(inbox.length,2);assert.equal(inbox[0].attachments.length,1);assert.match(inbox[0].text,/图片|image/);assert.equal(inbox[0].displayText,'');
  assert.match(inbox[1].text,/14/);assert.match(inbox[1].text,/new_kind/);assert.ok(!inbox[1].text.includes('/not-forwarded'));
 });

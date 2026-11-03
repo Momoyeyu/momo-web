@@ -97,12 +97,12 @@ def _message(r: sqlite3.Row) -> StoredMessage:
                 channel = {'accountId':parts[0], 'peerId':parts[1]}
         except (TypeError, ValueError):
             pass
-    from . import vision
+    from . import vision, message_display
     images = vision.for_run(r["run_id"]) if r["role"] == "user" else []
     return {
         **({"images": images} if images else {}),
         "role": r["role"],
-        "text": r["display_text"] if r["display_text"] is not None else r["text"],
+        "text": message_display.for_run(r["run_id"],r["text"]) if r["source"]=="qq" and r["role"]=="user" else r["display_text"] if r["display_text"] is not None else r["text"],
         "at": r["at"],
         "seq": int(r["seq"]),
         "eventId": r["event_id"],

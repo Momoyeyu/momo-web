@@ -73,7 +73,7 @@ class Coordinator:
                 source TEXT NOT NULL, account_id TEXT NOT NULL, external_id TEXT NOT NULL,
                 text TEXT NOT NULL, status TEXT NOT NULL, run_id TEXT NOT NULL,
                 at TEXT NOT NULL, UNIQUE(source,account_id,external_id))""")
-            additions = {"peer_id": "TEXT NOT NULL DEFAULT ''", "sender_id": "TEXT NOT NULL DEFAULT ''", "self_id": "TEXT NOT NULL DEFAULT ''", "audience": "TEXT NOT NULL DEFAULT 'owner'", "policy_revision": "TEXT NOT NULL DEFAULT ''", "raw_external_id": "TEXT NOT NULL DEFAULT ''", "retry_of": "TEXT NOT NULL DEFAULT ''", "attachments": "TEXT NOT NULL DEFAULT '[]'"}
+            additions = {"peer_id": "TEXT NOT NULL DEFAULT ''", "sender_id": "TEXT NOT NULL DEFAULT ''", "self_id": "TEXT NOT NULL DEFAULT ''", "audience": "TEXT NOT NULL DEFAULT 'owner'", "policy_revision": "TEXT NOT NULL DEFAULT ''", "raw_external_id": "TEXT NOT NULL DEFAULT ''", "retry_of": "TEXT NOT NULL DEFAULT ''", "attachments": "TEXT NOT NULL DEFAULT '[]'", "display_text": "TEXT"}
             columns = {r["name"] for r in c.execute("PRAGMA table_info(inbox)")}
             for name, declaration in additions.items():
                 if name not in columns:
@@ -321,7 +321,7 @@ class Coordinator:
                 from .social import social
                 normalized = social.authorize_event(data)
                 if normalized:
-                    self.enqueue(normalized["source"], normalized["accountId"], normalized["externalMessageId"], normalized["text"], peer_id=normalized["peerId"], sender_id=normalized["senderId"], self_id=normalized["selfId"], audience=normalized["audience"], policy_revision=str(normalized["policyRevision"]), attachments=normalized.get("attachments", []))
+                    self.enqueue(normalized["source"], normalized["accountId"], normalized["externalMessageId"], normalized["text"], peer_id=normalized["peerId"], sender_id=normalized["senderId"], self_id=normalized["selfId"], audience=normalized["audience"], policy_revision=str(normalized["policyRevision"]), attachments=normalized.get("attachments", []), display_text=normalized.get("displayText"))
                 if data.get("inboxId") and self.host:
                     def ack():
                         try:
@@ -355,7 +355,7 @@ class Coordinator:
             return "held_interrupt"
         return "queued"
 
-    def enqueue(self, source, account, external_id, text, *, peer_id="", sender_id="", self_id="", audience="owner", policy_revision="", attachments=None):
+    def enqueue(self, source, account, external_id, text, *, peer_id="", sender_id="", self_id="", audience="owner", policy_revision="", attachments=None, display_text=None):
         if source not in {"meeting", "qq", "virtual"}:
             raise CoordinationError("Unsupported message source")
         if len(str(text).encode('utf-8')) > 262144:
@@ -372,7 +372,7 @@ class Coordinator:
                     raise CoordinationError("Message inbox is full; please retry later")
                 inserted = c.execute("INSERT OR IGNORE INTO inbox(id,source,account_id,external_id,text,status,run_id,at,peer_id,sender_id,self_id,audience,policy_revision,raw_external_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (uuid.uuid4().hex, source, account, canonical, text, pending_status, uuid.uuid4().hex, db.now_iso(), peer_id, sender_id, self_id, audience, str(policy_revision), str(external_id)))
                 if inserted.rowcount:
-                    c.execute("UPDATE inbox SET attachments=? WHERE source=? AND account_id=? AND external_id=?", (json.dumps(attachments or []), source, account, canonical))
+                    c.execute("UPDATE inbox SET attachments=?,display_text=? WHERE source=? AND account_id=? AND external_id=?", (json.dumps(attachments or []), display_text, source, account, canonical))
                 row = c.execute("SELECT * FROM inbox WHERE source=? AND account_id=? AND external_id=?", (source, account, canonical)).fetchone()
             self.condition.notify_all()
         return dict(row) | {"acceptedNew": inserted.rowcount == 1}
@@ -1190,8 +1190,11 @@ class Coordinator:
                         if first['source'] == 'qq':
                             try:
                                 image_ids = vision.qq_images(self, first)
+                                if image_ids and not vision.enabled():
+                                    image_ids = []
+                                    image_note = 'The image was received and saved, but model vision is disabled. Do not claim to have seen its content.'
                             except (vision.VisionError, HostError, CoordinationError, ValueError):
-                                image_note = 'The attached images could not be read. Briefly explain that you could not see them; do not guess their content. The user can retry after enabling and verifying vision/media permissions.'
+                                image_note = 'The image could not be loaded for this reply. Briefly say that its content was unavailable. Do not guess its content or invent a permissions/format diagnosis.'
                         # Media IO can outlive focus, account or grant changes.
                         # Re-admit the original event before any provider call.
                         with self.condition:

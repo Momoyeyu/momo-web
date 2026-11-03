@@ -657,3 +657,20 @@ test('faces, stickers, unknown elements and mixed media are delivered as visible
  assert.equal(events[3].data.message.at(-1).data.text,'after');
  assert.ok(events[3].data.message.some(part=>part.type==='image'));
 });
+
+test('native image download accepts the verified message cache path returned by QQNT',async t=>{
+ const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+ const dataRoot=fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(),'momo-cache-image-')));t.after(()=>fs.rmSync(dataRoot,{recursive:true,force:true}));
+ const f=fixture({dataRoot});await f.auth();
+ const bytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jhb8AAAAASUVORK5CYII=','base64');
+ const cache=path.join(dataRoot,'native-picture.png');fs.writeFileSync(cache,bytes,{mode:0o600});
+ f.msg.getMsgsByMsgId=async()=>({result:0,msgList:[{chatType:1,peerUid:'u_peer',msgId:'received',elements:[{elementType:2,elementId:'elem',picElement:{fileName:'photo.png',fileSize:String(bytes.length),sourcePath:cache}}]}]});
+ f.msg.downloadRichMedia=args=>{queueMicrotask(()=>f.messages().onRichMediaDownloadComplete({msgId:args.msgId,msgElementId:args.elementId,fileErrCode:'0',filePath:cache}));};
+ await f.worker.request('onebot',{action:'media.incoming',params:{peerId:'654321',messageId:'received',elementId:'elem'},echo:'cache-download'});
+ const result=f.frames.find(frame=>frame.event==='onebot'&&frame.data?.echo==='cache-download').data;
+ assert.equal(result.status,'ok');assert.equal(result.data.dataBase64,bytes.toString('base64'));assert.ok(fs.existsSync(cache));
+ // A native completion must not substitute another file, even inside the account.
+ const other=path.join(dataRoot,'other.png');fs.writeFileSync(other,bytes,{mode:0o600});
+ f.msg.downloadRichMedia=args=>{queueMicrotask(()=>f.messages().onRichMediaDownloadComplete({msgId:args.msgId,msgElementId:args.elementId,fileErrCode:'0',filePath:other}));};
+ await expectNativeRejected(f,{action:'media.incoming',params:{peerId:'654321',messageId:'received',elementId:'elem'},echo:'wrong-cache'},'PROVIDER_REJECTED');
+});

@@ -154,3 +154,26 @@ test('forget can remove owned session data even when installed native resources 
   await runtime.forget({ ownerAction: true });
   await assert.rejects(readFile(join(config.dataRoot, 'session-secret')), { code: 'ENOENT' });
 });
+
+test('development startup refreshes only the qualified app worker and its hash', async t => {
+  const config = await fixture(t);
+  const before = await readFile(join(config.resourceRoot, roles.major));
+  await writeFile(config.manifestPath,(await readFile(config.manifestPath,'utf8'))+' '.repeat(70000));
+  assert.equal(typeof module.refreshQQDevelopmentWorker, 'function');
+  await module.refreshQQDevelopmentWorker(config);
+  const expected = await readFile(new URL('../src/qq-native-worker.cjs', import.meta.url));
+  assert.deepEqual(await readFile(join(config.resourceRoot, roles.worker)), expected);
+  assert.deepEqual(await readFile(join(config.resourceRoot, roles.major)), before);
+  const manifest = JSON.parse(await readFile(config.manifestPath, 'utf8'));
+  assert.equal(manifest.entries.find(e => e.path === roles.worker).sha256, createHash('sha256').update(expected).digest('hex'));
+  await prepare(config);
+});
+
+test('development refresh refuses a tampered closure before blessing any bytes', async t => {
+  const config = await fixture(t);
+  const worker = await readFile(join(config.resourceRoot, roles.worker));
+  await writeFile(join(config.resourceRoot, roles.major), 'tampered native resource');
+  assert.equal(typeof module.refreshQQDevelopmentWorker, 'function');
+  await assert.rejects(module.refreshQQDevelopmentWorker(config));
+  assert.deepEqual(await readFile(join(config.resourceRoot, roles.worker)), worker);
+});
