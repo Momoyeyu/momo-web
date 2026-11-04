@@ -1,12 +1,11 @@
 // One short synthesis per effective voice. Keep PCM only while a listener is
 // waiting: a silent warmup never enters playback, history or persistent state.
 import { s16leToFloat32 } from "../audio/pcm";
-import { resolveChatLang } from "../i18n";
+import { resolveChatLang, tFor } from "../i18n";
 import { getState, flushPendingState } from "../lib/store";
 import { ttsConfigured } from "../lib/asr";
 import { streamSpeech } from "./ttsClient";
 
-const lines = { zh: "你好，我是 momo。", en: "Hello, I'm momo.", ja: "こんにちは、momoです。" };
 const freshnessMs = 5 * 60_000;
 const retryMs = 15_000;
 type Listener = (chunk: Uint8Array, rate: number) => void;
@@ -44,7 +43,7 @@ function prepareVoice(listener?: Listener): Promise<Sample | undefined> {
   const result = (async () => {
     await flushPendingState(); // speech reads the committed configuration on the server
     signal.throwIfAborted();
-    await streamSpeech(lines[lang], {
+    await streamSpeech(tFor(lang, "title.tagline"), {
       lang, signal,
       onSampleRate: rate => { sample.rate = rate; },
       onChunk: chunk => { sample.chunks.push(chunk); sample.listener?.(chunk, sample.rate); },
@@ -71,9 +70,21 @@ export async function auditionVoice(signal: AbortSignal) {
   const { tts, general } = getState().settings;
   if (!tts.url.trim()) return { ok: false, detail: "unconfigured" };
   if (!tts.voice) return { ok: false, detail: "未上传参考音频" };
+  signal.throwIfAborted();
   const audio = new AudioContext();
+  let ownedFlight: typeof flight;
+  let rejectAbort: (reason: unknown) => void = () => {};
+  const aborted = new Promise<never>((_, reject) => { rejectAbort = reject; });
   const stop = () => { if (audio.state !== "closed") void audio.close().catch(() => {}); };
-  signal.addEventListener("abort", stop, { once: true });
+  const onAbort = () => {
+    stop();
+    if (ownedFlight && flight === ownedFlight) {
+      ownedFlight.sample.listener = undefined;
+      cancelWarmup();
+    }
+    rejectAbort(signal.reason);
+  };
+  signal.addEventListener("abort", onAbort, { once: true });
   try {
     const gain = audio.createGain();
     gain.gain.value = general.voiceVolume / 100;
@@ -92,7 +103,9 @@ export async function auditionVoice(signal: AbortSignal) {
       endAt = start + buffer.duration;
       lastSource = source;
     };
-    const [sample] = await Promise.all([prepareVoice(play), audio.resume()]);
+    const prepared = prepareVoice(play);
+    ownedFlight = flight;
+    const [sample] = await Promise.race([Promise.all([prepared, audio.resume()]), aborted]);
     signal.throwIfAborted();
     if (!sample || !lastSource) throw new Error("Missing voice");
     if (endAt > audio.currentTime) {
@@ -104,7 +117,8 @@ export async function auditionVoice(signal: AbortSignal) {
     }
     return { ok: !signal.aborted, detail: "" };
   } finally {
-    signal.removeEventListener("abort", stop);
+    signal.removeEventListener("abort", onAbort);
+    if (ownedFlight) ownedFlight.sample.listener = undefined;
     stop();
   }
 }

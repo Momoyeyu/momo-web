@@ -76,7 +76,7 @@ export default function ModelsTab({ active }: { active: boolean }) {
 
   const PROBES: Record<
     EndpointSection,
-    (s: SettingsData) => Promise<ProbeResult>
+    (s: SettingsData) => Promise<ProbeResult | undefined>
   > = {
     llm: async (s) => {
       if(!introRestricted())return probeLlm(s.llm);
@@ -84,8 +84,11 @@ export default function ModelsTab({ active }: { active: boolean }) {
     },
     tts: () => {
       audition.current?.abort();
-      audition.current = new AbortController();
-      return auditionVoice(audition.current.signal).catch(() => ({ ok: false, detail: "failed" }));
+      const controller = new AbortController();
+      audition.current = controller;
+      return auditionVoice(controller.signal)
+        .then(result => controller.signal.aborted ? undefined : result)
+        .catch(() => controller.signal.aborted ? undefined : { ok: false, detail: "failed" });
     },
   };
 
@@ -104,6 +107,7 @@ export default function ModelsTab({ active }: { active: boolean }) {
     setProbes((p) => ({ ...p, [sec]: "running" }));
     void PROBES[sec](settings).then((r) => {
       setProbes((p) => ({ ...p, [sec]: r }));
+      if (!r) return;
       clearTimeout(probeTimers.current[sec]);
       probeTimers.current[sec] = window.setTimeout(() => {
         setProbes((p) => {
