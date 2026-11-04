@@ -114,3 +114,12 @@ app.include_router(intro.router)
 
 from .api import vision
 app.include_router(vision.router)
+
+from .api import computer
+app.include_router(computer.router)
+
+from .api import browser
+app.include_router(browser.router)
+
+from .api import minecraft
+app.include_router(minecraft.router)

@@ -26,4 +26,6 @@ def configure(extensions: Any) -> bool:
     from .coordinator import runtime
 
     hub.bind(runtime)
-    return hub.configure(extensions)
+    from .plugins import extensions as installed_extensions
+
+    return hub.configure((extensions if isinstance(extensions, list) else []) + installed_extensions())

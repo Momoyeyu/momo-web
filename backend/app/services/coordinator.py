@@ -617,6 +617,12 @@ class Coordinator:
             return self._revoke_locked(reason)
 
     def _revoke_locked(self, reason):
+        from .computer import computer
+        computer.stop(reason)
+        from .minecraft import minecraft
+        minecraft.stop(reason, notify=False)
+        from .browser import browser
+        browser.stop(reason, notify=False)
         with self.condition:
             self.epoch += 1
             epoch = self.epoch

@@ -13,7 +13,7 @@ import Pager from "../../ui/Pager";
 import Switch from "../../ui/Switch";
 import AvatarPanel from "../panels/Avatar";
 import ExtConfigModal from "./ExtConfigModal";
-import OfficialPlugins from "./OfficialPlugins";
+import PluginLibrary from "./PluginLibrary";
 
 const SECTIONS = ["avatar", "mcp", "plugins"] as const;
 type ExtensionSection = (typeof SECTIONS)[number];
@@ -241,7 +241,7 @@ export default function ExtensionsTab({ active = true }: { active?: boolean }) {
         </section>
           </section>
           <section className="extension-pane" id="extension-panel-plugins" role="tabpanel" aria-labelledby="extension-tab-plugins" aria-hidden={section !== "plugins"} inert={!active || section !== "plugins"}>
-            <OfficialPlugins active={active && section === "plugins"} />
+            <PluginLibrary active={active && section === "plugins"} />
           </section>
         </div>
       </div>

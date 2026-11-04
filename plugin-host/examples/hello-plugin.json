@@ -1,0 +1,14 @@
+{
+  "manifest": {
+    "schemaVersion": 1,
+    "id": "hello-plugin",
+    "version": "1.0.0",
+    "name": "Hello plugin",
+    "description": "Dependency-free MCP greeting example. No filesystem or network operations.",
+    "entry": "main.mjs",
+    "capabilities": []
+  },
+  "files": {
+    "main.mjs": "import { createInterface } from 'node:readline';\nconst lines = createInterface({ input: process.stdin });\nlines.on('line', line => {\n  let request;\n  try { request = JSON.parse(line); } catch { return; }\n  if (request.id === undefined) return;\n  let result;\n  if (request.method === 'initialize') result = {\n    protocolVersion: request.params.protocolVersion,\n    capabilities: { tools: {} }, serverInfo: { name: 'hello-plugin', version: '1.0.0' }\n  };\n  else if (request.method === 'tools/list') result = { tools: [{\n    name: 'greet', description: 'Return a greeting without external side effects',\n    inputSchema: { type: 'object', properties: { name: { type: 'string' } }, additionalProperties: false }\n  }] };\n  else if (request.method === 'tools/call' && request.params.name === 'greet') {\n    const name = String(request.params.arguments?.name ?? 'world').slice(0, 100);\n    result = { content: [{ type: 'text', text: `Hello, ${name}!` }] };\n  } else if (request.method === 'ping') result = {};\n  const response = result === undefined\n    ? { jsonrpc: '2.0', id: request.id, error: { code: -32601, message: 'Method not found' } }\n    : { jsonrpc: '2.0', id: request.id, result };\n  process.stdout.write(JSON.stringify(response) + '\\n');\n});\n"
+  }
+}

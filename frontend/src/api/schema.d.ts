@@ -24,6 +24,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/browser/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Action */
+        post: operations["action_api_browser_actions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/browser/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open Page */
+        post: operations["open_page_api_browser_open_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/browser/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start */
+        post: operations["start_api_browser_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/browser/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_browser_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/browser/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop */
+        post: operations["stop_api_browser_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat": {
         parameters: {
             query?: never;
@@ -58,6 +143,23 @@ export interface paths {
          *     最终后端记录 = 前端展示。
          */
         post: operations["interrupt_api_chat_interrupt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chat/screen-reaction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Screen Reaction */
+        post: operations["screen_reaction_api_chat_screen_reaction_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -210,6 +312,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/computer/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ask */
+        post: operations["ask_api_computer_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/computer/frames": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Frames */
+        post: operations["frames_api_computer_frames_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/computer/react": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** React */
+        post: operations["react_api_computer_react_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/computer/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Settings */
+        patch: operations["settings_api_computer_settings_patch"];
+        trace?: never;
+    };
+    "/api/computer/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start */
+        post: operations["start_api_computer_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/computer/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_computer_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/computer/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop */
+        post: operations["stop_api_computer_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data/export": {
         parameters: {
             query?: never;
@@ -259,6 +480,42 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/extensions/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Plugins */
+        get: operations["list_plugins_api_extensions_plugins_get"];
+        put?: never;
+        /** Install Plugin */
+        post: operations["install_plugin_api_extensions_plugins_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/extensions/plugins/{plugin_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Plugin */
+        delete: operations["remove_plugin_api_extensions_plugins__plugin_id__delete"];
+        options?: never;
+        head?: never;
+        /** Toggle Plugin */
+        patch: operations["toggle_plugin_api_extensions_plugins__plugin_id__patch"];
         trace?: never;
     };
     "/api/extensions/probe": {
@@ -644,6 +901,74 @@ export interface paths {
         head?: never;
         /** Update Memory */
         patch: operations["update_memory_api_memories__mem_id__patch"];
+        trace?: never;
+    };
+    "/api/minecraft/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Action */
+        post: operations["action_api_minecraft_actions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minecraft/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Connect */
+        post: operations["connect_api_minecraft_connect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minecraft/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Status */
+        get: operations["status_api_minecraft_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minecraft/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop */
+        post: operations["stop_api_minecraft_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/onboarding": {
@@ -1236,6 +1561,17 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** Ask */
+        Ask: {
+            /** Clientid */
+            clientId: string;
+            /** Generation */
+            generation: number;
+            /** Leaseid */
+            leaseId: string;
+            /** Question */
+            question: string;
+        };
         /** AttentionIn */
         AttentionIn: {
             /** Action */
@@ -1253,6 +1589,13 @@ export interface components {
             restore: boolean;
             /** Runid */
             runId?: string | null;
+        };
+        /** Body_frames_api_computer_frames_post */
+        Body_frames_api_computer_frames_post: {
+            /** File */
+            file: string;
+            /** Generation */
+            generation: number;
         };
         /** Body_upload_api_social_accounts_qq_media_post */
         Body_upload_api_social_accounts_qq_media_post: {
@@ -1353,6 +1696,26 @@ export interface components {
             title: string;
             /** Updatedat */
             updatedAt: string;
+        };
+        /** Connect */
+        Connect: {
+            /** Account */
+            account: string;
+            /** Clientid */
+            clientId: string;
+            /** Leaseid */
+            leaseId: string;
+            /** Permissions */
+            permissions: ("game.observe" | "game.chat" | "game.move")[];
+            /**
+             * Port
+             * @default 17643
+             */
+            port: number;
+            /** Token */
+            token: string;
+            /** World */
+            world: string;
         };
         /** ConnectIn */
         ConnectIn: {
@@ -1489,6 +1852,17 @@ export interface components {
             /** Pinned */
             pinned?: boolean | null;
         };
+        /** Open */
+        Open: {
+            /** Clientid */
+            clientId: string;
+            /** Generation */
+            generation: number;
+            /** Leaseid */
+            leaseId: string;
+            /** Url */
+            url: string;
+        };
         /** OpeningIn */
         OpeningIn: {
             /** Clientid */
@@ -1605,6 +1979,15 @@ export interface components {
             /** Tools */
             tools: number;
         };
+        /** React */
+        React: {
+            /** Clientid */
+            clientId: string;
+            /** Generation */
+            generation: number;
+            /** Leaseid */
+            leaseId: string;
+        };
         /** ReconcileIn */
         ReconcileIn: {
             /** Commandid */
@@ -1676,6 +2059,31 @@ export interface components {
              */
             status: "idle" | "preparing" | "connecting" | "qr_pending" | "awaiting_confirmation" | "verifying" | "expired" | "connected" | "identity_mismatch" | "cancelled" | "stopping" | "stopped" | "disconnected" | "error";
         };
+        /** ScreenReactionIn */
+        ScreenReactionIn: {
+            /** Clientid */
+            clientId: string;
+            /** Generation */
+            generation: number;
+            /** Leaseid */
+            leaseId: string;
+            /** Messageid */
+            messageId?: string | null;
+            presentation?: components["schemas"]["PresentationIn"] | null;
+        };
+        /** Settings */
+        Settings: {
+            /**
+             * Proactive
+             * @default false
+             */
+            proactive: boolean;
+            /**
+             * Reactions
+             * @default false
+             */
+            reactions: boolean;
+        };
         /** SpeechIn */
         SpeechIn: {
             /** Input */
@@ -1733,6 +2141,107 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /** Action */
+        app__api__browser__Action: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "observe" | "load" | "click" | "type" | "scroll";
+            /** Clientid */
+            clientId: string;
+            /**
+             * Delta
+             * @default 0
+             */
+            delta: number;
+            /** Generation */
+            generation: number;
+            /**
+             * Html
+             * @default
+             */
+            html: string;
+            /** Leaseid */
+            leaseId: string;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /** Version */
+            version?: number | null;
+            /**
+             * X
+             * @default 0
+             */
+            x: number;
+            /**
+             * Y
+             * @default 0
+             */
+            y: number;
+        };
+        /** Start */
+        app__api__browser__Start: {
+            /** Allowedhosts */
+            allowedHosts?: string[];
+            /** Clientid */
+            clientId: string;
+            /** Leaseid */
+            leaseId: string;
+            /**
+             * Permissions
+             * @default [
+             *       "observe"
+             *     ]
+             */
+            permissions: ("observe" | "interact")[];
+        };
+        /** Start */
+        app__api__computer__Start: {
+            /**
+             * Proactive
+             * @default false
+             */
+            proactive: boolean;
+            /**
+             * Reactions
+             * @default false
+             */
+            reactions: boolean;
+            /** Source */
+            source: string;
+        };
+        /** Action */
+        app__api__minecraft__Action: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "observe" | "chat" | "follow";
+            /** Clientid */
+            clientId: string;
+            /**
+             * Durationms
+             * @default 500
+             */
+            durationMs: number;
+            /** Generation */
+            generation: number;
+            /** Leaseid */
+            leaseId: string;
+            /**
+             * Player
+             * @default
+             */
+            player: string;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -1760,6 +2269,145 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    action_api_browser_actions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__browser__Action"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_page_api_browser_open_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Open"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_api_browser_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__browser__Start"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_browser_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    stop_api_browser_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };
@@ -1816,6 +2464,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    screen_reaction_api_chat_screen_reaction_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenReactionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {
@@ -2094,6 +2775,211 @@ export interface operations {
             };
         };
     };
+    ask_api_computer_ask_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Ask"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    frames_api_computer_frames_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_frames_api_computer_frames_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    react_api_computer_react_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["React"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    settings_api_computer_settings_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Settings"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_api_computer_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__computer__Start"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_computer_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    stop_api_computer_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     export_data_api_data_export_get: {
         parameters: {
             query?: never;
@@ -2150,6 +3036,129 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    list_plugins_api_extensions_plugins_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    install_plugin_api_extensions_plugins_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_plugin_api_extensions_plugins__plugin_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    toggle_plugin_api_extensions_plugins__plugin_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plugin_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2811,6 +3820,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    action_api_minecraft_actions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__minecraft__Action"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connect_api_minecraft_connect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Connect"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    status_api_minecraft_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    stop_api_minecraft_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

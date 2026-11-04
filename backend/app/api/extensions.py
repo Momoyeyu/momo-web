@@ -19,3 +19,46 @@ def probe_extension(ext: dict[str, Any] = Body(...)) -> ProbeResult:
     失败不抛错——不可达的 server 只是不可见，探测本身永不阻塞 UI。
     """
     return extend.probe(ext)
+
+
+from fastapi import HTTPException
+from ..services import plugins
+
+
+@router.get("/api/extensions/plugins")
+def list_plugins():
+    return {"plugins": plugins.listing()}
+
+
+@router.post("/api/extensions/plugins")
+def install_plugin(bundle: dict[str, Any] = Body(...)):
+    try:
+        return plugins.install(bundle)
+    except plugins.PluginRuntimeError as error:
+        raise HTTPException(409, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+
+
+@router.patch("/api/extensions/plugins/{plugin_id}")
+def toggle_plugin(plugin_id: str, payload: dict[str, Any] = Body(...)):
+    if type(payload.get("enabled")) is not bool:
+        raise HTTPException(400, "enabled must be boolean")
+    if payload["enabled"] and payload.get("trustAccepted") is not True:
+        raise HTTPException(400, "Explicit local-code trust acknowledgement required")
+    try:
+        return plugins.change(plugin_id, payload["enabled"])
+    except plugins.PluginRuntimeError as error:
+        raise HTTPException(409, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error
+
+
+@router.delete("/api/extensions/plugins/{plugin_id}")
+def remove_plugin(plugin_id: str):
+    try:
+        return plugins.change(plugin_id, remove=True)
+    except plugins.PluginRuntimeError as error:
+        raise HTTPException(409, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(400, str(error)) from error

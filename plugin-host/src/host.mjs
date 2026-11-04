@@ -1,3 +1,5 @@
+import { BrowserPrototype } from './browser-prototype.mjs';
+import { createMinecraftAdapter, createMinecraftTransport } from './minecraft-adapter.mjs';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Context } from 'cordis';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -20,6 +22,12 @@ const opaque = value => typeof value === 'string' && value.length > 0 && value.l
 export class PluginHost {
   constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000, qqRuntime } = {}) {
     this.ctx = new Context();
+    this.browser = null;
+    this.ctx.plugin(ctx => { ctx.on('dispose', () => this.browser?.stop()); });
+    this.minecraft = createMinecraftAdapter();
+    this.ctx.plugin(ctx => { ctx.on('dispose', () => this.minecraft.stop()); });
+    this.computer = { observing: false, source: null, generation: 0 };
+    this.ctx.plugin(ctx => { ctx.on('dispose', () => { this.computer.observing = false; this.computer.generation++; }); });
     this.hostInstance = randomUUID();
     this.emit = emit;
     this.now = now;
@@ -90,6 +98,52 @@ export class PluginHost {
     }
     this.authenticate(message.token);
     switch (message.method) {
+      case 'browser.status': return { active: this.browser?.active === true, networkAvailable: false, version: this.browser?.version ?? 0 };
+      case 'browser.start': return this.mutate(async () => {
+        this.checkPermit(params.permit);
+        if (this.browser) await this.browser.stop();
+        const browser = new BrowserPrototype(permit => this.checkPermit(permit));
+        this.browser = browser;
+        try {
+          await browser.start();
+          this.checkPermit(params.permit);
+          return { active: true, networkAvailable: false };
+        } catch (error) { await browser.stop().catch(() => {}); throw error; }
+      });
+      case 'browser.stop': return this.mutate(async () => {
+        const browser = this.browser;
+        if (!browser) return { stopped: true };
+        const result = await browser.stop();
+        if (this.browser === browser) this.browser = null;
+        return result;
+      });
+      case 'browser.action': {
+        if (!this.browser) fail('UNAVAILABLE', 'Browser is stopped');
+        return this.browser.action(params.command, params.permit, params.version);
+      }
+      case 'minecraft.configure': {
+        await this.minecraft.stop();
+        this.minecraft = createMinecraftAdapter({ now: this.now,
+          transport: createMinecraftTransport({ port: params.port, token: params.token }),
+          authorize: ({ permission }) => !this.paused && !this.closed && permission?.activityEpoch === this.epoch,
+        });
+        return this.minecraft.status();
+      }
+      case 'minecraft.status': return this.minecraft.status();
+      case 'minecraft.stop': return this.minecraft.stop();
+      case 'minecraft.observe': return this.minecraft.observe(params.permission);
+      case 'minecraft.chat': return this.minecraft.chat(params.text, params.permission);
+      case 'minecraft.follow': return this.minecraft.follow(params.player, params.durationMs, params.permission);
+      case 'computer.start': {
+        if (this.paused) fail('PAUSED', 'Momo is not activated');
+        if (!opaque(params.source)) fail('INPUT', 'Selected source required');
+        this.computer = { observing: true, source: params.source, generation: this.computer.generation + 1 };
+        return { ...this.computer, executionAvailable: false };
+      }
+      case 'computer.stop':
+        this.computer.observing = false; this.computer.generation++;
+        return { stopped: true, ...this.computer };
+      case 'computer.status': return { ...this.computer, executionAvailable: false };
       case 'heartbeat': {
         if (!Number.isSafeInteger(params.activityEpoch) || params.activityEpoch < this.epoch) fail('STALE_EPOCH', 'Activity epoch is stale');
         // Heartbeats extend an existing grant, never unpause after failure/revocation.
@@ -236,10 +290,9 @@ export class PluginHost {
       const config = desired.get(id);
       if (config && JSON.stringify(config) === plugin.fingerprint && plugin.connected && plugin.enabled) continue;
       // Withdraw execution and discovery synchronously before awaiting disposal.
-      this.plugins.delete(id);
       plugin.enabled = false;
       this.toolVersion++;
-      closing.push(this.disposePlugin(plugin));
+      closing.push(this.disposePlugin(plugin).then(() => { if (this.plugins.get(id) === plugin) this.plugins.delete(id); }));
     }
     await Promise.all(closing);
     for (const [id, config] of desired) {
@@ -266,9 +319,9 @@ export class PluginHost {
         if (!plugin.connected) fail('PLUGIN_START', 'Plugin could not start');
         this.toolVersion++;
       } catch {
-        this.plugins.delete(id);
         plugin.enabled = false;
         await this.disposePlugin(plugin);
+        this.plugins.delete(id);
         if (!tolerateErrors) fail('PLUGIN_START', `Plugin ${id} could not start`);
         failures.push({ id, code: 'PLUGIN_START' });
       }
@@ -619,31 +672,70 @@ export class PluginHost {
   }
 
   async closePluginConnection(plugin) {
+    if (plugin.closePending) return plugin.closePending;
+    const pending = this.closePluginConnectionOwned(plugin);
+    plugin.closePending = pending;
+    try { return await pending; }
+    finally { if (plugin.closePending === pending) plugin.closePending = null; }
+  }
+
+  async closePluginConnectionOwned(plugin) {
     for (const controller of plugin.controllers) controller.abort();
     await plugin.channel?.close();
     plugin.connected = false;
     plugin.tools = [];
     const client = plugin.client;
+    const transport = plugin.transport;
+    // Keep ownership and the original pid until exit is confirmed. A retry must
+    // not forget a process just because SDK close cleared its child reference.
+    if (plugin.config.transport === 'stdio' && plugin.closingPid === undefined) {
+      plugin.closingPid = transport?.pid ?? null;
+    }
+    let failed = false;
+    try { await client?.close(); } catch { failed = true; }
+    try { await transport?.close(); } catch { failed = true; }
+    if (plugin.closingPid) {
+      const deadline = Date.now() + this.stopTimeoutMs;
+      let exited = false;
+      do {
+        // Signal zero only observes. Never kill by a remembered/reused pid.
+        try { process.kill(plugin.closingPid, 0); }
+        catch (error) { if (error.code === 'ESRCH') exited = true; }
+        if (exited) break;
+        await new Promise(resolve => setTimeout(resolve, 25));
+      } while (Date.now() < deadline);
+      if (!exited) failed = true;
+    }
+    if (failed) fail('PLUGIN_STOP', 'Plugin transport stop could not be confirmed');
     plugin.client = null;
-    try { await client?.close(); } catch { /* Never include provider error bodies or headers. */ }
-    try { await plugin.transport?.close(); } catch { /* Dispose is best effort; stop ACK below is bounded. */ }
     plugin.transport = null;
+    plugin.closingPid = undefined;
   }
 
   async disposePlugin(plugin) {
+    // QQ owns native cleanup independently of Cordis and has its own stop ACK.
+    if (plugin.config.type === 'qq') {
+      if (plugin.fiber) await plugin.fiber.dispose();
+      else await this.closePluginConnection(plugin);
+      return;
+    }
     if (plugin.config.type === 'virtual') await this.stopActivity(undefined, 'plugin_disabled');
+    // Cordis logs and swallows effect cleanup failures. Confirm directly first,
+    // so configure can retain a disabled record and the caller can retry.
+    await this.closePluginConnection(plugin);
     if (plugin.fiber) await plugin.fiber.dispose();
-    else await this.closePluginConnection(plugin);
   }
 
   async stopAll(reason) {
+    this.computer.observing = false;
+    this.computer.generation++;
     await this.stopActivity(undefined, reason);
     const active = [...this.inflight.values()];
     const channels = [...this.plugins.values()].filter(plugin => plugin.enabled && plugin.channel?.stop);
     const remoteUnknown = active.some(item => item.plugin.config.transport !== 'stdio');
     for (const item of active) item.controller.abort();
     const closing = [...new Set(active.map(item => item.plugin))].map(plugin => this.closePluginConnection(plugin));
-    const channelStops = channels.map(plugin => plugin.channel.stop());
+    const channelStops = [...channels.map(plugin => plugin.channel.stop()), this.minecraft.stop(), ...(this.browser ? [this.browser.stop()] : [])];
     const settled = Promise.allSettled([...closing, ...active.map(item => item.promise), ...channelStops]).then(results => results.every(result => result.status === 'fulfilled' && (result.value?.executorQuiescent !== false)));
     let stopTimer;
     const stopped = await Promise.race([settled, new Promise(resolve => { stopTimer = setTimeout(() => resolve(false), this.stopTimeoutMs); })]);

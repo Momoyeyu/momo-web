@@ -72,7 +72,32 @@ def _sse(ev: SseEvent) -> str:
 
 @router.post("/api/chat")
 def chat(req: ChatIn) -> StreamingResponse:
-    if not req.text.strip() and not req.images:
+    return _chat(req)
+
+
+class ScreenReactionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    generation: int
+    clientId: str
+    leaseId: str
+    messageId: str | None = Field(default=None, max_length=128)
+    presentation: PresentationIn | None = None
+
+
+@router.post("/api/chat/screen-reaction")
+def screen_reaction(req: ScreenReactionIn) -> StreamingResponse:
+    from ..services.computer import computer, ComputerError
+    try:
+        observation = computer.claim_reaction(req.generation, req.clientId, req.leaseId)
+    except (ComputerError, CoordinationError, vision.VisionError) as error:
+        raise HTTPException(409, str(error)) from error
+    if observation is None:
+        return StreamingResponse(iter([_sse({"t":"done", "suppressed":True})]), media_type="text/event-stream")
+    return _chat(ChatIn(clientId=req.clientId, leaseId=req.leaseId, messageId=req.messageId, presentation=req.presentation), observation=observation)
+
+
+def _chat(req: ChatIn, observation=None) -> StreamingResponse:
+    if observation is None and not req.text.strip() and not req.images:
         raise HTTPException(status_code=400, detail="empty text")
     try:
         runtime.require_meeting(req.clientId, req.leaseId)
@@ -94,7 +119,8 @@ def chat(req: ChatIn) -> StreamingResponse:
         )
 
     try:
-        runtime.prepare_local(req.clientId, req.leaseId)
+        if observation is None:
+            runtime.prepare_local(req.clientId, req.leaseId)
     except CoordinationError as error:
         runtime.inbox_status(inbox["id"], "held_interrupt")
         raise HTTPException(409, str(error)) from error
@@ -108,12 +134,21 @@ def chat(req: ChatIn) -> StreamingResponse:
         try:
             with runtime.run(inbox["run_id"], client=req.clientId, lease=req.leaseId):
                 runtime.inbox_status(inbox["id"], "processing")
+                observed = None
+                if observation is not None:
+                    from ..services.computer import computer
+                    token = current_run.set(inbox["run_id"])
+                    try:
+                        observed = computer.stage_reaction(observation["generation"])
+                    finally:
+                        current_run.reset(token)
                 iterator = iter(
                     turn.run_turn(
                         DialogueInput(req.text, req.images or []),
                         req.presentation.model_dump() if req.presentation else None,
                         first_meeting=req.firstMeeting,
                         run_id=inbox["run_id"],
+                        observation=observed,
                     )
                 )
                 while True:
@@ -126,6 +161,13 @@ def chat(req: ChatIn) -> StreamingResponse:
                         break
                     finally:
                         current_run.reset(token)
+                    if observation is not None:
+                        from ..services.computer import computer, ComputerError
+                        with computer.lock:
+                            computer.gate()
+                            if (computer.generation != observation["generation"] or not computer.observing
+                                    or not computer.proactive or not computer.reactions):
+                                raise ComputerError("computer.revoked")
                     if ev["t"] == "error":
                         errored = True
                     if ev["t"] == "sentence" and ev.get("text"):

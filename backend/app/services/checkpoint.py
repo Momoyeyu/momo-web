@@ -263,6 +263,7 @@ def begin_turn(
     source: str = "meeting",
     external_message_id: str | None = None,
     retry_of: str | None = None,
+    observation: dict | None = None,
 ) -> bool:
     with db.tx() as c:
         _scope_schema(c)
@@ -300,6 +301,9 @@ def begin_turn(
         c.execute("INSERT INTO run_audiences VALUES(?,?)", (rid, audience()))
         if retry_of:
             c.execute("INSERT INTO run_retries VALUES(?,?)", (rid, retry_of))
+        elif observation is not None:
+            c.execute("CREATE TABLE IF NOT EXISTS run_observations(run_id TEXT PRIMARY KEY REFERENCES runs(id) ON DELETE CASCADE,source TEXT NOT NULL,observed_at TEXT NOT NULL)")
+            c.execute("INSERT INTO run_observations VALUES(?,?,?)", (rid, str(observation['source'])[:200], str(observation['observedAt'])[:100]))
         else:
             _insert(c, "user", text, at, rid, source, external_message_id, visible=source in {"qq", "wechat"})
         return True

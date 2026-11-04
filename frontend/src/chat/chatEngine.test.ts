@@ -515,3 +515,23 @@ it("confirmation text is ready before voice and a late first sentence is skipped
     update({settings});
   }
 });
+
+describe('screen reactions',()=>{
+ it('suppressed reactions do not clear the current line or invent a player message',async()=>{
+  vi.mocked(meetingIdentity).mockReturnValue({clientId:'owner',leaseId:'lease'});
+  chatMock.mockImplementation(async function*(){yield {t:'done'};});
+  const display=vi.fn(),start=vi.fn(),user=vi.fn();
+  const eng=new ChatEngine({onStatus:()=>{},onUserMessage:user,onAssistantStart:start,onDisplay:display,onSentence:()=>{},onAssistantDone:()=>{},onError:()=>{}});
+  eng.sendScreenReaction(42);await tick(5);
+  expect(chatMock).toHaveBeenCalledWith('',expect.anything(),expect.anything(),false,expect.any(String),[],42);
+  expect(start).not.toHaveBeenCalled();expect(display).not.toHaveBeenCalled();expect(user).not.toHaveBeenCalled();expect(eng.history).toHaveLength(0);
+  eng.dispose();
+ });
+ it('screen reactions wait behind player activity instead of interrupting it',async()=>{
+  vi.mocked(meetingIdentity).mockReturnValue({clientId:'owner',leaseId:'lease'});
+  chatMock.mockImplementation(async function*(){yield {t:'sentence',no:0,text:'hello',cues:[],at:''};await new Promise(()=>{});});
+  const {eng}=makeEngine();eng.sendText('hello');await tick();
+  eng.sendScreenReaction(42);await tick();
+  expect(chatMock).toHaveBeenCalledTimes(1);expect(interruptMock).not.toHaveBeenCalled();eng.dispose();
+ });
+});

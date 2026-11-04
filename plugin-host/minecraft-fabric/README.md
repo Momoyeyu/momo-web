@@ -1,0 +1,15 @@
+# Managed Minecraft Fabric component — experimental
+
+This is a component of momo's official Cordis Minecraft plugin, not a mod manager or an independent agent. Original implementation; AIRI's MIT README was inspected only. AIRI currently supplies Mineflayer, not reusable Fabric code.
+
+Pinned target: Minecraft Java 1.21.1, Yarn 1.21.1+build.3, Fabric Loader 0.16.14, Fabric API 0.116.4+1.21.1, Java 21, Loom 1.7.4, Gradle 8.10.2. Build with `gradle build`. See https://fabricmc.net/2024/05/31/121.html for the target's development requirements.
+
+The host must prepare a dedicated licensed client instance and launch it with private JVM properties `momo.bridge.token` (at least 32 random characters) and optional `momo.bridge.port` (default 17643). The component binds only 127.0.0.1; every request requires the bearer token. It never signs into an account, joins a server, downloads jars, or evaluates model scripts. Account is the client player's UUID; world is `server-address/dimension-registry-id`. These must match each command. Never use the player's interactive client: stopping releases its controls.
+
+Host contract: `createMinecraftAdapter({transport, authorize})` with `createMinecraftTransport({port,token})`; `authorize` must recheck the shared coordinator's Boot activation, attention, visual capability verification and permission version. Observe returns a first-person framebuffer PNG (max 960px wide, memory only) and structural visible-player state, marked untrusted. Chat rejects slash commands; follow is a short straight-line movement lease capped at 1 second, stopping for missing targets, collisions, screens, death, gaps, or timeout. It is not pathfinding and cannot guarantee safety in arbitrary terrain. Stop acknowledges released controls on the game thread. A rejected/timeout stop must remain unverified in UI; no automatic restart.
+
+Not accepted as plan007 complete: managed instance installation/hash manifest, official account login UI, full safe pathfinding and emergency disconnect, model capability validation, and a real private-world acceptance run remain required. Node tests use injected transports and never log into any server. Compilation and live tests must be recorded separately; source presence is not evidence of a working client.
+
+Build verification (2026-11-04): Gradle 8.10.2 downloaded from Tencent mirror, SHA256 verified against the official Gradle checksum. Isolated Gradle user home, `--no-daemon build`: successful (compileJava and remapJar). Four Node adapter tests pass. No Minecraft client launched and no real login/world acceptance performed.
+
+Runtime endpoints: `/api/minecraft/status`, `/connect`, `/actions`, `/stop`. Connect binds an already running private component to an explicit world/account and capability list; it does not provision a client. Actions require a current meeting lease, generation, verified visual model, and shared attention permission. Revoke clears grants before the Cordis stop barrier. Frame responses are ephemeral external evidence; no additional inference loop exists.

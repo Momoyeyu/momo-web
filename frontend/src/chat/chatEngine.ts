@@ -83,6 +83,7 @@ interface DisplayState {
 }
 
 interface Turn {
+  screenGeneration?:number;
   images?: ImageRef[];
   imageResult?: (ok:boolean)=>void;
   presentation: PresentationSnapshot | null;
@@ -346,6 +347,15 @@ export class ChatEngine {
     );
   }
 
+  /** A screen reaction uses the same display/voice path, without a player message. */
+  sendScreenReaction(generation:number):void {
+    if(this.disposed||this.phase!=="idle"||this.turn||!meetingIdentity()||this.presentationPaused)return;
+    this.sendQueue=this.sendQueue.then(async()=>{
+      if(this.phase!=="idle"||this.turn||this.presentationPaused)return;
+      await this.doSend("",false,[],undefined,generation);
+    }).catch(()=>{});
+  }
+
   /** First meeting uses normal pacing / TTS / ACT, without a fictitious user. */
   beginFirstMeeting(): void {
     if (this.disposed || this.openingScheduled || this.phase !== "idle") return;
@@ -353,12 +363,12 @@ export class ChatEngine {
     this.sendQueue = this.sendQueue.then(() => this.doSend("", true)).catch(() => {});
   }
 
-  private async doSend(trimmed: string, opening = false, images: ImageRef[] = [], imageResult?: (ok:boolean)=>void): Promise<void> {
+  private async doSend(trimmed: string, opening = false, images: ImageRef[] = [], imageResult?: (ok:boolean)=>void, screenGeneration?:number): Promise<void> {
     if (this.disposed) return;
     await this.stopReplay();
     // 新输入隐式打断在途回合（绕过防抖，保证打断一定生效）；
     // await 回传完成：backend 先修正尾对再收新消息，保证消息不乱序。
-    if (this.phase !== "idle") await this.interruptNow(true);
+    if (this.phase !== "idle" || this.turn) await this.interruptNow(true);
     if (this.disposed) return;
 
     const cfg = getSettings();
@@ -380,14 +390,14 @@ export class ChatEngine {
     };
 
     const turn: Turn = {
-      images, imageResult,
+      images, imageResult, screenGeneration,
       presentation: null,
       id: newId("m"),
       abort: new AbortController(),
       audioAbort: new AbortController(),
       userText: trimmed,
-      userMessageId: opening ? "" : userMsg.id,
-      userMessage: opening ? null : userMsg,
+      userMessageId: opening || screenGeneration!==undefined ? "" : userMsg.id,
+      userMessage: opening || screenGeneration!==undefined ? null : userMsg,
       runId: null,
       owner: meetingIdentity(),
       ackText: "",
@@ -412,10 +422,9 @@ export class ChatEngine {
     };
     this.turn = turn;
     this.tryStage((st) => { st.beginPerformance(turn.id); turn.presentation = st.getPresentation(); });
-    this.lastDisplay = "";
+    if(screenGeneration===undefined)this.lastDisplay = "";
     turn.timer = setInterval(() => this.displayTick(turn), DISPLAY_TICK_MS);
-    this.events.onAssistantStart(turn.id);
-    this.setPhase("thinking");
+    if(screenGeneration===undefined){this.events.onAssistantStart(turn.id);this.setPhase("thinking");}
     void this.runTurn(turn, cfg, trimmed);
   }
 
@@ -684,9 +693,10 @@ export class ChatEngine {
 
   private async runTurn(turn: Turn, cfg: Settings, userText: string): Promise<void> {
     try {
-      for await (const ev of chat(userText, turn.abort.signal, turn.presentation, turn.opening, turn.id, turn.images?.map(image=>image.id))) {
+      for await (const ev of chat(userText, turn.abort.signal, turn.presentation, turn.opening, turn.id, turn.images?.map(image=>image.id),turn.screenGeneration)) {
         if (this.turn !== turn) return; // 已被打断
         if (ev.t === "sentence") {
+          if(turn.screenGeneration!==undefined&&!turn.text&&ev.text.trim()){this.events.onAssistantStart(turn.id);this.setPhase("thinking");}
           if(ev.text.trim()){turn.imageResult?.(true);turn.imageResult=undefined;}
           if (ev.generation != null) turn.generation = ev.generation;
           if(ev.presentationToken)turn.presentationToken=ev.presentationToken;

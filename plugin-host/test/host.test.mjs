@@ -302,3 +302,12 @@ test('an exited MCP child withdraws its catalog and can reconnect without toggli
   const result = await req('plugins.callTool', { name: 'echo__echo', permit: permit() });
   assert.equal(result.receipt.status, 'completed');
 });
+
+test('computer observation scope stops on revoke without gaining execution', async t => {
+  const { req } = await setup(t);
+  const initial = await req('computer.start', { source: 'synthetic-window' });
+  assert.equal(initial.executionAvailable, false);
+  await req('revoke', { activityEpoch: 2, reason: 'test' });
+  assert.equal((await req('computer.status')).observing, false);
+  await assert.rejects(req('computer.start', { source: 'synthetic-window' }), { code: 'PAUSED' });
+});
