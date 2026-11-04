@@ -430,3 +430,23 @@ def test_restored_queued_inbox_never_resumes_after_returning_to_daily(
         db.query("SELECT status FROM inbox WHERE id=?", (pending["id"],))[0]["status"]
         == "interrupted"
     )
+
+
+def test_asgi_send_disconnect_closes_chat_source_and_releases_attention(monkeypatch):
+    from app.api import chat
+    from starlette.requests import ClientDisconnect
+    core = Coordinator()
+    monkeypatch.setattr(chat, 'runtime', core)
+    monkeypatch.setattr(llm, 'chat_stream', lambda *a, **k: iter([{'type':'text','delta':'One. Two.'}]))
+    async def exercise():
+        response = chat.chat(chat.ChatIn(text='hello', messageId='send-disconnect'))
+        async def receive():
+            return {'type':'http.disconnect'}
+        async def send(message):
+            if message['type']=='http.response.body':
+                assert core.active is not None
+                raise OSError('client disconnected during send')
+        with pytest.raises(ClientDisconnect):
+            await response({'type':'http','asgi':{'spec_version':'2.4'}}, receive, send)
+        assert core.active is None and core.queue == []
+    asyncio.run(exercise())

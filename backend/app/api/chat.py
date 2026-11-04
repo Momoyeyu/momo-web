@@ -13,11 +13,33 @@ from typing import Iterator
 from ..services.dialogue_input import DialogueInput
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
+from starlette.concurrency import iterate_in_threadpool, run_in_threadpool
+from anyio import CancelScope
 from pydantic import BaseModel, Field, ConfigDict
 
 from ..services import checkpoint, turn, onboarding, vision
 from ..models import SseEvent
 from ..services.coordinator import runtime, CoordinationError, current_run
+
+async def _closing_stream(iterator):
+    try:
+        async for event in iterate_in_threadpool(iterator):
+            yield event
+    finally:
+        # Closing Starlette's threadpool adapter does not close its sync source.
+        # Release attention deterministically, including ASGI cancellation.
+        with CancelScope(shield=True):
+            await run_in_threadpool(iterator.close)
+
+
+class ChatStreamingResponse(StreamingResponse):
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            with CancelScope(shield=True):
+                await self.body_iterator.aclose()
+
 
 router = APIRouter()
 
@@ -193,7 +215,7 @@ def _chat(req: ChatIn, observation=None) -> StreamingResponse:
         if not errored:
             yield _sse({"t": "done", "runId": inbox["run_id"], "generation": generation, **({"presentationToken": presentation_token} if presentation_token else {})})
 
-    return StreamingResponse(stream(), media_type="text/event-stream")
+    return ChatStreamingResponse(_closing_stream(stream()), media_type="text/event-stream")
 
 
 @router.post("/api/chat/interrupt", status_code=204)
