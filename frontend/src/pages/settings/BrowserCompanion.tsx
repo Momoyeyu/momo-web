@@ -12,7 +12,8 @@ export default function BrowserCompanion(){
  const [status,setStatus]=useState<Status|null>(null),[open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [host,setHost]=useState(''),[hosts,setHosts]=useState<string[]>([]),[interact,setInteract]=useState(false),[url,setUrl]=useState(''),[image,setImage]=useState('');
  const read=async()=>{const next=await apiJson<Status>('/api/browser/status');setStatus(next);setHosts(next.allowedHosts??[]);setInteract(next.permissions.includes('interact'));};
- useEffect(()=>{void read().catch(()=>setError('browser.error'));},[open,meeting.state]);
+ useEffect(()=>{void read().catch(()=>setError('browser.error'));},[open,meeting.state,meeting.attention.focus]);
+ useEffect(()=>{if(!status?.active)return;let disposed=false;const timer=setInterval(()=>{void apiJson<Status>('/api/browser/status').then(next=>{if(disposed)return;setStatus(next);if(!next.active)setImage('');}).catch(()=>{if(!disposed)setError('browser.error');});},3000);return()=>{disposed=true;clearInterval(timer);};},[status?.active]);
  const run=async(fn:()=>Promise<void>)=>{if(busy)return;setBusy(true);setError('');try{await fn();}catch{setError('browser.error');}finally{setBusy(false);}};
  const addHost=()=>{try{const input=host.trim().toLowerCase();if(!input||/[/:@?#*\s]/.test(input))throw Error();const normalized=new URL('https://'+input).hostname;if(!normalized.includes('.')||/^\d+[.\d]*$/.test(normalized)||hosts.length>=20)throw Error();setHosts([...new Set([...hosts,normalized])]);setHost('');setError('');}catch{setError('browser.invalidHost');}};
  const start=()=>run(async()=>{const owner=meetingIdentity();if(!owner)throw Error();setStatus(await apiJson<Status>('/api/browser/start',jsonInit('POST',{...owner,permissions:interact?['observe','interact']:['observe'],allowedHosts:hosts})));});

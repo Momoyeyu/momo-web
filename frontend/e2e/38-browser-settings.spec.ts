@@ -25,6 +25,9 @@ test('browser scope is explicit and page snapshots use the active grant',async({
  await expect(modal.getByRole('img',{name:'隔离浏览器画面'})).toBeVisible();
  expect(calls[1]).toMatchObject({url:'https://example.com/',generation:7});
  await page.screenshot({path:info.outputPath('browser-settings.png')});
+ active=false;
+ await expect(modal.getByRole('textbox',{name:'网页地址'})).toHaveCount(0);
+ await modal.getByRole('button',{name:'开启',exact:true}).click();
  await modal.getByRole('button',{name:'关闭',exact:true}).click();
  await expect(modal.getByRole('textbox',{name:'网页地址'})).toHaveCount(0);
 });
