@@ -920,6 +920,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/minecraft/auth/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Auth Begin */
+        post: operations["auth_begin_api_minecraft_auth_begin_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minecraft/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Auth Logout */
+        post: operations["auth_logout_api_minecraft_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minecraft/auth/poll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Auth Poll */
+        post: operations["auth_poll_api_minecraft_auth_poll_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/minecraft/connect": {
         parameters: {
             query?: never;
@@ -931,6 +982,74 @@ export interface paths {
         put?: never;
         /** Connect */
         post: operations["connect_api_minecraft_connect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minecraft/managed/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Managed Prepare */
+        post: operations["managed_prepare_api_minecraft_managed_prepare_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minecraft/managed/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Managed Start */
+        post: operations["managed_start_api_minecraft_managed_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minecraft/managed/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Managed Status */
+        get: operations["managed_status_api_minecraft_managed_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minecraft/managed/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Managed Stop */
+        post: operations["managed_stop_api_minecraft_managed_stop_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1814,6 +1933,24 @@ export interface components {
             /** Summary */
             summary: string;
         };
+        /** Login */
+        Login: {
+            /** Clientid */
+            clientId: string;
+        };
+        /** ManagedStart */
+        ManagedStart: {
+            /** Clientid */
+            clientId: string;
+            /** Leaseid */
+            leaseId: string;
+            /** Permissions */
+            permissions: ("game.observe" | "game.chat" | "game.move")[];
+            /** Server */
+            server: string;
+            /** World */
+            world: string;
+        };
         /** Memory */
         Memory: {
             /** Content */
@@ -1896,6 +2033,11 @@ export interface components {
             receive?: boolean | null;
             /** Reply */
             reply?: boolean | null;
+        };
+        /** Prepare */
+        Prepare: {
+            /** Resources */
+            resources?: string | null;
         };
         /** PresentationAckIn */
         PresentationAckIn: {
@@ -2147,7 +2289,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "observe" | "load" | "click" | "type" | "scroll";
+            action: "observe" | "inspect" | "load" | "click" | "type" | "scroll" | "elementClick" | "elementFill";
             /** Clientid */
             clientId: string;
             /**
@@ -2155,6 +2297,11 @@ export interface components {
              * @default 0
              */
             delta: number;
+            /**
+             * Elementid
+             * @default
+             */
+            elementId: string;
             /** Generation */
             generation: number;
             /**
@@ -3857,6 +4004,79 @@ export interface operations {
             };
         };
     };
+    auth_begin_api_minecraft_auth_begin_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Login"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    auth_logout_api_minecraft_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    auth_poll_api_minecraft_auth_poll_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     connect_api_minecraft_connect_post: {
         parameters: {
             query?: never;
@@ -3886,6 +4106,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    managed_prepare_api_minecraft_managed_prepare_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Prepare"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    managed_start_api_minecraft_managed_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManagedStart"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    managed_status_api_minecraft_managed_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    managed_stop_api_minecraft_managed_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

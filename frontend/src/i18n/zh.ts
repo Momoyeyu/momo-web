@@ -478,6 +478,7 @@ export const zh = {
     dropHint: "拖入 zip 文件，或点击选择",
     empty: "没有匹配的模型。",
   },
+  minecraft: {"remembered":"已记住账号。启动时将重新验证登录和 Minecraft 所有权。","advancedResources": "高级：导入本地资源文件夹", "waitingLogin": "正在等待微软登录…", "loginExpired": "登录代码已过期，请重新登录。","joinHint": "启动后进入游戏菜单。请手动加入指定服务器；世界字段填写维度 ID，例如 minecraft:overworld。其他世界不获授权。", "title": "Minecraft 陪玩", "description": "通过当前对话控制独立游戏实例。", "running": "运行中", "stopped": "已停止", "configure": "配置", "dismiss": "关闭", "requirements": "需要 Java 21、已校验本地资源、拥有 Minecraft 的微软账号、Boot 和视觉能力。", "resourcesReady": "资源已校验", "resourcesMissing": "资源尚未准备", "resources": "已准备的资源文件夹", "prepare": "准备资源", "signedOut": "未登录", "clientId": "微软公共客户端 ID", "clientHint": "使用自己注册的公共客户端 ID。不要粘贴密码或访问令牌。", "login": "使用微软账号登录", "deviceHint": "打开微软页面并输入此代码。", "checkLogin": "检查登录", "logout": "退出账号", "server": "允许的服务器（主机:端口）", "world": "允许的世界标识", "observe": "必须允许观察。授权仅适用于该账号、服务器和世界。", "chat": "允许聊天", "move": "允许移动", "start": "启动陪玩", "stop": "停止陪玩", "error": "操作失败，请检查资源、账号和运行状态。"},
 };
 
 export type Dict = typeof zh;

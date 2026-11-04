@@ -13,7 +13,9 @@ One Cordis extension model and one Python coordinator. Desktop observation and c
 - Registry-backed imported-plugin list, search and five-item pagination. Existing MCP pagination reused. Browser tests cover 11 plugins and 17 MCP entries, search and deletion of the correct underlying record.
 - Selected screen capture and optional reactions. Normal chat consumes transient actual pixels; proactive output uses normal sentence/TTS/display acknowledgement without a fabricated player row.
 - Restricted browser execution, exact-host public HTTPS reads, current-run local-owner tools and transient screenshots. Real Docker fixture and Cordis revoke tests pass.
-- Fabric component builds; bounded adapter, API, model tool and resource qualification tests pass. No live account or world modified.
+- Fabric component builds; bounded adapter, model tools and managed login/launch UI are wired. Official resource preparation qualified 3,963 files on macOS arm64. Account endpoints use an owned public-client ID, private refresh storage and entitlement checks; no live account or world modified.
+- Browser semantic inspection and named element click/fill share the existing grant/version checks; no separate browser reasoning loop.
+- Minecraft startup cancellation is immediate; a lifetime-pipe supervisor reclaims its direct JVM child if the backend crashes. Settings polls process and login status automatically.
 
 ## Additional design decisions and reasons
 
@@ -23,11 +25,14 @@ One Cordis extension model and one Python coordinator. Desktop observation and c
 4. Use normal chat presentation for screen reactions: preserves one personality, history and actual-display accounting.
 5. Use a network-disabled renderer plus narrowly scoped fetch for the first browser slice: a separate Chromium profile alone does not isolate host files or private-network access.
 6. Do not add another MCP list implementation; verify the existing pagination and index mapping.
+7. Add managed game login/resource/launch rather than exposing bridge tokens: users should not wire execution credentials by hand.
+8. Protect game lifetime with a parent pipe and cancellable startup: stops must also work during slow identity-provider calls and host crashes.
+9. Reuse browser accessibility metadata for named actions, reducing fragile pixel targeting without introducing a second control architecture.
 
 ## Remaining acceptance requirements
 
 - Native desktop overlay and general computer interaction; background Web capture limitations.
 - Product-managed isolated environment preparation; current development Docker prerequisite is not a release UX.
 - Full browser site behavior beyond read-only snapshots, if retained in the accepted scope.
-- Minecraft assets/native closure, legitimate account provider and managed launch, robust following, real private-world acceptance.
+- Minecraft own public-client registration, real account/client/private-world acceptance and robust following. Resource closure and managed auth/launch code are implemented; mocked tests are not live acceptance.
 - Full final review, CI and user acceptance. Do not archive 006/007/008 as done.

@@ -81,3 +81,10 @@ remains an explicit startup override. When neither exists, QQ stays optional.
 The app never searches installed QQ clients or downloads resources to repair a
 missing binding. Retain this local setup file when restarting the same developer
 profile; do not publish it or copy machine-specific paths into another install.
+
+`MOMO_MINECRAFT_RESOURCES` optionally points to a prepared Minecraft resource
+closure for the managed companion. Without it, preparation reads
+`MOMO_RESOURCES_DIR/minecraft` (or backend resources/minecraft when unset).
+Preparation copies into the private dedicated instance; it does not modify the
+source folder. Development can use `.workbuddy/minecraft-resources`; do not write
+through resource symlinks into a preserved checkout.

@@ -96,7 +96,7 @@ class Browser:
             fingerprint = self.gate(client,lease)
             with self.lock:
                 if (generation != self.generation or self.epoch != runtime.epoch or fingerprint != self.fingerprint
-                        or 'observe' not in self.permissions or command['action'] != 'observe' and 'interact' not in self.permissions):
+                        or 'observe' not in self.permissions or command['action'] not in ('observe','inspect') and 'interact' not in self.permissions):
                     raise BrowserError('Browser grant revoked or capability denied')
                 permit = runtime.host.permit('browser-action')
             result = runtime.host.request('browser.action', {'command':command,'version':version,'permit':permit},timeout=25)

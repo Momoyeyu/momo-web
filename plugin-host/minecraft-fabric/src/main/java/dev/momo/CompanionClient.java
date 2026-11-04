@@ -62,6 +62,7 @@ public final class CompanionClient implements ClientModInitializer {
  private JsonObject command(JsonObject command) throws Exception {
   MinecraftClient client = MinecraftClient.getInstance();
   String type = command.get("type").getAsString();
+  if ("ping".equals(type)) { JsonObject ready = new JsonObject(); ready.addProperty("ready", true); ready.addProperty("protocol", 1); return ready; }
   long version = command.get("epoch").getAsLong();
   if (version < epoch) throw new IllegalArgumentException("Revoked");
   if (version > epoch) { release(client); epoch = version; }

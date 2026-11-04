@@ -863,6 +863,66 @@
         "title": "LiveTranscript",
         "type": "object"
       },
+      "Login": {
+        "properties": {
+          "clientId": {
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Clientid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId"
+        ],
+        "title": "Login",
+        "type": "object"
+      },
+      "ManagedStart": {
+        "properties": {
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "enum": [
+                "game.observe",
+                "game.chat",
+                "game.move"
+              ],
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "server": {
+            "maxLength": 253,
+            "minLength": 1,
+            "title": "Server",
+            "type": "string"
+          },
+          "world": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "World",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId",
+          "server",
+          "world",
+          "permissions"
+        ],
+        "title": "ManagedStart",
+        "type": "object"
+      },
       "Memory": {
         "properties": {
           "content": {
@@ -1144,6 +1204,25 @@
           }
         },
         "title": "PermissionIn",
+        "type": "object"
+      },
+      "Prepare": {
+        "properties": {
+          "resources": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resources"
+          }
+        },
+        "title": "Prepare",
         "type": "object"
       },
       "PresentationAckIn": {
@@ -1824,10 +1903,13 @@
           "action": {
             "enum": [
               "observe",
+              "inspect",
               "load",
               "click",
               "type",
-              "scroll"
+              "scroll",
+              "elementClick",
+              "elementFill"
             ],
             "title": "Action",
             "type": "string"
@@ -1842,6 +1924,12 @@
             "minimum": -768.0,
             "title": "Delta",
             "type": "integer"
+          },
+          "elementId": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Elementid",
+            "type": "string"
           },
           "generation": {
             "title": "Generation",
@@ -3733,6 +3821,74 @@
         "summary": "Action"
       }
     },
+    "/api/minecraft/auth/begin": {
+      "post": {
+        "operationId": "auth_begin_api_minecraft_auth_begin_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Login"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auth Begin"
+      }
+    },
+    "/api/minecraft/auth/logout": {
+      "post": {
+        "operationId": "auth_logout_api_minecraft_auth_logout_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auth Logout"
+      }
+    },
+    "/api/minecraft/auth/poll": {
+      "post": {
+        "operationId": "auth_poll_api_minecraft_auth_poll_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Auth Poll"
+      }
+    },
     "/api/minecraft/connect": {
       "post": {
         "operationId": "connect_api_minecraft_connect_post",
@@ -3767,6 +3923,110 @@
           }
         },
         "summary": "Connect"
+      }
+    },
+    "/api/minecraft/managed/prepare": {
+      "post": {
+        "operationId": "managed_prepare_api_minecraft_managed_prepare_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Prepare"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Managed Prepare"
+      }
+    },
+    "/api/minecraft/managed/start": {
+      "post": {
+        "operationId": "managed_start_api_minecraft_managed_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManagedStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Managed Start"
+      }
+    },
+    "/api/minecraft/managed/status": {
+      "get": {
+        "operationId": "managed_status_api_minecraft_managed_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Managed Status"
+      }
+    },
+    "/api/minecraft/managed/stop": {
+      "post": {
+        "operationId": "managed_stop_api_minecraft_managed_stop_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Managed Stop"
       }
     },
     "/api/minecraft/status": {

@@ -19,7 +19,8 @@ class Start(Owner):
 class Action(Owner):
     generation: int
     version: int | None = None
-    action: Literal['observe','load','click','type','scroll']
+    action: Literal['observe','inspect','load','click','type','scroll','elementClick','elementFill']
+    elementId: str = Field(default='',max_length=64)
     html: str = Field(default='',max_length=100000)
     x: float = Field(default=0,ge=0,lt=1024)
     y: float = Field(default=0,ge=0,lt=768)

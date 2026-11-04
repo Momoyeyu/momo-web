@@ -41,7 +41,11 @@ async def lifespan(app: FastAPI):
         memory.schedule_index()
         yield
     finally:
-        await __import__("asyncio").to_thread(runtime.close)
+        from .services import minecraft_managed
+        try:
+            await __import__("asyncio").to_thread(minecraft_managed.shutdown)
+        finally:
+            await __import__("asyncio").to_thread(runtime.close)
         memory.shutdown_index()
         from .core.mcp import hub
 

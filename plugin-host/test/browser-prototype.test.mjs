@@ -65,3 +65,27 @@ test('failed container removal can be retried without reactivating execution',as
  await browser.stop();
  assert.equal(attempts,2);
 });
+
+test('semantic inspection finds named controls and scoped fill replaces text', { skip: process.env.BROWSER_PROBE_TEST !== '1' }, async () => {
+  const browser = new BrowserPrototype(() => {});
+  await browser.start();
+  try {
+    for (let i=0;i<20;i++) {
+      try { await browser.action({action:'observe'},{}); break; }
+      catch { await new Promise(resolve=>setTimeout(resolve,250)); }
+    }
+    await browser.action({action:'load',html:'<label>Search<input aria-label="Search" value="old"></label><button>Confirm</button>'},{});
+    const inspected = await browser.action({action:'inspect'},{});
+    const input=inspected.elements.find(e=>e.role==='textbox' && e.name==='Search');
+    assert.ok(input?.id);
+    assert.equal('backendNodeId' in input,false);
+    assert.ok(inspected.elements.length<=60);
+    const filled=await browser.action({action:'elementFill',elementId:input.id,text:'replacement'},{},inspected.version);
+    assert.notEqual(filled.data,inspected.data);
+    await assert.rejects(browser.action({action:'elementFill',elementId:input.id,text:'bad'},{},filled.version),/UNKNOWN_ELEMENT/);
+    const fresh=await browser.action({action:'inspect'},{});
+    const button=fresh.elements.find(e=>e.role==='button' && e.name==='Confirm');
+    const clicked=await browser.action({action:'elementClick',elementId:button.id},{},fresh.version);
+    assert.ok(clicked.data);
+  } finally { await browser.stop(); }
+});
