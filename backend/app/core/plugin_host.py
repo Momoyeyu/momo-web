@@ -109,11 +109,15 @@ class PluginHost:
         self.control = threading.RLock()
 
     def start(self):
-        qq_runtime = managed_qq_runtime_config()
         root = Path(__file__).resolve().parents[3]
         resources = Path(
             os.environ.get("MOMO_RESOURCES_DIR", root / "resources/models")
         ).parent
+        if getattr(__import__("sys"), "frozen", False) and not os.environ.get("MOMO_QQ_RUNTIME_CONFIG"):
+            from .qq_install import prepare_installed_qq
+            from .state import DATA_DIR
+            prepare_installed_qq(resources, DATA_DIR)
+        qq_runtime = managed_qq_runtime_config()
         entry = Path(
             os.environ.get("MOMO_PLUGIN_HOST", resources / "plugin-host/src/index.mjs")
         )

@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
             await __import__("asyncio").to_thread(runtime.close)
             memory.shutdown_index()
             from .core.mcp import hub
-    
+
             hub.close()
     finally:
         ownership.release()

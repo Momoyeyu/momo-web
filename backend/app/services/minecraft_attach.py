@@ -1,10 +1,16 @@
 """Attach to the user's explicitly selected running Fabric client; never launch/login."""
-import json, os, stat, re, shutil
+import json, os, stat, re, shutil, sys
 from pathlib import Path
 import httpx
 from .minecraft import minecraft, MinecraftError
 DIRECTORY = Path.home()/'.momo'/'minecraft-bridge'
 MOD = Path(__file__).resolve().parents[3]/'plugin-host/minecraft-fabric/build/libs/momo-fabric-companion-0.1.0.jar'
+def mod_resource():
+    if getattr(sys, 'frozen', False):
+        resources = Path(os.environ['MOMO_RESOURCES_DIR']).parent
+        return resources/'plugin-host/resources/minecraft/momo-fabric-companion-0.1.0.jar'
+    return MOD
+
 def read(session):
     if not re.fullmatch(r'[0-9]+',session): raise MinecraftError('Invalid session')
     try:
@@ -46,13 +52,14 @@ def attach(session,world,account,permissions,client,lease):
 def install(instance_path):
     root=Path(instance_path).expanduser()
     if not root.is_dir() or root.is_symlink() or any(p.is_symlink() for p in root.parents): raise MinecraftError('Select an existing game instance')
-    if not MOD.is_file(): raise MinecraftError('Companion mod resource unavailable')
+    mod = mod_resource()
+    if not mod.is_file(): raise MinecraftError('Companion mod resource unavailable')
     dest=root/'mods'
     if dest.is_symlink(): raise MinecraftError('Symlink mod directory forbidden')
     dest.mkdir(exist_ok=True)
-    target=dest/MOD.name
+    target=dest/mod.name
     try:
-        with target.open('xb') as out: out.write(MOD.read_bytes())
+        with target.open('xb') as out: out.write(mod.read_bytes())
     except FileExistsError:
-        if target.is_symlink() or target.read_bytes()!=MOD.read_bytes(): raise MinecraftError('Existing mod differs; remove explicitly before installing')
+        if target.is_symlink() or target.read_bytes()!=mod.read_bytes(): raise MinecraftError('Existing mod differs; remove explicitly before installing')
     return {'installed':True,'restartRequired':True}

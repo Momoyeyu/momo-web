@@ -26,3 +26,8 @@ def test_install_never_overwrites(tmp_path,monkeypatch):
  assert bridge.install(str(instance))['installed']
  (instance/'mods/momo.jar').write_bytes(b'other')
  with pytest.raises(MinecraftError):bridge.install(str(instance))
+
+def test_installed_mod_uses_packaged_resource_root(tmp_path,monkeypatch):
+ monkeypatch.setenv('MOMO_RESOURCES_DIR',str(tmp_path/'models'))
+ monkeypatch.setattr(bridge.sys,'frozen',True,raising=False)
+ assert bridge.mod_resource()==tmp_path/'plugin-host/resources/minecraft/momo-fabric-companion-0.1.0.jar'
