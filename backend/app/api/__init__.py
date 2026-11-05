@@ -1,1 +1,1 @@
-"""HTTP 层：按资源分 router，将来整体换 Tauri command。"""
+"""Shared resource-oriented HTTP API for Web and Electron clients."""

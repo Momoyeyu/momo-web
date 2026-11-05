@@ -19,7 +19,7 @@ export interface AsrEngine {
 
 // ---------------------------------------------------------------- builtin
 
-/** 内置 ASR 的 WS 地址：与页面同源，走 vite 代理（dev）/ backend 直连（Tauri）。 */
+/** 内置 ASR 的 WS 地址：与页面同源，走 vite 代理（dev）/ 受控 backend 连接（Electron）。 */
 export function builtinAsrUrl(): string {
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   return `${proto}//${location.host}/api/asr/stream`;
