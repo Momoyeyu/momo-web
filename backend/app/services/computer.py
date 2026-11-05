@@ -42,6 +42,9 @@ class Computer:
             return self.snapshot(check=False)
 
     def gate(self):
+        from .activities import require_enabled
+        try: require_enabled('computer')
+        except ValueError as error: raise ComputerError(str(error)) from None
         cfg = state.load()['settings']['llm']
         if (not runtime.started or runtime.mode != 'meeting' or runtime.focus
                 or runtime.restoring or runtime.interrupt_hold):

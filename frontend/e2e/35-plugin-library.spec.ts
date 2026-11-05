@@ -9,9 +9,9 @@ test('plugin library searches, pages, and requires trust before enabling importe
  });
  await openExtensionTab(page,'插件');
  const library=page.locator('.plugin-library');
- await expect(library.locator('.plugin-library-card')).toHaveCount(4);
+ await expect(library.locator('.plugin-library-card')).toHaveCount(3);
  await library.locator('.pager-btn').last().click();
- await expect(library.locator('.plugin-library-card')).toHaveCount(5);
+ await expect(library.locator('.plugin-library-card')).toHaveCount(4);
  await page.screenshot({path:testInfo.outputPath('plugin-library.png')});
  await library.locator('.list-search').fill('Sample 10');
  await expect(library.locator('.plugin-library-card')).toHaveCount(1);

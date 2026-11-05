@@ -10,29 +10,28 @@ One Cordis extension model and one Python coordinator. Desktop observation and c
 
 - Versioned JSON package contract, strict paths/size/manifest checks, atomic disabled-by-default installation, explicit trust review, disk reconstruction, enable/disable/removal and retryable unconfirmed stop. Portable example included in `plugin-host/examples/hello-plugin.json`.
 - Imported plugins are out-of-process MCP tool providers owned by Cordis. They run with the local user's permissions after explicit trust; capability labels are **not** sandbox enforcement. V1 does not yet support third-party phone views, channels or arbitrary frontend code. See `plugin-host/PLUGIN-FORMAT.md`.
-- Registry-backed imported-plugin list, search and five-item pagination. Existing MCP pagination reused. Browser tests cover 11 plugins and 17 MCP entries, search and deletion of the correct underlying record.
+- Registry-backed imported-plugin list, search and four-item paginated grid. Existing MCP pagination reused. Browser tests cover 11 plugins and 17 MCP entries, search and deletion of the correct underlying record.
 - Selected screen capture and optional reactions. Normal chat consumes transient actual pixels; proactive output uses normal sentence/TTS/display acknowledgement without a fabricated player row.
-- Restricted browser execution, exact-host public HTTPS reads, current-run local-owner tools and transient screenshots. Real Docker fixture and Cordis revoke tests pass.
-- Fabric component builds; bounded adapter, model tools and managed login/launch UI are wired. Official resource preparation qualified 3,963 files on macOS arm64. Account endpoints use an owned public-client ID, private refresh storage and entitlement checks; no live account or world modified.
-- Browser semantic inspection and named element click/fill share the existing grant/version checks; no separate browser reasoning loop.
-- Minecraft startup cancellation is immediate; a lifetime-pipe supervisor reclaims its direct JVM child if the backend crashes. Settings polls process and login status automatically.
+- Existing application native broker replaces the retired Docker renderer. Browser and desktop share selected-window control; no independent browser session is created.
+- Existing Minecraft instance discovery/attach replaces the mistaken independent account/client workflow. Fixed Fabric actions include bounded obstacle navigation; no account credentials are read.
+- Native window observation and bounded input share grant/version checks; DOM semantic attachment to existing browser sessions is not implemented.
+- Application approval supports once/always/deny, scoped capabilities and editable revocable allowlist. It is authorization, not an OS sandbox.
+- Shared card layout, one Chat extension entry and three-language filled-list tests at720p/1080p are implemented.
 
-## Additional design decisions and reasons
+## Additional decisions and corrections
 
-1. Preserve a failed-stop plugin record and offer retry instead of deleting it: otherwise a surviving process becomes invisible.
-2. Keep imported code out of the trusted Cordis process and document the trust boundary: package validation cannot sandbox arbitrary Node code.
-3. Inject screen pixels only into a single provider request, with TTL and a second authorization check: avoids durable capture and stale permission reuse during compact/revoke races.
-4. Use normal chat presentation for screen reactions: preserves one personality, history and actual-display accounting.
-5. Use a network-disabled renderer plus narrowly scoped fetch for the first browser slice: a separate Chromium profile alone does not isolate host files or private-network access.
-6. Do not add another MCP list implementation; verify the existing pagination and index mapping.
-7. Add managed game login/resource/launch rather than exposing bridge tokens: users should not wire execution credentials by hand.
-8. Protect game lifetime with a parent pipe and cancellable startup: stops must also work during slow identity-provider calls and host crashes.
-9. Reuse browser accessibility metadata for named actions, reducing fragile pixel targeting without introducing a second control architecture.
+1. Failed-stop plugin ownership remains visible and retryable.
+2. Imported code remains an explicitly trusted local process; capability metadata does not sandbox arbitrary code.
+3. Screen evidence is transient and rechecked before provider submission.
+4. Proactive reactions use the ordinary chat presentation path.
+5. User corrected the architecture: operate existing applications. Docker renderer, independent game login/client/resource provisioning are removed, not release prerequisites.
+6. Application permissions are separate from plugin enablement and current activity; permanent approval never implies unattended start.
+7. Native helper uses AIRI's local executor approach with fixed actions and target identity checks, no new reasoning loop.
 
 ## Remaining acceptance requirements
 
 - Native desktop overlay and general computer interaction; background Web capture limitations.
-- Product-managed isolated environment preparation; current development Docker prerequisite is not a release UX.
-- Full browser site behavior beyond read-only snapshots, if retained in the accepted scope.
-- Minecraft own public-client registration, real account/client/private-world acceptance and robust following. Resource closure and managed auth/launch code are implemented; mocked tests are not live acceptance.
+- Existing-application input smoke requires macOS Accessibility permission; no Docker prerequisite remains.
+- Actual existing-browser interaction smoke and optional DOM semantic fast path.
+- Existing Minecraft Fabric instance attachment and gameplay smoke; no new account or client registration required.
 - Full final review, CI and user acceptance. Do not archive 006/007/008 as done.

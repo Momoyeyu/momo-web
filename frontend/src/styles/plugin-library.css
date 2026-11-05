@@ -19,3 +19,28 @@
 .extension-modal-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .extension-modal-heading h3{margin:0}
 .extension-modal .browser-preview{max-height:280px;object-fit:contain}
+/* Four equally sized cards, independent of the details displayed inside them. */
+.plugin-library-items{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start}
+.plugin-library-items>.official-plugins{min-width:0}
+.plugin-library-items .social-cards{display:block}
+.plugin-library-items .social-card,.plugin-library-items>.plugin-library-card{box-sizing:border-box;height:142px;min-height:0;padding:16px;border-radius:var(--r-lg,16px);border:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column;gap:10px}
+.plugin-library-items .social-card-top h4,.extension-card-heading strong{font-size:16px;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plugin-library-items .social-account-identity{margin:0;min-height:18px}
+.plugin-library-items .social-card-bottom,.extension-card-footer{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.extension-card-heading{display:flex;align-items:center;gap:12px}
+.extension-card-footer{font-size:12px;min-width:0}
+.extension-card-footer>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plugin-library-items>.plugin-library-card>p{margin:0;font-size:12px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.plugin-library-items>.plugin-library-card>.plugin-library-actions{margin-top:auto;gap:8px}
+.plugin-library .list-pager{margin-top:auto}
+.extension-activities .plugin-library-items{grid-template-columns:1fr}
+@media(max-height:800px){.plugin-library{gap:10px}.plugin-library-items .social-card,.plugin-library-items>.plugin-library-card{height:126px;padding:12px}.plugin-library-items .social-app-mark{width:32px;height:32px}.extension-panel .list-body{min-height:0}.extension-panel .list-item{min-height:48px;margin-bottom:6px}}
+.extension-pane .plugin-library .social-card{height:142px;min-height:0}
+@media(max-height:800px){.extension-pane .plugin-library .social-card{height:126px}}
+@media(max-height:800px){
+ .extension-panel .list-item{padding:6px 10px;min-height:52px}
+ .extension-panel .avatar-thumb{width:36px;height:36px}
+ .extension-panel .list-body{min-height:290px}
+}
+.permission-app{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}
+.permission-app>div{min-width:0;display:grid;gap:6px}.permission-app small{color:var(--text-dim);overflow-wrap:anywhere}.permission-app span{font-size:12px}

@@ -1,4 +1,4 @@
-import { BrowserPrototype } from './browser-prototype.mjs';
+import { NativeControl } from './native-control.mjs';
 import { createMinecraftAdapter, createMinecraftTransport } from './minecraft-adapter.mjs';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Context } from 'cordis';
@@ -22,8 +22,7 @@ const opaque = value => typeof value === 'string' && value.length > 0 && value.l
 export class PluginHost {
   constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000, qqRuntime } = {}) {
     this.ctx = new Context();
-    this.browser = null;
-    this.ctx.plugin(ctx => { ctx.on('dispose', () => this.browser?.stop()); });
+    this.ctx.plugin(ctx => { ctx.on('dispose', () => this.nativeControl?.stop()); });
     this.minecraft = createMinecraftAdapter();
     this.ctx.plugin(ctx => { ctx.on('dispose', () => this.minecraft.stop()); });
     this.computer = { observing: false, source: null, generation: 0 };
@@ -97,30 +96,17 @@ export class PluginHost {
       return { hostInstance: this.hostInstance, protocolVersion: 1, heartbeatMs: this.heartbeatMs };
     }
     this.authenticate(message.token);
+    this.nativeControl ??= new NativeControl(permit => this.checkPermit(permit));
     switch (message.method) {
-      case 'browser.status': return { active: this.browser?.active === true, networkAvailable: false, version: this.browser?.version ?? 0 };
-      case 'browser.start': return this.mutate(async () => {
-        this.checkPermit(params.permit);
-        if (this.browser) await this.browser.stop();
-        const browser = new BrowserPrototype(permit => this.checkPermit(permit));
-        this.browser = browser;
-        try {
-          await browser.start();
-          this.checkPermit(params.permit);
-          return { active: true, networkAvailable: false };
-        } catch (error) { await browser.stop().catch(() => {}); throw error; }
-      });
-      case 'browser.stop': return this.mutate(async () => {
-        const browser = this.browser;
-        if (!browser) return { stopped: true };
-        const result = await browser.stop();
-        if (this.browser === browser) this.browser = null;
-        return result;
-      });
-      case 'browser.action': {
-        if (!this.browser) fail('UNAVAILABLE', 'Browser is stopped');
-        return this.browser.action(params.command, params.permit, params.version);
-      }
+      case 'native.targets': return this.nativeControl.targets();
+      case 'native.start': this.checkPermit(params.permit); return this.nativeControl.start(params);
+      case 'native.observe': return this.nativeControl.observe(params.permit, params.bindingId);
+      case 'native.action': return this.nativeControl.action(params.command, params.permit, params.version, params.bindingId);
+      case 'native.stop': return this.nativeControl.stop();
+      case 'browser.status': return { active: false, retired: true };
+      case 'browser.stop': return { stopped: true };
+      case 'browser.start':
+      case 'browser.action': fail('RETIRED', 'Select an existing browser window through native control');
       case 'minecraft.configure': {
         await this.minecraft.stop();
         this.minecraft = createMinecraftAdapter({ now: this.now,
@@ -735,7 +721,7 @@ export class PluginHost {
     const remoteUnknown = active.some(item => item.plugin.config.transport !== 'stdio');
     for (const item of active) item.controller.abort();
     const closing = [...new Set(active.map(item => item.plugin))].map(plugin => this.closePluginConnection(plugin));
-    const channelStops = [...channels.map(plugin => plugin.channel.stop()), this.minecraft.stop(), ...(this.browser ? [this.browser.stop()] : [])];
+    const channelStops = [...(this.nativeControl ? [this.nativeControl.stop()] : []),...channels.map(plugin => plugin.channel.stop()), this.minecraft.stop()];
     const settled = Promise.allSettled([...closing, ...active.map(item => item.promise), ...channelStops]).then(results => results.every(result => result.status === 'fulfilled' && (result.value?.executorQuiescent !== false)));
     let stopTimer;
     const stopped = await Promise.race([settled, new Promise(resolve => { stopTimer = setTimeout(() => resolve(false), this.stopTimeoutMs); })]);

@@ -1,6 +1,7 @@
 import {musicDirector} from './audio/director';
 import {useIntro} from './services/introClient';
 import {ambient} from './audio/ambient';
+import AppPermissions from './components/AppPermissions';
 import {enterMeeting,leaveMeeting,meetingSnapshot,subscribeMeeting,storedMeetingIdentity,refreshAttention,type AttentionState} from "./services/meetingClient";
 import {getChatEngine,loadTranscript} from "./chat/engineInstance";
 import {historyPage} from "./services/lifeClient";
@@ -305,6 +306,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
           {(meeting.state === "failed" || historyFailed || attentionFault) && <div className="meeting-gate-actions">{attentionFault?<Button size="sm" variant="ghost" onClick={()=>{location.hash='#/settings';}}>{t('settings.title')}</Button>:<Button size="sm" variant="ghost" onClick={() => historyFailed ? setHistoryRetry(value=>value+1) : void enterMeeting().catch(() => {})}>{t("meeting.retry")}</Button>}<Button size="sm" variant="ghost" onClick={() => {location.hash="#/title";}}>{t("common.backTitle")}</Button></div>}
         </div>
       </div>}
+      <AppPermissions/>
       <TooltipLayer />
       <IntroGuide ready={ready} />
 

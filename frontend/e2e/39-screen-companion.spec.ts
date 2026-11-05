@@ -1,32 +1,24 @@
 import {test,expect} from './fixtures';
 import {bootChat,openExtensionTab,gotoRoute} from './helpers';
-test('screen capture survives settings navigation and explicit stop releases its tracks',async({page})=>{
- let observing=false,frames=0;
- await page.addInitScript(()=>{
-  Object.defineProperty(navigator.mediaDevices,'getDisplayMedia',{value:async()=>{
-   const canvas=document.createElement('canvas');canvas.width=320;canvas.height=180;
-   const context=canvas.getContext('2d')!;context.fillStyle='#e9c476';context.fillRect(0,0,320,180);
-   const stream=canvas.captureStream(1);
-   (window as unknown as {fixtureScreen:MediaStream}).fixtureScreen=stream;
-   return stream;
-  }});
- });
- await page.route('**/api/computer/**',async route=>{
-  const path=new URL(route.request().url()).pathname;
-  if(path.endsWith('/start'))observing=true;
-  if(path.endsWith('/stop'))observing=false;
-  if(path.endsWith('/frames')){
-   const body=route.request().postDataBuffer();expect(body?.includes(Buffer.from([0xff,0xd8]))).toBe(true);frames++;
-  }
-  await route.fulfill({json:{observing,generation:23,proactive:false,reactions:false}});
+test('native observation persists across settings and chat and stops explicitly',async({page})=>{
+ let active=false,frames=0,proactive=false,reactions=false;
+ await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:true}}}));
+ await page.route('**/api/computer/**',async r=>{
+  const path=new URL(r.request().url()).pathname;
+  if(path.endsWith('/approvals')){await r.fulfill({json:{pending:[],allowlist:[]}});return;}
+  if(path.endsWith('/targets')){await r.fulfill({json:{targets:[{windowId:7,ownerPid:9,bundleId:'test.app',name:'Fixture app',path:'/fixture'}]}});return;}
+  if(path.endsWith('/settings')){const b=r.request().postDataJSON();proactive=b.proactive;reactions=b.reactions;}
+  if(path.endsWith('/start'))active=true;
+  if(path.endsWith('/stop'))active=false;
+  if(path.endsWith('/frame')){expect(active).toBe(true);frames++;}
+  await r.fulfill({json:{active,plugin:'computer',observing:active,generation:23,proactive,reactions}});
  });
  await bootChat(page);await openExtensionTab(page,'插件');
- await page.getByRole('button',{name:'选择共享画面',exact:true}).click();
+ const open=async()=>{await page.locator('.extension-card').filter({hasText:'桌面陪伴'}).getByRole('button',{name:'配置',exact:true}).click();};
+ await open();let modal=page.getByRole('dialog',{name:'桌面陪伴'});
+ await modal.getByRole('button',{name:'查找窗口'}).click();await modal.getByRole('combobox').selectOption('7');await modal.getByRole('button',{name:'开启',exact:true}).click();
  await expect.poll(()=>frames).toBeGreaterThan(0);
- await gotoRoute(page,'chat');
- const before=frames;await expect.poll(()=>frames).toBeGreaterThan(before);
- await openExtensionTab(page,'插件');
- await page.getByRole('button',{name:'停止观察',exact:true}).click();
- await expect.poll(()=>observing).toBe(false);
- expect(await page.evaluate(()=>(window as unknown as {fixtureScreen:MediaStream}).fixtureScreen.getTracks().every(track=>track.readyState==='ended'))).toBe(true);
+ await modal.getByRole('switch',{name:'主动发言'}).click();await expect.poll(()=>proactive).toBe(true);
+ await modal.getByRole('button',{name:'关闭配置'}).click();await gotoRoute(page,'chat');const before=frames;await expect.poll(()=>frames).toBeGreaterThan(before);
+ await openExtensionTab(page,'插件');await open();modal=page.getByRole('dialog',{name:'桌面陪伴'});await modal.getByRole('button',{name:'关闭',exact:true}).click();await expect.poll(()=>active).toBe(false);
 });

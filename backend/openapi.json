@@ -183,6 +183,52 @@
         "title": "Ask",
         "type": "object"
       },
+      "Attach": {
+        "properties": {
+          "account": {
+            "title": "Account",
+            "type": "string"
+          },
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          },
+          "permissions": {
+            "items": {
+              "enum": [
+                "game.observe",
+                "game.chat",
+                "game.move"
+              ],
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "sessionId": {
+            "title": "Sessionid",
+            "type": "string"
+          },
+          "world": {
+            "title": "World",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId",
+          "sessionId",
+          "world",
+          "account",
+          "permissions"
+        ],
+        "title": "Attach",
+        "type": "object"
+      },
       "AttentionIn": {
         "properties": {
           "action": {
@@ -696,6 +742,52 @@
         "title": "ControlIn",
         "type": "object"
       },
+      "Decision": {
+        "properties": {
+          "capabilities": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "observe",
+                    "interact"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capabilities"
+          },
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "decision": {
+            "enum": [
+              "once",
+              "always",
+              "deny"
+            ],
+            "title": "Decision",
+            "type": "string"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId",
+          "decision"
+        ],
+        "title": "Decision",
+        "type": "object"
+      },
       "FaceIn": {
         "properties": {
           "intensity": {
@@ -732,6 +824,19 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Install": {
+        "properties": {
+          "instancePath": {
+            "title": "Instancepath",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instancePath"
+        ],
+        "title": "Install",
         "type": "object"
       },
       "InterruptIn": {
@@ -861,66 +966,6 @@
           "messages"
         ],
         "title": "LiveTranscript",
-        "type": "object"
-      },
-      "Login": {
-        "properties": {
-          "clientId": {
-            "maxLength": 36,
-            "minLength": 36,
-            "title": "Clientid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "clientId"
-        ],
-        "title": "Login",
-        "type": "object"
-      },
-      "ManagedStart": {
-        "properties": {
-          "clientId": {
-            "title": "Clientid",
-            "type": "string"
-          },
-          "leaseId": {
-            "title": "Leaseid",
-            "type": "string"
-          },
-          "permissions": {
-            "items": {
-              "enum": [
-                "game.observe",
-                "game.chat",
-                "game.move"
-              ],
-              "type": "string"
-            },
-            "title": "Permissions",
-            "type": "array"
-          },
-          "server": {
-            "maxLength": 253,
-            "minLength": 1,
-            "title": "Server",
-            "type": "string"
-          },
-          "world": {
-            "maxLength": 200,
-            "minLength": 1,
-            "title": "World",
-            "type": "string"
-          }
-        },
-        "required": [
-          "clientId",
-          "leaseId",
-          "server",
-          "world",
-          "permissions"
-        ],
-        "title": "ManagedStart",
         "type": "object"
       },
       "Memory": {
@@ -1204,25 +1249,6 @@
           }
         },
         "title": "PermissionIn",
-        "type": "object"
-      },
-      "Prepare": {
-        "properties": {
-          "resources": {
-            "anyOf": [
-              {
-                "maxLength": 2000,
-                "minLength": 1,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Resources"
-          }
-        },
-        "title": "Prepare",
         "type": "object"
       },
       "PresentationAckIn": {
@@ -1551,6 +1577,40 @@
         "title": "ReplayIn",
         "type": "object"
       },
+      "Resume": {
+        "properties": {
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          },
+          "plugin": {
+            "default": "computer",
+            "enum": [
+              "computer",
+              "browser"
+            ],
+            "title": "Plugin",
+            "type": "string"
+          },
+          "requestId": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Requestid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId",
+          "requestId"
+        ],
+        "title": "Resume",
+        "type": "object"
+      },
       "RetiredWaitIn": {
         "additionalProperties": false,
         "properties": {
@@ -1858,6 +1918,29 @@
         "title": "StoredMessage",
         "type": "object"
       },
+      "Update": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "enum": [
+              "computer",
+              "browser",
+              "minecraft"
+            ],
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "enabled"
+        ],
+        "title": "Update",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -1896,6 +1979,24 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "app__api__app_permissions__Owner": {
+        "properties": {
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId"
+        ],
+        "title": "Owner",
         "type": "object"
       },
       "app__api__browser__Action": {
@@ -2101,6 +2202,84 @@
           "action"
         ],
         "title": "Action",
+        "type": "object"
+      },
+      "app__api__native_control__Owner": {
+        "properties": {
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          },
+          "plugin": {
+            "default": "computer",
+            "enum": [
+              "computer",
+              "browser"
+            ],
+            "title": "Plugin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId"
+        ],
+        "title": "Owner",
+        "type": "object"
+      },
+      "app__api__native_control__Start": {
+        "properties": {
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          },
+          "ownerPid": {
+            "exclusiveMinimum": 0.0,
+            "title": "Ownerpid",
+            "type": "integer"
+          },
+          "permissions": {
+            "items": {
+              "enum": [
+                "observe",
+                "interact"
+              ],
+              "type": "string"
+            },
+            "title": "Permissions",
+            "type": "array"
+          },
+          "plugin": {
+            "default": "computer",
+            "enum": [
+              "computer",
+              "browser"
+            ],
+            "title": "Plugin",
+            "type": "string"
+          },
+          "windowId": {
+            "exclusiveMinimum": 0.0,
+            "title": "Windowid",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId",
+          "windowId",
+          "ownerPid",
+          "permissions"
+        ],
+        "title": "Start",
         "type": "object"
       }
     }
@@ -2688,6 +2867,69 @@
         "summary": "Load Checkpoint"
       }
     },
+    "/api/computer/approvals": {
+      "get": {
+        "operationId": "status_api_computer_approvals_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status"
+      }
+    },
+    "/api/computer/approvals/{request_id}/decision": {
+      "post": {
+        "operationId": "decision_api_computer_approvals__request_id__decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decision"
+      }
+    },
     "/api/computer/ask": {
       "post": {
         "operationId": "ask_api_computer_ask_post",
@@ -2758,6 +3000,229 @@
           }
         },
         "summary": "Frames"
+      }
+    },
+    "/api/computer/native/frame": {
+      "post": {
+        "operationId": "frame_api_computer_native_frame_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__native_control__Owner"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Frame"
+      }
+    },
+    "/api/computer/native/resume": {
+      "post": {
+        "operationId": "resume_api_computer_native_resume_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Resume"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume"
+      }
+    },
+    "/api/computer/native/start": {
+      "post": {
+        "operationId": "start_api_computer_native_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__native_control__Start"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start"
+      }
+    },
+    "/api/computer/native/status": {
+      "get": {
+        "operationId": "status_api_computer_native_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status"
+      }
+    },
+    "/api/computer/native/stop": {
+      "post": {
+        "operationId": "stop_api_computer_native_stop_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stop"
+      }
+    },
+    "/api/computer/native/targets": {
+      "post": {
+        "operationId": "targets_api_computer_native_targets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__native_control__Owner"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Targets"
+      }
+    },
+    "/api/computer/permissions/{app_id}": {
+      "delete": {
+        "operationId": "remove_api_computer_permissions__app_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app_id",
+            "required": true,
+            "schema": {
+              "title": "App Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__app_permissions__Owner"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove"
       }
     },
     "/api/computer/react": {
@@ -2946,6 +3411,56 @@
           }
         },
         "summary": "Validate Data"
+      }
+    },
+    "/api/extensions/activities": {
+      "get": {
+        "operationId": "read_api_extensions_activities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read"
+      },
+      "patch": {
+        "operationId": "update_api_extensions_activities_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Update"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update"
       }
     },
     "/api/extensions/plugins": {
@@ -3821,14 +4336,14 @@
         "summary": "Action"
       }
     },
-    "/api/minecraft/auth/begin": {
+    "/api/minecraft/attach": {
       "post": {
-        "operationId": "auth_begin_api_minecraft_auth_begin_post",
+        "operationId": "attach_api_minecraft_attach_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Login"
+                "$ref": "#/components/schemas/Attach"
               }
             }
           },
@@ -3854,39 +4369,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Auth Begin"
-      }
-    },
-    "/api/minecraft/auth/logout": {
-      "post": {
-        "operationId": "auth_logout_api_minecraft_auth_logout_post",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Auth Logout"
-      }
-    },
-    "/api/minecraft/auth/poll": {
-      "post": {
-        "operationId": "auth_poll_api_minecraft_auth_poll_post",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Auth Poll"
+        "summary": "Attach"
       }
     },
     "/api/minecraft/connect": {
@@ -3925,14 +4408,14 @@
         "summary": "Connect"
       }
     },
-    "/api/minecraft/managed/prepare": {
+    "/api/minecraft/install": {
       "post": {
-        "operationId": "managed_prepare_api_minecraft_managed_prepare_post",
+        "operationId": "install_api_minecraft_install_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Prepare"
+                "$ref": "#/components/schemas/Install"
               }
             }
           },
@@ -3958,48 +4441,12 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Managed Prepare"
+        "summary": "Install"
       }
     },
-    "/api/minecraft/managed/start": {
-      "post": {
-        "operationId": "managed_start_api_minecraft_managed_start_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ManagedStart"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Managed Start"
-      }
-    },
-    "/api/minecraft/managed/status": {
+    "/api/minecraft/sessions": {
       "get": {
-        "operationId": "managed_status_api_minecraft_managed_status_get",
+        "operationId": "sessions_api_minecraft_sessions_get",
         "responses": {
           "200": {
             "content": {
@@ -4010,23 +4457,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Managed Status"
-      }
-    },
-    "/api/minecraft/managed/stop": {
-      "post": {
-        "operationId": "managed_stop_api_minecraft_managed_stop_post",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Managed Stop"
+        "summary": "Sessions"
       }
     },
     "/api/minecraft/status": {

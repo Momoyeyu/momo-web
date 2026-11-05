@@ -76,7 +76,10 @@ def test_oversize_page_never_reaches_renderer():
         runtime.host.request.assert_not_called()
 
 
-def test_internal_tool_can_present_its_own_preamble_only():
+def test_internal_tool_can_present_its_own_preamble_only(tmp_path, monkeypatch):
+    from app.services import activities
+    monkeypatch.setattr(activities.state, "DATA_DIR", tmp_path)
+    activities.set_enabled("browser", True)
     from app.services.computer import computer
     from app.services.minecraft import minecraft
     b=Browser()

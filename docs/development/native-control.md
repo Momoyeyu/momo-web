@@ -1,0 +1,9 @@
+# Existing application control
+
+NativeControl controls an explicitly selected existing macOS window. It does not launch a browser, game, shell, or separate environment. AIRI's local executor approach (NSWorkspace/CGWindowList and Quartz Unicode events) is adapted under MIT; revision and attribution live beside the fixed Swift source.
+
+Build using `python3 scripts/build-native-control.py --sdk /Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk --output .workbuddy/native-control/control`. The installed compiler currently matches 26.5 rather than the default 27 SDK. Set `MOMO_NATIVE_CONTROL_EXECUTABLE` to the compiled resource; production must package the matching signed helper, not compile during interaction.
+
+Host calls: `native.targets`, `native.start` (windowId, ownerPid, permissions, permit), `native.observe` (bindingId, permit), `native.action` (bindingId, command, version, permit), `native.stop`. Start and actions verify coordinator permits. Target identity binds bundle ID, canonical app path, PID and window ID. Every input rechecks foreground, identity and window bounds. Inputs are bounded click/Unicode text/scroll; no shell, arbitrary scripts, key chords or Enter. Events are posted to the selected PID, not a global keyboard stream. Stop kills only owned short-lived helpers and waits for exit. The policy is application authorization, **not OS isolation of the user's application**.
+
+Observed smoke: helper compiled; actual native window inventory returned 10 windows, screen capture permission true, Accessibility input permission false. No private screenshot or real input performed. Broker tests verify fresh observations, identity changes, moved windows and cancellation racing a late start. Real input smoke requires Accessibility permission and an approved harmless target. Permissions must not be bypassed.

@@ -30,6 +30,9 @@ class Minecraft:
         return {**result, 'generation': self.generation, 'permissions': sorted(self.permissions), 'managedProvisioningAvailable': False}
 
     def gate(self, client, lease):
+        from .activities import require_enabled
+        try: require_enabled('minecraft')
+        except ValueError as error: raise MinecraftError(str(error)) from None
         if client is None:
             from .computer_tools import require_local
             require_local()
@@ -38,7 +41,8 @@ class Minecraft:
             raise MinecraftError('Minecraft attention unavailable')
         from .computer import computer
         from .browser import browser
-        if (runtime.active and client is not None) or computer.observing or browser.permissions:
+        from .native_control import native_control
+        if (runtime.active and client is not None) or computer.observing or browser.permissions or native_control.target or native_control.stopping or native_control.stop_unconfirmed:
             raise MinecraftError('Another activity owns attention')
         cfg = state.load()['settings']['llm']
         vision.require_enabled(cfg)

@@ -29,6 +29,9 @@ class Browser:
         return {**result,'generation':self.generation,'permissions':sorted(self.permissions),'networkAvailable':False,'allowedHosts':list(self.allowedHosts)}
 
     def gate(self, client, lease):
+        from .activities import require_enabled
+        try: require_enabled('browser')
+        except ValueError as error: raise BrowserError(str(error)) from None
         run_id = None
         if client is None:
             from .computer_tools import require_local

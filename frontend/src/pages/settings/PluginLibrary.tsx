@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {useT} from '../../i18n';
 import {apiJson,jsonInit} from '../../services/http';
-import {CARD_PAGE_SIZE,clampPage} from '../../lib/paging';
+import {clampPage} from '../../lib/paging';
 import Button from '../../ui/Button';
 import Hint from '../../ui/Hint';
 import Modal from '../../ui/Modal';
@@ -21,13 +21,13 @@ export default function PluginLibrary({active}:{active:boolean}){
  const [review,setReview]=useState<Installed|null>(null),[removing,setRemoving]=useState<Installed|null>(null);
  const refresh=async()=>{const result=await apiJson<{plugins:Installed[]}>(endpoint);setPlugins(result.plugins);setLoaded(true);};
  useEffect(()=>{if(!active)return;const controller=new AbortController();void apiJson<{plugins:Installed[]}>(endpoint,{signal:controller.signal}).then(result=>{if(!controller.signal.aborted){setPlugins(result.plugins);setLoaded(true);}}).catch(()=>{if(!controller.signal.aborted)setError('plugins.error');});return()=>controller.abort();},[active]);
- useEffect(()=>{if(active)toolbar.current?.scrollIntoView({block:'nearest'});},[page,query,active]);
+
  const run=async(action:()=>Promise<unknown>)=>{if(busy)return;setBusy(true);setError('');try{await action();await refresh();setReview(null);setRemoving(null);}catch{setError('plugins.error');try{await refresh();}catch{/* Retain the action error. */}}finally{setBusy(false);}};
  const importFile=async(input:File)=>{if(input.size>2*1024*1024){setError('plugins.fileLarge');return;}await run(async()=>apiJson(endpoint,jsonInit('POST',JSON.parse(await input.text()))));};
  const needle=query.trim().toLocaleLowerCase();
  const rows:[string,Installed|null][]=[['official-qq',null],['official-computer',null],['official-browser',null],['official-minecraft',null],...plugins.map(item=>[item.manifest.id,item] as [string,Installed])];
  const matches=rows.filter(([id,item])=>(item?`${item.manifest.name} ${item.manifest.id}`:id==='official-qq'?'QQ':t(id==='official-computer'?'computer.title':id==='official-browser'?'browser.title':'minecraft.title')).toLocaleLowerCase().includes(needle));
- const paging=clampPage(page,matches.length,CARD_PAGE_SIZE),shown=matches.slice(paging.page*CARD_PAGE_SIZE,(paging.page+1)*CARD_PAGE_SIZE);
+ const paging=clampPage(page,matches.length,4),shown=matches.slice(paging.page*4,(paging.page+1)*4);
  return <section className="plugin-library panel panel-stack">
   <div className="panel-title-row"><h3 className="opt-group">{t('plugins.title')}</h3><Hint text={t('plugins.importHint')} side="down"/></div>
   <div ref={toolbar} className="list-toolbar plugin-library-toolbar"><input className="list-search" aria-label={t('plugins.search')} placeholder={t('plugins.search')} value={query} onChange={e=>{setQuery(e.target.value);setPage(0);}}/><Button disabled={busy} onClick={()=>file.current?.click()}>{t('plugins.importFile')}</Button><input ref={file} type="file" accept=".json,application/json" hidden onChange={e=>{const selected=e.target.files?.[0];e.target.value='';if(selected)void importFile(selected);}}/></div>
