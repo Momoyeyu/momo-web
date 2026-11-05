@@ -176,3 +176,20 @@ def test_music_mood_is_bounded_and_not_spoken():
         assert allowed_act(acts[0],None)=={}
     assert parse('<|ACT {"mood":"https://example.com/audio"}|>Hello')==('Hello',[])
     assert parse('<|ACT {"mood":[],"expression":null}|>')[1]==[{'expression':None}]
+
+
+def test_explicit_music_commands_are_bounded_local_and_hidden():
+    from app.core.performance import allowed_act, MUSIC_COMMANDS
+    from app.services.prompt import build_system_prompt
+    from app.core.state import normalize_state
+    presentation = {'expressions': [], 'motions': []}
+    for command in MUSIC_COMMANDS:
+        plain, acts = parse('<|ACT {"music":"'+command+'"}|>Okay.')
+        assert plain == 'Okay.' and acts == [{'music': command}]
+        assert allowed_act(acts[0], presentation) == acts[0]
+        assert allowed_act(acts[0], None) == {}
+    for value in ('[]', '"https://example.com/music"', '123'):
+        assert parse('<|ACT {"music":'+value+'}|>Hi') == ('Hi', [])
+    prompt = build_system_prompt(normalize_state({}), [], presentation)
+    assert 'You CAN control' in prompt and '"music":"next"' in prompt
+    assert 'You CAN control' not in build_system_prompt(normalize_state({}), [], None)

@@ -25,3 +25,8 @@ describe("presentation cursor", () => {
     expect(result.cues[0]).toMatchObject({ expression: null, motion: "Idle/2" });
   });
 });
+it('retains music commands alongside simultaneous expression and mood channels',()=>{
+ const result=dueCues([{id:'music',offset:0,music:'next'},{id:'mood',offset:0,mood:'quiet'},{id:'face',offset:0,expression:null}],0,0,5);
+ expect(result.cues).toHaveLength(1);expect(result.cues[0]).toMatchObject({music:'next',mood:'quiet',expression:null});
+ expect(dueCues([],result.next,1,5).cues).toEqual([]);
+});

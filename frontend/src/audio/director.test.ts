@@ -13,3 +13,17 @@ it('requires two distinct consistent dialogue turns and minimum residence',()=>{
 it('serious comfort overrides bright music without letting remote/unknown cues act',()=>{
  const chosen:string[]=[];const d=new MusicDirector(id=>chosen.push(id),()=>70000,()=>12);d.page('chat',false);d.cue('https://evil.example/music','x');d.cue('comfort','a');expect(chosen).toEqual(['daily','comfort']);d.page('settings',false);d.cue('bright','b');d.cue('bright','c');expect(chosen.at(-1)).toBe('comfort');
 });
+it('explicit music requests switch immediately, deduplicate and persist until auto',()=>{
+ const chosen:string[]=[];let now=0;const d=new MusicDirector(id=>chosen.push(id),()=>now,()=>12);d.page('chat',false);
+ d.command('next','a');expect(chosen.at(-1)).toBe('night');d.command('next','a');expect(chosen).toHaveLength(2);
+ now=120000;d.cue('comfort','b');expect(chosen.at(-1)).toBe('night');
+ d.command('title','c');d.page('log',false);d.page('chat',false);expect(chosen.at(-1)).toBe('title');
+ d.command('auto','d');expect(chosen.at(-1)).toBe('daily');d.cue('comfort','e');expect(chosen.at(-1)).toBe('comfort');
+ d.page('title',false);d.page('chat',false);expect(chosen.at(-1)).toBe('daily');
+});
+it('rejects unknown, subpage and intro music commands',()=>{
+ const chosen:string[]=[];const d=new MusicDirector(id=>chosen.push(id),()=>0,()=>12);
+ d.command('next','a');d.page('chat',true);d.command('next','b');expect(chosen).toEqual(['connection']);
+ d.page('chat',false);d.command('https://example.com','c');d.command({},'d');expect(chosen.at(-1)).toBe('daily');
+ d.page('settings',false);d.command('night','e');expect(chosen.at(-1)).toBe('daily');
+});

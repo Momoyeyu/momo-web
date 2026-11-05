@@ -272,6 +272,7 @@ class PerformanceCue(TypedDict):
     id: str
     offset: int
     expression: NotRequired[ExpressionCue | None]
+    music: NotRequired[Literal["next", "auto", "title", "connection", "daily", "night", "uplift", "comfort"]]
     mood: NotRequired[Literal["neutral", "bright", "quiet", "comfort"]]
     motion: NotRequired[str]
 

@@ -11,6 +11,7 @@ import math
 from typing import Any
 
 PREFIX = '<|ACT '
+MUSIC_COMMANDS = ('next', 'auto', 'title', 'connection', 'daily', 'night', 'uplift', 'comfort')
 LIMIT = 2048
 log = logging.getLogger(__name__)
 
@@ -31,6 +32,8 @@ def normalize_act(value: Any) -> dict[str, Any]:
                 result['expression'] = {'name': exp['name'], 'intensity': max(0.0, min(1.0, intensity))}
                 if duration is not None:
                     result['expression']['duration'] = duration
+    if value.get('music') in MUSIC_COMMANDS:
+        result['music'] = value['music']
     if value.get('mood') in ('neutral', 'bright', 'quiet', 'comfort'):
         result['mood'] = value['mood']
     motion = value.get('motion')
@@ -116,6 +119,8 @@ def allowed_act(payload: dict, presentation: dict | None) -> dict:
     if not presentation:
         return {}
     result = {}
+    if payload.get('music') in MUSIC_COMMANDS:
+        result['music'] = payload['music']
     if payload.get('mood') in ('neutral', 'bright', 'quiet', 'comfort'):
         result['mood'] = payload['mood']
     if 'expression' in payload:

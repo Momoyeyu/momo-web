@@ -1014,6 +1014,7 @@ export class ChatEngine {
   }
 
   private fireCue(cue: PerformanceCue, turn: Turn): void {
+    if(turn.presentation && this.sceneActive && cue.music)musicDirector.command(cue.music,turn.id);
     if(turn.presentation && this.sceneActive && cue.mood)musicDirector.cue(cue.mood,turn.id);
     if (turn.presentation) this.tryStage((st) => st.applyCue(cue, turn.id, turn.presentation!.revision));
   }

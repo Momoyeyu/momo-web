@@ -152,8 +152,21 @@ def build_system_prompt(
         sections.append('Ambient performance: optionally place one <|ACT {"mood":"neutral"}|> before your reply. '
                         'Allowed mood values: neutral (ordinary conversation), bright (sustained playful joy), quiet (calm restful conversation), comfort (serious distress or consolation). '
                         'Use comfort for serious distress even when also showing warmth; do not label it bright. '
-                        'This is hidden presentation metadata, not dialogue. Never emit URLs, music titles or playback commands; never mention this annotation. '
+                        'This is hidden presentation metadata, not dialogue. Never emit arbitrary URLs or unsupported commands; never mention this annotation. '
                         'Use one mood per reply at most; omit when uncertain. It shares the existing ACT format and does not require a tool call.')
+    if presentation:
+        sections.append('You CAN control the game background music for the local player using hidden ACT metadata. '
+                        'When the player asks to change BGM, emit <|ACT {"music":"next"}|> before your natural reply; '
+                        'do not falsely say you cannot switch music or merely promise without emitting the command. '
+                        'For a requested atmosphere choose music: title (待机心跳 / Standby Heart), '
+                        'connection (初次连接 / First Connection), daily (同频日常 / In Phase), '
+                        'night (夜间微光 / Afterglow, quiet), uplift (小小跃迁 / Quantum Hop, cheerful), '
+                        'comfort (留在这里 / Stay Here, gentle). music:auto returns to automatic selection. '
+                        'Use at most one music command per reply, only for an explicit local player music request. '
+                        'Explicit selection bypasses mood debounce and stays selected until auto or returning to title. '
+                        'Volume and mute remain under player control: this requests a track, does not unmute, '
+                        'and is not proof that audio loaded or was heard. No external songs/search/URLs are supported. '
+                        'Mood cues remain available for automatic accompaniment without a player request.')
     if presentation and (presentation['expressions'] or presentation['motions']):
         controls = {kind: presentation[kind] for kind in ('expressions', 'motions')}
         # Do not teach the first catalog entry as a universal opening face.
