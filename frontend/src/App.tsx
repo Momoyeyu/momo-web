@@ -1,3 +1,5 @@
+import {musicDirector} from './audio/director';
+import {useIntro} from './services/introClient';
 import {ambient} from './audio/ambient';
 import {enterMeeting,leaveMeeting,meetingSnapshot,subscribeMeeting,storedMeetingIdentity,refreshAttention,type AttentionState} from "./services/meetingClient";
 import {getChatEngine,loadTranscript} from "./chat/engineInstance";
@@ -56,9 +58,10 @@ function renderPage(route: Route, active: boolean, attention:AttentionState,onHo
 
 export default function App({ready, onPrepared}: {ready: boolean; onPrepared: () => void}) {
   const route = useRoute();
+  const audioIntro=useIntro().data?.phase;
   useEffect(()=>ambient.install(),[]);
   useEffect(()=>{const sync=()=>ambient.configure(getSettings().general);sync();return subscribe(sync);},[]);
-  useEffect(()=>{if(route==='title'||route==='chat')ambient.scene(route==='title'?'title':'daily');},[route]);
+  useEffect(()=>{musicDirector.page(route,!!audioIntro&&['naming','memory','return_title','celebration'].includes(audioIntro));},[route,audioIntro]);
   const t = useT();
   const meeting = useSyncExternalStore(subscribeMeeting,meetingSnapshot);
   const [syncedLease,setSyncedLease]=useState<string|null>(null);

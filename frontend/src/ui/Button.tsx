@@ -10,7 +10,7 @@ import type { ButtonHTMLAttributes } from "react";
 import "../styles/controls.css";
 
 export default function Button({
-  sound,
+  sound="tap",
   onClick,
   variant = "solid",
   size = "md",
@@ -19,7 +19,7 @@ export default function Button({
   ...rest
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   /** solid = 实心主按钮（默认）；ghost = 描边次按钮。 */
-  sound?: Sound;
+  sound?: Sound | false;
   variant?: "solid" | "ghost";
   /** md = 默认尺寸；sm = 卡片/行内小按钮（原 `small`）。 */
   size?: "md" | "sm";
@@ -38,5 +38,5 @@ export default function Button({
   ]
     .filter(Boolean)
     .join(" ");
-  return <button type={type} className={cls || undefined} {...rest} onClick={e=>{onClick?.(e);if(sound&&!e.defaultPrevented)ambient.sound(sound);}} />;
+  return <button type={type} className={cls || undefined} {...rest} onClick={e=>{onClick?.(e);if(sound&&onClick&&!e.defaultPrevented)ambient.sound(sound);}} />;
 }

@@ -55,7 +55,7 @@ export default function Settings() {
             style={{ transform: `translateX(${idx * 100}%)` }}
           />
           {TABS.map((id) => (
-            <Button
+            <Button sound={tab===id?false:"confirm"}
               key={id}
               data-intro={`tab-${id}`}
               className={`stab${tab === id ? " active" : ""}`}

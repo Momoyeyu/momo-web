@@ -21,5 +21,5 @@ test('original audio assets decode and loop in real Web Audio',async({page})=>{
   for(const track of Object.values(manifest.music) as {file:string;frames:number;sampleRate:number}[]){const b=await c.decodeAudioData(await(await fetch('/audio/'+track.file)).arrayBuffer());const source=c.createBufferSource();source.buffer=b;source.loop=true;source.connect(c.destination);results.push({duration:b.duration,expected:track.frames/track.sampleRate,channels:b.numberOfChannels});}
   await c.close();return results;
  });
- expect(result).toHaveLength(2);for(const r of result){expect(Math.abs(r.duration-r.expected)).toBeLessThan(.001);expect(r.channels).toBe(2);}
+ expect(result).toHaveLength(6);for(const r of result){expect(Math.abs(r.duration-r.expected)).toBeLessThan(.001);expect(r.channels).toBe(2);}
 });

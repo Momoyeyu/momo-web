@@ -37,6 +37,9 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const lastActivity=data?.lastActivity;
  const lastApp=phoneAppFor(lastActivity??null);
  const seenActivity=useRef('');
+ const pendingSound=useRef<number|null>(null);
+ const lastNotify=useRef(-Infinity);
+ useEffect(()=>{if(data){if(active&&pendingSound.current!==null&&data.pending>pendingSound.current&&performance.now()-lastNotify.current>5000){ambient.sound('notify');lastNotify.current=performance.now();}pendingSound.current=data.pending;}},[data?.pending,active]);
  useEffect(()=>{
   if(session.lease!==lease){session={lease,open:false,suppressed:false,app:null};revision.current++;accountRef.current='';seenActivity.current='';setOlder([]);setCursor(undefined);setOpen(false);setApp(null);setPeer(undefined);setData(null);}
  },[lease]);

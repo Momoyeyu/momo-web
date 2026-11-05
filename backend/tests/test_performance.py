@@ -164,3 +164,15 @@ def test_catalog_keeps_visual_fact_separate_from_context_and_uses_file_ids():
     assert "visual appearance" in prompt and "usage context" in prompt
     assert "右手抬起左右摆动" in prompt and "欢迎；安慰时避免" in prompt
     assert "motions/wave.motion3.json" in prompt
+
+
+def test_music_mood_is_bounded_and_not_spoken():
+    from app.core.performance import allowed_act
+    presentation={'expressions':[], 'motions':[]}
+    for mood in ('neutral','bright','quiet','comfort'):
+        plain, acts=parse('<|ACT {"mood":"'+mood+'"}|>I am here.')
+        assert plain=='I am here.' and acts==[{'mood':mood}]
+        assert allowed_act(acts[0],presentation)=={'mood':mood}
+        assert allowed_act(acts[0],None)=={}
+    assert parse('<|ACT {"mood":"https://example.com/audio"}|>Hello')==('Hello',[])
+    assert parse('<|ACT {"mood":[],"expression":null}|>')[1]==[{'expression':None}]

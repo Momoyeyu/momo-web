@@ -8,7 +8,7 @@ export function dueCues(cues: PerformanceCue[], from: number, reveal: number, le
     const cue = cues[next];
     if (!Number.isInteger(cue.offset) || cue.offset < 0 || cue.offset > length) { next++; continue; }
     if (Math.floor(reveal) < cue.offset) break;
-    combined = { ...(combined ?? {}), id: cue.id, offset: cue.offset, ...("expression" in cue ? { expression: cue.expression } : {}), ...(cue.motion ? { motion: cue.motion } : {}) };
+    combined = { ...(combined ?? {}), id: cue.id, offset: cue.offset, ...("expression" in cue ? { expression: cue.expression } : {}), ...(cue.motion ? { motion: cue.motion } : {}), ...(cue.mood ? {mood:cue.mood}: {}) };
     next++;
   }
   return { next, cues: combined ? [combined] : [] };

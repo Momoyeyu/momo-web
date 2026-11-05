@@ -1,3 +1,4 @@
+import {ambient} from '../audio/ambient';
 // 自绘下拉选择：原生 <select> 的默认弹层与整页设计语言脱节。
 // 结构 = 值框（描边圆角 + 右端箭头）+ 浮层选项列（选中左侧金条、悬停浅金底）。
 // 交互：点击开合；外点/Esc 关；↑↓ 移动高亮，Enter 选定。
@@ -82,6 +83,7 @@ export default function Select({
 
   const pick = (v: string): void => {
     onChange(v);
+    if(v!==value)ambient.sound("tap");
     setOpen(false);
   };
 

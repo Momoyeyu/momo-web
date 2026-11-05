@@ -1,5 +1,5 @@
 export interface ExpressionRequest { name: string; intensity: number; duration?: number }
-export interface PerformanceCue { id: string; offset: number; expression?: ExpressionRequest | null; motion?: string }
+export interface PerformanceCue { mood?: "neutral"|"bright"|"quiet"|"comfort"; id: string; offset: number; expression?: ExpressionRequest | null; motion?: string }
 export interface ControlResource { name: string; desc: string; label?: string; context?: string; duration?: number; enabled?: boolean }
 export interface PresentationSnapshot {
   avatarId: string; revision: string;

@@ -1,7 +1,14 @@
 {
-  "version": 1,
-  "status": "original listening drafts; not mastered OST",
+  "version": 2,
+  "status": "complete first production version; listening acceptance pending",
   "sfx": {
+    "warm/tap": {
+      "file": "warm-tap.wav",
+      "frames": 1800,
+      "sampleRate": 24000,
+      "peak": 0.10099,
+      "rms": 0.04731
+    },
     "warm/confirm": {
       "file": "warm-confirm.wav",
       "frames": 4680,
@@ -71,6 +78,13 @@
       "sampleRate": 24000,
       "peak": 0.21847,
       "rms": 0.08026
+    },
+    "glass/tap": {
+      "file": "glass-tap.wav",
+      "frames": 1800,
+      "sampleRate": 24000,
+      "peak": 0.06312,
+      "rms": 0.02957
     },
     "glass/confirm": {
       "file": "glass-confirm.wav",
@@ -146,29 +160,557 @@
   "music": {
     "title": {
       "file": "title.wav",
-      "frames": 1212632,
-      "sampleRate": 24000,
-      "peak": 0.23892,
-      "rms": 0.04475,
+      "title": "\u5f85\u673a\u5fc3\u8df3",
+      "titleEn": "Standby Heart",
       "bpm": 76,
-      "beatsPerBar": 4,
-      "loopStart": 0,
-      "loopEnd": 1212632,
       "key": "D major",
-      "bars": 16
+      "bars": 32,
+      "beatsPerBar": 4,
+      "sampleRate": 24000,
+      "frames": 2425263,
+      "loopStart": 0,
+      "loopEnd": 2425263,
+      "peak": 0.3229465186595917,
+      "rms": 0.06499999761581421,
+      "seam": 0.0049669984728097916,
+      "switchBars": [
+        0,
+        4,
+        8,
+        12,
+        16,
+        20,
+        24,
+        28
+      ],
+      "ostSeconds": 155.5789375,
+      "loudness": {
+        "input_i": "-21.65",
+        "input_tp": "-9.13",
+        "input_lra": "4.50",
+        "input_thresh": "-31.92",
+        "output_i": "-23.03",
+        "output_tp": "-10.30",
+        "output_lra": "5.00",
+        "output_thresh": "-33.21",
+        "normalization_type": "dynamic",
+        "target_offset": "0.03"
+      }
+    },
+    "connection": {
+      "file": "connection.wav",
+      "title": "\u521d\u6b21\u8fde\u63a5",
+      "titleEn": "First Connection",
+      "bpm": 76,
+      "key": "D major",
+      "bars": 32,
+      "beatsPerBar": 4,
+      "sampleRate": 24000,
+      "frames": 2425263,
+      "loopStart": 0,
+      "loopEnd": 2425263,
+      "peak": 0.3436771631240845,
+      "rms": 0.0650000050663948,
+      "seam": 0.004971757531166077,
+      "switchBars": [
+        0,
+        4,
+        8,
+        12,
+        16,
+        20,
+        24,
+        28
+      ],
+      "ostSeconds": 155.5789375,
+      "loudness": {
+        "input_i": "-21.57",
+        "input_tp": "-8.80",
+        "input_lra": "4.40",
+        "input_thresh": "-31.84",
+        "output_i": "-23.05",
+        "output_tp": "-10.31",
+        "output_lra": "5.00",
+        "output_thresh": "-33.22",
+        "normalization_type": "dynamic",
+        "target_offset": "0.05"
+      }
     },
     "daily": {
       "file": "daily.wav",
-      "frames": 1097143,
-      "sampleRate": 24000,
-      "peak": 0.23727,
-      "rms": 0.04701,
+      "title": "\u540c\u9891\u65e5\u5e38",
+      "titleEn": "In Phase",
       "bpm": 84,
-      "beatsPerBar": 4,
-      "loopStart": 0,
-      "loopEnd": 1097143,
       "key": "D major",
-      "bars": 16
+      "bars": 32,
+      "beatsPerBar": 4,
+      "sampleRate": 24000,
+      "frames": 2194286,
+      "loopStart": 0,
+      "loopEnd": 2194286,
+      "peak": 0.33496302366256714,
+      "rms": 0.06499999761581421,
+      "seam": 0.0007875114679336548,
+      "switchBars": [
+        0,
+        4,
+        8,
+        12,
+        16,
+        20,
+        24,
+        28
+      ],
+      "ostSeconds": 141.14285416666667,
+      "loudness": {
+        "input_i": "-21.66",
+        "input_tp": "-8.93",
+        "input_lra": "4.40",
+        "input_thresh": "-31.92",
+        "output_i": "-23.10",
+        "output_tp": "-10.38",
+        "output_lra": "4.50",
+        "output_thresh": "-33.27",
+        "normalization_type": "dynamic",
+        "target_offset": "0.10"
+      }
+    },
+    "night": {
+      "file": "night.wav",
+      "title": "\u591c\u95f4\u5fae\u5149",
+      "titleEn": "Afterglow",
+      "bpm": 64,
+      "key": "B minor",
+      "bars": 32,
+      "beatsPerBar": 4,
+      "sampleRate": 24000,
+      "frames": 2880000,
+      "loopStart": 0,
+      "loopEnd": 2880000,
+      "peak": 0.33530718088150024,
+      "rms": 0.06499999761581421,
+      "seam": 0.002294624224305153,
+      "switchBars": [
+        0,
+        4,
+        8,
+        12,
+        16,
+        20,
+        24,
+        28
+      ],
+      "ostSeconds": 184.0,
+      "loudness": {
+        "input_i": "-21.98",
+        "input_tp": "-8.84",
+        "input_lra": "4.90",
+        "input_thresh": "-32.25",
+        "output_i": "-23.38",
+        "output_tp": "-10.17",
+        "output_lra": "4.90",
+        "output_thresh": "-33.54",
+        "normalization_type": "dynamic",
+        "target_offset": "0.38"
+      }
+    },
+    "uplift": {
+      "file": "uplift.wav",
+      "title": "\u5c0f\u5c0f\u8dc3\u8fc1",
+      "titleEn": "Quantum Hop",
+      "bpm": 96,
+      "key": "D major",
+      "bars": 32,
+      "beatsPerBar": 4,
+      "sampleRate": 24000,
+      "frames": 1920000,
+      "loopStart": 0,
+      "loopEnd": 1920000,
+      "peak": 0.30146926641464233,
+      "rms": 0.0650000050663948,
+      "seam": 0.00901716947555542,
+      "switchBars": [
+        0,
+        4,
+        8,
+        12,
+        16,
+        20,
+        24,
+        28
+      ],
+      "ostSeconds": 124.0,
+      "loudness": {
+        "input_i": "-21.84",
+        "input_tp": "-9.81",
+        "input_lra": "5.20",
+        "input_thresh": "-32.13",
+        "output_i": "-23.04",
+        "output_tp": "-10.65",
+        "output_lra": "5.90",
+        "output_thresh": "-33.25",
+        "normalization_type": "dynamic",
+        "target_offset": "0.04"
+      }
+    },
+    "comfort": {
+      "file": "comfort.wav",
+      "title": "\u7559\u5728\u8fd9\u91cc",
+      "titleEn": "Stay Here",
+      "bpm": 68,
+      "key": "D major",
+      "bars": 32,
+      "beatsPerBar": 4,
+      "sampleRate": 24000,
+      "frames": 2710588,
+      "loopStart": 0,
+      "loopEnd": 2710588,
+      "peak": 0.3571164011955261,
+      "rms": 0.06499999761581421,
+      "seam": 0.002285965718328953,
+      "switchBars": [
+        0,
+        4,
+        8,
+        12,
+        16,
+        20,
+        24,
+        28
+      ],
+      "ostSeconds": 173.41177083333332,
+      "loudness": {
+        "input_i": "-22.12",
+        "input_tp": "-8.36",
+        "input_lra": "3.70",
+        "input_thresh": "-32.36",
+        "output_i": "-23.27",
+        "output_tp": "-9.47",
+        "output_lra": "4.10",
+        "output_thresh": "-33.43",
+        "normalization_type": "dynamic",
+        "target_offset": "0.27"
+      }
     }
-  }
+  },
+  "album": [
+    {
+      "number": 1,
+      "id": "title",
+      "title": "\u5f85\u673a\u5fc3\u8df3",
+      "titleEn": "Standby Heart",
+      "seconds": 155.5789375,
+      "format": "48000 Hz / 16-bit PCM + lossless FLAC",
+      "sections": [
+        {
+          "section": "intro",
+          "startBar": 0,
+          "bars": 4
+        },
+        {
+          "section": "theme",
+          "startBar": 4,
+          "bars": 8
+        },
+        {
+          "section": "answer",
+          "startBar": 12,
+          "bars": 8
+        },
+        {
+          "section": "bridge",
+          "startBar": 20,
+          "bars": 8
+        },
+        {
+          "section": "return",
+          "startBar": 28,
+          "bars": 12
+        },
+        {
+          "section": "coda",
+          "startBar": 40,
+          "bars": 8
+        }
+      ],
+      "sha256": "21db44b74cc292c76ab3ce2edc44e9697c21764abd78dd6e028f8c8a426f9da5",
+      "qc": {
+        "input_i": "-21.65",
+        "input_tp": "-9.13",
+        "input_lra": "4.50",
+        "input_thresh": "-31.92",
+        "output_i": "-23.03",
+        "output_tp": "-10.30",
+        "output_lra": "5.00",
+        "output_thresh": "-33.21",
+        "normalization_type": "dynamic",
+        "target_offset": "0.03"
+      }
+    },
+    {
+      "number": 2,
+      "id": "connection",
+      "title": "\u521d\u6b21\u8fde\u63a5",
+      "titleEn": "First Connection",
+      "seconds": 155.5789375,
+      "format": "48000 Hz / 16-bit PCM + lossless FLAC",
+      "sections": [
+        {
+          "section": "intro",
+          "startBar": 0,
+          "bars": 4
+        },
+        {
+          "section": "theme",
+          "startBar": 4,
+          "bars": 8
+        },
+        {
+          "section": "answer",
+          "startBar": 12,
+          "bars": 8
+        },
+        {
+          "section": "bridge",
+          "startBar": 20,
+          "bars": 8
+        },
+        {
+          "section": "return",
+          "startBar": 28,
+          "bars": 12
+        },
+        {
+          "section": "coda",
+          "startBar": 40,
+          "bars": 8
+        }
+      ],
+      "sha256": "be4052b822bf8ed1b8c3c86022e479aeb96e10a2a8d197726cecf0a19e39d99f",
+      "qc": {
+        "input_i": "-21.57",
+        "input_tp": "-8.80",
+        "input_lra": "4.40",
+        "input_thresh": "-31.84",
+        "output_i": "-23.05",
+        "output_tp": "-10.31",
+        "output_lra": "5.00",
+        "output_thresh": "-33.22",
+        "normalization_type": "dynamic",
+        "target_offset": "0.05"
+      }
+    },
+    {
+      "number": 3,
+      "id": "daily",
+      "title": "\u540c\u9891\u65e5\u5e38",
+      "titleEn": "In Phase",
+      "seconds": 141.14285416666667,
+      "format": "48000 Hz / 16-bit PCM + lossless FLAC",
+      "sections": [
+        {
+          "section": "intro",
+          "startBar": 0,
+          "bars": 4
+        },
+        {
+          "section": "theme",
+          "startBar": 4,
+          "bars": 8
+        },
+        {
+          "section": "answer",
+          "startBar": 12,
+          "bars": 8
+        },
+        {
+          "section": "bridge",
+          "startBar": 20,
+          "bars": 8
+        },
+        {
+          "section": "return",
+          "startBar": 28,
+          "bars": 12
+        },
+        {
+          "section": "coda",
+          "startBar": 40,
+          "bars": 8
+        }
+      ],
+      "sha256": "b7b0d4c8ebf42dc6fd7ae97c25e98dc1d41c0c140b5c0935c7c1e9d3b2977146",
+      "qc": {
+        "input_i": "-21.66",
+        "input_tp": "-8.93",
+        "input_lra": "4.40",
+        "input_thresh": "-31.92",
+        "output_i": "-23.10",
+        "output_tp": "-10.38",
+        "output_lra": "4.50",
+        "output_thresh": "-33.27",
+        "normalization_type": "dynamic",
+        "target_offset": "0.10"
+      }
+    },
+    {
+      "number": 4,
+      "id": "night",
+      "title": "\u591c\u95f4\u5fae\u5149",
+      "titleEn": "Afterglow",
+      "seconds": 184.0,
+      "format": "48000 Hz / 16-bit PCM + lossless FLAC",
+      "sections": [
+        {
+          "section": "intro",
+          "startBar": 0,
+          "bars": 4
+        },
+        {
+          "section": "theme",
+          "startBar": 4,
+          "bars": 8
+        },
+        {
+          "section": "answer",
+          "startBar": 12,
+          "bars": 8
+        },
+        {
+          "section": "bridge",
+          "startBar": 20,
+          "bars": 8
+        },
+        {
+          "section": "return",
+          "startBar": 28,
+          "bars": 12
+        },
+        {
+          "section": "coda",
+          "startBar": 40,
+          "bars": 8
+        }
+      ],
+      "sha256": "aae8aaa578182925faad61bae19ec6dfadf928f6a15fb9ecc8a123eb00da755b",
+      "qc": {
+        "input_i": "-21.98",
+        "input_tp": "-8.84",
+        "input_lra": "4.90",
+        "input_thresh": "-32.25",
+        "output_i": "-23.38",
+        "output_tp": "-10.17",
+        "output_lra": "4.90",
+        "output_thresh": "-33.54",
+        "normalization_type": "dynamic",
+        "target_offset": "0.38"
+      }
+    },
+    {
+      "number": 5,
+      "id": "uplift",
+      "title": "\u5c0f\u5c0f\u8dc3\u8fc1",
+      "titleEn": "Quantum Hop",
+      "seconds": 124.0,
+      "format": "48000 Hz / 16-bit PCM + lossless FLAC",
+      "sections": [
+        {
+          "section": "intro",
+          "startBar": 0,
+          "bars": 4
+        },
+        {
+          "section": "theme",
+          "startBar": 4,
+          "bars": 8
+        },
+        {
+          "section": "answer",
+          "startBar": 12,
+          "bars": 8
+        },
+        {
+          "section": "bridge",
+          "startBar": 20,
+          "bars": 8
+        },
+        {
+          "section": "return",
+          "startBar": 28,
+          "bars": 12
+        },
+        {
+          "section": "coda",
+          "startBar": 40,
+          "bars": 8
+        }
+      ],
+      "sha256": "68ac460df9b2c2454510ec76cf5ed68dd62cd36fcfdf36c011800a0af564b6c7",
+      "qc": {
+        "input_i": "-21.84",
+        "input_tp": "-9.81",
+        "input_lra": "5.20",
+        "input_thresh": "-32.13",
+        "output_i": "-23.04",
+        "output_tp": "-10.65",
+        "output_lra": "5.90",
+        "output_thresh": "-33.25",
+        "normalization_type": "dynamic",
+        "target_offset": "0.04"
+      }
+    },
+    {
+      "number": 6,
+      "id": "comfort",
+      "title": "\u7559\u5728\u8fd9\u91cc",
+      "titleEn": "Stay Here",
+      "seconds": 173.41177083333332,
+      "format": "48000 Hz / 16-bit PCM + lossless FLAC",
+      "sections": [
+        {
+          "section": "intro",
+          "startBar": 0,
+          "bars": 4
+        },
+        {
+          "section": "theme",
+          "startBar": 4,
+          "bars": 8
+        },
+        {
+          "section": "answer",
+          "startBar": 12,
+          "bars": 8
+        },
+        {
+          "section": "bridge",
+          "startBar": 20,
+          "bars": 8
+        },
+        {
+          "section": "return",
+          "startBar": 28,
+          "bars": 12
+        },
+        {
+          "section": "coda",
+          "startBar": 40,
+          "bars": 8
+        }
+      ],
+      "sha256": "bfa917aebffa96325bcf68aac0afd67f1f122c3fce3e3616aa06595551f116a4",
+      "qc": {
+        "input_i": "-22.12",
+        "input_tp": "-8.36",
+        "input_lra": "3.70",
+        "input_thresh": "-32.36",
+        "output_i": "-23.27",
+        "output_tp": "-9.47",
+        "output_lra": "4.10",
+        "output_thresh": "-33.43",
+        "normalization_type": "dynamic",
+        "target_offset": "0.27"
+      }
+    }
+  ]
 }

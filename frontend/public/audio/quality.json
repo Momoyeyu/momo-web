@@ -1,0 +1,62 @@
+{
+  "title": {
+    "seconds": 101.052625,
+    "seam": 0.004974365234375,
+    "localDerivativeLimit": 0.06964416503906246,
+    "peak": 0.322906494140625,
+    "threeLoopBoundaryCheck": true,
+    "stemsReconstructMaster": true,
+    "integratedLUFS": "-21.65",
+    "truePeak": "-9.13"
+  },
+  "connection": {
+    "seconds": 101.052625,
+    "seam": 0.004974365234375,
+    "localDerivativeLimit": 0.06970520019531246,
+    "peak": 0.343658447265625,
+    "threeLoopBoundaryCheck": true,
+    "stemsReconstructMaster": true,
+    "integratedLUFS": "-21.57",
+    "truePeak": "-8.80"
+  },
+  "daily": {
+    "seconds": 91.42858333333334,
+    "seam": 0.00079345703125,
+    "localDerivativeLimit": 0.06060791015625,
+    "peak": 0.334930419921875,
+    "threeLoopBoundaryCheck": true,
+    "stemsReconstructMaster": true,
+    "integratedLUFS": "-21.66",
+    "truePeak": "-8.93"
+  },
+  "night": {
+    "seconds": 120.0,
+    "seam": 0.002288818359375,
+    "localDerivativeLimit": 0.039004516601562456,
+    "peak": 0.335296630859375,
+    "threeLoopBoundaryCheck": true,
+    "stemsReconstructMaster": true,
+    "integratedLUFS": "-21.98",
+    "truePeak": "-8.84"
+  },
+  "uplift": {
+    "seconds": 80.0,
+    "seam": 0.009033203125,
+    "localDerivativeLimit": 0.06549377441406246,
+    "peak": 0.30145263671875,
+    "threeLoopBoundaryCheck": true,
+    "stemsReconstructMaster": true,
+    "integratedLUFS": "-21.84",
+    "truePeak": "-9.81"
+  },
+  "comfort": {
+    "seconds": 112.94116666666666,
+    "seam": 0.002288818359375,
+    "localDerivativeLimit": 0.0787353515625,
+    "peak": 0.357086181640625,
+    "threeLoopBoundaryCheck": true,
+    "stemsReconstructMaster": true,
+    "integratedLUFS": "-22.12",
+    "truePeak": "-8.36"
+  }
+}

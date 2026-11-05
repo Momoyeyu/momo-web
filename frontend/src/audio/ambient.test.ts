@@ -28,7 +28,7 @@ describe('ambient audio',()=>{
  });
  it('ducks only when a playback source reports audible sound',async()=>{
   const a=new AmbientAudio();await a.unlock();await tick();const voice={};a.speech(voice,true);expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(.22*.25,0,.18/3);
-  a.speech(voice,false);expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(.22,0,.18/3);
+  a.speech(voice,false);await new Promise(r=>setTimeout(r,380));expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(.22,0,.18/3);
  });
  it('keeps previous music when next audio fails',async()=>{
   const a=new AmbientAudio();await a.unlock();await tick();vi.mocked(fetch).mockRejectedValue(new Error('offline'));a.scene('daily');await tick();expect(sources.filter(s=>s.loop)).toHaveLength(1);expect(sources[0].stop).not.toHaveBeenCalled();
@@ -45,4 +45,19 @@ it('releases the cross-tab lock when focus is lost while resume is pending',asyn
  vi.stubGlobal('AudioContext',class extends Base {override resume=()=>new Promise<void>(resolve=>{resumes.push(resolve);});});
  vi.stubGlobal('navigator',{locks:{request:(_name:string,_opts:unknown,callback:(lock:object)=>Promise<void>)=>callback({}).then(()=>{lockDone=true;})}});
  const a=new AmbientAudio();const dispose=a.install();const unlocking=a.unlock();await tick();focused=false;events.get('blur')!();resumes.forEach(resolve=>resolve());await unlocking;await tick();expect(lockDone).toBe(true);expect(sources).toHaveLength(0);dispose();
+});
+it('repeated silent RMS releases ducking instead of postponing forever',async()=>{
+ const a=new AmbientAudio();await a.unlock();await tick();const voice={};a.speech(voice,true);
+ for(let i=0;i<10;i++){a.speech(voice,false);await new Promise(r=>setTimeout(r,45));}
+ expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(.22,0,.18/3);
+});
+it('reloads an aborted target during rapid scene reversals',async()=>{
+ const a=new AmbientAudio();await a.unlock();await tick();
+ const pending:{url:string;signal:AbortSignal;resolve:(r:Response)=>void}[]=[];
+ vi.mocked(fetch).mockImplementation((url,init)=>new Promise(resolve=>pending.push({url:String(url),signal:init!.signal as AbortSignal,resolve})));
+ a.scene('daily');a.scene('night');a.scene('daily');
+ expect(pending.map(p=>p.url)).toEqual(['/audio/daily.wav','/audio/night.wav','/audio/daily.wav']);
+ expect(pending[0].signal.aborted).toBe(true);
+ for(const p of pending)p.resolve({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)} as Response);
+ await tick();expect(sources.filter(s=>s.loop)).toHaveLength(2);
 });

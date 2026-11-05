@@ -1,0 +1,2335 @@
+{
+  "id": "daily",
+  "bpm": 84,
+  "key": "D major",
+  "bars": 32,
+  "beatsPerBar": 4,
+  "sections": [
+    {
+      "section": "theme",
+      "startBar": 0,
+      "bars": 8
+    },
+    {
+      "section": "answer",
+      "startBar": 8,
+      "bars": 8
+    },
+    {
+      "section": "breath",
+      "startBar": 16,
+      "bars": 8
+    },
+    {
+      "section": "return",
+      "startBar": 24,
+      "bars": 8
+    }
+  ],
+  "events": [
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 0,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 0,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 66,
+      "beat": 0,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 38,
+      "beat": 0,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 0,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 69,
+      "beat": 1,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 2.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 3.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 4,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 4,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 66,
+      "beat": 4,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 38,
+      "beat": 4,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 4,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 69,
+      "beat": 5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 6.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 7.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 8,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 8,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 69,
+      "beat": 8,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 42,
+      "beat": 8,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 8,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 9,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 71,
+      "beat": 10.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 69,
+      "beat": 11.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 12,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 12,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 69,
+      "beat": 12,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 42,
+      "beat": 12,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 12,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 13,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 71,
+      "beat": 14.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 69,
+      "beat": 15.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "air",
+      "note": 50,
+      "beat": 16,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 16,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 62,
+      "beat": 16,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 31,
+      "beat": 16,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 16,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 69,
+      "beat": 17,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 18.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 19.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "air",
+      "note": 50,
+      "beat": 20,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 20,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 62,
+      "beat": 20,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 31,
+      "beat": 20,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 20,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 69,
+      "beat": 21,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 22.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 23.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "air",
+      "note": 52,
+      "beat": 24,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 24,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 24,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 33,
+      "beat": 24,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 24,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 71,
+      "beat": 26.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 69,
+      "beat": 27.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "air",
+      "note": 52,
+      "beat": 28,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 28,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 28,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 33,
+      "beat": 28,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 28,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 29,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 71,
+      "beat": 30.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 69,
+      "beat": 31.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 32,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 32,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 66,
+      "beat": 32,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 38,
+      "beat": 32,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 32,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 33,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 81,
+      "beat": 34.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 35.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 32.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 33.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 78,
+      "beat": 34.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 36,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 36,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 66,
+      "beat": 36,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 38,
+      "beat": 36,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 36,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 37,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 81,
+      "beat": 38.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 39.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 36.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 37.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 78,
+      "beat": 38.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 40,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 40,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 69,
+      "beat": 40,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 42,
+      "beat": 40,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 40,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 41,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 42.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 43.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 40.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 41.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 81,
+      "beat": 42.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 44,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 44,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 69,
+      "beat": 44,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 42,
+      "beat": 44,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 44,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 45,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 46.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 47.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 44.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 45.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 81,
+      "beat": 46.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 50,
+      "beat": 48,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 48,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 62,
+      "beat": 48,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 31,
+      "beat": 48,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 48,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 49,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 81,
+      "beat": 50.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 51.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 62,
+      "beat": 48.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 49.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 74,
+      "beat": 50.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 50,
+      "beat": 52,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 52,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 62,
+      "beat": 52,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 31,
+      "beat": 52,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 52,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 53,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 81,
+      "beat": 54.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 55.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 62,
+      "beat": 52.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 53.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 74,
+      "beat": 54.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 52,
+      "beat": 56,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 56,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 56,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 33,
+      "beat": 56,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 56,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 57,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 58.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 59.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 64,
+      "beat": 56.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 57.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 58.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 52,
+      "beat": 60,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 60,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 60,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 33,
+      "beat": 60,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 60,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 61,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 62.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 63.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 64,
+      "beat": 60.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 61.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 62.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 64,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 64,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 66,
+      "beat": 64,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 38,
+      "beat": 64,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 64,
+      "duration": 2.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 66.5,
+      "duration": 2.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 68,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 68,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 66,
+      "beat": 68,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 38,
+      "beat": 68,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 68,
+      "duration": 2.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 70.5,
+      "duration": 2.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 72,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 72,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 69,
+      "beat": 72,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 42,
+      "beat": 72,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 72,
+      "duration": 2.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 71,
+      "beat": 74.5,
+      "duration": 2.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 76,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 76,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 69,
+      "beat": 76,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 42,
+      "beat": 76,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 76,
+      "duration": 2.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 71,
+      "beat": 78.5,
+      "duration": 2.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "air",
+      "note": 50,
+      "beat": 80,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 80,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 62,
+      "beat": 80,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 31,
+      "beat": 80,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 80,
+      "duration": 2.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 82.5,
+      "duration": 2.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "air",
+      "note": 50,
+      "beat": 84,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 84,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 62,
+      "beat": 84,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 31,
+      "beat": 84,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 84,
+      "duration": 2.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 86.5,
+      "duration": 2.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "air",
+      "note": 52,
+      "beat": 88,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 88,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 88,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 33,
+      "beat": 88,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 88,
+      "duration": 2.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 71,
+      "beat": 90.5,
+      "duration": 2.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "air",
+      "note": 52,
+      "beat": 92,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 92,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 92,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 33,
+      "beat": 92,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 92,
+      "duration": 2.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 71,
+      "beat": 94.5,
+      "duration": 2.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 96,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 96,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 66,
+      "beat": 96,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 38,
+      "beat": 96,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 96,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 97,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 81,
+      "beat": 98.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 99.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 96.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 97.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 78,
+      "beat": 98.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 100,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 100,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 66,
+      "beat": 100,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 38,
+      "beat": 100,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 100,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 101,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 81,
+      "beat": 102.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 103.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 100.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 101.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 78,
+      "beat": 102.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 104,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 104,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 69,
+      "beat": 104,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 42,
+      "beat": 104,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 104,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 105,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 106.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 107.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 104.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 105.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 81,
+      "beat": 106.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 108,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 108,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 69,
+      "beat": 108,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 42,
+      "beat": 108,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 108,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 109,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 110.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 111.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 108.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 109.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 81,
+      "beat": 110.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 50,
+      "beat": 112,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 112,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 62,
+      "beat": 112,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 31,
+      "beat": 112,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 112,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 113,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 81,
+      "beat": 114.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 115.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 62,
+      "beat": 112.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 113.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 74,
+      "beat": 114.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 50,
+      "beat": 116,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 116,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 62,
+      "beat": 116,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "bass",
+      "note": 31,
+      "beat": 116,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 78,
+      "beat": 116,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 117,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 81,
+      "beat": 118.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 119.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 62,
+      "beat": 116.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 117.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 74,
+      "beat": 118.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 52,
+      "beat": 120,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 120,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 120,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 33,
+      "beat": 120,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 120,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 121,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 122.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 123.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 64,
+      "beat": 120.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 121.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 122.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "air",
+      "note": 52,
+      "beat": 124,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": 0.45
+    },
+    {
+      "part": "air",
+      "note": 57,
+      "beat": 124,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "air",
+      "note": 61,
+      "beat": 124,
+      "duration": 5.5,
+      "velocity": 0.0405,
+      "pan": -0.45
+    },
+    {
+      "part": "bass",
+      "note": 33,
+      "beat": 124,
+      "duration": 2.8,
+      "velocity": 0.135,
+      "pan": 0
+    },
+    {
+      "part": "keys",
+      "note": 76,
+      "beat": 124,
+      "duration": 1.8,
+      "velocity": 0.12150000000000001,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 125,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "keys",
+      "note": 73,
+      "beat": 126.5,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": 0.12
+    },
+    {
+      "part": "keys",
+      "note": 74,
+      "beat": 127.25,
+      "duration": 1.8,
+      "velocity": 0.0828,
+      "pan": -0.12
+    },
+    {
+      "part": "spark",
+      "note": 64,
+      "beat": 124.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    },
+    {
+      "part": "spark",
+      "note": 69,
+      "beat": 125.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": -0.35
+    },
+    {
+      "part": "spark",
+      "note": 73,
+      "beat": 126.5,
+      "duration": 1.35,
+      "velocity": 0.0405,
+      "pan": 0.35
+    }
+  ]
+}

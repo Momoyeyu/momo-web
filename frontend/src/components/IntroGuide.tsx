@@ -1,3 +1,4 @@
+import {ambient} from '../audio/ambient';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useIntro,refreshIntro,confirmIntroLanguage,finishIntro,completeIntroTts,confirmIntroMemory,acknowledgeIntro} from '../services/introClient';
 import {navigate,useRoute} from '../router';
@@ -24,6 +25,8 @@ export default function IntroGuide({ready}:{ready:boolean}){
  const lastGuide=useRef<{box:Box;message:string;anchor:string;confirm:boolean}|null>(null);
  useLayoutEffect(()=>{if(box&&message)lastGuide.current={box,message,anchor,confirm};});
  const phase=intro.data?.phase;
+ const sounded=useRef(false);
+ useEffect(()=>{if(phase==='celebration'&&!sounded.current){sounded.current=true;ambient.sound('complete');}},[phase]);
  const restricted=phase!=='completed';
  useEffect(()=>subscribeMeeting(()=>{if(phase==='return_title'&&route==='chat'&&meetingSnapshot().state==='failed')navigate('title');}),[phase,route]);
  useLayoutEffect(()=>{const el=panel.current;if(!el)return;const observer=new ResizeObserver(()=>setGuideHeight(el.offsetHeight));observer.observe(el);return()=>observer.disconnect();},[restricted,ready]);

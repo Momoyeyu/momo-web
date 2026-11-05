@@ -1,3 +1,4 @@
+import {musicDirector} from '../audio/director';
 // 回合协调器：文字/语音输入 → backend SSE（/api/chat，ReAct 在 backend）
 // → 情绪解析 + 句切 → TTS 流式播放 → 口型/表情驱动；
 // 打断（SpeechStarted / stop）= 停播放 + abort SSE/TTS。
@@ -1013,6 +1014,7 @@ export class ChatEngine {
   }
 
   private fireCue(cue: PerformanceCue, turn: Turn): void {
+    if(turn.presentation && this.sceneActive && cue.mood)musicDirector.cue(cue.mood,turn.id);
     if (turn.presentation) this.tryStage((st) => st.applyCue(cue, turn.id, turn.presentation!.revision));
   }
 

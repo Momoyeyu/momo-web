@@ -124,13 +124,13 @@ export default function GeneralTab() {
       onChange={(v) => patchGeneral({ voiceVolume: v })}
     />
   </FieldRow>
-  <FieldRow label={t('settings.environmentAudio')}><Button variant="ghost" size="sm" onClick={()=>setSoundOpen(true)}>{t('settings.environmentAudio')}</Button></FieldRow>
+  <FieldRow label={t('settings.environmentAudio')}><Button variant="ghost" size="sm" sound="confirm" onClick={()=>setSoundOpen(true)}>{t('settings.environmentAudio')}</Button></FieldRow>
   {soundOpen&&<Modal label={t('settings.environmentAudio')} onClose={()=>setSoundOpen(false)}>
     <h3>{t('settings.environmentAudio')}</h3><div className="modal-body"><div className="opt-list">
   <FieldRow label={t("settings.sfxVolume")}><Slider value={settings.general.sfxVolume??35} onChange={v=>patchGeneral({sfxVolume:v})}/></FieldRow>
   <FieldRow label={t("settings.musicVolume")}><Slider value={settings.general.musicVolume??22} onChange={v=>patchGeneral({musicVolume:v})}/></FieldRow>
   <FieldRow label={t("settings.soundPalette")}><Select value={settings.general.soundPalette??'warm'} options={[{value:'warm',label:t('settings.soundWarm')},{value:'glass',label:t('settings.soundGlass')}]} onChange={v=>patchGeneral({soundPalette:v as 'warm'|'glass'})}/></FieldRow>
-    </div></div><div className="modal-foot"><Button variant="ghost" onClick={()=>ambient.sound('complete')}>{t('settings.soundPreview')}</Button><Button variant="ghost" onClick={()=>setSoundOpen(false)}>{t('settings.soundClose')}</Button></div>
+    </div></div><div className="modal-foot"><Button variant="ghost" onClick={()=>ambient.sound('complete')}>{t('settings.soundPreview')}</Button><Button variant="ghost" sound="cancel" onClick={()=>setSoundOpen(false)}>{t('settings.soundClose')}</Button></div>
   </Modal>}
   </div>
 </section>
