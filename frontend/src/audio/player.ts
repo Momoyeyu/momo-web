@@ -1,3 +1,4 @@
+import {ambient} from './ambient';
 // TTS 下行播放：s16le 24kHz mono → AudioWorklet(public/worklets/pcm-player.js)
 // 环形缓冲排播；worklet 上报输出 RMS → 平滑 → onMouthOpen(0..1) 驱动口型；
 // 队列播空上报 drain → onDrain。
@@ -71,6 +72,7 @@ export class TtsPlayer {
   setPaused(paused: boolean): void {
     this.paused=paused;
     this.node?.port.postMessage({type:"pause",paused});
+    if(paused)ambient.speech(this,false);
     if(paused){this.mouth=0;this.onMouthOpen?.(0);}
   }
 
@@ -78,6 +80,7 @@ export class TtsPlayer {
   stop(): void {
     this.pending = [];
     this.node?.port.postMessage({ type: "clear" });
+    ambient.speech(this,false);
     this._playing = false;
     this.mouth = 0;
     this.onMouthOpen?.(0);
@@ -149,12 +152,14 @@ export class TtsPlayer {
   private onWorkletMsg(msg: WorkletOutMsg): void {
     if (!msg) return;
     if (msg.type === "rms" && !this.paused) {
+      ambient.speech(this,(msg.rms??0)>.001 && this.volume>0);
       const target = Math.min(1, (msg.rms ?? 0) * MOUTH_GAIN);
       const k = target > this.mouth ? MOUTH_ATTACK : MOUTH_RELEASE;
       this.mouth += (target - this.mouth) * k;
       this.onMouthOpen?.(this.mouth);
     } else if (msg.type === "drain") {
-      this._playing = false;
+      ambient.speech(this,false);
+    this._playing = false;
       this.mouth = 0;
       this.onMouthOpen?.(0);
       this.onDrain?.();

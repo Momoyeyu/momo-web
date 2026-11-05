@@ -64,6 +64,9 @@ class GeneralSettings(TypedDict):
     textSpeed: int
     sentenceSpeed: int
     voiceVolume: int
+    sfxVolume: NotRequired[int]
+    musicVolume: NotRequired[int]
+    soundPalette: NotRequired[Literal["warm", "glass"]]
     showStatus: bool
     voiceInput: bool
 

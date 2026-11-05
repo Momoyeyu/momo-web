@@ -1,3 +1,4 @@
+import {ambient} from './ambient';
 // 麦克风采集：getUserMedia → AudioWorklet → 重采样 16k → s16le 分帧回调。
 // 与 momo 的差异：sink 直接是字节回调（由 ASR websocket 消费），无 ws 信令。
 // worklet 以 Blob URL 内联加载（dev/build 一致、不经 bundler）。
@@ -46,6 +47,7 @@ export class MicStreamer {
     });
     try {
       this.stream = stream;
+      ambient.microphone(this,true);
       this.onChunk = onChunk;
       this.onError = opts?.onError ?? null;
 
@@ -115,6 +117,7 @@ export class MicStreamer {
   }
 
   private teardown(): void {
+    ambient.microphone(this,false);
     this._active = false;
     this.onChunk = null;
     this.framer = null;

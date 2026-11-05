@@ -58,6 +58,9 @@ export interface GeneralConfig {
   sentenceSpeed: number;
   /** TTS 语音播放音量 0–100（%）。 */
   voiceVolume: number;
+  sfxVolume?: number;
+  musicVolume?: number;
+  soundPalette?: "warm"|"glass";
   /** chat 页左上角是否显示对话状态条（空闲/聆听/思考/回应）。 */
   showStatus: boolean;
   /** 使用内置识别的语音输入开关。 */

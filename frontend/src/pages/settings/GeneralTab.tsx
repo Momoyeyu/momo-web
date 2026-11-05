@@ -1,3 +1,6 @@
+import Modal from '../../ui/Modal';
+import Button from '../../ui/Button';
+import {ambient} from '../../audio/ambient';
 import {useIntro} from "../../services/introClient";
 import DataTransfer from "./DataTransfer";
 // 「通用」tab：界面语言与对话语言、语音输入/输出、对话框透明度与速度、对话框预览。
@@ -17,6 +20,7 @@ import DialogPreview from "./DialogPreview";
 
 export default function GeneralTab() {
   const t = useT();
+  const [soundOpen,setSoundOpen]=useState(false);
   const intro=useIntro();
   const guided=!!intro.data && intro.data.phase!=="completed";
   const settings = useSyncExternalStore(subscribe, getState).settings;
@@ -120,6 +124,14 @@ export default function GeneralTab() {
       onChange={(v) => patchGeneral({ voiceVolume: v })}
     />
   </FieldRow>
+  <FieldRow label={t('settings.environmentAudio')}><Button variant="ghost" size="sm" onClick={()=>setSoundOpen(true)}>{t('settings.environmentAudio')}</Button></FieldRow>
+  {soundOpen&&<Modal label={t('settings.environmentAudio')} onClose={()=>setSoundOpen(false)}>
+    <h3>{t('settings.environmentAudio')}</h3><div className="modal-body"><div className="opt-list">
+  <FieldRow label={t("settings.sfxVolume")}><Slider value={settings.general.sfxVolume??35} onChange={v=>patchGeneral({sfxVolume:v})}/></FieldRow>
+  <FieldRow label={t("settings.musicVolume")}><Slider value={settings.general.musicVolume??22} onChange={v=>patchGeneral({musicVolume:v})}/></FieldRow>
+  <FieldRow label={t("settings.soundPalette")}><Select value={settings.general.soundPalette??'warm'} options={[{value:'warm',label:t('settings.soundWarm')},{value:'glass',label:t('settings.soundGlass')}]} onChange={v=>patchGeneral({soundPalette:v as 'warm'|'glass'})}/></FieldRow>
+    </div></div><div className="modal-foot"><Button variant="ghost" onClick={()=>ambient.sound('complete')}>{t('settings.soundPreview')}</Button><Button variant="ghost" onClick={()=>setSoundOpen(false)}>{t('settings.soundClose')}</Button></div>
+  </Modal>}
   </div>
 </section>
 </div>

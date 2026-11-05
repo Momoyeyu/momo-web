@@ -1,0 +1,174 @@
+{
+  "version": 1,
+  "status": "original listening drafts; not mastered OST",
+  "sfx": {
+    "warm/confirm": {
+      "file": "warm-confirm.wav",
+      "frames": 4680,
+      "sampleRate": 24000,
+      "peak": 0.21847,
+      "rms": 0.08026
+    },
+    "warm/cancel": {
+      "file": "warm-cancel.wav",
+      "frames": 4680,
+      "sampleRate": 24000,
+      "peak": 0.21767,
+      "rms": 0.08027
+    },
+    "warm/on": {
+      "file": "warm-on.wav",
+      "frames": 4680,
+      "sampleRate": 24000,
+      "peak": 0.21413,
+      "rms": 0.08026
+    },
+    "warm/off": {
+      "file": "warm-off.wav",
+      "frames": 4680,
+      "sampleRate": 24000,
+      "peak": 0.21767,
+      "rms": 0.08027
+    },
+    "warm/phone-in": {
+      "file": "warm-phone-in.wav",
+      "frames": 6480,
+      "sampleRate": 24000,
+      "peak": 0.24961,
+      "rms": 0.08304
+    },
+    "warm/phone-out": {
+      "file": "warm-phone-out.wav",
+      "frames": 6480,
+      "sampleRate": 24000,
+      "peak": 0.23026,
+      "rms": 0.08301
+    },
+    "warm/boot": {
+      "file": "warm-boot.wav",
+      "frames": 7800,
+      "sampleRate": 24000,
+      "peak": 0.24961,
+      "rms": 0.08753
+    },
+    "warm/home": {
+      "file": "warm-home.wav",
+      "frames": 7800,
+      "sampleRate": 24000,
+      "peak": 0.25035,
+      "rms": 0.08751
+    },
+    "warm/complete": {
+      "file": "warm-complete.wav",
+      "frames": 7800,
+      "sampleRate": 24000,
+      "peak": 0.25194,
+      "rms": 0.08789
+    },
+    "warm/notify": {
+      "file": "warm-notify.wav",
+      "frames": 4680,
+      "sampleRate": 24000,
+      "peak": 0.21847,
+      "rms": 0.08026
+    },
+    "glass/confirm": {
+      "file": "glass-confirm.wav",
+      "frames": 4680,
+      "sampleRate": 24000,
+      "peak": 0.13587,
+      "rms": 0.05012
+    },
+    "glass/cancel": {
+      "file": "glass-cancel.wav",
+      "frames": 4680,
+      "sampleRate": 24000,
+      "peak": 0.13285,
+      "rms": 0.05012
+    },
+    "glass/on": {
+      "file": "glass-on.wav",
+      "frames": 4680,
+      "sampleRate": 24000,
+      "peak": 0.13554,
+      "rms": 0.05013
+    },
+    "glass/off": {
+      "file": "glass-off.wav",
+      "frames": 4680,
+      "sampleRate": 24000,
+      "peak": 0.13285,
+      "rms": 0.05012
+    },
+    "glass/phone-in": {
+      "file": "glass-phone-in.wav",
+      "frames": 6480,
+      "sampleRate": 24000,
+      "peak": 0.15408,
+      "rms": 0.05232
+    },
+    "glass/phone-out": {
+      "file": "glass-phone-out.wav",
+      "frames": 6480,
+      "sampleRate": 24000,
+      "peak": 0.13328,
+      "rms": 0.05225
+    },
+    "glass/boot": {
+      "file": "glass-boot.wav",
+      "frames": 7800,
+      "sampleRate": 24000,
+      "peak": 0.15408,
+      "rms": 0.05503
+    },
+    "glass/home": {
+      "file": "glass-home.wav",
+      "frames": 7800,
+      "sampleRate": 24000,
+      "peak": 0.14933,
+      "rms": 0.05497
+    },
+    "glass/complete": {
+      "file": "glass-complete.wav",
+      "frames": 7800,
+      "sampleRate": 24000,
+      "peak": 0.15771,
+      "rms": 0.05493
+    },
+    "glass/notify": {
+      "file": "glass-notify.wav",
+      "frames": 4680,
+      "sampleRate": 24000,
+      "peak": 0.13587,
+      "rms": 0.05012
+    }
+  },
+  "music": {
+    "title": {
+      "file": "title.wav",
+      "frames": 1212632,
+      "sampleRate": 24000,
+      "peak": 0.23892,
+      "rms": 0.04475,
+      "bpm": 76,
+      "beatsPerBar": 4,
+      "loopStart": 0,
+      "loopEnd": 1212632,
+      "key": "D major",
+      "bars": 16
+    },
+    "daily": {
+      "file": "daily.wav",
+      "frames": 1097143,
+      "sampleRate": 24000,
+      "peak": 0.23727,
+      "rms": 0.04701,
+      "bpm": 84,
+      "beatsPerBar": 4,
+      "loopStart": 0,
+      "loopEnd": 1097143,
+      "key": "D major",
+      "bars": 16
+    }
+  }
+}

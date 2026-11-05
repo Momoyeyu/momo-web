@@ -1,3 +1,4 @@
+import {ambient} from '../audio/ambient';
 // One short synthesis per effective voice. Keep PCM only while a listener is
 // waiting: a silent warmup never enters playback, history or persistent state.
 import { s16leToFloat32 } from "../audio/pcm";
@@ -75,7 +76,7 @@ export async function auditionVoice(signal: AbortSignal) {
   let ownedFlight: typeof flight;
   let rejectAbort: (reason: unknown) => void = () => {};
   const aborted = new Promise<never>((_, reject) => { rejectAbort = reject; });
-  const stop = () => { if (audio.state !== "closed") void audio.close().catch(() => {}); };
+  const stop = () => { ambient.speech(audio,false); if (audio.state !== "closed") void audio.close().catch(() => {}); };
   const onAbort = () => {
     stop();
     if (ownedFlight && flight === ownedFlight) {
@@ -100,6 +101,7 @@ export async function auditionVoice(signal: AbortSignal) {
       source.connect(gain);
       const start = Math.max(audio.currentTime, endAt);
       source.start(start);
+      if(audio.state==="running" && general.voiceVolume>0)ambient.speech(audio,true);
       endAt = start + buffer.duration;
       lastSource = source;
     };

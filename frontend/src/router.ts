@@ -1,3 +1,4 @@
+import {ambient} from './audio/ambient';
 // 唯一生活：标题、见面与其子页面；旧存档地址安全回到标题。
 import {useSyncExternalStore} from 'react';
 export type Route = 'title' | 'chat' | 'settings' | 'backlog';
@@ -8,6 +9,8 @@ function currentRoute(): Route {
 }
 let from: Route | null = null;
 export function navigate(route: Route): void {
+  if(route===currentRoute())return;
+  ambient.sound(route==='chat'?(currentRoute()==='title'?'boot':'cancel'):route==='title'?'home':'confirm');
   from = currentRoute();
   window.location.hash = `#/${route}`;
 }

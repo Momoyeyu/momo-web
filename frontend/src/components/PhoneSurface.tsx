@@ -1,3 +1,4 @@
+import {ambient} from '../audio/ambient';
 import {createPortal} from 'react-dom';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {phoneSnapshot,type PhoneSnapshot,type PhoneMessage} from '../services/phoneClient';
@@ -69,6 +70,8 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
  useEffect(()=>{if(session.lease===lease){session.app=app;session.peer=peer;}},[lease,app,peer]);
  const present=(value:boolean)=>{onVisibilityChange?.(value);document.querySelector('.app-stage')?.setAttribute('data-phone-present',String(value));};
  const choosePeer=(value:string)=>changePeer(value);
+ const soundOpen=useRef(open);
+ useEffect(()=>{if(soundOpen.current!==open){if(active)ambient.sound(open?'phone-in':'phone-out');soundOpen.current=open;}},[open,active]);
  const toggle=()=>{session.open=!open;if(!session.open)session.suppressed=true;setOpen(session.open);};
  const current=apps.find(a=>a.id===app);
  const appMissing=!!app&&!!data&&!current;
