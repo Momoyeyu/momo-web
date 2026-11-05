@@ -5,7 +5,7 @@ import hmac
 import os
 import re
 
-ORIGINS = {"tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"}
+ORIGINS = {"momo://app"}
 
 
 def token():

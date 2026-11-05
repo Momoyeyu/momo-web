@@ -1,24 +1,18 @@
 /** Desktop credentials live only in memory and never enter URLs or persisted settings. */
 export interface Runtime { baseUrl: string; token?: string }
+declare global {
+  interface Window { momoDesktop?: {getRuntime(): Promise<Runtime>} }
+}
 let pending: Promise<Runtime> | undefined;
-export function desktop(): boolean { return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window; }
+export function desktop(): boolean { return typeof window !== 'undefined' && 'momoDesktop' in window; }
 async function resolveDesktopRuntime(): Promise<Runtime> {
-  const invoke = (window as unknown as {__TAURI_INTERNALS__: {invoke: (cmd: string) => Promise<Runtime>}}).__TAURI_INTERNALS__.invoke;
-  const deadline = Date.now() + 55000;
-  while (true) {
-    try {
-      const value = await invoke('get_runtime');
-      const url = new URL(value.baseUrl);
-      if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !value.token)
-        throw new Error('Invalid desktop runtime');
-      return value;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : error;
-      if (message !== 'Backend is starting') throw error;
-      if (Date.now() >= deadline) throw new Error('Desktop startup timed out');
-      await new Promise(resolve => setTimeout(resolve, 250));
-    }
-  }
+  const value = await window.momoDesktop!.getRuntime();
+  const url = new URL(value.baseUrl);
+  if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port ||
+      url.username || url.password || url.pathname !== '/' || url.search || url.hash ||
+      typeof value.token !== 'string' || !value.token)
+    throw new Error('Invalid desktop runtime');
+  return value;
 }
 export function runtime(): Promise<Runtime> {
   if (!desktop()) return Promise.resolve({baseUrl: ''});

@@ -30,22 +30,29 @@ from .api import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    from .services import intro as intro_service
-    intro_service.initialize()
-    await __import__("asyncio").to_thread(runtime.start)
+    from .core.data_lock import DataDirectoryLock
+    from .core.state import DATA_DIR
+    ownership = DataDirectoryLock(DATA_DIR)
+    ownership.acquire()
     try:
-        state_service.migrate_legacy_services()
-        await __import__("asyncio").to_thread(
-            extend.configure, load_state()["settings"]["extensions"]
-        )
-        memory.schedule_index()
-        yield
+        from .services import intro as intro_service
+        intro_service.initialize()
+        await __import__("asyncio").to_thread(runtime.start)
+        try:
+            state_service.migrate_legacy_services()
+            await __import__("asyncio").to_thread(
+                extend.configure, load_state()["settings"]["extensions"]
+            )
+            memory.schedule_index()
+            yield
+        finally:
+            await __import__("asyncio").to_thread(runtime.close)
+            memory.shutdown_index()
+            from .core.mcp import hub
+    
+            hub.close()
     finally:
-        await __import__("asyncio").to_thread(runtime.close)
-        memory.shutdown_index()
-        from .core.mcp import hub
-
-        hub.close()
+        ownership.release()
 
 
 app = FastAPI(title="momo-web backend", lifespan=lifespan)

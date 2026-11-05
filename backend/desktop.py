@@ -7,6 +7,7 @@ import socket
 import sys
 import threading
 import signal
+from pathlib import Path
 
 
 def force_owned_group_exit():
@@ -26,6 +27,9 @@ def main():
         parser.error("Desktop token and nonce are required")
     os.environ["MOMO_DATA_DIR"] = os.path.abspath(args.data_dir)
     os.environ["MOMO_RESOURCES_DIR"] = os.path.abspath(args.resources_dir)
+    helper = Path(args.resources_dir).resolve().parent / "helpers/momo-native-control"
+    if sys.platform == "darwin" and helper.is_file():
+        os.environ["MOMO_NATIVE_CONTROL_EXECUTABLE"] = str(helper)
     import uvicorn
     from app.main import app
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

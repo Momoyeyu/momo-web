@@ -44,8 +44,8 @@ def pair(tmp_path):
     (source / ".env").write_text("PRIVATE")
     (target / "app/frontend").mkdir(parents=True)
     (target / "app/frontend/a.ts").write_text("old")
-    (target / "app/src-tauri").mkdir()
-    (target / "app/src-tauri/keep.rs").write_text("native")
+    (target / "app/desktop").mkdir()
+    (target / "app/desktop/keep.ts").write_text("native")
     commit(source)
     commit(target)
     return source, target
@@ -80,7 +80,7 @@ def test_deletes_only_previous_owned_file_and_deletion_is_repeatable(pair):
     result = module.promote(source, target, "HEAD", apply=True)
     commit(target)
     assert result["deleted"] == ["app/backend/b.py"]
-    assert (target / "app/src-tauri/keep.rs").read_text() == "native"
+    assert (target / "app/desktop/keep.ts").read_text() == "native"
     module.promote(source, target, "HEAD", apply=True)
     assert not git(target, "status", "--porcelain").strip()
 
@@ -108,7 +108,7 @@ def test_bootstrap_retires_deleted_tracked_shared_files_and_rejects_drift(pair):
     report = module.promote(source, target, "HEAD", bootstrap=True, apply=True)
     assert report["deleted"] == ["app/frontend/Checkpoint.tsx"]
     assert not retired.exists()
-    assert (target / "app/src-tauri/keep.rs").exists()
+    assert (target / "app/desktop/keep.ts").exists()
 
 
 def test_parent_symlink_cannot_redirect_writes_outside_target(pair, tmp_path):

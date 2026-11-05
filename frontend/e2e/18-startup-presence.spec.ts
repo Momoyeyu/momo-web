@@ -91,10 +91,10 @@ test('static presence precedes React; real startup stages animate then release t
   const restoring=new Promise<void>(resolve=>{restore=resolve;});
   await fixture(page,restoring);
   await page.addInitScript(()=>{
-    const target=window as unknown as {__startupReady:boolean;__TAURI_INTERNALS__:unknown};
+    const target=window as unknown as {__startupReady:boolean;momoDesktop:unknown};
     target.__startupReady=false;
-    target.__TAURI_INTERNALS__={invoke:async()=>{
-      if(!target.__startupReady)throw 'Backend is starting';
+    target.momoDesktop={getRuntime:async()=>{
+      while(!target.__startupReady) await new Promise(resolve=>setTimeout(resolve,50));
       return {baseUrl:location.origin,token:'synthetic-startup-test'};
     }};
   });
@@ -123,7 +123,7 @@ test('static presence precedes React; real startup stages animate then release t
 test('failed native startup stops the scene, hides private errors, and retries successfully', async ({page},info)=>{
   await fixture(page);
   await page.addInitScript(()=>{
-    (window as unknown as {__TAURI_INTERNALS__:unknown}).__TAURI_INTERNALS__={invoke:async()=>{
+    (window as unknown as {momoDesktop:unknown}).momoDesktop={getRuntime:async()=>{
       if(!sessionStorage.getItem('startup-failed-once')){
         sessionStorage.setItem('startup-failed-once','yes');
         throw 'private runtime failure: token=must-not-appear';

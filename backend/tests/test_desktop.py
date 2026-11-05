@@ -32,7 +32,7 @@ def test_desktop_http_capability_and_origin(monkeypatch):
         assert (
             client.get(
                 "/api/state",
-                headers={"x-momo-token": "a" * 64, "Origin": "tauri://localhost"},
+                headers={"x-momo-token": "a" * 64, "Origin": "momo://app"},
             ).status_code
             == 200
         )
@@ -335,10 +335,10 @@ def test_crash_guard_never_kills_inherited_process_group(monkeypatch):
 def test_trusted_native_view_can_read_auth_denial(monkeypatch):
     monkeypatch.setenv("MOMO_DESKTOP_TOKEN", "a" * 64)
     response = TestClient(app).get(
-        "/api/health", headers={"origin": "tauri://localhost"}
+        "/api/health", headers={"origin": "momo://app"}
     )
     assert response.status_code == 403
-    assert response.headers.get("access-control-allow-origin") == "tauri://localhost"
+    assert response.headers.get("access-control-allow-origin") == "momo://app"
     assert response.headers.get("vary") == "Origin"
     untrusted = TestClient(app).get(
         "/api/health", headers={"origin": "https://evil.example"}
@@ -400,7 +400,7 @@ def test_archive_configuration_uses_utf8_on_non_utf8_windows_locale(monkeypatch)
 
 
 @pytest.mark.parametrize(
-    "origin", ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"]
+    "origin", ["momo://app"]
 )
 def test_native_view_can_read_audio_rate_and_interrupt_generation(monkeypatch, origin):
     import importlib.util

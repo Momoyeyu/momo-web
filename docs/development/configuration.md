@@ -85,3 +85,7 @@ profile; do not publish it or copy machine-specific paths into another install.
 ### Existing application control
 
 `MOMO_NATIVE_CONTROL_EXECUTABLE` points to the locally prepared fixed-action macOS helper (see `scripts/build-native-control.py`). The helper discovers existing windows and performs only approved bounded actions. It does not launch a separate browser or expose a shell. Screen Recording and Accessibility remain system permissions; application allowlist approval does not grant them automatically.
+
+## Electron 桌面接入（017）
+
+`MOMO_DESKTOP_DATA_DIR` 仅覆盖 Electron 的隔离 profile 根目录（包含 Chromium 状态与 data/），不修改 Web 的 `MOMO_DATA_DIR`。正式安装默认使用系统应用支持目录下的 momo，开发使用 momo-development。共享 API 接受 `momo://app` 与运行时内存令牌；旧 Tauri origin 不再接受。Python 生命周期持有数据目录排他锁，Web/桌面不能同时写同一目录。原生 helper 由安装资源/helpers 选择，不依赖玩家的 PATH。退出不删除 profile；迁移使用设置内备份导入，不直接搬 WebView IndexedDB 文件。
