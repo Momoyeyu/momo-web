@@ -344,3 +344,7 @@
 .chat-toolbar .tb-focus.is-active { color:var(--accent);background:rgba(231,190,119,.075); }
 @keyframes phone-breathe { 50% { opacity:.5;transform:rotate(-7deg); } }
 @media(prefers-reduced-motion:reduce) { .phone-status-icon { animation:none; } }
+
+.room-background, .room-lighting { position:absolute; inset:0; pointer-events:none; }
+.room-lighting { background-size:cover; background-position:center; transition:opacity 1.4s ease-in-out; }
+@media(prefers-reduced-motion:reduce) { .room-lighting { transition:none; } }

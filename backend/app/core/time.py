@@ -1,19 +1,33 @@
-"""当前时刻信息：UTC 时间 + 本机时区。
+"""Host-local clock shared by the per-turn anchor and common_time tool.
 
-common_time 能力与 prompt 时间锚点共用这一份实现；
-capability.py 只是把它包装成 tool result。
+The Web backend runs on the player's computer. UTC is supplementary, never a
+value the model must convert to discover the player's current wall-clock time.
 """
 from __future__ import annotations
-
 from datetime import datetime, timezone
 
 
 def now_info() -> dict[str, str]:
-    """返回 {"utc", "tz"}：utc 为完整 ISO 时间戳（到秒），tz 为本机时区名+偏移。"""
     now = datetime.now().astimezone()
-    off = now.strftime("%z")  # +0800 / -0500
-    tz = f"{now.tzname() or ''}{off[:3]}:{off[3:]}"  # CST+08:00
+    offset = now.strftime('%z')
+    zone = f'UTC{offset[:3]}:{offset[3:]}'
+    hour = now.hour
+    period = ('late night' if hour < 5 else 'morning' if hour < 12 else
+              'afternoon' if hour < 18 else 'evening' if hour < 22 else 'night')
     return {
-        "utc": now.astimezone(timezone.utc).isoformat(timespec="seconds"),
-        "tz": tz,
+        'local': now.isoformat(timespec='seconds'),
+        'local_24h': now.strftime('%Y-%m-%d %H:%M:%S'),
+        'time_of_day': period,
+        'tz': zone,
+        'utc': now.astimezone(timezone.utc).isoformat(timespec='seconds'),
     }
+
+
+def time_anchor() -> str:
+    info = now_info()
+    return (f"Current player-computer local time (24-hour clock): {info['local_24h']}; "
+            f"timezone {info['tz']}; local time of day: {info['time_of_day']}. "
+            "Use this fresh clock for current-time statements, not old dialogue, summaries or memories. "
+            "Hours 12–23 are after noon; hours 00–11 are before noon. Do not convert this local time again. "
+            "This clock describes the host player, not the location of every external contact. "
+            "Call common_time if you need a fresh precise reading; never infer a timezone from language.")

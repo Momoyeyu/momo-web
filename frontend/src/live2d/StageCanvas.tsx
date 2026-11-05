@@ -2,6 +2,8 @@
 // 激活期间留在子页面下层，页面自身覆盖它；仅 chat 开放人物点击。
 // 加载失败时静默降级（背景图仍在，面板可正常用）。
 
+import RoomBackground from "./RoomBackground";
+import {roomPhase,roomImages} from "./roomTime";
 import { useEffect, useRef } from "react";
 import { getAvatarId, subscribe } from "../lib/store";
 import { getStage } from "./stage";
@@ -18,7 +20,7 @@ export default function StageCanvas({ visible, interactive, onReady }: { visible
     // Imported / unavailable models must not leave startup covering usable UI forever.
     const deadline = window.setTimeout(prepared, 3000);
     const room = new Image();
-    room.src = '/stage/stage-room.jpg';
+    room.src = roomImages[roomPhase(new Date().getHours())];
     const roomReady = room.decode().catch(() => {});
     const canvas = canvasRef.current ??= document.createElement("canvas");
     canvas.className = "live2d-canvas";
@@ -62,6 +64,7 @@ export default function StageCanvas({ visible, interactive, onReady }: { visible
         backgroundPosition: "center",
       }}
     >
+      <RoomBackground />
       <div className="scene-ambient" aria-hidden="true" />
       <div ref={homeRef} className="live2d-home" style={{ position: "absolute", inset: 0 }} />
       <div className="scene-reading-shade" aria-hidden="true" />

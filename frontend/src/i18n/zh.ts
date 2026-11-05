@@ -346,7 +346,7 @@ export const zh = {
       tts: "TTS · 语音合成",
       embedding: "Embedding · 语义检索",
       lang: "语言设置",
-      voice: "语音设置",
+      voice: "声音设置",
       avatar: "Live2D 模型",
       dialog: "对话框设置",
       extensions: "拓展 · MCP",

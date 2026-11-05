@@ -344,7 +344,7 @@ export const ja: Dict = {
       tts: "TTS · 音声合成",
       embedding: "Embedding · 意味検索",
       lang: "言語設定",
-      voice: "音声設定",
+      voice: "サウンド設定",
       avatar: "Live2D モデル",
       dialog: "テキストウィンドウ設定",
       extensions: "拡張 · MCP",

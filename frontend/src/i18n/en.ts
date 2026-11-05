@@ -344,7 +344,7 @@ export const en: Dict = {
       tts: "TTS · Speech synthesis",
       embedding: "Embedding · Semantic recall",
       lang: "Language",
-      voice: "Voice",
+      voice: "Sound settings",
       avatar: "Live2D model",
       dialog: "Dialog box",
       extensions: "Extensions · MCP",

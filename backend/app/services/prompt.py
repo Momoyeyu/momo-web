@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any
 
 from ..models import State
-from ..core.time import now_info
 
 _LANG_NAMES = {"zh": "中文", "en": "English", "ja": "日本語"}
 #: momo 的「灵魂」：一份 markdown 资源文件，**原样**注入 system prompt 的人设段。
@@ -59,7 +58,6 @@ _T: dict[str, Any] = {
         "Your conversation language is {lang}; talk with the user in that "
         "language unless they ask for another one"
     ),
-    "time_line": "The current UTC time is {utc}; your timezone is {tz}",
     "mem_head": "# Memory Configuration",
     "pins_head": "## Your initial memories",
     "output_head": "## How you speak",

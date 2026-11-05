@@ -98,3 +98,15 @@ def test_mismatched_or_unbounded_plugin_context_is_rejected_before_model(monkeyp
     with pytest.raises(ValueError):
         list(turn.run_turn("hello", source="qq", plugin_context=bad))
     assert not called
+
+
+def test_clock_anchor_refreshes_after_history_each_turn(monkeypatch):
+    from app.core import time as clock
+    moments=iter(['2026-11-05 17:30:00','2026-11-05 17:31:00'])
+    monkeypatch.setattr(clock,'now_info',lambda:{'local_24h':next(moments),'tz':'UTC+08:00','time_of_day':'afternoon'})
+    first,_=capture(monkeypatch)
+    second,_=capture(monkeypatch)
+    def anchor(messages):
+        return [m['content'] for m in messages if m['role']=='system' and m['content'].startswith('Current player-computer')]
+    assert len(anchor(first))==1 and '17:30:00' in anchor(first)[0]
+    assert len(anchor(second))==1 and '17:31:00' in anchor(second)[0]

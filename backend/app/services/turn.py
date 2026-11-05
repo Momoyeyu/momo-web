@@ -220,8 +220,8 @@ def build_messages(
         previous_run = item.get('runId')
     if for_compact:
         return messages
-    from ..core.time import now_info
-    messages.append({"role": "system", "content": "Current time: " + str(now_info())})
+    from ..core.time import time_anchor
+    messages.append({"role": "system", "content": time_anchor()})
     if presentation and presentation["expressions"]:
         import json
         messages.append({"role":"system", "content":"Current face: " + json.dumps(presentation["expressionState"], ensure_ascii=False)})
