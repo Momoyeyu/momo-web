@@ -10,7 +10,8 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -25,16 +26,43 @@ class LlmError(Exception):
     """LLM 调用失败；str(e) 直接作为 SSE error 事件的 message。"""
 
 
+def _thinking_payload(llm_cfg: dict[str, Any], payload: dict[str, Any]) -> None:
+    """Apply the trusted DeepSeek protocol to a private request copy.
+
+    Persisted dialogue lacks reasoning by design. Missing historical fields use
+    empty strings for tools-enabled replay; current tool rounds retain full
+    reasoning in the request-local messages.
+    """
+    enabled = llm_cfg.get("thinking") is True
+    try:
+        host = urlsplit(str(llm_cfg.get("url") or "")).hostname
+    except ValueError:
+        host = None
+    if host != "api.deepseek.com":
+        if enabled:
+            raise LlmError("native thinking is not supported for this provider")
+        return
+    payload["thinking"] = {"type": "enabled" if enabled else "disabled"}
+    if enabled and payload.get("tools"):
+        payload["messages"] = [
+            {**m, "reasoning_content": m.get("reasoning_content") or ""}
+            if m.get("role") == "assistant" else dict(m)
+            for m in payload["messages"]
+        ]
+
+
 def chat_completion(
     llm_cfg: dict[str, Any],
     messages: list[ChatMessage],
     tools: list[dict[str, Any]] | None = None,
     usage_out: dict[str, Any] | None = None,
+    reasoning_out: dict[str, Any] | None = None,
 ) -> ChatMessage:
     """POST {url}/v1/chat/completions → choices[0].message（形状见 models.ChatMessage）。
 
     失败抛 LlmError。usage_out 传入 dict 时清原值并写入响应的 usage
-    （压缩阈值判定用）。
+    （压缩阈值判定用）。reasoning_content 从返回消息剥离，仅在调用方显式
+    传入 reasoning_out 时存入该请求内的临时字典。
     """
     url = str(llm_cfg.get("url") or "").rstrip("/")
     if not url:
@@ -48,6 +76,12 @@ def chat_completion(
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
+
+    _thinking_payload(llm_cfg, payload)
+    if usage_out is not None:
+        usage_out.clear()
+    if reasoning_out is not None:
+        reasoning_out.clear()
 
     headers: dict[str, str] = {}
     key = llm_cfg.get("key") or ""
@@ -72,7 +106,10 @@ def chat_completion(
 
     try:
         data = resp.json()
-        message = data["choices"][0]["message"]
+        message = dict(data["choices"][0]["message"])
+        reasoning = message.pop("reasoning_content", None)
+        if reasoning_out is not None and isinstance(reasoning, str):
+            reasoning_out["reasoning_content"] = reasoning
     except Exception as e:
         raise LlmError("bad llm response") from e
     if usage_out is not None:
@@ -88,6 +125,8 @@ def chat_stream(
     messages: list[ChatMessage],
     tools: list[dict[str, Any]] | None = None,
     usage_out: dict[str, Any] | None = None,
+    reasoning_out: dict[str, Any] | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ) -> Iterator[dict[str, Any]]:
     """流式跑一轮，逐条 yield：
 
@@ -95,7 +134,9 @@ def chat_stream(
         {"type": "tool_calls", "calls": [...]}      本轮要调用的工具（至多一次，最后）
 
     工具调用参数在 OpenAI 协议里是**分片**下发的，必须按 index 累积后再解析，
-    不能拿单片去 json.loads。失败抛 LlmError。
+    不能拿单片去 json.loads。失败抛 LlmError。reasoning_out 仅用于本回合
+    的工具协议回填，不会 yield。cancelled 每条 SSE 行都校验（包括思考片段）；
+    完全无数据的同步网络读取仍受 TIMEOUT 约束。
     """
     url = str(llm_cfg.get("url") or "").rstrip("/")
     if not url:
@@ -112,12 +153,20 @@ def chat_stream(
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
 
+    _thinking_payload(llm_cfg, payload)
+    if usage_out is not None:
+        usage_out.clear()
+    if reasoning_out is not None:
+        reasoning_out.clear()
+
     headers: dict[str, str] = {}
     key = llm_cfg.get("key") or ""
     if key:
         headers["Authorization"] = f"Bearer {key}"
 
     slots: dict[int, dict[str, Any]] = {}
+    if cancelled and cancelled():
+        return
     try:
         with httpx.stream(
             "POST",
@@ -130,6 +179,8 @@ def chat_stream(
             if resp.status_code != 200:
                 raise LlmError(f"http {resp.status_code}")
             for line in resp.iter_lines():
+                if cancelled and cancelled():
+                    return
                 if not line or not line.startswith("data:"):
                     continue
                 data = line[5:].strip()
@@ -139,6 +190,10 @@ def chat_stream(
                     chunk = json.loads(data)
                 except Exception:
                     continue  # 半截/注释行：跳过
+                if not isinstance(chunk, dict):
+                    raise LlmError("bad llm response")
+                if chunk.get("error"):
+                    raise LlmError("llm stream error")
                 if usage_out is not None:
                     usage = chunk.get("usage")
                     if isinstance(usage, dict):
@@ -148,6 +203,11 @@ def chat_stream(
                 if not choices:
                     continue
                 delta = choices[0].get("delta") or {}
+                reasoning = delta.get("reasoning_content")
+                if reasoning_out is not None and isinstance(reasoning, str):
+                    reasoning_out["reasoning_content"] = (
+                        reasoning_out.get("reasoning_content", "") + reasoning
+                    )
                 text = delta.get("content")
                 if text:
                     yield {"type": "text", "delta": text}
@@ -174,5 +234,7 @@ def chat_stream(
     except httpx.HTTPError as e:
         raise LlmError("llm unreachable") from e
 
+    if cancelled and cancelled():
+        return
     if slots:
         yield {"type": "tool_calls", "calls": [slots[i] for i in sorted(slots)]}

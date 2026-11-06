@@ -411,7 +411,7 @@ def test_run_turn_extends_tools_and_dispatches(monkeypatch):
 
     seen_tools = []
 
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         seen_tools.append(tools)
         if len(seen_tools) == 1:
             yield {
@@ -436,7 +436,7 @@ def test_run_turn_without_extensions_passes_static_tools(monkeypatch):
     monkeypatch.setattr(hub, "open", lambda exts, reserved: ExtTools())
     monkeypatch.setattr(hub, "close", lambda: None)
 
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         assert tools is TOOLS  # 无拓展 → 静态表原样下发
         yield {"type": "text", "delta": "好。"}
 

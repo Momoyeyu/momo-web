@@ -17,6 +17,11 @@
       },
       "ChatIn": {
         "properties": {
+          "firstMeeting": {
+            "default": false,
+            "title": "Firstmeeting",
+            "type": "boolean"
+          },
           "presentation": {
             "anyOf": [
               {
@@ -307,6 +312,18 @@
             "title": "Assistant",
             "type": "string"
           },
+          "generation": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Generation"
+          },
           "user": {
             "default": "",
             "title": "User",
@@ -429,6 +446,22 @@
           }
         },
         "title": "MemoryPatch",
+        "type": "object"
+      },
+      "OpeningIn": {
+        "properties": {
+          "presentation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PresentationIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "OpeningIn",
         "type": "object"
       },
       "PresentationIn": {
@@ -1153,6 +1186,78 @@
           }
         },
         "summary": "Update Memory"
+      }
+    },
+    "/api/onboarding": {
+      "get": {
+        "operationId": "status_api_onboarding_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Status"
+      }
+    },
+    "/api/onboarding/opening": {
+      "post": {
+        "operationId": "opening_api_onboarding_opening_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpeningIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Opening"
+      }
+    },
+    "/api/resources/status": {
+      "get": {
+        "operationId": "resources_status_api_resources_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Resources Status Api Resources Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Resources Status"
       }
     },
     "/api/state": {

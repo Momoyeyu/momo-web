@@ -5,6 +5,7 @@ import { bootPersist } from "./lib/store";
 import { liveTranscript } from "./services/checkpointClient";
 import { loadTranscript } from "./chat/engineInstance";
 import "./styles/base.css";
+import { firstMeetingStatus } from "./services/onboardingClient";
 
 // 先从 backend 恢复配置（momo.yaml 权威，含 key），失败也照常启动（localStorage 兜底）。
 // 随后从 backend 灌 live 会话转写（momo.db 权威：backlog/字幕重启后延续）。
@@ -16,6 +17,14 @@ void bootPersist()
       })
       .catch(() => {}),
   )
+  .then(async () => {
+    const meeting = await firstMeetingStatus();
+    if (meeting && ["new", "asking", "clarifying"].includes(meeting.stage) &&
+        (!location.hash || ["#/title", "#title", "#/chat"].includes(location.hash))) {
+      // Replace rather than push: the title screen is not a prior first-launch step.
+      history.replaceState(null, "", `${location.pathname}${location.search}#/chat`);
+    }
+  })
   .finally(() => {
     createRoot(document.getElementById("root")!).render(
       <StrictMode>

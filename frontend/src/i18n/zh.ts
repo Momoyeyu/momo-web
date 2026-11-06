@@ -1,6 +1,17 @@
 // 中文（基准字典——key 结构的单一来源，其他语言需与之同形）。
 
 export const zh = {
+  meeting: {
+    connectionSettings: '连接设置',
+    'connectTitle': '让 momo 与你相遇',
+    'connectBody': '连接一个对话模型，我们就可以开始认识彼此了。语音可以之后再设置。',
+    'url': '服务地址',
+    'key': 'API 密钥（按服务要求填写）',
+    'model': '模型名称',
+    'begin': '开始相遇',
+    'connectionError': '暂时没能保存连接，请检查地址、模型名称和后端服务后再试。',
+  },
+
   performance: {
     label: "名称",
     desc: "实际表现",
@@ -145,6 +156,10 @@ export const zh = {
     asrBuiltinHint: "使用本机内置的语音识别，支持中文、日文和英文，无需额外配置。",
     asrHint: "接入你自己的语音识别服务。需要 OpenAI 兼容的转写接口，填写服务地址、密钥和模型名称。",
     asrModelPh: "whisper-1 / faster-whisper-large-v3",
+    thinking: "思考模式",
+    thinkingHint: "回答前先思考，可能增加等待时间。目前支持 DeepSeek 官方接口。",
+    builtinSpeechUnavailable: "内置语音资源不可用，请重新安装完整应用。",
+    builtinRecallUnavailable: "记忆语义检索暂不可用，当前使用文字匹配。",
     llmHint: "接入对话使用的大语言模型服务。需要 OpenAI 兼容的接口，填写服务地址、密钥和模型名称。",
     ttsUrlPh: "http://127.0.0.1:9880",
     ttsHint: "接入语音合成服务。需要 GPT-SoVITS 的 api_v2 接口，填写服务地址，并上传一段清晰的参考音频作为角色音色。参考文本是这段音频的内容，可以留空。",

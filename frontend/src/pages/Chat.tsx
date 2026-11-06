@@ -18,9 +18,10 @@ import { useT, resolveChatLang } from "../i18n";
 import { getStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
 import { getState, speakerName, subscribe } from "../lib/store";
-import { asrConfigured, ttsConfigured } from "../lib/asr";
+import { ttsConfigured } from "../lib/asr";
 import Button from "../ui/Button";
 import Icon from "../ui/Icon";
+import FirstMeeting from "../components/FirstMeeting";
 import DialogBox from "../components/DialogBox";
 import "../styles/chat.css";
 
@@ -37,10 +38,9 @@ export default function Chat() {
   useSyncExternalStore(subscribe, getState);
   const name = speakerName();
   const showStatus = getState().settings.general.showStatus;
-  // 语音输入开关 + ASR 配置双重门控（与设置页「通用」同一个开关）。
+  // 内置语音输入与设置页「通用」共用同一个开关。
   const micAllowed =
-    getState().settings.general.voiceInput &&
-    asrConfigured(getState().settings.asr);
+    getState().settings.general.voiceInput;
   const ttsReady = ttsConfigured(getState().settings.tts);
   const [status, setStatus] = useState<ChatStatus>(getChatEngine().status);
   const [micOn, setMicOn] = useState(getChatEngine().listening);
@@ -48,6 +48,7 @@ export default function Chat() {
   const [streamActive, setStreamActive] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [modelError, setModelError] = useState(false);
   const [input, setInput] = useState("");
   const [closeUp, setCloseUp] = useState(() => getStage().getCloseUp());
   const errTimer = useRef<number | null>(null);
@@ -59,6 +60,7 @@ export default function Chat() {
     const showErr = (e: Error): void => {
       let msg = e.message || t("chat.errDefault");
       if (e instanceof ServiceError) {
+        if (e.service === "llm") setModelError(true);
         const detail =
           e.failure === "unconfigured"
             ? t("chat.errCfg")
@@ -105,13 +107,14 @@ export default function Chat() {
   const send = (): void => {
     const text = input.trim();
     if (!text) return;
+    setModelError(false);
     getChatEngine().sendText(text);
     setInput("");
   };
 
   const toggleMic = (): void => {
     const eng = getChatEngine();
-    if (eng.listening) {
+    if (eng.microphoneActive) {
       eng.stopListening();
       setMicOn(false);
     } else {
@@ -137,6 +140,7 @@ export default function Chat() {
 
   return (
     <div className="chat-page">
+      <FirstMeeting connectionFailed={modelError} />
       {error && <div className="chat-error">{error}</div>}
 
       <div className="dialog-zone">

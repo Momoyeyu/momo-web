@@ -13,6 +13,7 @@ import { useState } from "react";
 import { useT } from "../i18n";
 import { fromRoute, navigate } from "../router";
 import Button from "../ui/Button";
+import BuiltinResourcesNotice from "../components/BuiltinResourcesNotice";
 import GridBackdrop from "../components/GridBackdrop";
 import { ropeFrom } from "../lib/ropeAngle";
 import MemoryPanel from "./panels/Memory";
@@ -115,6 +116,7 @@ export default function Settings() {
       {/* 底部操作条：返回按钮聚拢右下 */}
       <footer className="footbar">
         <div className="footbar-inner">
+          <BuiltinResourcesNotice />
           <div className="foot-right">
             <Button variant="ghost" onClick={() => navigate(backRoute)}>
               {backLabel}

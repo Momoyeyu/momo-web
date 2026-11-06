@@ -1,0 +1,42 @@
+{
+  "model_identity": "Xenova/multilingual-e5-small@761b726dd34fb83930e26aab4e9ac3899aa1fa78:int8:mean:l2:e5-prefix:v1:max512",
+  "source_repository": "Xenova/multilingual-e5-small",
+  "source_revision": "761b726dd34fb83930e26aab4e9ac3899aa1fa78",
+  "upstream_repository": "intfloat/multilingual-e5-small",
+  "upstream_revision": "614241f622f53c4eeff9890bdc4f31cfecc418b3",
+  "license": "MIT",
+  "license_source": "microsoft/unilm LICENSE; upstream model card license: mit",
+  "dimension": 384,
+  "max_tokens": 512,
+  "pooling": "attention-mask mean + L2",
+  "prefixes": {
+    "query": "query: ",
+    "passage": "passage: "
+  },
+  "files": [
+    {
+      "path": "model_quantized.onnx",
+      "sha256": "f80102d3f2a1229f387d3c81909990d8945513e347b0eab049f7de3c6f98c193",
+      "size_bytes": 118308185,
+      "url": "https://huggingface.co/Xenova/multilingual-e5-small/resolve/761b726dd34fb83930e26aab4e9ac3899aa1fa78/onnx/model_quantized.onnx"
+    },
+    {
+      "path": "tokenizer.json",
+      "sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+      "size_bytes": 17082730,
+      "url": "https://huggingface.co/Xenova/multilingual-e5-small/resolve/761b726dd34fb83930e26aab4e9ac3899aa1fa78/tokenizer.json"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "904dc4d8749877f1dba1cda48200d2462dccbeb7c134d5e4ef6fa75e0198c8fe",
+      "size_bytes": 1104,
+      "url": "https://raw.githubusercontent.com/microsoft/unilm/master/LICENSE"
+    },
+    {
+      "path": "UPSTREAM_README.md",
+      "sha256": "0038de97aee16258cecbad7ffda4b4febd6953e747a00e0ddbc8e6ed241e9c1c",
+      "size_bytes": 497538,
+      "url": "https://huggingface.co/intfloat/multilingual-e5-small/raw/614241f622f53c4eeff9890bdc4f31cfecc418b3/README.md"
+    }
+  ]
+}

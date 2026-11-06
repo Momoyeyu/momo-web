@@ -46,10 +46,8 @@ const DEFAULT_SETTINGS: Settings = {
   // 服务地址与模型一律留空：新用户按输入框里的灰色提示自己填。
   // 这里曾经预填过 deepseek / 本机端口 / 某台内网 embedding 服务器的地址 ——
   // 那些是开发者的环境，不该随仓库发给每个 clone 的人。
-  llm: { url: "", key: "", model: "" },
-  asr: { mode: "builtin", url: "", key: "", model: "" },
+  llm: { url: "", key: "", model: "", thinking: false },
   tts: { url: "", key: "", voice: "", prompt: "" },
-  embedding: { url: "", key: "", model: "" },
   extensions: [],
 };
 
@@ -162,10 +160,8 @@ function merge(parsed: Partial<PersistedState>): PersistedState {
   return {
     settings: {
       general: { ...d.settings.general, ...s?.general },
-      llm: { ...d.settings.llm, ...s?.llm },
-      asr: { ...d.settings.asr, ...s?.asr },
+      llm: { ...d.settings.llm, ...s?.llm, thinking: s?.llm?.thinking === true },
       tts: { ...d.settings.tts, ...s?.tts },
-      embedding: { ...d.settings.embedding, ...s?.embedding },
       extensions: normalizeExtensions(s?.extensions),
     },
     avatars,

@@ -5,17 +5,7 @@ export interface LlmConfig {
   url: string;
   key: string;
   model: string;
-}
-
-/** ASR 端点（ws(s)://…[/v1/listen]，Deepgram 对齐流式）。 */
-export interface AsrConfig {
-  /** builtin = backend 内置 SenseVoice；openai = 任何 OpenAI 兼容 HTTP 端点。 */
-  mode: "builtin" | "openai";
-  /** openai 模式：base URL（http(s)://host/v1 或完整 /audio/transcriptions）。 */
-  url: string;
-  key: string;
-  /** openai 模式：模型名（OpenAI 官方要 whisper-1；自托管多为任意值）。 */
-  model: string;
+  thinking: boolean;
 }
 
 /** TTS 端点：GPT-SoVITS api_v2 服务地址（前端统一走 backend 的 /api/tts/speech）。 */
@@ -29,14 +19,6 @@ export interface TtsConfig {
   prompt: string;
   // 语言不在这里：TTS 合成语言跟随**对话语言**（settings.general.chatLang），
   // 由调用方按请求传入（见 services/ttsClient.ts 的 SpeakOptions.lang）。
-}
-
-/** 语义检索 embedding 端点（http(s)://…，POST /v1/embeddings，OpenAI 对齐）。
- *  由 backend 记忆检索消费；url 留空 = 只用词面召回。 */
-export interface EmbeddingConfig {
-  url: string;
-  key: string;
-  model: string;
 }
 
 /** 界面语言（i18n）；新增语言同时在 i18n/ 注册字典。 */
@@ -67,9 +49,8 @@ export interface GeneralConfig {
   voiceVolume: number;
   /** chat 页左上角是否显示对话状态条（空闲/聆听/思考/回应）。 */
   showStatus: boolean;
-  /** 语音输入（ASR 麦克风）；asr.url 未配置时强制为关。 */
+  /** 使用内置识别的语音输入开关。 */
   voiceInput: boolean;
-  /** 记忆语义检索（embedding）；embedding.url 未配置时强制为关。 */
 }
 
 /** MCP 拓展登记项：外部 MCP server 的连接配置（backend 每回合按此连接并
@@ -98,9 +79,7 @@ export interface McpExtension {
 export interface Settings {
   general: GeneralConfig;
   llm: LlmConfig;
-  asr: AsrConfig;
   tts: TtsConfig;
-  embedding: EmbeddingConfig;
   /** 已登记的 MCP 拓展清单。 */
   extensions: McpExtension[];
 }

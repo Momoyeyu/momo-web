@@ -3,7 +3,7 @@
 // 打断（SpeechStarted / stop）= 停播放 + abort SSE/TTS。
 // 设置每次回合开始从 store 现读——setting 页改动无需重启即生效。
 
-import { createAsr, setAsrChatLang } from "../services/asrClient";
+import { createAsr } from "../services/asrClient";
 import { ttsConfigured } from "../lib/asr";
 import type { AsrEngine } from "../services/asrClient";
 import { MicStreamer } from "../audio/capture";
@@ -23,6 +23,7 @@ import { streamSpeech } from "../services/ttsClient";
 import { chat, interrupt as sendInterrupt } from "../services/chatClient";
 import type { PerformanceCue, PresentationSnapshot } from "../live2d/performanceTypes";
 import { dueCues } from "./cueScheduler";
+import { meetingGeneration } from "../services/onboardingClient";
 import { charsPerSec, dwellMs, sentencePauseMs } from "./pacing";
 
 interface ChatEngineEvents {
@@ -82,6 +83,8 @@ interface Turn {
   audioAbort: AbortController;
   userText: string;
   userMessageId: string;
+  opening: boolean;
+  generation: number | null;
   /** assistant 已产出全文（打断按此落账）。 */
   text: string;
   llmDone: boolean;
@@ -120,6 +123,7 @@ export class ChatEngine {
   private asr: AsrEngine | null = null;
   private micOn = false;
   private micStarting = false;
+  private micAttempt = 0;
   /** 离开 chat 页的挂起标记；micIntended 记录挂起前用户开着麦（回来恢复）。 */
   private micSuspended = false;
   private micIntended = false;
@@ -129,6 +133,7 @@ export class ChatEngine {
    *  backend 可能先收新消息再收截断，把新回合落账作废）。 */
   private sendQueue: Promise<void> = Promise.resolve();
   private disposed = false;
+  private openingScheduled = false;
   private voiceMuted = false;
   private unsubVolume: (() => void) | null = null;
   /** 最近一次上屏字幕（Chat 页中途挂载时同步用）。 */
@@ -140,6 +145,15 @@ export class ChatEngine {
     this.unsubVolume = subscribe(() => this.applyVolume());
     this.player.onMouthOpen = (v) =>
       this.tryStage((s) => s.setMouthOpen(v, this.player.playing));
+    this.player.onUnavailable = () => {
+      const t = this.turn;
+      if (!t) return;
+      t.audioAbort.abort();
+      for (const item of t.sentences) item.tts = null;
+      this.safe(() => this.player.stop());
+      this.flushTts(t);
+      this.maybeFinish(t);
+    };
     this.player.onDrain = () => {
       const t = this.turn;
       if (t) this.maybeFinish(t);
@@ -155,6 +169,11 @@ export class ChatEngine {
   /** 麦克风是否开着（持续监听形态，与回合状态正交）。 */
   get listening(): boolean {
     return this.micOn;
+  }
+
+  /** Pending activation counts as on for the toggle, so a second click cancels it. */
+  get microphoneActive(): boolean {
+    return this.micOn || this.micStarting;
   }
 
   /** 语音输出静音开关（工具栏即时切换，不持久化）。 */
@@ -248,7 +267,14 @@ export class ChatEngine {
     );
   }
 
-  private async doSend(trimmed: string): Promise<void> {
+  /** First meeting uses normal pacing / TTS / ACT, without a fictitious user. */
+  beginFirstMeeting(): void {
+    if (this.disposed || this.openingScheduled || this.phase !== "idle") return;
+    this.openingScheduled = true;
+    this.sendQueue = this.sendQueue.then(() => this.doSend("", true)).catch(() => {});
+  }
+
+  private async doSend(trimmed: string, opening = false): Promise<void> {
     if (this.disposed) return;
     // 新输入隐式打断在途回合（绕过防抖，保证打断一定生效）；
     // await 回传完成：backend 先修正尾对再收新消息，保证消息不乱序。
@@ -270,8 +296,10 @@ export class ChatEngine {
       text: trimmed,
       at: new Date().toISOString(),
     };
-    this.history.push(userMsg);
-    this.events.onUserMessage(userMsg);
+    if (!opening) {
+      this.history.push(userMsg);
+      this.events.onUserMessage(userMsg);
+    }
 
     const turn: Turn = {
       presentation: null,
@@ -279,7 +307,9 @@ export class ChatEngine {
       abort: new AbortController(),
       audioAbort: new AbortController(),
       userText: trimmed,
-      userMessageId: userMsg.id,
+      userMessageId: opening ? "" : userMsg.id,
+      opening,
+      generation: meetingGeneration(),
       text: "",
       llmDone: false,
       finished: false,
@@ -311,16 +341,10 @@ export class ChatEngine {
       this.micIntended = false;
       return;
     }
-    // 内置引擎总能连（模型缺失由 backend 回 error 事件）；自定义引擎要求 url
-    if (cfg.asr.mode === "openai" && !cfg.asr.url.trim()) {
-      this.events.onError(new ServiceError("asr", "unconfigured"));
-      return;
-    }
     this.micStarting = true;
+    const attempt = ++this.micAttempt;
     const mic = new MicStreamer();
-    // 语言跟随对话语言：内置引擎按它选识别语言，openai 引擎按它传 language
-    setAsrChatLang(cfg.general.lang, cfg.general.chatLang);
-    const asr = createAsr(cfg.asr, {
+    const asr = createAsr({
       onSpeechStarted: () => {
         if (this.phase !== "idle") this.interrupt();
       },
@@ -331,30 +355,37 @@ export class ChatEngine {
       onClose: (_code: number) => {
         // 服务端断连：若我们认为还在听，收尾回到非监听态。
         if (this.asr === asr) {
-          this.asr = null;
-          this.micOn = false;
-          this.safe(() => this.mic?.cancel());
-          this.mic = null;
-          this.emitStatus();
+          // Invalidate pending permission/start too; a late grant must not record.
+          this.stopListening();
         }
       },
     });
+    // Store pending resources too: stop/navigation must cancel a connecting socket.
+    this.mic = mic;
+    this.asr = asr;
+    const current = (): boolean => !this.disposed && attempt === this.micAttempt && this.micIntended;
     try {
       // 连接就绪后再开采集，避免开头几帧静默丢弃。
       await asr.connect();
+      if (!current()) return;
       await mic.start((pcm) => asr.send(pcm), {
         onError: (e) => this.events.onError(toError(e)),
       });
-      this.mic = mic;
-      this.asr = asr;
+      if (!current()) return;
       this.micOn = true;
       this.emitStatus();
     } catch (e) {
       this.safe(() => mic.cancel());
       this.safe(() => asr.close());
-      this.events.onError(toError(e));
+      if (current()) this.events.onError(toError(e));
     } finally {
-      this.micStarting = false;
+      if (!current() || !this.micOn) {
+        this.safe(() => mic.cancel());
+        this.safe(() => asr.close());
+        if (this.asr === asr) { this.asr = null; this.mic = null; }
+        if (attempt === this.micAttempt) this.micIntended = false;
+      }
+      if (attempt === this.micAttempt) this.micStarting = false;
     }
   }
 
@@ -374,7 +405,7 @@ export class ChatEngine {
     if (!this.micSuspended) return;
     this.micSuspended = false;
     const cfg = getSettings();
-    if (this.micIntended && cfg.general.voiceInput && cfg.asr.url.trim()) {
+    if (this.micIntended && cfg.general.voiceInput) {
       void this.startListening();
     }
   }
@@ -382,6 +413,8 @@ export class ChatEngine {
   /** 关麦（释放 ASR 连接与采集）。无条件清意向——
    *  挂起态由 suspendMic 自己先存意向再调本函数。 */
   stopListening(): void {
+    this.micAttempt++;
+    this.micStarting = false;
     this.micIntended = false;
     this.micOn = false;
     const mic = this.mic;
@@ -455,7 +488,7 @@ export class ChatEngine {
     // 与回传 backend 的截断值一致（assistant 可空，空则本地也不落账）。
     const seen = this.seenText(turn);
     const done = persist
-      ? sendInterrupt(turn.userText, seen)
+      ? (turn.generation == null ? sendInterrupt(turn.userText, seen) : sendInterrupt(turn.userText, seen, turn.generation))
       : Promise.resolve();
     // 各句已逐句进转写；打断时按「用户实际看到的」重建本轮尾部，
     // 与回传 backend 的 seen 同源（backend 用同一规则裁剪 DB 里的本轮行）。
@@ -480,9 +513,10 @@ export class ChatEngine {
 
   private async runTurn(turn: Turn, cfg: Settings, userText: string): Promise<void> {
     try {
-      for await (const ev of chat(userText, turn.abort.signal, turn.presentation)) {
+      for await (const ev of chat(userText, turn.abort.signal, turn.presentation, turn.opening)) {
         if (this.turn !== turn) return; // 已被打断
         if (ev.t === "sentence") {
+          if (ev.generation != null) turn.generation = ev.generation;
           turn.text += ev.text;
           this.pushSentence(turn, cfg, ev.text, ev.cues);
         } else if (ev.t === "error") {
@@ -499,6 +533,7 @@ export class ChatEngine {
       const index = this.history.findIndex((m) => m.id === turn.userMessageId);
       if (index >= 0) this.history.splice(index, 1);
     }
+    if (turn.opening && !turn.text.trim()) this.openingScheduled = false;
     turn.llmDone = true;
     this.maybeFinish(turn);
   }
@@ -526,10 +561,8 @@ export class ChatEngine {
     this.history.push(msg);
     this.events.onSentence(msg);
     if (this.voiceMuted || turn.audioAbort.signal.aborted) return;
-    if (!ttsConfigured(cfg.tts)) {
-      this.reportTtsOnce(turn, new ServiceError("tts", "unconfigured"));
-      return;
-    }
+    // Voice is optional; missing configuration is a valid text-only mode.
+    if (!ttsConfigured(cfg.tts)) return;
     const tts: TtsItem = { chunks: [], pushed: 0, done: false };
     item.tts = tts;
     turn.inflight += 1;

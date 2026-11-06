@@ -34,3 +34,9 @@ backend/models/
 *.sqlite-shm
 *.sqlite3-wal
 *.sqlite3-shm
+
+# Large bundled model build inputs: included in offline release resource archive.
+# Manifests, checksums, model cards and licenses remain tracked.
+backend/resources/embedding/**/*.onnx
+backend/resources/embedding/**/tokenizer.json
+backend/resources/embedding/**/.cache/

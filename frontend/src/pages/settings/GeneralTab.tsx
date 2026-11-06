@@ -4,7 +4,7 @@ import { useState, useSyncExternalStore } from "react";
 
 import { getChatEngine } from "../../chat/engineInstance";
 import { useT, tFor, LANGS } from "../../i18n";
-import { asrConfigured, ttsConfigured as ttsReadyOf } from "../../lib/asr";
+import { ttsConfigured as ttsReadyOf } from "../../lib/asr";
 import { getState, speakerName, subscribe, update } from "../../lib/store";
 import type { Settings as SettingsData } from "../../lib/types";
 import FieldRow from "../../ui/FieldRow";
@@ -19,7 +19,6 @@ export default function GeneralTab() {
 
   const [voiceMuted, setVoiceMuted] = useState(getChatEngine().muted);
   const ttsReady = ttsReadyOf(settings.tts);
-  const asrReady = asrConfigured(settings.asr);
 
   const toggleVoice = (on: boolean): void => {
     const eng = getChatEngine();
@@ -90,14 +89,9 @@ export default function GeneralTab() {
   <div className="opt-list">
   <FieldRow
     label={t("settings.voiceInput")}
-    hint={!asrReady ? t("settings.voiceNeedAsr") : undefined}
   >
     <Switch
-      on={asrReady && settings.general.voiceInput}
-      disabled={!asrReady}
-      title={
-        !asrReady ? t("settings.voiceNeedAsr") : undefined
-      }
+      on={settings.general.voiceInput}
       onChange={toggleVoiceInput}
     />
   </FieldRow>

@@ -17,7 +17,7 @@ from ..core.sentences import Sentence, SentenceStream
 from ..core import db
 from ..core.state import load as load_state
 from ..models import ChatMessage, ErrorEvent, State, StoredMessage, TurnEvent
-from . import checkpoint, compress, memory
+from . import checkpoint, compress, memory, onboarding
 from .capability import TOOLS, builtin_names, run_call
 from .prompt import build_system_prompt
 
@@ -30,16 +30,21 @@ SUMMARY_PREFIX = "以下是本次对话此前部分的摘要，其后的最新�
 # ==================== 主流程 ====================
 
 
-def run_turn(text: str, presentation: dict | None = None) -> Iterator[TurnEvent]:
+def run_turn(text: str, presentation: dict | None = None, first_meeting: bool = False) -> Iterator[TurnEvent]:
     """一回合：yield 增量/错误事件（结束即返回）。流程见 services/turn.py。"""
+    onboarding.status()  # Initialize/migrate before this turn adds a player row.
     state = load_state()
+    # Capture before reading history: a load/new session during prompt assembly
+    # must invalidate the whole turn, not authorize its old context in a new scene.
+    at, gen = db.now_iso(), checkpoint.generation()
     messages = build_messages(state, text, presentation)  # 节点 B
-
-    at, gen = db.now_iso(), checkpoint.generation()  # 代际快照
     if not checkpoint.begin_turn(text, gen, at):
         return  # 会话已被读档/重置 → 本回合静默作废
 
     try:
+        direction = onboarding.resolve(text, gen, at, allow_new=first_meeting)
+        if direction:
+            messages.insert(-1, {'role': 'system', 'content': direction})
         with mcp.open_tools(state["settings"]["extensions"], builtin_names()) as ext_tools:
             for event in react(messages, ext_tools, state, gen, at, presentation):
                 if event["t"] == "error":
@@ -47,7 +52,11 @@ def run_turn(text: str, presentation: dict | None = None) -> Iterator[TurnEvent]
                     # cannot pick up an unanswered, failed input.
                     checkpoint.discard_unanswered_turn(gen, at)
                 yield event
+    except llm.LlmError as e:
+        checkpoint.discard_unanswered_turn(gen, at)
+        yield _error(str(e))
     finally:
+        onboarding.settle_reply(at)
         # Also handles setup exceptions, empty/control-only responses and close.
         checkpoint.discard_unanswered_turn(gen, at)
 
@@ -133,6 +142,7 @@ def react(
             return None
         ev: TurnEvent = {
             "t": "sentence",
+            "generation": gen,
             "no": seq,
             "text": sent.text,
             "cues": [
@@ -148,8 +158,17 @@ def react(
     for _ in range(MAX_ROUNDS):
         calls: list[dict[str, Any]] | None = None
         round_text = ""
+        reasoning: dict[str, Any] = {}  # Private protocol state, never a TurnEvent.
+        if checkpoint.generation() != gen:
+            return
         try:
-            for ev in llm.chat_stream(llm_cfg, messages, tools=tools, usage_out=usage):
+            for ev in llm.chat_stream(
+                llm_cfg, messages, tools=tools, usage_out=usage,
+                reasoning_out=reasoning,
+                cancelled=lambda: checkpoint.generation() != gen,
+            ):
+                if checkpoint.generation() != gen:
+                    return
                 if ev["type"] == "text":
                     delta = str(ev["delta"])
                     round_text += delta
@@ -161,9 +180,13 @@ def react(
                 elif ev["type"] == "tool_calls":
                     calls = ev["calls"]
         except llm.LlmError as e:
+            if checkpoint.generation() != gen:
+                return
             yield _error(str(e))  # 节点 ERR（不发 done，由 api 层决定）
             return
 
+        if checkpoint.generation() != gen:
+            return
         if calls:
             # 工具轮：本轮 assistant 消息（含前言正文）原样回传 + 回填工具结果
             messages.append(
@@ -171,9 +194,12 @@ def react(
                     "role": "assistant",
                     "content": round_text or None,
                     "tool_calls": calls,
+                    **reasoning,
                 }
             )
             for call in calls:
+                if checkpoint.generation() != gen:
+                    return
                 messages.append(run_call(call, ext_tools))
             continue
 

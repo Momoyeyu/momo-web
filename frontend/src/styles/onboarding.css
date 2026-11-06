@@ -1,0 +1,14 @@
+/* The connection gate uses the same quiet panel / gold action as settings. */
+.first-meeting-setup {
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100cqh - 40px);
+  overflow-y: auto;
+}
+.first-meeting-setup:focus { outline: none; }
+.first-meeting-setup h2 { margin: 0; font-size: 22px; }
+.first-meeting-setup p { margin: 0; line-height: 1.7; }
+.first-meeting-setup form { display: grid; gap: 16px; margin-top: 8px; }
+.first-meeting-setup label { display: grid; gap: 8px; }
+.first-meeting-setup input { width: 100%; min-width: 0; }
+.first-meeting-error { color: #ec9d9d; }
+.first-meeting-connect { position: absolute; right: 24px; top: 24px; }

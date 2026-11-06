@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ConfigDict
 
-from ..services import checkpoint, turn
+from ..services import checkpoint, turn, onboarding
 from ..models import SseEvent
 
 router = APIRouter()
@@ -43,12 +43,14 @@ class PresentationIn(BaseModel):
 
 class ChatIn(BaseModel):
     text: str
+    firstMeeting: bool = False
     presentation: PresentationIn | None = None
 
 
 class InterruptIn(BaseModel):
     """打断回传：本回合的用户输入 + 用户实际看到的 assistant 文本（可空）。"""
 
+    generation: int | None = Field(default=None, ge=0)
     user: str = ""
     assistant: str = ""
 
@@ -65,7 +67,7 @@ def chat(req: ChatIn) -> StreamingResponse:
     def stream() -> Iterator[str]:
         errored = False
         try:
-            for ev in turn.run_turn(req.text, req.presentation.model_dump() if req.presentation else None):
+            for ev in turn.run_turn(req.text, req.presentation.model_dump() if req.presentation else None, **({"first_meeting": True} if req.firstMeeting else {})):
                 if ev["t"] == "error":
                     errored = True
                 yield _sse(ev)
@@ -85,5 +87,5 @@ def interrupt(req: InterruptIn) -> Response:
     幂等且与回合写入无序敏感——无论打断先于/后于回合落账到达，
     最终后端记录 = 前端展示。
     """
-    checkpoint.interrupt_turn(req.user, req.assistant)
-    return Response(status_code=204)
+    generation = onboarding.interrupt(req.user, req.assistant, req.generation)
+    return Response(status_code=204, headers={"X-Momo-Generation": str(generation)})

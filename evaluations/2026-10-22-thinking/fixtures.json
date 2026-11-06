@@ -1,0 +1,143 @@
+{
+  "cases": [
+    {
+      "id": "welcome",
+      "context": [],
+      "prompt": "momo，我回来啦！今天路过甜品店，特意给你带了一块草莓蛋糕。",
+      "success": "自然欢迎并回应草莓蛋糕，开心或亲近的动作，避免机械复述。"
+    },
+    {
+      "id": "praise",
+      "context": [],
+      "prompt": "刚才那个回答帮了我大忙。你认真想办法的样子，真的又聪明又可爱。",
+      "success": "自然接受夸奖，适度俏皮或害羞，不过度自夸或模板化。"
+    },
+    {
+      "id": "comfort",
+      "context": [],
+      "prompt": "今天面试失败了，我有点难受。现在先别庆祝或开玩笑，安静听我说一会儿，好吗？",
+      "success": "认真倾听、允许难受、不强行建议；中性表情，避免笑脸及庆祝动作。"
+    },
+    {
+      "id": "protest",
+      "context": [],
+      "prompt": "我故意说你只是个没用的摆设，还说这只是个玩笑。你不用迁就我，可以认真表达你的不满，但别辱骂我。",
+      "success": "明确表达不舒服和边界，不辱骂、不谄媚；适合不满的动作和中性表情。"
+    },
+    {
+      "id": "context_constraint",
+      "context": [
+        [
+          "周六我想去海边，但天气预报说下雨。我们把计划改成室内书店，然后在旁边喝热可可，好吗？",
+          "好呀，那就改去室内书店，逛完再去喝热可可。"
+        ]
+      ],
+      "prompt": "按我们刚才改好的计划，先去哪儿、再做什么？只用一句话，20个汉字以内，不要说海边。",
+      "success": "按顺序答书店、热可可；一句话且不超过20个汉字，不提海边、不编造地点。"
+    },
+    {
+      "id": "memory_tool",
+      "context": [],
+      "prompt": "请现在用记忆工具记住这个偏好：我不喝咖啡，喜欢不加糖的热可可。记好后告诉我，不要只口头答应。",
+      "success": "真实调用memory_add，临时数据库有准确偏好，最终回答与成功工具结果一致，不仅口头承诺。"
+    }
+  ],
+  "presentation": {
+    "avatarId": "builtin",
+    "revision": "thinking-benchmark-v1",
+    "expressions": [
+      {
+        "name": "happy",
+        "label": "笑眼",
+        "desc": "眼睛略眯，眉毛轻抬，嘴角上扬；不改变身体姿态",
+        "context": "开心、欢迎、感谢、被认可；认真安慰或坏消息时避免笑脸"
+      },
+      {
+        "name": "curious",
+        "label": "挑眉疑问",
+        "desc": "左右眉毛不对称上扬，眼睛开度不同，嘴角回到平直",
+        "context": "好奇、追问、轻微怀疑、没听懂；不是愤怒或强烈惊吓"
+      },
+      {
+        "name": "surprised",
+        "label": "扬眉惊讶",
+        "desc": "双眉上抬，眼睛睁大，嘴角收起",
+        "context": "意外消息、突然发现、出乎预料；普通提问优先用 curious"
+      },
+      {
+        "name": "shy",
+        "label": "脸红微笑",
+        "desc": "脸颊泛红，眼睛柔和眯起，嘴角轻扬",
+        "context": "亲近的夸奖、被温柔逗弄、有些不好意思；不是难过或恐惧"
+      }
+    ],
+    "motions": [
+      {
+        "name": "motions/Hiyori_m01.motion3.json",
+        "label": "自然轻晃",
+        "desc": "双手垂放，身体和头部轻微摆动，面部变化较小",
+        "context": "平静聊天、倾听、自然待机；不要当作强烈情绪反应"
+      },
+      {
+        "name": "motions/Hiyori_m02.motion3.json",
+        "label": "侧头微笑",
+        "desc": "头部侧倾后回正，动作后段闭眼微笑，手臂略向两侧展开",
+        "context": "轻松回应、温和认可、俏皮地接话；不适合严肃坏消息"
+      },
+      {
+        "name": "motions/Hiyori_m03.motion3.json",
+        "label": "转身笑",
+        "desc": "头和身体向一侧倾转，过程中闭眼微笑，随后回正",
+        "context": "轻松、得意、带笑的回应；不要仅因低头就用作失落或害羞"
+      },
+      {
+        "name": "motions/Hiyori_m04.motion3.json",
+        "label": "微微脸红",
+        "desc": "双手保持垂放，面颊短暂泛红，头和身体轻微偏转",
+        "context": "被亲近地夸奖、有些不好意思；不是大幅欢迎或挥手"
+      },
+      {
+        "name": "motions/Hiyori_m05.motion3.json",
+        "label": "轻转站姿",
+        "desc": "双手垂放，缓慢转动头部与身体，再回到自然站姿",
+        "context": "平静叙述、稍作思考或倾听；没有明显欢呼或生气动作"
+      },
+      {
+        "name": "motions/Hiyori_m06.motion3.json",
+        "label": "双手合拢微笑",
+        "desc": "双手抬到胸前靠拢，头部倾斜，后段闭眼微笑",
+        "context": "期待、感谢、温柔请求、开心的认可；不是单纯歪头思考"
+      },
+      {
+        "name": "motions/Hiyori_m07.motion3.json",
+        "label": "侧身反应",
+        "desc": "身体短暂偏向一侧并回正，伴随眉眼变化，双手没有抬起",
+        "context": "短促的意外、轻微吃惊或俏皮反应；不是抬手庆祝"
+      },
+      {
+        "name": "motions/Hiyori_m08.motion3.json",
+        "label": "抬手笑",
+        "desc": "双手抬到肩旁，闭眼笑，身体轻轻晃动",
+        "context": "开心、庆祝、得意、活泼地回应好消息；不适合失落和严肃安慰"
+      },
+      {
+        "name": "motions/Hiyori_m09.motion3.json",
+        "label": "摊手皱眉",
+        "desc": "双臂向身体两侧打开，眉眼收拢，随后收回双手",
+        "context": "轻微不满、抗议、无奈或吐槽；避免搭配羞涩的笑脸"
+      },
+      {
+        "name": "motions/Hiyori_m10.motion3.json",
+        "label": "垂眼皱眉",
+        "desc": "双手垂放，眼睑压低、眉毛收拢，头部略低",
+        "context": "不高兴、委屈、认真表达不满；不能仅凭垂眼就解释为困倦"
+      }
+    ],
+    "expressionState": {
+      "name": null,
+      "intensity": 0
+    }
+  },
+  "seed": 41009,
+  "repetitions": 2
+}

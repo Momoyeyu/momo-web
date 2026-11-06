@@ -12,12 +12,11 @@ vi.mock("../services/ttsClient", () => ({
   streamSpeech: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("../services/asrClient", () => ({
-  setAsrChatLang: vi.fn(),
-  createAsr: () => ({
+  createAsr: vi.fn(() => ({
     connect: (): Promise<void> => Promise.resolve(),
     send: (): void => {},
     close: (): void => {},
-  }),
+  })),
 }));
 vi.mock("../audio/capture", () => ({
   MicStreamer: class {
@@ -51,6 +50,8 @@ vi.mock("../live2d/stage", () => ({
   }),
 }));
 
+import { MicStreamer } from "../audio/capture";
+import { createAsr } from "../services/asrClient";
 import { chat, interrupt } from "../services/chatClient";
 import { ChatEngine } from "./chatEngine";
 import { getSettings, update } from "../lib/store";
@@ -102,8 +103,7 @@ beforeEach(() => {
   update({
     settings: {
       ...getSettings(),
-      llm: { url: "http://llm.test", key: "", model: "test-model" },
-      asr: { mode: "openai", url: "http://asr.test/v1", key: "", model: "" },
+      llm: { url: "http://llm.test", key: "", model: "test-model", thinking: false },
       tts: { url: "http://tts.test", key: "", voice: "", prompt: "" },
     },
   });
@@ -234,6 +234,47 @@ describe("麦克风开关语义", () => {
     }
   });
 
+  it("stop during pending builtin connection never reopens the microphone", async () => {
+    let ready!: () => void;
+    const connect = new Promise<void>(resolve => { ready = resolve; });
+    const close = vi.fn();
+    vi.mocked(createAsr).mockReturnValueOnce({connect: () => connect, send: () => {}, close});
+    const {eng} = makeEngine();
+    const opening = eng.startListening();
+    expect(eng.microphoneActive).toBe(true);
+    eng.stopListening();
+    expect(eng.microphoneActive).toBe(false);
+    ready();
+    await opening;
+    expect(eng.listening).toBe(false);
+    expect(close).toHaveBeenCalled();
+    eng.dispose();
+  });
+
+  it("ASR disconnect during permission wait invalidates activation and releases a late microphone", async () => {
+    let allow!: () => void;
+    let disconnected: ((code: number) => void) | undefined;
+    const permission = new Promise<void>(resolve => { allow = resolve; });
+    const start = vi.spyOn(MicStreamer.prototype, "start").mockImplementationOnce(() => permission);
+    const cancel = vi.spyOn(MicStreamer.prototype, "cancel");
+    vi.mocked(createAsr).mockImplementationOnce(events => {
+      disconnected = events.onClose;
+      return {connect: async () => {}, send: () => {}, close: () => {}};
+    });
+    const {eng} = makeEngine();
+    const opening = eng.startListening();
+    await tick();
+    disconnected?.(1006);
+    const cancellations = cancel.mock.calls.length;
+    allow();
+    await opening;
+    expect(eng.listening).toBe(false);
+    expect(eng.microphoneActive).toBe(false);
+    expect(cancel.mock.calls.length).toBeGreaterThan(cancellations);
+    eng.dispose();
+    start.mockRestore();cancel.mockRestore();
+  });
+
   it("voiceInput 关着时 startListening 不启动", async () => {
     const { eng } = makeEngine();
     setVoiceInput(false);
@@ -306,6 +347,23 @@ describe('unanswered request failures', () => {
     eng.sendText('question');
     await tick();
     expect(eng.history.map(m => m.text)).toEqual(['question', 'A real reply.']);
+    eng.dispose();
+  });
+});
+
+describe('scripted first meeting', () => {
+  it('plays an assistant-only opening through the existing sentence queue once', async () => {
+    chatMock.mockImplementation(async function* () {
+      yield { t: 'sentence' as const, no: 0, text: '我叫 momo。', cues: [], at: '' };
+      yield { t: 'done' as const };
+    });
+    const { eng } = makeEngine();
+    eng.beginFirstMeeting();
+    eng.beginFirstMeeting();
+    await tick();
+    expect(chatMock).toHaveBeenCalledTimes(1);
+    expect(eng.history.map(m => [m.role, m.text])).toEqual([['assistant', '我叫 momo。']]);
+    expect(chatMock.mock.calls[0][3]).toBe(true);
     eng.dispose();
   });
 });

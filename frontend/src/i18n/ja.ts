@@ -1,6 +1,16 @@
 import type { Dict } from "./zh";
 
 export const ja: Dict = {
+  meeting: {
+    connectionSettings: '接続設定',
+    'connectTitle': 'momo に会おう',
+    'connectBody': '対話モデルを接続して、お互いを知ることから始めましょう。音声はあとで設定できます。',
+    'url': 'サービス URL',
+    'key': 'API キー（必要な場合）',
+    'model': 'モデル名',
+    'begin': 'momo に会う',
+    'connectionError': '接続を保存できませんでした。URL、モデル名とバックエンドを確認して、もう一度お試しください。',
+  },
   performance: {
     label: "名前",
     desc: "実際の動き",
@@ -144,6 +154,10 @@ export const ja: Dict = {
     asrBuiltinHint: "この端末の内蔵音声認識を使います。中国語・日本語・英語に対応。追加設定は不要です。",
     asrHint: "独自の音声認識サービスに接続します。OpenAI 互換の転写インターフェースが必要です。URL、API キー、モデル名を入力してください。",
     asrModelPh: "whisper-1 / faster-whisper-large-v3",
+    thinking: "思考モード",
+    thinkingHint: "返答の前に思考するため、待ち時間が長くなる場合があります。現在は DeepSeek 公式 API に対応しています。",
+    builtinSpeechUnavailable: "内蔵音声リソースを利用できません。完全版を再インストールしてください。",
+    builtinRecallUnavailable: "意味検索を利用できないため、文字による検索を使用しています。",
     llmHint: "会話に使う大規模言語モデルサービスに接続します。OpenAI 互換のインターフェースが必要です。URL、API キー、モデル名を入力してください。",
     ttsUrlPh: "http://127.0.0.1:9880",
     ttsHint: "音声合成サービスに接続します。GPT-SoVITS の api_v2 インターフェースが必要です。URL を入力し、クリアな参照音声をアップロードして声を設定します。参照テキストはその音声の内容で、空でも構いません。",

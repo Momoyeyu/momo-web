@@ -24,15 +24,7 @@ class LlmConfig(TypedDict):
     url: str
     key: str
     model: str
-
-
-class AsrConfig(TypedDict):
-    """ASR 端点。mode: "builtin" 用内置 SenseVoice；"openai" 用任何兼容
-    OpenAI /v1/audio/transcriptions 的服务（url 为 base，如 http://host:8080/v1）。"""
-
-    mode: str
-    url: str
-    key: str
+    thinking: bool
 
 
 class TtsConfig(TypedDict):
@@ -46,12 +38,6 @@ class TtsConfig(TypedDict):
     key: str
     voice: str
     prompt: str
-
-
-class EmbeddingConfig(TypedDict):
-    url: str
-    key: str
-    model: str
 
 
 class Extension(TypedDict):
@@ -81,9 +67,7 @@ class GeneralSettings(TypedDict):
 class Settings(TypedDict):
     general: GeneralSettings
     llm: LlmConfig
-    asr: AsrConfig
     tts: TtsConfig
-    embedding: EmbeddingConfig
     extensions: list[Extension]
 
 
@@ -236,6 +220,7 @@ class ChatMessage(TypedDict):
 
     role: ChatRole
     content: str | None
+    reasoning_content: NotRequired[str]  # Ephemeral provider context, never stored.
     tool_calls: NotRequired[list[ToolCall]]
     tool_call_id: NotRequired[str]
 
@@ -281,6 +266,7 @@ class SentenceEvent(TypedDict):
     """
 
     t: Literal["sentence"]
+    generation: NotRequired[int]
     no: int
     text: str
     cues: list[PerformanceCue]

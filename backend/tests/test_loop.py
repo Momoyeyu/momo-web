@@ -18,7 +18,7 @@ def _tool_call(name: str, args: str = "{}", call_id: str = "call_1"):
 def test_react_tool_then_text(monkeypatch):
     seen_messages = []
 
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         seen_messages.append(list(messages))
         assert tools  # tools 声明已传
         if len(seen_messages) == 1:
@@ -58,7 +58,7 @@ def test_react_tool_then_text(monkeypatch):
 
 
 def test_llm_error_yields_error_event(monkeypatch):
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         raise llm.LlmError("llm unreachable")
 
     monkeypatch.setattr(llm, "chat_stream", fake_chat)
@@ -69,7 +69,7 @@ def test_llm_error_yields_error_event(monkeypatch):
 
 
 def test_max_rounds_without_content(monkeypatch):
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         yield {"type": "tool_calls", "calls": [_tool_call("common_time")]}
 
     monkeypatch.setattr(llm, "chat_stream", fake_chat)
@@ -83,7 +83,7 @@ def test_tool_memory_ops_via_react(monkeypatch):
     """tool_call 走真实 memory 层：add 成功、delete 未知 id 返回说明文本。"""
     rounds = []
 
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         rounds.append(list(messages))
         n = len(rounds)
         if n == 1:
@@ -163,7 +163,7 @@ def test_turn_speaks_before_and_after_tool_call(monkeypatch):
     """正文不再是回合的终点：工具调用前后都能说话，两段都成句落账。"""
     rounds = []
 
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         rounds.append(list(messages))
         if len(rounds) == 1:
             yield {"type": "text", "delta": "我查一下。"}
@@ -192,7 +192,7 @@ def test_sentence_is_persisted_before_round_finishes(monkeypatch):
     """阶段二的核心：第一句在**整轮结束之前**就已落账 —— 生成期间就能看到。"""
     snapshots = []
 
-    def fake_chat(llm_cfg, messages, tools=None, usage_out=None):
+    def fake_chat(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         yield {"type": "text", "delta": "第一句。第二句。"}
         # 流还没结束，此刻查 DB：第一句已经落账（第二句因「等下一个字符」还在缓冲）
         snapshots.append([m["text"] for m in checkpoint.live_messages()])

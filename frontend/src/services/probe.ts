@@ -3,8 +3,6 @@
 // 网络层失败/超时才算不可达。
 
 import type {
-  AsrConfig,
-  EmbeddingConfig,
   LlmConfig,
   TtsConfig,
 } from "../lib/types";
@@ -60,15 +58,6 @@ export async function probeLlm(cfg: LlmConfig): Promise<ProbeResult> {
   return get(modelsUrl(cfg), headers);
 }
 
-export async function probeEmbedding(
-  cfg: EmbeddingConfig,
-): Promise<ProbeResult> {
-  if (!cfg.url) return { ok: false, detail: "unconfigured" };
-  const headers: Record<string, string> = {};
-  if (cfg.key) headers.Authorization = `Bearer ${cfg.key}`;
-  return get(modelsUrl(cfg), headers);
-}
-
 export async function probeTts(cfg: TtsConfig): Promise<ProbeResult> {
   if (!cfg.url) return { ok: false, detail: "unconfigured" };
   try {
@@ -82,26 +71,4 @@ export async function probeTts(cfg: TtsConfig): Promise<ProbeResult> {
   } catch {
     return { ok: false, detail: "backend unreachable" };
   }
-}
-
-export async function probeAsr(cfg: AsrConfig): Promise<ProbeResult> {
-  if (cfg.mode === "builtin") {
-    try {
-      const s = await apiJson<{ ready: boolean; missing: string[] }>(
-        "/api/asr/status",
-      );
-      if (s.ready) return { ok: true, detail: "sensevoice" };
-      return {
-        ok: false,
-        detail: s.missing.length ? `缺少模型：${s.missing.join(", ")}` : "未就绪",
-      };
-    } catch {
-      return { ok: false, detail: "backend unreachable" };
-    }
-  }
-  if (!cfg.url) return { ok: false, detail: "unconfigured" };
-  const headers: Record<string, string> = {};
-  if (cfg.key) headers.Authorization = `Bearer ${cfg.key}`;
-  // OpenAI 兼容服务的惯例是 GET {base}/models；404 也说明主机可达
-  return get(modelsUrl(cfg), headers);
 }

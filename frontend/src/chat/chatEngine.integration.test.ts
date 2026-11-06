@@ -78,7 +78,7 @@ beforeEach(() => {
   update({
     settings: {
       ...getSettings(),
-      llm: { url: "http://llm.test", key: "", model: "test-model" },
+      llm: { url: "http://llm.test", key: "", model: "test-model", thinking: false },
       tts: { url: "", key: "", voice: "", prompt: "" },
     },
   });
@@ -106,4 +106,13 @@ describe("引擎消费真实 SSE（不 mock chatClient）", () => {
     await vi.waitFor(() => expect(errors.length).toBeGreaterThan(0));
     expect(errors.some((e) => String(e.message).includes("模型炸了"))).toBe(true);
   });
+});
+
+it('text-only conversation is valid without a configured voice service', async () => {
+  stubFetch();
+  const { engine, sentences, errors } = makeEngine();
+  engine.sendText('叫我小星');
+  await vi.waitFor(() => expect(sentences).toHaveLength(3));
+  expect(errors).toEqual([]);
+  engine.dispose();
 });

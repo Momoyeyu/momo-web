@@ -49,7 +49,7 @@ class _InlineThread:
 def _fake_completion(content="好。", prompt_tokens=0):
     """llm.chat_completion 替身：压缩摘要走非流式这条路径。"""
 
-    def fake(llm_cfg, messages, tools=None, usage_out=None):
+    def fake(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         if usage_out is not None:
             usage_out.update({"prompt_tokens": prompt_tokens})
         return {"role": "assistant", "content": content}
@@ -58,7 +58,7 @@ def _fake_completion(content="好。", prompt_tokens=0):
 
 
 def _fake_chat(content="好。", prompt_tokens=0):
-    def fake(llm_cfg, messages, tools=None, usage_out=None):
+    def fake(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         if usage_out is not None:
             usage_out.update({"prompt_tokens": prompt_tokens})
         yield {"type": "text", "delta": content}
@@ -412,7 +412,7 @@ def test_run_turn_skips_stream_when_gen_stale(monkeypatch):
     client = TestClient(app)
     sid = client.post("/api/checkpoints", json={}).json()["id"]
 
-    def fake(llm_cfg, messages, tools=None, usage_out=None):
+    def fake(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         client.post(f"/api/checkpoints/{sid}/load")  # LLM 返回前发生读档
         yield {"type": "text", "delta": "迟到回复"}
 
@@ -454,7 +454,7 @@ def test_compress_trigger_and_assembly(monkeypatch):
     # 下一回合：摘要作为独立 system 消息注入，最近窗口照旧
     seen = []
 
-    def spy(llm_cfg, messages, tools=None, usage_out=None):
+    def spy(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         seen.append(list(messages))
         yield {"type": "text", "delta": "嗯。"}
 
@@ -472,7 +472,7 @@ def test_compress_rolls_old_summary(monkeypatch):
     _set_summary("旧摘要")
     got = []
 
-    def fake(llm_cfg, messages, tools=None, usage_out=None):
+    def fake(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         got.append(messages[-1]["content"])
         return {"role": "assistant", "content": "新摘要"}
 
@@ -505,7 +505,7 @@ def test_compress_failure_silent(monkeypatch):
     _seed(4)
     monkeypatch.setattr(compress, "Thread", _InlineThread)
 
-    def boom(llm_cfg, messages, tools=None, usage_out=None):
+    def boom(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         raise llm.LlmError("down")
 
     monkeypatch.setattr(llm, "chat_completion", boom)
@@ -519,7 +519,7 @@ def test_compress_aborts_when_generation_moved(monkeypatch):
     """压缩进行期间会话被 load/打断（代际变更）→ 放弃写回，不破坏新会话。"""
     _seed(4)
 
-    def fake(llm_cfg, messages, tools=None, usage_out=None):
+    def fake(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
         checkpoint.interrupt_turn("", "")  # 代际 +1（等价 load 效果）
         return {"role": "assistant", "content": "摘要"}
 

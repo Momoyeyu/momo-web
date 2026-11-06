@@ -20,6 +20,8 @@ export class TtsPlayer {
   onMouthOpen: ((value: number) => void) | null = null;
   /** 播放队列播空（一句话/一轮播完）。 */
   onDrain: (() => void) | null = null;
+  /** Autoplay blocked or worklet unavailable: caller falls back to subtitles. */
+  onUnavailable: (() => void) | null = null;
 
   private ctx: AudioContext | null = null;
   private node: AudioWorkletNode | null = null;
@@ -98,6 +100,8 @@ export class TtsPlayer {
       this.initPromise = this.init().catch(() => {
         // 加载失败（如 worklet 404）：重置允许下次 push 重试，ctx 复用。
         this.initPromise = null;
+        this.stop();
+        this.onUnavailable?.();
       });
     }
     if (this.ctx && this.ctx.state !== "closed") {
@@ -111,6 +115,12 @@ export class TtsPlayer {
     await ctx.audioWorklet.addModule("/worklets/pcm-player.js");
     // init 期间被 dispose → ctx 已换主，放弃建图。
     if (this.ctx !== ctx) return;
+    if (ctx.state !== "running") {
+      this.initPromise = null;
+      this.stop();
+      this.onUnavailable?.();
+      return;
+    }
     const node = new AudioWorkletNode(ctx, "pcm-player");
     node.port.onmessage = (ev: MessageEvent<WorkletOutMsg>) => this.onWorkletMsg(ev.data);
     const gain = ctx.createGain();

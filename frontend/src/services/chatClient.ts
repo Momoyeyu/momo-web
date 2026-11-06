@@ -8,6 +8,7 @@
 //   {"t":"done"}                       回合结束
 //   {"t":"error","message":"…"}        回合失败（yield 给调用方映射成 Error）
 
+import { firstMeetingPending, acknowledgeMeetingGeneration } from "./onboardingClient";
 import { ServiceError } from "../lib/errors";
 
 /**
@@ -16,15 +17,19 @@ import { ServiceError } from "../lib/errors";
  * 返回在回传完成（响应体收完）后兑现的 Promise——调用方可 await 它来
  * 给「打断 → 新回合」排序；失败静默（打断本身已本地生效，backend 幂等调和）。
  */
-export function interrupt(user: string, assistant: string): Promise<void> {
+export function interrupt(user: string, assistant: string, generation?: number): Promise<void> {
   try {
     return fetch("/api/chat/interrupt", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ user, assistant }),
+      body: JSON.stringify({ user, assistant, ...(generation == null ? {} : {generation}) }),
       keepalive: true,
     }).then(
-      (r) => r.arrayBuffer().then(() => undefined),
+      (r) => r.arrayBuffer().then(() => {
+        if (r.ok && r.headers.has("x-momo-generation")) {
+          acknowledgeMeetingGeneration(Number(r.headers.get("x-momo-generation")));
+        }
+      }),
       () => undefined,
     );
   } catch {
@@ -36,7 +41,7 @@ export function interrupt(user: string, assistant: string): Promise<void> {
 import type { PerformanceCue, PresentationSnapshot } from "../live2d/performanceTypes";
 
 export type ChatEvent =
-  | { t: "sentence"; no: number; text: string; cues: PerformanceCue[]; at: string }
+  | { t: "sentence"; no: number; generation?: number; text: string; cues: PerformanceCue[]; at: string }
   | { t: "done" }
   | { t: "error"; message: string };
 
@@ -56,12 +61,14 @@ function parseEvent(data: string): ChatEvent | null {
       text?: unknown;
       message?: unknown;
       no?: unknown;
+      generation?: unknown;
       cues?: unknown;
       at?: unknown;
     };
     if (j.t === "sentence" && typeof j.text === "string") {
       return {
         t: "sentence",
+        ...(typeof j.generation === "number" ? {generation: j.generation} : {}),
         no: typeof j.no === "number" ? j.no : 0,
         text: j.text,
         cues: Array.isArray(j.cues) ? (j.cues as PerformanceCue[]) : [],
@@ -90,13 +97,14 @@ export async function* chat(
   text: string,
   signal?: AbortSignal,
   presentation: PresentationSnapshot | null = null,
+  opening = false,
 ): AsyncGenerator<ChatEvent> {
   let res: Response;
   try {
-    res = await fetch("/api/chat", {
+    res = await fetch(opening ? "/api/onboarding/opening" : "/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ text, presentation }),
+      body: JSON.stringify({ text, presentation, firstMeeting: firstMeetingPending() }),
       signal: signal ?? null,
     });
   } catch (e) {

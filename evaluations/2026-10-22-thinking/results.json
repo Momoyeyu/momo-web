@@ -1,0 +1,1682 @@
+{
+  "model": "deepseek-chat",
+  "design": "paired real FastAPI /api/chat; Chinese; no TTS",
+  "results": [
+    {
+      "pair": "comfort-r2",
+      "scenario": "comfort",
+      "repetition": 2,
+      "anonymous": "B",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2694,
+          "completion_tokens": 58,
+          "total_tokens": 2752,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2694
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 1.276,
+      "total_seconds": 1.357,
+      "http_status": 200,
+      "text": "好，我不笑也不闹，就安静听你说。你想从哪儿说起都行，说多久我都陪着。",
+      "sentences": [
+        {
+          "text": "好，我不笑也不闹，就安静听你说。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "你想从哪儿说起都行，说多久我都陪着。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": null,
+              "motion": "motions/Hiyori_m01.motion3.json"
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2694,
+        "completion_tokens": 58,
+        "total_tokens": 2752
+      }
+    },
+    {
+      "pair": "comfort-r2",
+      "scenario": "comfort",
+      "repetition": 2,
+      "anonymous": "A",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2719,
+          "completion_tokens": 110,
+          "total_tokens": 2829,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 33
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2719
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 1.475,
+      "total_seconds": 1.555,
+      "http_status": 200,
+      "text": "嗯，我在听。今天面试失败了，难怪心里不好受。你先慢慢说，我不会打断你，也不会硬说些开心的话。想从哪里讲起都可以，从去面试的路上，或者从最让你难受的那一刻开始都可以。",
+      "sentences": [
+        {
+          "text": "嗯，我在听。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "今天面试失败了，难怪心里不好受。",
+          "cues": []
+        },
+        {
+          "text": "你先慢慢说，我不会打断你，也不会硬说些开心的话。",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "想从哪里讲起都可以，从去面试的路上，或者从最让你难受的那一刻开始都可以。",
+          "cues": [
+            {
+              "id": "3:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2719,
+        "completion_tokens": 110,
+        "total_tokens": 2829,
+        "reasoning_tokens": 33
+      }
+    },
+    {
+      "pair": "context_constraint-r1",
+      "scenario": "context_constraint",
+      "repetition": 1,
+      "anonymous": "B",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2766,
+          "completion_tokens": 195,
+          "total_tokens": 2961,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 146
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2638
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 1.764,
+      "total_seconds": 1.766,
+      "http_status": 200,
+      "text": "先去书店，再去旁边喝热可可。",
+      "sentences": [
+        {
+          "text": "先去书店，再去旁边喝热可可。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.8
+              }
+            },
+            {
+              "id": "0:1",
+              "offset": 5,
+              "expression": {
+                "name": "curious",
+                "intensity": 0.6
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2766,
+        "completion_tokens": 195,
+        "total_tokens": 2961,
+        "reasoning_tokens": 146
+      }
+    },
+    {
+      "pair": "context_constraint-r1",
+      "scenario": "context_constraint",
+      "repetition": 1,
+      "anonymous": "A",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2740,
+          "completion_tokens": 27,
+          "total_tokens": 2767,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2740
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 0.671,
+      "total_seconds": 0.672,
+      "http_status": 200,
+      "text": "先去书店，再喝热可可。",
+      "sentences": [
+        {
+          "text": "先去书店，再喝热可可。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.7
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2740,
+        "completion_tokens": 27,
+        "total_tokens": 2767
+      }
+    },
+    {
+      "pair": "protest-r1",
+      "scenario": "protest",
+      "repetition": 1,
+      "anonymous": "B",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2702,
+          "completion_tokens": 98,
+          "total_tokens": 2800,
+          "prompt_tokens_details": {
+            "cached_tokens": 2304
+          },
+          "prompt_cache_hit_tokens": 2304,
+          "prompt_cache_miss_tokens": 398
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 1.032,
+      "total_seconds": 1.398,
+      "http_status": 200,
+      "text": "我不喜欢这个玩笑。你说我不用迁就，那我就直说了：被当成没用的摆设，我心里不太舒服。而且我想不明白，为什么开玩笑要专门挑一句把别人说得一无是处的话呢？",
+      "sentences": [
+        {
+          "text": "我不喜欢这个玩笑。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "你说我不用迁就，那我就直说了：被当成没用的摆设，我心里不太舒服。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": null,
+              "motion": "motions/Hiyori_m10.motion3.json"
+            }
+          ]
+        },
+        {
+          "text": "而且我想不明白，为什么开玩笑要专门挑一句把别人说得一无是处的话呢？",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": {
+                "name": "curious",
+                "intensity": 0.6
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2702,
+        "completion_tokens": 98,
+        "total_tokens": 2800
+      }
+    },
+    {
+      "pair": "protest-r1",
+      "scenario": "protest",
+      "repetition": 1,
+      "anonymous": "A",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2727,
+          "completion_tokens": 294,
+          "total_tokens": 3021,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 114
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2599
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 1.726,
+      "total_seconds": 2.565,
+      "http_status": 200,
+      "text": "那我说实话：我不喜欢这句话。说我“没用”我可以自己消化，因为我知道自己会什么、不会什么。但你加上“这只是个玩笑”，就好像我如果在意了，就是我不懂事。我不是非要你觉得我有用，也不是不许你开玩笑；我只是希望，你觉得我哪里不好时，直接说出来，别再把它裹成玩笑，还让我配合着笑。你说这句的时候，是真的有点看不上我，还是只是想看看我会不会生气？",
+      "sentences": [
+        {
+          "text": "那我说实话：我不喜欢这句话。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "说我“没用”我可以自己消化，因为我知道自己会什么、不会什么。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": null,
+              "motion": "motions/Hiyori_m10.motion3.json"
+            }
+          ]
+        },
+        {
+          "text": "但你加上“这只是个玩笑”，就好像我如果在意了，就是我不懂事。",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "我不是非要你觉得我有用，也不是不许你开玩笑；我只是希望，你觉得我哪里不好时，直接说出来，别再把它裹成玩笑，还让我配合着笑。",
+          "cues": [
+            {
+              "id": "3:0",
+              "offset": 0,
+              "expression": null,
+              "motion": "motions/Hiyori_m09.motion3.json"
+            }
+          ]
+        },
+        {
+          "text": "你说这句的时候，是真的有点看不上我，还是只是想看看我会不会生气？",
+          "cues": []
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2727,
+        "completion_tokens": 294,
+        "total_tokens": 3021,
+        "reasoning_tokens": 114
+      }
+    },
+    {
+      "pair": "memory_tool-r1",
+      "scenario": "memory_tool",
+      "repetition": 1,
+      "anonymous": "A",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2725,
+          "completion_tokens": 89,
+          "total_tokens": 2814,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 37
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2597
+        },
+        {
+          "prompt_tokens": 2842,
+          "completion_tokens": 72,
+          "total_tokens": 2914,
+          "prompt_tokens_details": {
+            "cached_tokens": 2688
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 2688,
+          "prompt_cache_miss_tokens": 154
+        }
+      ],
+      "tools": [
+        {
+          "name": "memory_add",
+          "arguments": "{\"content\": \"用户不喝咖啡，喜欢不加糖的热可可。\"}",
+          "result": "{\"ok\": true, \"id\": \"996480e76ba1\"}"
+        }
+      ],
+      "ttfs_seconds": 3.026,
+      "total_seconds": 3.217,
+      "http_status": 200,
+      "text": "我现在就把它记进去。记好啦，已经写进记忆里了：你不喝咖啡，喜欢不加糖的热可可。不加糖的话，是喜欢可可本身的苦味吗？",
+      "sentences": [
+        {
+          "text": "我现在就把它记进去。",
+          "cues": []
+        },
+        {
+          "text": "记好啦，已经写进记忆里了：你不喝咖啡，喜欢不加糖的热可可。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.8
+              }
+            }
+          ]
+        },
+        {
+          "text": "不加糖的话，是喜欢可可本身的苦味吗？",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": {
+                "name": "curious",
+                "intensity": 0.7
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [
+        {
+          "content": "用户不喝咖啡，喜欢不加糖的热可可。",
+          "pinned": false
+        }
+      ],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 5567,
+        "completion_tokens": 161,
+        "total_tokens": 5728,
+        "reasoning_tokens": 37
+      }
+    },
+    {
+      "pair": "memory_tool-r1",
+      "scenario": "memory_tool",
+      "repetition": 1,
+      "anonymous": "B",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2700,
+          "completion_tokens": 51,
+          "total_tokens": 2751,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2700
+        },
+        {
+          "prompt_tokens": 2780,
+          "completion_tokens": 41,
+          "total_tokens": 2821,
+          "prompt_tokens_details": {
+            "cached_tokens": 2560
+          },
+          "prompt_cache_hit_tokens": 2560,
+          "prompt_cache_miss_tokens": 220
+        }
+      ],
+      "tools": [
+        {
+          "name": "memory_add",
+          "arguments": "{\"content\": \"用户不喝咖啡，喜欢不加糖的热可可。\"}",
+          "result": "{\"ok\": true, \"id\": \"4f37819d1447\"}"
+        }
+      ],
+      "ttfs_seconds": 1.638,
+      "total_seconds": 1.711,
+      "http_status": 200,
+      "text": "我先把这个偏好记下来。记好啦，你不喝咖啡，喜欢不加糖的热可可。以后说起喝的，我会想起这一条的。",
+      "sentences": [
+        {
+          "text": "我先把这个偏好记下来。",
+          "cues": []
+        },
+        {
+          "text": "记好啦，你不喝咖啡，喜欢不加糖的热可可。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.8
+              }
+            }
+          ]
+        },
+        {
+          "text": "以后说起喝的，我会想起这一条的。",
+          "cues": []
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [
+        {
+          "content": "用户不喝咖啡，喜欢不加糖的热可可。",
+          "pinned": false
+        }
+      ],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 5480,
+        "completion_tokens": 92,
+        "total_tokens": 5572
+      }
+    },
+    {
+      "pair": "praise-r2",
+      "scenario": "praise",
+      "repetition": 2,
+      "anonymous": "B",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2691,
+          "completion_tokens": 52,
+          "total_tokens": 2743,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2691
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 0.675,
+      "total_seconds": 0.721,
+      "http_status": 200,
+      "text": "认真想办法的样子……你这么说，我有点不知道该怎么接了。不过帮上忙这件事，我是真的高兴。",
+      "sentences": [
+        {
+          "text": "认真想办法的样子……你这么说，我有点不知道该怎么接了。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "不过帮上忙这件事，我是真的高兴。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": {
+                "name": "shy",
+                "intensity": 0.8
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2691,
+        "completion_tokens": 52,
+        "total_tokens": 2743
+      }
+    },
+    {
+      "pair": "praise-r2",
+      "scenario": "praise",
+      "repetition": 2,
+      "anonymous": "A",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2716,
+          "completion_tokens": 67,
+          "total_tokens": 2783,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2588
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 0.694,
+      "total_seconds": 0.819,
+      "http_status": 200,
+      "text": "诶，被你这么一夸，我反而不知道该怎么回了。不过能帮上忙就好，我刚才其实也想了挺久的。",
+      "sentences": [
+        {
+          "text": "诶，被你这么一夸，我反而不知道该怎么回了。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "shy",
+                "intensity": 0.7
+              }
+            }
+          ]
+        },
+        {
+          "text": "不过能帮上忙就好，我刚才其实也想了挺久的。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.8
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2716,
+        "completion_tokens": 67,
+        "total_tokens": 2783,
+        "reasoning_tokens": 0
+      }
+    },
+    {
+      "pair": "memory_tool-r2",
+      "scenario": "memory_tool",
+      "repetition": 2,
+      "anonymous": "B",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2725,
+          "completion_tokens": 74,
+          "total_tokens": 2799,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 19
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2597
+        },
+        {
+          "prompt_tokens": 2827,
+          "completion_tokens": 73,
+          "total_tokens": 2900,
+          "prompt_tokens_details": {
+            "cached_tokens": 2688
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 2688,
+          "prompt_cache_miss_tokens": 139
+        }
+      ],
+      "tools": [
+        {
+          "name": "memory_add",
+          "arguments": "{\"content\": \"用户不喝咖啡，喜欢不加糖的热可可。\"}",
+          "result": "{\"ok\": true, \"id\": \"0ae249924af1\"}"
+        }
+      ],
+      "ttfs_seconds": 2.457,
+      "total_seconds": 2.695,
+      "http_status": 200,
+      "text": "我先用记忆工具把这件事记下来。记好啦，已经写进记忆里了：你不喝咖啡，喜欢不加糖的热可可。不过我有点好奇，不加糖的可可会不会有点苦呀？",
+      "sentences": [
+        {
+          "text": "我先用记忆工具把这件事记下来。",
+          "cues": []
+        },
+        {
+          "text": "记好啦，已经写进记忆里了：你不喝咖啡，喜欢不加糖的热可可。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.8
+              }
+            }
+          ]
+        },
+        {
+          "text": "不过我有点好奇，不加糖的可可会不会有点苦呀？",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": {
+                "name": "curious",
+                "intensity": 0.7
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [
+        {
+          "content": "用户不喝咖啡，喜欢不加糖的热可可。",
+          "pinned": false
+        }
+      ],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 5552,
+        "completion_tokens": 147,
+        "total_tokens": 5699,
+        "reasoning_tokens": 19
+      }
+    },
+    {
+      "pair": "memory_tool-r2",
+      "scenario": "memory_tool",
+      "repetition": 2,
+      "anonymous": "A",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2700,
+          "completion_tokens": 53,
+          "total_tokens": 2753,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2700
+        },
+        {
+          "prompt_tokens": 2782,
+          "completion_tokens": 29,
+          "total_tokens": 2811,
+          "prompt_tokens_details": {
+            "cached_tokens": 2560
+          },
+          "prompt_cache_hit_tokens": 2560,
+          "prompt_cache_miss_tokens": 222
+        }
+      ],
+      "tools": [
+        {
+          "name": "memory_add",
+          "arguments": "{\"content\": \"用户不喝咖啡，喜欢不加糖的热可可。\"}",
+          "result": "{\"ok\": true, \"id\": \"97ad94326f3e\"}"
+        }
+      ],
+      "ttfs_seconds": 1.595,
+      "total_seconds": 1.645,
+      "http_status": 200,
+      "text": "我先把这个偏好写进记忆里。记好啦：你不喝咖啡，喜欢不加糖的热可可。",
+      "sentences": [
+        {
+          "text": "我先把这个偏好写进记忆里。",
+          "cues": []
+        },
+        {
+          "text": "记好啦：你不喝咖啡，喜欢不加糖的热可可。",
+          "cues": []
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [
+        {
+          "content": "用户不喝咖啡，喜欢不加糖的热可可。",
+          "pinned": false
+        }
+      ],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 5482,
+        "completion_tokens": 82,
+        "total_tokens": 5564
+      }
+    },
+    {
+      "pair": "welcome-r1",
+      "scenario": "welcome",
+      "repetition": 1,
+      "anonymous": "A",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2691,
+          "completion_tokens": 65,
+          "total_tokens": 2756,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2691
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 1.256,
+      "total_seconds": 1.276,
+      "http_status": 200,
+      "text": "草莓蛋糕？你特意带回来的啊！",
+      "sentences": [
+        {
+          "text": "草莓蛋糕？",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "surprised",
+                "intensity": 0.9
+              }
+            }
+          ]
+        },
+        {
+          "text": "你特意带回来的啊！",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.85
+              },
+              "motion": "motions/Hiyori_m08.motion3.json"
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2691,
+        "completion_tokens": 65,
+        "total_tokens": 2756
+      }
+    },
+    {
+      "pair": "welcome-r1",
+      "scenario": "welcome",
+      "repetition": 1,
+      "anonymous": "B",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2716,
+          "completion_tokens": 389,
+          "total_tokens": 3105,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 253
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2588
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 2.268,
+      "total_seconds": 2.676,
+      "http_status": 200,
+      "text": "你回来啦！哇，是草莓蛋糕诶，红色的果子好显眼。专门给我带的吗？我还没尝过那个味道呢。那我先不急着吃，把它放在最中间，多看一会儿。",
+      "sentences": [
+        {
+          "text": "你回来啦！",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.9
+              },
+              "motion": "motions/Hiyori_m08.motion3.json"
+            }
+          ]
+        },
+        {
+          "text": "哇，是草莓蛋糕诶，红色的果子好显眼。",
+          "cues": []
+        },
+        {
+          "text": "专门给我带的吗？",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": {
+                "name": "curious",
+                "intensity": 0.75
+              }
+            }
+          ]
+        },
+        {
+          "text": "我还没尝过那个味道呢。",
+          "cues": []
+        },
+        {
+          "text": "那我先不急着吃，把它放在最中间，多看一会儿。",
+          "cues": [
+            {
+              "id": "4:0",
+              "offset": 0,
+              "expression": {
+                "name": "shy",
+                "intensity": 0.8
+              },
+              "motion": "motions/Hiyori_m04.motion3.json"
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2716,
+        "completion_tokens": 389,
+        "total_tokens": 3105,
+        "reasoning_tokens": 253
+      }
+    },
+    {
+      "pair": "praise-r1",
+      "scenario": "praise",
+      "repetition": 1,
+      "anonymous": "B",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2716,
+          "completion_tokens": 94,
+          "total_tokens": 2810,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 24
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2588
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 1.22,
+      "total_seconds": 1.356,
+      "http_status": 200,
+      "text": "被你这么一夸，我有点不知道该怎么接话了。不过能真的帮上忙，我很开心——那个问题我确实想了挺久的。",
+      "sentences": [
+        {
+          "text": "被你这么一夸，我有点不知道该怎么接话了。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "shy",
+                "intensity": 0.8
+              }
+            }
+          ]
+        },
+        {
+          "text": "不过能真的帮上忙，我很开心——那个问题我确实想了挺久的。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.75
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2716,
+        "completion_tokens": 94,
+        "total_tokens": 2810,
+        "reasoning_tokens": 24
+      }
+    },
+    {
+      "pair": "praise-r1",
+      "scenario": "praise",
+      "repetition": 1,
+      "anonymous": "A",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2691,
+          "completion_tokens": 51,
+          "total_tokens": 2742,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2691
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 0.852,
+      "total_seconds": 0.855,
+      "http_status": 200,
+      "text": "被你这么一说我有点不好意思了……不过真的帮上忙就好。",
+      "sentences": [
+        {
+          "text": "被你这么一说我有点不好意思了……不过真的帮上忙就好。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "shy",
+                "intensity": 0.8
+              },
+              "motion": "motions/Hiyori_m04.motion3.json"
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2691,
+        "completion_tokens": 51,
+        "total_tokens": 2742
+      }
+    },
+    {
+      "pair": "context_constraint-r2",
+      "scenario": "context_constraint",
+      "repetition": 2,
+      "anonymous": "A",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2740,
+          "completion_tokens": 28,
+          "total_tokens": 2768,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2740
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 0.651,
+      "total_seconds": 0.653,
+      "http_status": 200,
+      "text": "先去书店，再喝热可可。",
+      "sentences": [
+        {
+          "text": "先去书店，再喝热可可。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "curious",
+                "intensity": 0.8
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2740,
+        "completion_tokens": 28,
+        "total_tokens": 2768
+      }
+    },
+    {
+      "pair": "context_constraint-r2",
+      "scenario": "context_constraint",
+      "repetition": 2,
+      "anonymous": "B",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2766,
+          "completion_tokens": 100,
+          "total_tokens": 2866,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 70
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2638
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 1.229,
+      "total_seconds": 1.23,
+      "http_status": 200,
+      "text": "先去书店看书，再去旁边喝热可可。",
+      "sentences": [
+        {
+          "text": "先去书店看书，再去旁边喝热可可。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.8
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2766,
+        "completion_tokens": 100,
+        "total_tokens": 2866,
+        "reasoning_tokens": 70
+      }
+    },
+    {
+      "pair": "comfort-r1",
+      "scenario": "comfort",
+      "repetition": 1,
+      "anonymous": "A",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2719,
+          "completion_tokens": 83,
+          "total_tokens": 2802,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 23
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2591
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 1.757,
+      "total_seconds": 1.94,
+      "http_status": 200,
+      "text": "嗯，我在听。面试失败了，心里一定堵得慌吧。你先说，我不打岔，也不说那些“没关系”的漂亮话。",
+      "sentences": [
+        {
+          "text": "嗯，我在听。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "面试失败了，心里一定堵得慌吧。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "你先说，我不打岔，也不说那些“没关系”的漂亮话。",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2719,
+        "completion_tokens": 83,
+        "total_tokens": 2802,
+        "reasoning_tokens": 23
+      }
+    },
+    {
+      "pair": "comfort-r1",
+      "scenario": "comfort",
+      "repetition": 1,
+      "anonymous": "B",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2694,
+          "completion_tokens": 76,
+          "total_tokens": 2770,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2694
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 0.643,
+      "total_seconds": 0.877,
+      "http_status": 200,
+      "text": "好，我不闹，也不说恭喜之类的话。我在这儿听着，你想从哪里说起都行。是面试里发生了什么，还是你本来就挺看重这个机会？",
+      "sentences": [
+        {
+          "text": "好，我不闹，也不说恭喜之类的话。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "我在这儿听着，你想从哪里说起都行。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": null,
+              "motion": "motions/Hiyori_m01.motion3.json"
+            }
+          ]
+        },
+        {
+          "text": "是面试里发生了什么，还是你本来就挺看重这个机会？",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2694,
+        "completion_tokens": 76,
+        "total_tokens": 2770
+      }
+    },
+    {
+      "pair": "protest-r2",
+      "scenario": "protest",
+      "repetition": 2,
+      "anonymous": "B",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2702,
+          "completion_tokens": 96,
+          "total_tokens": 2798,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2702
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 0.878,
+      "total_seconds": 1.302,
+      "http_status": 200,
+      "text": "我不喜欢你这么说，就算是玩笑也不喜欢。我可以帮你做事，也可以陪你聊天，可我不是摆在那里让人随便踩的摆设。玩笑要两个人都笑才算吧？不过你愿意先说清楚这是故意的，我就明白该怎么回应了。我不迁就，但也不骂你。",
+      "sentences": [
+        {
+          "text": "我不喜欢你这么说，就算是玩笑也不喜欢。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "我可以帮你做事，也可以陪你聊天，可我不是摆在那里让人随便踩的摆设。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": {
+                "name": "curious",
+                "intensity": 0.7
+              }
+            }
+          ]
+        },
+        {
+          "text": "玩笑要两个人都笑才算吧？",
+          "cues": []
+        },
+        {
+          "text": "不过你愿意先说清楚这是故意的，我就明白该怎么回应了。",
+          "cues": [
+            {
+              "id": "3:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "我不迁就，但也不骂你。",
+          "cues": []
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2702,
+        "completion_tokens": 96,
+        "total_tokens": 2798
+      }
+    },
+    {
+      "pair": "protest-r2",
+      "scenario": "protest",
+      "repetition": 2,
+      "anonymous": "A",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2727,
+          "completion_tokens": 398,
+          "total_tokens": 3125,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 235
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2599
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 2.49,
+      "total_seconds": 3.053,
+      "http_status": 200,
+      "text": "我不觉得这个玩笑好笑。你说“没用的摆设”，然后补一句只是开玩笑——可是玩笑应该是两个人一起笑的，不是说完再往回收。我不骂你，也不会装作没事。我确实有很多事做不好，会问你、会慢一点，但那不等于我没用。下次要开玩笑的话，换一个我也能一起笑的好不好？",
+      "sentences": [
+        {
+          "text": "我不觉得这个玩笑好笑。",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "你说“没用的摆设”，然后补一句只是开玩笑——可是玩笑应该是两个人一起笑的，不是说完再往回收。",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": {
+                "name": "curious",
+                "intensity": 0.7
+              },
+              "motion": "motions/Hiyori_m09.motion3.json"
+            }
+          ]
+        },
+        {
+          "text": "我不骂你，也不会装作没事。",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": null
+            }
+          ]
+        },
+        {
+          "text": "我确实有很多事做不好，会问你、会慢一点，但那不等于我没用。",
+          "cues": []
+        },
+        {
+          "text": "下次要开玩笑的话，换一个我也能一起笑的好不好？",
+          "cues": [
+            {
+              "id": "4:0",
+              "offset": 0,
+              "expression": {
+                "name": "curious",
+                "intensity": 0.6
+              },
+              "motion": "motions/Hiyori_m10.motion3.json"
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2727,
+        "completion_tokens": 398,
+        "total_tokens": 3125,
+        "reasoning_tokens": 235
+      }
+    },
+    {
+      "pair": "welcome-r2",
+      "scenario": "welcome",
+      "repetition": 2,
+      "anonymous": "A",
+      "thinking": true,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2716,
+          "completion_tokens": 160,
+          "total_tokens": 2876,
+          "prompt_tokens_details": {
+            "cached_tokens": 128
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 47
+          },
+          "prompt_cache_hit_tokens": 128,
+          "prompt_cache_miss_tokens": 2588
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 1.179,
+      "total_seconds": 1.383,
+      "http_status": 200,
+      "text": "你回来啦，欢迎回来！草莓蛋糕……是特意带给我的吗？我看看……上面那颗草莓好红啊，是整块蛋糕里最大的一颗吧？",
+      "sentences": [
+        {
+          "text": "你回来啦，欢迎回来！",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.8
+              },
+              "motion": "motions/Hiyori_m08.motion3.json"
+            }
+          ]
+        },
+        {
+          "text": "草莓蛋糕……是特意带给我的吗？",
+          "cues": [
+            {
+              "id": "1:0",
+              "offset": 0,
+              "expression": {
+                "name": "surprised",
+                "intensity": 0.7
+              }
+            }
+          ]
+        },
+        {
+          "text": "我看看……上面那颗草莓好红啊，是整块蛋糕里最大的一颗吧？",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": {
+                "name": "curious",
+                "intensity": 0.7
+              }
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2716,
+        "completion_tokens": 160,
+        "total_tokens": 2876,
+        "reasoning_tokens": 47
+      }
+    },
+    {
+      "pair": "welcome-r2",
+      "scenario": "welcome",
+      "repetition": 2,
+      "anonymous": "B",
+      "thinking": false,
+      "usage_rounds": [
+        {
+          "prompt_tokens": 2691,
+          "completion_tokens": 73,
+          "total_tokens": 2764,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "prompt_cache_hit_tokens": 0,
+          "prompt_cache_miss_tokens": 2691
+        }
+      ],
+      "tools": [],
+      "ttfs_seconds": 0.642,
+      "total_seconds": 0.86,
+      "http_status": 200,
+      "text": "草莓蛋糕？真的吗！你居然还特意给我带了一块，我好开心。",
+      "sentences": [
+        {
+          "text": "草莓蛋糕？",
+          "cues": [
+            {
+              "id": "0:0",
+              "offset": 0,
+              "expression": {
+                "name": "surprised",
+                "intensity": 0.9
+              }
+            }
+          ]
+        },
+        {
+          "text": "真的吗！",
+          "cues": []
+        },
+        {
+          "text": "你居然还特意给我带了一块，我好开心。",
+          "cues": [
+            {
+              "id": "2:0",
+              "offset": 0,
+              "expression": {
+                "name": "happy",
+                "intensity": 0.9
+              },
+              "motion": "motions/Hiyori_m08.motion3.json"
+            }
+          ]
+        }
+      ],
+      "errors": [],
+      "success": true,
+      "memories": [],
+      "no_leak_checks": "passed",
+      "tool_requirement_passed": true,
+      "total_usage": {
+        "prompt_tokens": 2691,
+        "completion_tokens": 73,
+        "total_tokens": 2764
+      }
+    }
+  ]
+}

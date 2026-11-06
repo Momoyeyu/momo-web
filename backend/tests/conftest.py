@@ -4,15 +4,21 @@ from __future__ import annotations
 import pytest
 
 from app.core import db, state
-from app.services import checkpoint
+from app.services import checkpoint, memory
+from app.core import embed
 
 
 @pytest.fixture(autouse=True)
-def isolated_data(tmp_path, monkeypatch):
+def isolated_data(tmp_path, monkeypatch, request):
     monkeypatch.setattr(state, "DATA_DIR", tmp_path)
     monkeypatch.setattr(state, "STATE_PATH", tmp_path / "momo.yaml")
+    memory.shutdown_index()
     db.reset()
+    monkeypatch.setattr(memory, "schedule_index", lambda: None)
+    if request.node.get_closest_marker("bundled_model") is None:
+        monkeypatch.setattr(embed, "embed", lambda *a, **k: None)
     yield
+    memory.shutdown_index()
     db.reset()
 
 

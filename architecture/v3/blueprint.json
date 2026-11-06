@@ -1,0 +1,101 @@
+{
+  "meta": {
+    "title": "V3 001～003：唯一生活、Web晋级与可撤销插件宿主"
+  },
+  "nodes": [
+    {
+      "id": "web",
+      "label": "Web唯一共享业务源 / meeting lease",
+      "row": 0,
+      "col": 0
+    },
+    {
+      "id": "brain",
+      "label": "Python唯一协调器 / durable inbox",
+      "row": 0,
+      "col": 1
+    },
+    {
+      "id": "history",
+      "label": "永久账本 + ACK + bounded projection",
+      "kind": "store",
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": "tools",
+      "label": "Cordis常驻宿主 / MCP / epochs",
+      "row": 1,
+      "col": 1
+    },
+    {
+      "id": "promotion",
+      "label": "固定Git revision / 哈希 / 漂移拒绝",
+      "row": 1,
+      "col": 0
+    },
+    {
+      "id": "recovery",
+      "label": "一致备份 / migration / restore pause",
+      "row": 1,
+      "col": 2
+    },
+    {
+      "id": "context-plan",
+      "label": "009共同调研：001～003后优先",
+      "row": 2,
+      "col": 2
+    }
+  ],
+  "edges": [
+    {
+      "from": "web",
+      "to": "brain",
+      "label": "lease + eventId"
+    },
+    {
+      "from": "brain",
+      "to": "history",
+      "label": "display/delivery ACK"
+    },
+    {
+      "from": "brain",
+      "to": "tools",
+      "label": "expiring permits / heartbeat"
+    },
+    {
+      "from": "tools",
+      "to": "brain",
+      "label": "durable facts / inbox"
+    },
+    {
+      "from": "promotion",
+      "to": "web"
+    },
+    {
+      "from": "recovery",
+      "to": "history"
+    },
+    {
+      "from": "recovery",
+      "to": "brain",
+      "label": "revoke / no replay"
+    }
+  ],
+  "depends": {
+    "web": [
+      "history",
+      "brain"
+    ],
+    "brain": [
+      "history",
+      "tools"
+    ],
+    "recovery": [
+      "history",
+      "brain"
+    ],
+    "promotion": [],
+    "context-plan": []
+  }
+}

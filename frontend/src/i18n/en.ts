@@ -1,6 +1,16 @@
 import type { Dict } from "./zh";
 
 export const en: Dict = {
+  meeting: {
+    connectionSettings: 'Connection settings',
+    'connectTitle': 'Meet momo',
+    'connectBody': 'Connect a chat model so we can get to know each other. You can set up voice later.',
+    'url': 'Service URL',
+    'key': 'API key (if required)',
+    'model': 'Model name',
+    'begin': 'Meet momo',
+    'connectionError': 'Could not save the connection. Check the URL, model name and backend, then try again.',
+  },
   performance: {
     label: "Name",
     desc: "Appearance",
@@ -144,6 +154,10 @@ export const en: Dict = {
     asrBuiltinHint: "Use the built-in speech recognition on this machine; it supports Chinese, Japanese and English and needs no extra setup.",
     asrHint: "Connect your own speech recognition service. It must expose an OpenAI-compatible transcription API. Enter its URL, key and model name.",
     asrModelPh: "whisper-1 / faster-whisper-large-v3",
+    thinking: "Thinking",
+    thinkingHint: "Think before replying; responses may take longer. Currently supported on the official DeepSeek API.",
+    builtinSpeechUnavailable: "Built-in speech resources are unavailable. Reinstall the complete application.",
+    builtinRecallUnavailable: "Semantic recall is unavailable. Text matching remains active.",
     llmHint: "Connect the language model service used for conversation. It must be an OpenAI-compatible API. Enter its URL, key and model name.",
     ttsUrlPh: "http://127.0.0.1:9880",
     ttsHint: "Connect a speech synthesis service. It must expose GPT-SoVITS api_v2. Enter the URL and upload a clear reference clip to set the voice; the reference text is what the clip says and can be left empty.",
