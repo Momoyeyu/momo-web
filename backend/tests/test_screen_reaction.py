@@ -58,6 +58,7 @@ def test_claim_enforces_fresh_generation_and_rate_without_inference():
     with patch.object(computer, 'gate'), patch('app.services.computer.runtime') as runtime:
         runtime.active = runtime.presentation = None
         runtime.queue = []
+        runtime.interrupt_hold = False
         assert computer.claim_reaction(9,'client','lease') is None
         assert computer.claim_reaction(0,'client','lease') == {'generation':0}
         assert computer.claim_reaction(0,'client','lease') is None
