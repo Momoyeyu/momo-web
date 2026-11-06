@@ -106,7 +106,7 @@ def test_endpoint_admission_stages_pixels_without_player_interrupt(monkeypatch):
     monkeypatch.setattr(runtime, 'run', run)
     monkeypatch.setattr(runtime, 'inbox_status', lambda *args: None)
     monkeypatch.setattr(runtime, 'present', lambda *args: 'presentation-token')
-    monkeypatch.setattr(computer_tools, 'require_local', lambda: 'observed-run')
+    monkeypatch.setattr(computer_tools, 'require_local', lambda **kwargs: 'observed-run')
     monkeypatch.setattr(vision, 'require_enabled', lambda *args: None)
     seen = []
     def provider(cfg, messages, **kwargs):
