@@ -234,3 +234,46 @@ def test_reduced_observation_and_click_share_exact_pixel_mapping(local):
             result=json.loads(computer_tools.execute('computer_action',{'action':'click','x':512,'y':384,'version':3}))
             assert result['ok'] is False and len(commands)==1
         finally:current_run.reset(token)
+
+@pytest.mark.parametrize('focused', [False, True])
+def test_owner_minecraft_stop_tool_revokes_without_game_gate(local, monkeypatch, focused):
+    import json
+    from app.services import minecraft as module, capability
+    runtime,native,_,_,calls=local
+    native.stop();monkeypatch.setattr(module,'runtime',runtime)
+    game=module.Minecraft();monkeypatch.setattr(module,'minecraft',game)
+    game.connect(17643,'fixture-token','fixture-world','fixture-account',['game.observe'],'owner','lease')
+    runtime.prepare_local('owner','lease')
+    with runtime.run('owner-run',client='owner',lease='lease'):
+        token=current_run.set('owner-run')
+        try:
+            runtime.focus=focused; game.actions=120
+            monkeypatch.setattr(game,'gate',lambda *args: (_ for _ in ()).throw(AssertionError('stop must bypass game gate')))
+            declared=next(row['function'] for row in computer_tools.declarations() if row['function']['name']=='minecraft_action')
+            assert 'stop' in declared['parameters']['properties']['action']['enum']
+            generation=game.generation
+            result=json.loads(capability.execute_tool('minecraft_action',{'action':'stop'}))
+            assert result.get('ok') is not False
+            assert game.binding is None and game.permissions==set() and game.generation>generation
+            assert calls[-1]=='minecraft.stop'
+            assert json.loads(capability.execute_tool('minecraft_action',{'action':'stop'})).get('ok') is not False
+        finally: current_run.reset(token)
+
+@pytest.mark.parametrize('denial', ['remote','old-run','audience'])
+def test_minecraft_stop_tool_cannot_be_invoked_by_external_or_stale_scope(local,monkeypatch,denial):
+    import json
+    from app.services import minecraft as module, capability
+    runtime,native,_,_,calls=local
+    native.stop();monkeypatch.setattr(module,'runtime',runtime)
+    game=module.Minecraft();monkeypatch.setattr(module,'minecraft',game)
+    game.connect(17643,'fixture-token','fixture-world','fixture-account',['game.observe'],'owner','lease')
+    runtime.prepare_local('owner','lease')
+    with runtime.run('owner-run',client='owner',lease='lease'):
+        token=current_run.set('old-run' if denial=='old-run' else 'owner-run')
+        try:
+            if denial=='remote':runtime.activity['source']='qq'
+            if denial=='audience':monkeypatch.setattr(checkpoint,'audience',lambda:'qq:fixture')
+            count=len(calls)
+            assert json.loads(capability.execute_tool('minecraft_action',{'action':'stop'}))['ok'] is False
+            assert game.binding and game.permissions and len(calls)==count
+        finally:current_run.reset(token)

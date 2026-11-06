@@ -27,7 +27,10 @@ class Minecraft:
 
     def status(self):
         result = runtime.host.request('minecraft.status') if runtime.host else {'available': False}
-        return {**result, 'generation': self.generation, 'permissions': sorted(self.permissions), 'managedProvisioningAvailable': False}
+        # Binding authority is separate from the adapter's last action/stop state.
+        with self.lock:
+            return {**result, 'active': self.binding is not None, 'generation': self.generation,
+                    'permissions': sorted(self.permissions), 'managedProvisioningAvailable': False}
 
     def gate(self, client, lease):
         from .activities import require_enabled

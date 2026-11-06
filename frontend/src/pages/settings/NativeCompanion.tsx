@@ -10,6 +10,7 @@ import Button from '../../ui/Button';
 import FieldRow from '../../ui/FieldRow';
 import Hint from '../../ui/Hint';
 import Switch from '../../ui/Switch';
+import NativeWindowNotice, {type NativeWindowDiagnostics} from './NativeWindowNotice';
 import AppPermissions from '../../components/AppPermissions';
 
 type Target={windowId:number;ownerPid:number;bundleId:string;path:string;name?:string;title?:string};
@@ -18,6 +19,7 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
  const computer=useSyncExternalStore(subscribeComputer,computerSnapshot);
  const t=useT(),enabled=useActivities()[plugin],meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
  const [open,setOpen]=useState(false),[targets,setTargets]=useState<Target[]>([]),[selected,setSelected]=useState(''),[interact,setInteract]=useState(false),[busy,setBusy]=useState(false),[active,setActive]=useState(false),[error,setError]=useState(false);
+ const [diagnostics,setDiagnostics]=useState<NativeWindowDiagnostics|null>(null);
  const [pending,setPending]=useState<string|null>(null);
  const [stopUnconfirmed,setStopUnconfirmed]=useState(false);
  const mounted=useRef(false),operation=useRef(false),request=useRef<AbortController|null>(null);
@@ -65,8 +67,9 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
     </select>
    </FieldRow>
    <div className="extension-detail-actions"><Button variant="ghost" disabled={busy||active||Boolean(pending)||meeting.state!=='active'} onClick={()=>void run(async()=>{
-    const result=await post<{targets:Target[]}>('targets',{...meetingIdentity(),plugin});if(!mounted.current)return;setTargets(result.targets);setSelected(old=>result.targets.some(x=>String(x.windowId)===old)?old:'');
+    const result=await post<{targets:Target[];screenPermission?:boolean;inputPermission?:boolean}>('targets',{...meetingIdentity(),plugin});if(!mounted.current)return;setDiagnostics(result);setTargets(result.targets);setSelected(old=>result.targets.some(x=>String(x.windowId)===old)?old:'');
    })}>{t('permissions.findWindows')}</Button></div>
+   <NativeWindowNotice result={diagnostics} interact={interact}/>
    <FieldRow label={t('permissions.interact')} hint={t('permissions.interactHint')}><Switch title={t('permissions.interact')} on={interact} onChange={setInteract} disabled={busy||active||Boolean(pending)}/></FieldRow>
    <div className="extension-detail-actions">
     <Button disabled={!enabled||busy||active||stopUnconfirmed||!target||meeting.state!=='active'||Boolean(pending)} onClick={()=>void run(()=>start({...meetingIdentity(),plugin,windowId:target!.windowId,ownerPid:target!.ownerPid,permissions:interact?['observe','interact']:['observe']}))}>{t('browser.start')}</Button>
