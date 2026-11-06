@@ -90,3 +90,49 @@ def test_expired_or_revoked_grant_exposes_safe_permission_code():
     for message, expected in [('Application permission revoked','APPLICATION_PERMISSION_REVOKED'), ('Application grant changed','APPLICATION_GRANT_CHANGED'), ('Local active owner run required','LOCAL_OWNER_RUN_REQUIRED'), ('vision.disabled','VISION_DISABLED')]:
         with patch.object(tools, 'require_local', return_value='r'), patch.object(native_control, 'execute', side_effect=ValueError(message)):
             assert json.loads(tools.execute('computer_observe', {}))['code'] == expected
+
+
+def test_saved_image_and_screenshot_use_actual_cost_until_wire_materialization(monkeypatch):
+    from app.services import checkpoint
+    from app.services.context_policy import estimate, Budget
+    cfg={'url':'https://fixture.invalid','model':'fixture','vision':True,'contextWindow':16000,'maxOutputTokens':1000}
+    monkeypatch.setattr(vision,'require_enabled',lambda *_:None)
+    monkeypatch.setattr(vision,'enabled',lambda *_:True)
+    monkeypatch.setattr(tools.state,'load',lambda:{'settings':{'llm':cfg}})
+    image=vision.store(pixels())
+    messages=[{'role':'user','content':vision.parts('earlier image',[image['id']],audience='owner',cfg=cfg)}]
+    token=current_run.set('budget-fixture')
+    try:
+        with patch.object(tools,'require_local',return_value='budget-fixture'):
+            tools.stage(pixels(),lambda:None)
+            assert estimate(messages) < Budget.from_config(cfg).safe
+            result=tools.project(messages,cfg,materialize=True)
+            assert len(result)==2
+            assert all('vision_tokens' not in part for m in result for part in m['content'] if isinstance(part,dict))
+    finally: current_run.reset(token)
+
+
+def test_observation_reservation_excludes_pixels_and_real_overflow_still_fails(monkeypatch):
+    from app.services.context_policy import estimate
+    token=current_run.set('reserve-fixture')
+    cfg={'contextWindow':2000,'maxOutputTokens':1000}
+    monkeypatch.setattr(tools.state,'load',lambda:{'settings':{'llm':cfg}})
+    monkeypatch.setattr(vision,'require_enabled',lambda *_:None)
+    try:
+        with patch.object(tools,'require_local',return_value='reserve-fixture'):
+            tools.stage(pixels(),lambda:None)
+            reserve=tools.observation_budget()
+            assert 'base64' not in str(reserve)
+            short=[{'role':'user','content':[{'type':'image_url','image_url':{'url':'data:image/png;base64,A'},'vision_tokens':2048}]}]
+            long=[{'role':'user','content':[{'type':'image_url','image_url':{'url':'data:image/png;base64,'+'A'*100000},'vision_tokens':2048}]}]
+            assert estimate(short)==estimate(long)
+            with pytest.raises(vision.VisionError,match='computer.budget'): tools.project([],cfg,materialize=True)
+    finally: current_run.reset(token)
+
+
+def test_observation_expiring_during_compaction_cannot_silently_drop_pixels():
+    token=current_run.set('expired-reservation')
+    try:
+        with pytest.raises(vision.VisionError,match='computer.observationExpired'):
+            tools.project([],{},materialize=True,require_observation=True)
+    finally: current_run.reset(token)

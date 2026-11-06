@@ -66,14 +66,14 @@ def _worker(request=None, tools=None):
         _lock.release()
 
 
-def guard_request(cfg, messages, tools, *, cancelled):
+def guard_request(cfg, messages, tools, *, cancelled, extra_messages=()):
     """Rare hard-capacity fallback only. Bounded, cancellation-aware; no truncation.
 
     Rebuilding a request after publication is owned by the caller; an already
     prepared oversized tool round is rejected rather than dropping tool pairs.
     """
     budget = Budget.from_config(cfg)
-    size = estimate(messages, tools)
+    size = estimate([*messages,*extra_messages], tools)
     from . import checkpoint
     policy = Policy(cfg, checkpoint.audience(), tools)
     policy.record_request(size)
@@ -81,12 +81,12 @@ def guard_request(cfg, messages, tools, *, cancelled):
     if budget.output >= budget.window:
         raise llm.LlmError('Model output reserve exceeds its context window')
     if size <= budget.safe:
-        maybe_compress(size, request=messages, tools=tools)
+        maybe_compress(size, request=[*messages,*extra_messages], tools=tools)
         return
     deadline = monotonic() + 65
     for attempt in range(2):
         before = checkpoint.summary_state()
-        maybe_compress(size, request=messages, tools=tools)
+        maybe_compress(size, request=[*messages,*extra_messages], tools=tools)
         while not _done.wait(.1):
             if cancelled():
                 raise llm.LlmError('Context preparation cancelled')
@@ -97,7 +97,7 @@ def guard_request(cfg, messages, tools, *, cancelled):
         if not hasattr(messages, 'refresh') or checkpoint.summary_state() == before:
             break
         messages.refresh()
-        size = estimate(messages, tools)
+        size = estimate([*messages,*extra_messages], tools)
         if size <= budget.safe:
             return
     raise llm.LlmError('Context capacity reached; please retry after maintenance')

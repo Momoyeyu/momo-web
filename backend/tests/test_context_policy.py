@@ -88,3 +88,34 @@ def test_unobserved_candidate_does_not_borrow_baseline_evidence():
 
 def test_output_allowance_is_not_silently_lowered():
     assert Budget.from_config({'contextWindow':32000,'maxOutputTokens':12000}).output==12000
+
+
+def test_screenshot_reservation_triggers_real_guard_refresh_without_summarizing_pixels(monkeypatch):
+    import math
+    from app.services import compress, turn
+    from app.core import state, llm
+    from conftest import add_turn
+    from tests.test_checkpoint import _InlineThread
+    cfg = state.load()
+    cfg['settings']['llm']['maxOutputTokens'] = 1000
+    for i in range(30): add_turn('q'*300, 'a'*300, at=str(i))
+    messages = turn.build_messages(cfg, 'look at the approved window')
+    tool_pair = [{'role':'assistant','content':None,'tool_calls':[{'id':'observe-1','type':'function','function':{'name':'computer_observe','arguments':'{}'}}]}, {'role':'tool','tool_call_id':'observe-1','content':'{"pixelsFollow":true}'}]
+    messages.extend(tool_pair)
+    cfg['settings']['llm']['contextWindow'] = math.ceil((estimate(messages)+1500)/.92)
+    reservation = [{'role':'user','content':[{'type':'image_url','image_url':{'url':'momo-observation:pending'},'vision_tokens':4096}]}]
+    assert estimate(messages) < Budget.from_config(cfg['settings']['llm']).safe
+    assert estimate([*messages,*reservation]) > Budget.from_config(cfg['settings']['llm']).safe
+    monkeypatch.setattr(compress,'load_state',lambda:cfg)
+    monkeypatch.setattr(compress,'Thread',_InlineThread)
+    requests = []
+    def summarize(*args, **kwargs):
+        requests.append(args[1])
+        assert 'momo-observation:' not in str(args[1])
+        return {'content':'old experiences'}
+    monkeypatch.setattr(llm,'chat_completion',summarize)
+    compress.guard_request(cfg['settings']['llm'],messages,[],cancelled=lambda:False,extra_messages=reservation)
+    assert requests
+    assert estimate([*messages,*reservation]) <= Budget.from_config(cfg['settings']['llm']).safe
+    assert messages[-3]['content'] == 'look at the approved window'
+    assert messages[-2:] == tool_pair

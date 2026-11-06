@@ -155,3 +155,62 @@ def test_historical_pixels_yield_to_current_image_and_real_tool_budget():
     assert any(p['type']=='image_url' for p in messages[-1]['content'])
     assert all(any(iid in p.get('text','') for p in m['content']) for m in messages)
     assert sum(p['type']=='image_url' for m in messages for p in m['content'])<5
+
+
+def test_screenshot_reservation_sheds_old_pixels_but_retains_current_upload():
+    cfg=configured()
+    cfg.update(contextWindow=9000,maxOutputTokens=1000)
+    image=vision.store(png((32,32)))
+    messages=[{'role':'user','content':vision.parts(label,[image['id']],audience='owner',cfg=cfg)} for label in ('old','current')]
+    reserve=[{'role':'user','content':[{'type':'image_url','image_url':{'url':'momo-observation:pending'},'vision_tokens':4096}]}]
+    vision.fit_history(messages,cfg,extra_messages=reserve)
+    assert not any(p['type']=='image_url' for p in messages[0]['content'])
+    assert any(p['type']=='image_url' for p in messages[1]['content'])
+
+
+def test_turn_observation_followup_keeps_saved_image_costs_and_reservation(monkeypatch):
+    from app.services import computer_tools
+    from app.services.native_control import native_control
+    from app.services.coordinator import current_run
+    cfg=configured()
+    values=state.load()
+    values['settings']['llm'].update(contextWindow=24000,maxOutputTokens=1000)
+    state.write_state(values)
+    item=vision.store(png((32,32)))
+    gen=checkpoint.generation();at=db.now_iso()
+    checkpoint.begin_turn('earlier image',gen,at)
+    rid=checkpoint.current_run(gen,at)
+    vision.bind(rid,[item['id']],'owner')
+    checkpoint.append_sentence('Earlier red image.',gen,at)
+    checkpoint.acknowledge(rid,'Earlier red image.',gen)
+    checkpoint.finish_turn(gen,at)
+    monkeypatch.setattr(computer_tools,'require_local',lambda:'observe-turn')
+    monkeypatch.setattr(computer_tools,'declarations',lambda *_:[{'type':'function','function':{'name':'computer_observe','description':'Observe approved window','parameters':{'type':'object','properties':{}}}}])
+    monkeypatch.setattr(native_control,'execute',lambda *a,**k:{'data':base64.b64encode(png((32,32))).decode(),'version':1})
+    monkeypatch.setattr(native_control,'validate',lambda *_:None)
+    # Keep the real guard but suppress unrelated asynchronous background maintenance.
+    monkeypatch.setattr(turn.compress,'maybe_compress',lambda *a,**k:False)
+    guard=turn.compress.guard_request
+    reservations=[]
+    def checked_guard(*args,**kwargs):
+        reservations.append(kwargs.get('extra_messages'))
+        return guard(*args,**kwargs)
+    monkeypatch.setattr(turn.compress,'guard_request',checked_guard)
+    requests=[]
+    def stream(config,messages,**kwargs):
+        requests.append(messages)
+        if len(requests)==1:
+            yield {'type':'tool_calls','calls':[{'id':'observe','type':'function','function':{'name':'computer_observe','arguments':'{}'}}]}
+        else:
+            assert sum(p.get('type')=='image_url' for m in messages if isinstance(m.get('content'),list) for p in m['content'])==2
+            assert 'vision_tokens' not in json.dumps(messages)
+            assert 'momo-observation:' not in json.dumps(messages)
+            yield {'type':'text','delta':'The approved window is visible.'}
+    monkeypatch.setattr(turn.llm,'chat_stream',stream)
+    token=current_run.set('observe-turn')
+    try: events=list(turn.run_turn('Observe the approved window.'))
+    finally: current_run.reset(token)
+    assert not [e for e in events if e['t']=='error']
+    assert any(e.get('text')=='The approved window is visible.' for e in events)
+    assert not reservations[0] and reservations[1]
+    assert 'base64' not in json.dumps(checkpoint.live_messages())

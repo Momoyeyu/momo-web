@@ -199,7 +199,7 @@ def image_cost(width, height):
     return 1024 + math.ceil(width/512)*math.ceil(height/512)*1024
 
 
-def fit_history(messages, cfg, tools=None):
+def fit_history(messages, cfg, tools=None, *, extra_messages=()):
     """Retain current pixels; shed optional old pixels before hard capacity checks.
 
     Text observations and image references remain intact. Only the transient
@@ -212,7 +212,7 @@ def fit_history(messages, cfg, tools=None):
     for index,message in enumerate(messages):
         if index==latest_user or not isinstance(message.get('content'),list): continue
         for part in list(message['content']):
-            if estimate(messages,tools)<=safe: return
+            if estimate([*messages,*extra_messages],tools)<=safe: return
             if part.get('type')=='image_url': message['content'].remove(part)
 
 

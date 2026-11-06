@@ -357,13 +357,14 @@ def react(
                 # while the user revoked this run's captured generation.
                 if checkpoint.generation() != gen:
                     return
+                observation_budget = computer_tools.observation_budget()
                 if isinstance(messages, ContextMessages):
-                    messages.fit_images = lambda: vision.fit_history(messages, llm_cfg, tools)
-                vision.fit_history(messages, llm_cfg, tools)
-                compress.guard_request(llm_cfg, messages, tools, cancelled=lambda: checkpoint.generation() != gen)
+                    messages.fit_images = lambda: vision.fit_history(messages, llm_cfg, tools, extra_messages=observation_budget)
+                vision.fit_history(messages, llm_cfg, tools, extra_messages=observation_budget)
+                compress.guard_request(llm_cfg, messages, tools, cancelled=lambda: checkpoint.generation() != gen, extra_messages=observation_budget)
                 for ev in llm.chat_stream(
                     llm_cfg,
-                    computer_tools.project(vision.materialize(messages, llm_cfg, checkpoint.audience()), llm_cfg, tools),
+                    computer_tools.project(messages, llm_cfg, tools, materialize=True, require_observation=bool(observation_budget)),
                     tools=tools,
                     usage_out=usage,
                     reasoning_out=reasoning,
