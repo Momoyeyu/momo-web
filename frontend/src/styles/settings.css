@@ -820,7 +820,6 @@
 .general-columns { align-items: stretch; }
 .general-columns .opt-row { padding-block: 10px; }
 .general-columns .col-foot { margin-top: 8px; padding-top: 0; }
-.sound-preview-action { display:flex; justify-content:flex-end; padding-top:16px; }
 @media(max-width: 760px) { .general-columns { grid-template-columns: 1fr; } }
 .general-language .opt-list { display:grid; grid-template-columns:1fr 1fr; gap:32px; }
 .general-language .opt-row { padding-block:6px; border:0; }

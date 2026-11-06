@@ -118,8 +118,7 @@ export default function GeneralTab() {
   </FieldRow>
   <FieldRow label={t("settings.sfxVolume")}><Slider value={settings.general.sfxVolume??35} onChange={v=>patchGeneral({sfxVolume:v})}/></FieldRow>
   <FieldRow label={t("settings.musicVolume")}><Slider value={settings.general.musicVolume??22} onChange={v=>patchGeneral({musicVolume:v})}/></FieldRow>
-  <FieldRow label={t("settings.soundPalette")}><Select value={settings.general.soundPalette??'warm'} options={[{value:'warm',label:t('settings.soundWarm')},{value:'glass',label:t('settings.soundGlass')}]} onChange={v=>patchGeneral({soundPalette:v as 'warm'|'glass'})}/></FieldRow>
-  <div className="sound-preview-action"><Button variant="ghost" size="sm" onClick={()=>ambient.sound('complete')}>{t('settings.soundPreview')}</Button></div>
+  <FieldRow label={t("settings.soundPalette")}><Select value={settings.general.soundPalette??'warm'} options={[{value:'warm',label:t('settings.soundWarm')},{value:'glass',label:t('settings.soundGlass')}]} onChange={v=>patchGeneral({soundPalette:v as 'warm'|'glass'})}/><Button variant="ghost" size="sm" onClick={()=>ambient.sound('complete')}>{t('settings.soundPreview')}</Button></FieldRow>
   </div>
 </section>
 
