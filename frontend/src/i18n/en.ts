@@ -27,6 +27,7 @@ export const en: Dict = {
     "permissionNote": "Sign-in and chat permissions are separate. Set message access under Permissions.",
     "forget": "Sign out",
     "states": {
+      "preparing": "Preparing QQ sign-in…",
       "loading": "Reading sign-in status…",
       "idle": "Let momo sign in to her own QQ account.",
       "connecting": "Connecting to QQ…",

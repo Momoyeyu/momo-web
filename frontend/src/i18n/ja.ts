@@ -27,6 +27,7 @@ export const ja: Dict = {
     "permissionNote": "ログインと会話の権限は別です。送受信の範囲は「権限」で設定できます。",
     "forget": "ログアウト",
     "states": {
+      "preparing": "QQ ログインを準備中…",
       "loading": "ログイン状態を確認中…",
       "idle": "momo 自身の QQ アカウントでログインできます。",
       "connecting": "QQ に接続中…",

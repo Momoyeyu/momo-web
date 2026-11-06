@@ -27,6 +27,7 @@ export const zh = {
     "permissionNote": "登录与聊天权限独立；收发范围在「权限」中设置。",
     "forget": "退出登录",
     "states": {
+      "preparing": "正在准备 QQ 登录…",
       "loading": "正在读取登录状态…",
       "idle": "让 momo 登录自己的 QQ 账号。",
       "connecting": "正在连接 QQ…",

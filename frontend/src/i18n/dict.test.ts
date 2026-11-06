@@ -5,6 +5,8 @@
 // 是 E2E 才抓到的。这里在 unit 层把它拦住。
 import { describe, expect, it } from "vitest";
 
+import type { QQRuntimeState } from "../services/qqRuntimeClient";
+
 import { en } from "./en";
 import { ja } from "./ja";
 import { t } from "./index";
@@ -37,6 +39,22 @@ describe("三语字典", () => {
         expect(value, `${lang} 缺 ${key}`).toBeTypeOf("string");
         expect(value, `${lang} 的 ${key} 退化成了键名`).not.toBe(key);
       }
+    }
+  });
+
+  it("every QQ login state has readable text in all three languages", () => {
+    // The runtime status union makes a newly added untranslated state a type error.
+    const states: Record<string, Record<QQRuntimeState["status"] | "loading", string>> = {
+      zh: zh.social.login.states,
+      en: en.social.login.states,
+      ja: ja.social.login.states,
+    };
+    for (const [lang, translations] of Object.entries(states)) {
+      for (const [status, text] of Object.entries(translations)) {
+        expect(text.trim(), `${lang}: ${status}`).not.toBe("");
+        expect(text, `${lang}: ${status}`).not.toBe(`social.login.states.${status}`);
+      }
+      expect(translations.preparing).not.toBeUndefined();
     }
   });
 
