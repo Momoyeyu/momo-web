@@ -136,3 +136,22 @@ def test_observation_expiring_during_compaction_cannot_silently_drop_pixels():
         with pytest.raises(vision.VisionError,match='computer.observationExpired'):
             tools.project([],{},materialize=True,require_observation=True)
     finally: current_run.reset(token)
+
+
+def test_reaction_downsampling_preserves_original_deadline_and_authorization(monkeypatch):
+    from app.services.context_policy import Budget,estimate
+    cfg={'contextWindow':32768,'maxOutputTokens':4096}
+    data=io.BytesIO();Image.new('RGB',(1600,1600),'white').save(data,'PNG')
+    token=current_run.set('reaction-budget')
+    try:
+        with patch.object(tools,'require_local',return_value='reaction-budget'):
+            tools.stage(data.getvalue(),lambda:None)
+            original=tools._pending['reaction-budget']
+            messages=[{'role':'system','content':'H'*(Budget.from_config(cfg).safe-6000)}]
+            tools.fit_observation(messages,cfg)
+            reduced=tools._pending['reaction-budget']
+            assert reduced[2:4]==(1024,1024)
+            assert reduced[0]==original[0] and reduced[-1] is original[-1] and reduced[-2] is original[-2]
+            assert estimate([*messages,*tools.observation_budget()])<=Budget.from_config(cfg).safe
+    finally:
+        tools._pending.pop('reaction-budget',None);current_run.reset(token)

@@ -129,3 +129,57 @@ def test_expired_request_can_be_explicitly_retried(setup):
  assert c.start(1,12,['observe'],'owner','lease')['status']=='expired'
  retry=c.start(1,12,['observe'],'owner','lease')
  assert retry['status']=='pending' and retry['requestId']!=r['requestId']
+
+
+def test_stop_pending_approval_rejects_delayed_continuation(setup):
+ c,p,calls=setup
+ module.runtime.require_meeting=lambda *args:None
+ module.runtime.active=False
+ pending=c.start(1,12,['observe'],'owner','lease')
+ p.decide(pending['requestId'],'once',1)
+ c.stop()
+ before=len(calls)
+ with pytest.raises(ValueError):c.resume(pending['requestId'],'owner','lease')
+ assert len(calls)==before
+ assert not c.pending and not c.pending_request and not c.target
+
+
+def test_observation_pixels_map_to_logical_window_coordinates(setup):
+ c,p,calls=setup
+ pending=c.start(1,12,['observe','interact'],'owner','lease');p.decide(pending['requestId'],'once',1);c.start(1,12,['observe','interact'],'owner','lease')
+ original=module.runtime.host.request
+ def host(method,params=None):
+  if method=='native.observe':return {'version':7,'bounds':{'x':100,'y':200,'width':800,'height':600}}
+  return original(method,params)
+ module.runtime.host.request=host
+ c.execute({'action':'observe'})
+ info=c.bind_observation(c.generation,7,{'width':1024,'height':768})
+ assert info=={'imageWidth':1024,'imageHeight':768,'coordinateSpace':'image-pixels'}
+ command={'action':'click','x':512,'y':384}
+ c.execute(command,7)
+ assert calls[-1][1]['command']=={'action':'click','x':400,'y':300}
+ assert command['x']==512
+
+
+@pytest.mark.parametrize('x,y,version', [(-1,0,7),(1024,0,7),(0,768,7),(float('nan'),0,7),(True,0,7),(1,1,6)])
+def test_observation_mapping_rejects_outside_or_stale_coordinates(setup,x,y,version):
+ c,p,calls=setup
+ pending=c.start(1,12,['observe','interact'],'owner','lease');p.decide(pending['requestId'],'once',1);c.start(1,12,['observe','interact'],'owner','lease')
+ original=module.runtime.host.request
+ module.runtime.host.request=lambda method,params=None: {'version':7,'bounds':{'width':800,'height':600}} if method=='native.observe' else original(method,params)
+ c.execute({'action':'observe'});c.bind_observation(c.generation,7,{'width':1024,'height':768})
+ before=len(calls)
+ with pytest.raises(ValueError):c.execute({'action':'scroll','x':x,'y':y,'delta':10},version)
+ assert len(calls)==before
+
+
+def test_observation_mapping_expires_without_refreshing_input_authority(setup):
+ c,p,calls=setup
+ pending=c.start(1,12,['observe','interact'],'owner','lease');p.decide(pending['requestId'],'once',1);c.start(1,12,['observe','interact'],'owner','lease')
+ original=module.runtime.host.request
+ module.runtime.host.request=lambda method,params=None: {'version':7,'bounds':{'width':800,'height':600}} if method=='native.observe' else original(method,params)
+ c.execute({'action':'observe'});c.bind_observation(c.generation,7,{'width':512,'height':384})
+ c.projection['observed']-=16
+ before=len(calls)
+ with pytest.raises(ValueError):c.execute({'action':'click','x':100,'y':100},7)
+ assert len(calls)==before

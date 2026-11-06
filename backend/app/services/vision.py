@@ -61,7 +61,8 @@ def require_enabled(cfg=None):
         raise VisionError('vision.disabled')
 
 
-def normalize(raw):
+def normalize(raw, *, max_edge=1536):
+    if max_edge not in (512,1024,1536): raise VisionError("vision.size")
     if not raw or len(raw) > MAX_BYTES:
         raise VisionError('vision.size')
     try:
@@ -73,7 +74,7 @@ def normalize(raw):
                 animated = bool(getattr(image, 'is_animated', False))
                 image.seek(0)
                 image = ImageOps.exif_transpose(image).convert('RGBA')
-                image.thumbnail((1536, 1536), Image.Resampling.LANCZOS)
+                image.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
                 # Fresh pixels strip EXIF, XMP, comments and embedded profiles.
                 clean = Image.new('RGB', image.size, 'white')
                 clean.paste(image, mask=image.getchannel('A'))

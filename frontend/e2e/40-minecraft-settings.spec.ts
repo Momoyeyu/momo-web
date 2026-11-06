@@ -14,7 +14,7 @@ test('Minecraft attaches existing world without launcher or login',async({page})
  await page.locator('.extension-card').filter({hasText:'Minecraft 陪玩'}).getByRole('button',{name:'配置',exact:true}).click();
  const modal=page.getByRole('dialog');
  await expect(modal.getByText('微软公共客户端 ID',{exact:true})).toHaveCount(0);
- await modal.getByRole('combobox',{name:'当前游戏'}).selectOption('fixture');
+ await modal.locator('.sel-face').click();await modal.getByRole('option',{name:'momo-test · local/minecraft:overworld'}).click();
  await modal.getByRole('switch',{name:'允许聊天'}).click();
  await modal.getByRole('button',{name:'启动陪玩'}).click();
  await expect.poll(()=>attached).toMatchObject({sessionId:'fixture',permissions:['game.observe','game.chat']});

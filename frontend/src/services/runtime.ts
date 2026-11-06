@@ -1,7 +1,8 @@
+import type {DesktopWindowBridge} from './desktopWindow';
 /** Desktop credentials live only in memory and never enter URLs or persisted settings. */
 export interface Runtime { baseUrl: string; token?: string }
 declare global {
-  interface Window { momoDesktop?: {getRuntime(): Promise<Runtime>} }
+  interface Window { momoDesktop?: {getRuntime(): Promise<Runtime>} & Partial<DesktopWindowBridge> }
 }
 let pending: Promise<Runtime> | undefined;
 export function desktop(): boolean { return typeof window !== 'undefined' && 'momoDesktop' in window; }

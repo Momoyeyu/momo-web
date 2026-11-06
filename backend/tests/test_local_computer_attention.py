@@ -166,3 +166,71 @@ def test_model_waits_for_inflight_background_capture(local):
             model.join(2)
         assert model_entered.is_set()
         assert not errors
+
+
+def test_minecraft_current_owner_run_can_use_existing_game_during_local_hold(local,monkeypatch):
+    from app.services import minecraft as module
+    runtime,native,_,_,calls=local
+    native.stop()
+    monkeypatch.setattr(module,'runtime',runtime)
+    game=module.Minecraft()
+    game.connect(17643,'fixture-token','fixture-world','fixture-account',['game.observe','game.chat'],'owner','lease')
+    runtime.prepare_local('owner','lease')
+    with runtime.run('owner-run',client='owner',lease='lease'):
+        token=current_run.set('owner-run')
+        try:
+            assert game.execute('observe',{},game.generation,None,None)['ok']
+            runtime.focus=True
+            before=len(calls)
+            with pytest.raises(ValueError):game.execute('chat',{'text':'denied'},game.generation,None,None)
+            assert len(calls)==before
+        finally:current_run.reset(token)
+
+
+def test_minecraft_late_observation_after_focus_is_discarded(local,monkeypatch):
+    from app.services import minecraft as module
+    runtime,native,_,_,_=local
+    native.stop();monkeypatch.setattr(module,'runtime',runtime)
+    game=module.Minecraft()
+    game.connect(17643,'fixture-token','fixture-world','fixture-account',['game.observe'],'owner','lease')
+    original=runtime.host.request
+    def request(method,params=None):
+        result=original(method,params)
+        if method=='minecraft.observe':runtime.focus=True
+        return result
+    runtime.host.request=request
+    runtime.prepare_local('owner','lease')
+    with runtime.run('owner-run',client='owner',lease='lease'):
+        token=current_run.set('owner-run')
+        try:
+            with pytest.raises(ValueError):game.execute('observe',{},game.generation,None,None)
+        finally:current_run.reset(token)
+
+
+def test_reduced_observation_and_click_share_exact_pixel_mapping(local):
+    import json
+    from app.core import state
+    runtime,native,_,_,calls=local
+    raw=io.BytesIO();Image.new('RGB',(1600,1200),'white').save(raw,'PNG')
+    original=runtime.host.request
+    commands=[]
+    def request(method,params=None):
+        if method=='native.observe':return {'version':3,'bounds':{'x':200,'y':100,'width':800,'height':600},'data':base64.b64encode(raw.getvalue()).decode()}
+        if method=='native.action':commands.append(params['command'])
+        return original(method,params)
+    runtime.host.request=request
+    runtime.prepare_local('owner','lease')
+    with runtime.run('owner-run',client='owner',lease='lease'):
+        token=current_run.set('owner-run')
+        try:
+            with computer_tools.capture_scope(1024):result=json.loads(computer_tools.execute('computer_observe',{}))
+            assert result['imageWidth']==1024 and result['imageHeight']==768 and result['coordinateSpace']=='image-pixels'
+            payload=computer_tools.project([],state.load()['settings']['llm'])
+            image=payload[-1]['content'][-1]['image_url']['url'].split(',')[1]
+            assert Image.open(io.BytesIO(base64.b64decode(image))).size==(1024,768)
+            result=json.loads(computer_tools.execute('computer_action',{'action':'click','x':512,'y':384,'version':3}))
+            assert result['ok'] and commands==[{'action':'click','x':400,'y':300}]
+            native.stop()
+            result=json.loads(computer_tools.execute('computer_action',{'action':'click','x':512,'y':384,'version':3}))
+            assert result['ok'] is False and len(commands)==1
+        finally:current_run.reset(token)

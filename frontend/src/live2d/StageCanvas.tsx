@@ -54,7 +54,7 @@ export default function StageCanvas({ visible, interactive, onReady }: { visible
   useEffect(() => { getStage().setChatVisible(visible,interactive); }, [visible,interactive]);
 
   return (
-    <div
+    <div className="stage-scene"
       style={{
         position: "fixed",
         inset: 0,

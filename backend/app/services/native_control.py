@@ -1,5 +1,7 @@
 """Existing-application control; one coordinator, explicit application grants."""
 import threading
+import math
+import time
 import uuid
 from .coordinator import runtime
 from . import vision, activities
@@ -19,6 +21,8 @@ class NativeControl:
         self.stop_unconfirmed=False
         self.stopping=False
         self.session_id=None
+        self.observation=None
+        self.projection=None
 
     def gate(self,client=None,lease=None,allow_busy=False):
         if client is None:
@@ -119,6 +123,35 @@ class NativeControl:
             raise ValueError('Application grant changed')
         permissions.check(self.grant,self.target,runtime.epoch)
 
+    def bind_observation(self,generation,version,dimensions):
+        """Bind provider image coordinates to this exact authorized window observation."""
+        with self.lock:
+            self.validate(generation)
+            observed=self.observation
+            width,height=dimensions.get('width'),dimensions.get('height')
+            if (not isinstance(version,int) or isinstance(version,bool) or version<1
+                    or not observed or observed['version']!=version or observed['generation']!=generation
+                    or not isinstance(width,int) or not isinstance(height,int) or not 0<width<=1536 or not 0<height<=1536):
+                raise ValueError('Observation mapping unavailable')
+            bounds=observed['bounds']
+            if not isinstance(bounds,dict) or any(not isinstance(bounds.get(k),(int,float)) or not math.isfinite(bounds[k]) or bounds[k]<=0 for k in ('width','height')):
+                raise ValueError('Observation mapping unavailable')
+            self.projection={**observed,'imageWidth':width,'imageHeight':height}
+            return {'imageWidth':width,'imageHeight':height,'coordinateSpace':'image-pixels'}
+
+    def _map_coordinates(self,command,version):
+        projection=self.projection
+        if (not isinstance(version,int) or isinstance(version,bool)
+                or not projection or projection['version']!=version or projection['generation']!=self.generation
+                or time.monotonic()-projection['observed']>15):
+            raise ValueError('Observation mapping unavailable')
+        x,y=command.get('x'),command.get('y')
+        if (any(isinstance(v,bool) or not isinstance(v,(int,float)) or not math.isfinite(v) for v in (x,y))
+                or not 0<=x<projection['imageWidth'] or not 0<=y<projection['imageHeight']):
+            raise ValueError('Invalid observation coordinate')
+        return {**command,'x':x*projection['bounds']['width']/projection['imageWidth'],
+                'y':y*projection['bounds']['height']/projection['imageHeight']}
+
     def execute(self,command,version=None):
         with self.operation:
             return self._execute(command,version)
@@ -132,10 +165,13 @@ class NativeControl:
             method='native.observe' if command['action']=='observe' else 'native.action'
             if command['action'] != 'observe' and 'interact' not in self.grant['capabilities']:
                 raise ValueError('Interaction not granted')
+            if command['action'] in ('click','scroll'):command=self._map_coordinates(command,version)
+            self.projection=None
             params={'command':command,'version':version,'bindingId':self.session_id,'permit':host.permit('native-action')}
         result=host.request(method,params)
         with self.lock:
             self.validate(generation)
+            self.observation={"version":result.get("version"),"bounds":result.get("bounds"),"generation":generation,"observed":time.monotonic()} if command["action"]=="observe" else None
             return result
 
     def frame(self,client,lease):
@@ -153,6 +189,7 @@ class NativeControl:
             if self.plugin!='computer':raise ValueError('Desktop frame scope required')
             # A scheduler observation must not replace the model's version mid-turn.
             if getattr(runtime,'active',None):return {'skipped':True}
+            self.observation=self.projection=None
             params={'command':{'action':'observe'},'bindingId':self.session_id,'permit':host.permit('native-frame')}
         result=host.request('native.observe',params)
         with self.lock:
@@ -175,6 +212,7 @@ class NativeControl:
             self.target=self.grant=self.pending=None
             self.pending_request=None
             self.session_id=None
+            self.observation=self.projection=None
             self.stopping=True
         try:
             if host and had_binding:host.request('native.stop')

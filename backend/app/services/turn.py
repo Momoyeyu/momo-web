@@ -361,6 +361,14 @@ def react(
                 if isinstance(messages, ContextMessages):
                     messages.fit_images = lambda: vision.fit_history(messages, llm_cfg, tools, extra_messages=observation_budget)
                 vision.fit_history(messages, llm_cfg, tools, extra_messages=observation_budget)
+                if observation_only and observation_budget:
+                    computer_tools.fit_observation(messages,llm_cfg,tools)
+                    observation_budget=computer_tools.observation_budget()
+                    if not observation_budget:raise vision.VisionError("computer.observationExpired")
+                from .context_policy import Budget, estimate
+                if observation_budget and estimate([*messages,*observation_budget],tools)>Budget.from_config(llm_cfg).safe:
+                    # Fresh pixels must never wait behind hard maintenance.
+                    raise vision.VisionError('computer.budget')
                 compress.guard_request(llm_cfg, messages, tools, cancelled=lambda: checkpoint.generation() != gen, extra_messages=observation_budget)
                 for ev in llm.chat_stream(
                     llm_cfg,
@@ -415,7 +423,30 @@ def react(
                 ):
                     if checkpoint.generation() != gen:
                         return
-                    result = run_call(call, ext_tools)
+                    capture_edge=1536
+                    reservation=computer_tools.capture_budget(call,capture_edge)
+                    if reservation:
+                        prepared=False
+                        for capture_edge in (1536,1024,512):
+                            reservation=computer_tools.capture_budget(call,capture_edge)
+                            vision.fit_history(messages,llm_cfg,tools,extra_messages=reservation)
+                            if isinstance(messages,ContextMessages):
+                                messages.fit_images=lambda:vision.fit_history(messages,llm_cfg,tools,extra_messages=reservation)
+                            try:
+                                compress.guard_request(llm_cfg,messages,tools,cancelled=lambda:checkpoint.generation()!=gen,extra_messages=reservation)
+                            except llm.LlmError as error:
+                                if str(error)=='Context capacity reached; please retry after maintenance' and capture_edge!=512:
+                                    continue
+                                break
+                            prepared=True
+                            break
+                        if not prepared:
+                            import json
+                            messages.append({'role':'tool','tool_call_id':call.get('id',''),'content':json.dumps({'ok':False,'code':'COMPUTER_CONTEXT_CAPACITY','error':'Observation was not captured because context preparation could not complete safely. Do not claim pixels or retry mutations.'})})
+                            continue
+                        if checkpoint.generation()!=gen:return
+                    with computer_tools.capture_scope(capture_edge):
+                        result = run_call(call, ext_tools)
                     messages.append(result)
                     if call.get('function', {}).get('name') == 'image_read':
                         import json

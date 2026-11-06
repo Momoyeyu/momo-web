@@ -1,3 +1,7 @@
+import {getStage} from './live2d/stage';
+import {useDesktopWindowBridge,setDesktopMode} from './services/desktopWindow';
+import DesktopPetControls from './components/DesktopPetControls';
+import './styles/desktop-pet.css';
 import {musicDirector} from './audio/director';
 import {useIntro} from './services/introClient';
 import {ambient} from './audio/ambient';
@@ -9,7 +13,7 @@ import {useT} from "./i18n";
 import Button from "./ui/Button";
 import TooltipLayer from "./ui/TooltipLayer";
 import IntroGuide from "./components/IntroGuide";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import StageCanvas from "./live2d/StageCanvas";
 import Title from "./pages/Title";
 import Chat from "./pages/Chat";
@@ -59,6 +63,18 @@ function renderPage(route: Route, active: boolean, attention:AttentionState,onHo
 
 export default function App({ready, onPrepared}: {ready: boolean; onPrepared: () => void}) {
   const route = useRoute();
+  const desktopWindow=useDesktopWindowBridge();
+  const framingBeforePet=useRef<boolean|null>(null);
+  useLayoutEffect(()=>{
+    document.documentElement.classList.toggle('desktop-pet',desktopWindow.mode==='pet');
+    document.documentElement.classList.toggle('desktop-shell',!!window.momoDesktop?.setWindowMode);
+    if(desktopWindow.mode==='pet'){
+      if(framingBeforePet.current===null)framingBeforePet.current=getStage().getCloseUp();
+      getStage().setCloseUp(false);
+    }else if(framingBeforePet.current!==null){getStage().setCloseUp(framingBeforePet.current);framingBeforePet.current=null;}
+    return()=>{document.documentElement.classList.remove('desktop-pet','desktop-shell');};
+  },[desktopWindow.mode]);
+  useEffect(()=>{if(desktopWindow.mode==='pet'&&route!=='chat')void setDesktopMode('chat').catch(()=>{});},[desktopWindow.mode,route]);
   const audioIntro=useIntro().data?.phase;
   useEffect(()=>ambient.install(),[]);
   useEffect(()=>{const sync=()=>ambient.configure(getSettings().general);sync();return subscribe(sync);},[]);
@@ -306,6 +322,8 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
           {(meeting.state === "failed" || historyFailed || attentionFault) && <div className="meeting-gate-actions">{attentionFault?<Button size="sm" variant="ghost" onClick={()=>{location.hash='#/settings';}}>{t('settings.title')}</Button>:<Button size="sm" variant="ghost" onClick={() => historyFailed ? setHistoryRetry(value=>value+1) : void enterMeeting().catch(() => {})}>{t("meeting.retry")}</Button>}<Button size="sm" variant="ghost" onClick={() => {location.hash="#/title";}}>{t("common.backTitle")}</Button></div>}
         </div>
       </div>}
+      <div className="desktop-window-grip" aria-hidden="true"/>
+      <DesktopPetControls/>
       <AppPermissions/>
       <TooltipLayer />
       <IntroGuide ready={ready} />

@@ -11,6 +11,9 @@ for(const viewport of [{width:1280,height:720},{width:1920,height:1080}])test(`e
  await page.screenshot({path:info.outputPath('plugin-cards.png')});
  await gotoRoute(page,'chat');
  await page.getByRole('button',{name:'拓展',exact:true}).click();
- await expect(page.getByRole('dialog').locator('.extension-card')).toHaveCount(3);
+ await expect(page.getByRole('dialog').getByRole('tab')).toHaveCount(3);
+ await expect(page.getByRole('dialog').getByRole('button',{name:'查找窗口'})).toBeVisible();
+ await expect(page.getByRole('dialog').getByRole('button',{name:'配置',exact:true})).toHaveCount(0);
+ await page.screenshot({path:info.outputPath('activity-controls.png')});
  await page.getByRole('dialog').getByRole('button',{name:'关闭配置',exact:true}).click();
 });

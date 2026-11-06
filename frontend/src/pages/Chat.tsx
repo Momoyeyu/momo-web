@@ -1,3 +1,4 @@
+import {useDesktopWindow} from '../services/desktopWindow';
 import ExtensionActivities from './ExtensionActivities';
 import {useImageDraft} from '../chat/useImageDraft';
 import '../styles/images.css';
@@ -44,7 +45,9 @@ const STATUS_LABEL_KEYS: Record<ChatStatus, string> = {
 
 export default function Chat({active,attention,onHome}: {active: boolean;attention:AttentionState;onHome:()=>void}) {
   const t = useT();
+  const desktopWindow=useDesktopWindow();
   const [phoneOpen,setPhoneOpen]=useState(false),[phoneClose,setPhoneClose]=useState(0);
+  useEffect(()=>{if(desktopWindow.mode==='pet')setPhoneClose(value=>value+1);},[desktopWindow.mode]);
   const intro=useIntro();
   const introActive=!!intro.data && intro.data.phase!=="completed";
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
@@ -291,7 +294,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
           {phoneBusy && <Button className="tb" disabled={controlling} onClick={()=>void control('stop')} aria-label={t('attention.stopPhone')} title={t('attention.stopPhone')}><Icon name="stop" size={15}/></Button>}
           {attention.phonePaused && !attention.focus && <Button className="tb" disabled={controlling} onClick={()=>void control('resume_phone')} title={t('attention.resumePhone')}><Icon name="play" size={16}/></Button>}
           {!introActive&&<ExtensionActivities/>}
-          {!introActive&&<PhoneSurface active={interactive} attention={attention} onVisibilityChange={setPhoneOpen} closeSignal={phoneClose}/>}
+          {!introActive&&<PhoneSurface active={interactive&&desktopWindow.mode!=='pet'} attention={attention} onVisibilityChange={setPhoneOpen} closeSignal={phoneClose}/>}
           <Button
             className="tb"
             aria-label={t("chat.backlog")}

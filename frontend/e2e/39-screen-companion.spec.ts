@@ -22,3 +22,21 @@ test('native observation persists across settings and chat and stops explicitly'
  await modal.getByRole('button',{name:'关闭配置'}).click();await gotoRoute(page,'chat');const before=frames;await expect.poll(()=>frames).toBeGreaterThan(before);
  await openExtensionTab(page,'插件');await open();modal=page.getByRole('dialog',{name:'桌面陪伴'});await modal.getByRole('button',{name:'关闭',exact:true}).click();await expect.poll(()=>active).toBe(false);
 });
+
+test('unconfirmed native stop stays retryable instead of looking idle',async({page})=>{
+ let stopUnconfirmed=true,stops=0;
+ await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:true}}}));
+ await page.route('**/api/computer/**',async r=>{
+  const path=new URL(r.request().url()).pathname;
+  if(path.endsWith('/approvals')){await r.fulfill({json:{pending:[],allowlist:[]}});return;}
+  if(path.endsWith('/stop')){stops++;stopUnconfirmed=false;}
+  await r.fulfill({json:{active:false,stopUnconfirmed}});
+ });
+ await bootChat(page);await page.getByRole('button',{name:'拓展',exact:true}).click();
+ const modal=page.getByRole('dialog');
+ await expect(modal.getByRole('button',{name:'开启',exact:true})).toBeDisabled();
+ await expect(modal.getByRole('button',{name:'关闭',exact:true})).toBeEnabled();
+ await modal.getByRole('button',{name:'关闭',exact:true}).click();
+ await expect.poll(()=>stops).toBe(1);
+ await expect(modal.getByRole('button',{name:'关闭',exact:true})).toBeDisabled();
+});

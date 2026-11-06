@@ -54,7 +54,8 @@ class AppPermissions:
    if set(capabilities)<=set(saved.get('capabilities',[])):return self._grant(r,'always')
    raise AppApprovalRequired(rid,'pending')
  def _grant(self,r,decision):
-  r['status']='granted'
+  # Pending-request expiry and execution lifetime are separate five-minute windows.
+  r['status']='granted';r['expires']=self.clock()+300
   g={'id':r['id'],'appId':r['appId'],'epoch':r['epoch'],'version':self.versions.get(r['appId'],0),'expires':r['expires'],'decision':decision,'capabilities':list(r['capabilities'])}
   self.grants[r['id']]=g
   return copy.deepcopy(g)

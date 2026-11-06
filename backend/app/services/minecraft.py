@@ -37,7 +37,7 @@ class Minecraft:
             from .computer_tools import require_local
             require_local()
         else: runtime.require_meeting(client, lease)
-        if not runtime.started or runtime.mode != 'meeting' or runtime.focus or runtime.restoring or runtime.interrupt_hold:
+        if not runtime.started or runtime.mode != 'meeting' or runtime.focus or runtime.restoring or (runtime.interrupt_hold and client is not None):
             raise MinecraftError('Minecraft attention unavailable')
         from .computer import computer
         from .browser import browser
@@ -75,8 +75,9 @@ class Minecraft:
                 self.actions += 1
                 permission = {**self.binding, 'activityEpoch': runtime.epoch}
             result = runtime.host.request('minecraft.' + action, {**arguments, 'permission': permission})
+            fingerprint = self.gate(client, lease)
             with self.lock:
-                if generation != self.generation or self.epoch != runtime.epoch:
+                if generation != self.generation or self.epoch != runtime.epoch or fingerprint != self.fingerprint:
                     raise MinecraftError('Late Minecraft result discarded')
             return result
 

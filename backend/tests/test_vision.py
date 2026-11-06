@@ -174,7 +174,7 @@ def test_turn_observation_followup_keeps_saved_image_costs_and_reservation(monke
     from app.services.coordinator import current_run
     cfg=configured()
     values=state.load()
-    values['settings']['llm'].update(contextWindow=24000,maxOutputTokens=1000)
+    values['settings']['llm'].update(contextWindow=32000,maxOutputTokens=1000)
     state.write_state(values)
     item=vision.store(png((32,32)))
     gen=checkpoint.generation();at=db.now_iso()
@@ -188,6 +188,7 @@ def test_turn_observation_followup_keeps_saved_image_costs_and_reservation(monke
     monkeypatch.setattr(computer_tools,'declarations',lambda *_:[{'type':'function','function':{'name':'computer_observe','description':'Observe approved window','parameters':{'type':'object','properties':{}}}}])
     monkeypatch.setattr(native_control,'execute',lambda *a,**k:{'data':base64.b64encode(png((32,32))).decode(),'version':1})
     monkeypatch.setattr(native_control,'validate',lambda *_:None)
+    monkeypatch.setattr(native_control,'bind_observation',lambda generation,version,dimensions:{'imageWidth':dimensions['width'],'imageHeight':dimensions['height'],'coordinateSpace':'image-pixels'})
     # Keep the real guard but suppress unrelated asynchronous background maintenance.
     monkeypatch.setattr(turn.compress,'maybe_compress',lambda *a,**k:False)
     guard=turn.compress.guard_request
@@ -214,3 +215,152 @@ def test_turn_observation_followup_keeps_saved_image_costs_and_reservation(monke
     assert any(e.get('text')=='The approved window is visible.' for e in events)
     assert not reservations[0] and reservations[1]
     assert 'base64' not in json.dumps(checkpoint.live_messages())
+
+
+def test_observation_capacity_maintenance_finishes_before_fresh_capture(monkeypatch):
+    from types import SimpleNamespace
+    from app.services import computer_tools
+    from app.services.native_control import native_control
+    from app.services.coordinator import current_run
+    configured();values=state.load();values['settings']['llm']['contextWindow']=100000;state.write_state(values)
+    now=[0];captures=[];requests=[]
+    monkeypatch.setattr(computer_tools,'time',SimpleNamespace(monotonic=lambda:now[0]))
+    monkeypatch.setattr(computer_tools,'require_local',lambda:'preflight-turn')
+    monkeypatch.setattr(computer_tools,'declarations',lambda *_:[])
+    monkeypatch.setattr(native_control,'validate',lambda *_:None)
+    monkeypatch.setattr(native_control,'bind_observation',lambda generation,version,dimensions:{'imageWidth':dimensions['width'],'imageHeight':dimensions['height'],'coordinateSpace':'image-pixels'})
+    def capture(*args,**kwargs):
+        captures.append(now[0]);return {'data':base64.b64encode(png()).decode(),'version':1}
+    monkeypatch.setattr(native_control,'execute',capture)
+    real_guard=turn.compress.guard_request
+    def guard(*args,**kwargs):
+        if kwargs.get('extra_messages') and not captures:now[0]+=20
+        return real_guard(*args,**kwargs)
+    monkeypatch.setattr(turn.compress,'guard_request',guard)
+    monkeypatch.setattr(turn.compress,'maybe_compress',lambda *a,**k:False)
+    def stream(config,messages,**kwargs):
+        requests.append(messages)
+        if len(requests)==1:yield {'type':'tool_calls','calls':[{'id':'observe','type':'function','function':{'name':'computer_observe','arguments':'{}'}}]}
+        else:yield {'type':'text','delta':'Fresh observation received.'}
+    monkeypatch.setattr(turn.llm,'chat_stream',stream)
+    token=current_run.set('preflight-turn')
+    try:events=list(turn.run_turn('Observe.'))
+    finally:current_run.reset(token)
+    assert captures==[20]
+    assert any(e.get('text')=='Fresh observation received.' for e in events)
+    assert not [e for e in events if e['t']=='error']
+
+
+def test_observation_preflight_capacity_failure_never_captures_or_claims_pixels(monkeypatch):
+    from app.services import computer_tools
+    from app.services.native_control import native_control
+    from app.services.coordinator import current_run
+    from app.core.llm import LlmError
+    configured()
+    captures=[];requests=[]
+    monkeypatch.setattr(computer_tools,'require_local',lambda:'denied-preflight')
+    monkeypatch.setattr(computer_tools,'declarations',lambda *_:[])
+    monkeypatch.setattr(native_control,'execute',lambda *a,**k:captures.append(True))
+    real_guard=turn.compress.guard_request
+    def guard(*args,**kwargs):
+        if kwargs.get('extra_messages'):raise LlmError('Context capacity reached; please retry after maintenance')
+        return real_guard(*args,**kwargs)
+    monkeypatch.setattr(turn.compress,'guard_request',guard)
+    monkeypatch.setattr(turn.compress,'maybe_compress',lambda *a,**k:False)
+    def stream(config,messages,**kwargs):
+        requests.append(messages)
+        if len(requests)==1:yield {'type':'tool_calls','calls':[{'id':'observe','type':'function','function':{'name':'computer_observe','arguments':'{}'}}]}
+        else:
+            result=json.loads(messages[-1]['content'])
+            assert result['code']=='COMPUTER_CONTEXT_CAPACITY' and not result.get('pixelsFollow')
+            yield {'type':'text','delta':'Observation is unavailable at this context capacity.'}
+    monkeypatch.setattr(turn.llm,'chat_stream',stream)
+    token=current_run.set('denied-preflight')
+    try:events=list(turn.run_turn('Observe.'))
+    finally:current_run.reset(token)
+    assert not captures
+    assert any(e.get('text')=='Observation is unavailable at this context capacity.' for e in events)
+
+
+@pytest.mark.parametrize('available,expected_edge', [(7000,1024),(4000,512),(2500,None)])
+@pytest.mark.parametrize('initial_bounds',[None,{'width':1536,'height':200}])
+def test_default_32k_turn_selects_readable_resolution_with_real_guard(monkeypatch,available,expected_edge,initial_bounds):
+    from app.services import computer_tools
+    from app.services.native_control import native_control
+    from app.services.coordinator import current_run
+    from app.services.context_policy import Budget
+    configured();values=state.load();values['settings']['llm'].update(contextWindow=32768,maxOutputTokens=4096);state.write_state(values)
+    cfg=values['settings']['llm'];budget=Budget.from_config(cfg)
+    monkeypatch.setattr(turn,'build_system_prompt',lambda *a,**k:'')
+    overhead=estimate(turn.build_messages(values,'Observe.'),turn.TOOLS)
+    header_size=budget.safe-available-overhead
+    monkeypatch.setattr(turn,'build_system_prompt',lambda *a,**k:'H'*header_size)
+    assert estimate(turn.build_messages(values,'Observe.'),turn.TOOLS)==budget.safe-available
+    monkeypatch.setattr(computer_tools,'require_local',lambda:'adaptive-turn')
+    monkeypatch.setattr(computer_tools,'declarations',lambda *_:[])
+    # A narrow window may become square before the helper captures it.
+    monkeypatch.setattr(native_control,'target',{'bounds':initial_bounds} if initial_bounds else None)
+    monkeypatch.setattr(native_control,'validate',lambda *_:None)
+    monkeypatch.setattr(native_control,'bind_observation',lambda generation,version,dimensions:{'imageWidth':dimensions['width'],'imageHeight':dimensions['height'],'coordinateSpace':'image-pixels'})
+    captured=[];requests=[]
+    raw=png((1600,1600))
+    def capture(*args,**kwargs):
+        captured.append(True);return {'data':base64.b64encode(raw).decode(),'version':1}
+    monkeypatch.setattr(native_control,'execute',capture)
+    # No old prefix exists to summarize; the real hard guard must try smaller images.
+    monkeypatch.setattr(turn.compress,'maybe_compress',lambda *a,**k:False)
+    def stream(config,messages,**kwargs):
+        requests.append(messages)
+        if len(requests)==1:
+            yield {'type':'tool_calls','calls':[{'id':'observe','type':'function','function':{'name':'computer_observe','arguments':'{}'}}]}
+        else:
+            if expected_edge is None:
+                assert json.loads(messages[-1]['content'])['code']=='COMPUTER_CONTEXT_CAPACITY'
+            else:
+                receipt=json.loads(next(m['content'] for m in messages if m.get('role')=='tool'))
+                assert receipt['imageWidth']==receipt['imageHeight']==expected_edge
+                image=messages[-1]['content'][-1]['image_url']['url'].split(',')[1]
+                assert Image.open(io.BytesIO(base64.b64decode(image))).size==(expected_edge,expected_edge)
+            yield {'type':'text','delta':'Observation handling finished.'}
+    monkeypatch.setattr(turn.llm,'chat_stream',stream)
+    token=current_run.set('adaptive-turn')
+    try:events=list(turn.run_turn('Observe.'))
+    finally:
+        computer_tools._pending.pop('adaptive-turn',None)
+        current_run.reset(token)
+    assert len(captured)==(0 if expected_edge is None else 1)
+    assert not [e for e in events if e['t']=='error']
+
+
+def test_proactive_turn_reduces_large_snapshot_without_waiting_or_resetting_ttl(monkeypatch):
+    from app.services import computer_tools
+    from app.services.coordinator import current_run
+    from app.services.context_policy import Budget
+    configured();values=state.load();values['settings']['llm'].update(contextWindow=32768,maxOutputTokens=4096);state.write_state(values)
+    cfg=values['settings']['llm'];observation={'source':'fixture','observedAt':1}
+    monkeypatch.setattr(turn,'build_system_prompt',lambda *a,**k:'')
+    overhead=estimate(turn.build_messages(values,'',observation=observation),[])
+    header_size=Budget.from_config(cfg).safe-6000-overhead
+    monkeypatch.setattr(turn,'build_system_prompt',lambda *a,**k:'H'*header_size)
+    monkeypatch.setattr(computer_tools,'require_local',lambda:'reaction-turn')
+    monkeypatch.setattr(computer_tools,'declarations',lambda *_:[])
+    monkeypatch.setattr(turn.compress,'maybe_compress',lambda *a,**k:False)
+    token=current_run.set('reaction-turn')
+    try:
+        computer_tools.stage(png((1600,1600)),lambda:None)
+        deadline=computer_tools._pending['reaction-turn'][0]
+        real_project=computer_tools.project
+        def project(*args,**kwargs):
+            assert computer_tools._pending['reaction-turn'][0]==deadline
+            return real_project(*args,**kwargs)
+        monkeypatch.setattr(computer_tools,'project',project)
+        def stream(config,messages,**kwargs):
+            assert kwargs['tools']==[]
+            image=messages[-1]['content'][-1]['image_url']['url'].split(',')[1]
+            assert Image.open(io.BytesIO(base64.b64decode(image))).size==(1024,1024)
+            yield {'type':'text','delta':'The screen changed.'}
+        monkeypatch.setattr(turn.llm,'chat_stream',stream)
+        events=list(turn.run_turn('',observation=observation))
+        assert any(e.get('text')=='The screen changed.' for e in events)
+        assert not [e for e in events if e['t']=='error']
+    finally:current_run.reset(token)

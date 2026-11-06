@@ -1,0 +1,24 @@
+/* One renderer, one avatar and one voice. Only the host frame changes. */
+.desktop-window-grip{display:none}
+.desktop-shell .desktop-window-grip{display:block;position:fixed;z-index:15;top:0;left:80px;right:0;height:18px;app-region:drag;-webkit-app-region:drag}
+html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transparent!important;--dialog-zone-h:160px;--dialog-bottom-gap:0px}
+.desktop-pet .app-stage{width:100vw;height:100vh;background:transparent}
+.desktop-pet .grid-backdrop,.desktop-pet .room-background,.desktop-pet .scene-ambient,.desktop-pet .scene-reading-shade{display:none}
+.desktop-pet .stage-scene{background:none!important}
+.desktop-pet .chat-toolbar,.desktop-pet .phone-surface,.desktop-pet .desktop-window-grip{display:none}
+.desktop-pet .dialog-drawer{width:calc(100% - 20px);left:10px;right:10px;bottom:10px}
+.desktop-pet .dialog-zone{padding:0}
+.desktop-pet .chat-page .dialog-box{width:100%;min-height:0;padding:10px 12px}
+.desktop-pet .subtitle{font-size:13px;line-height:1.5;min-height:3em;max-height:72px;overflow-y:auto;column-gap:6px;grid-template-columns:10px minmax(0,1fr)}
+.desktop-pet .nameplate{font-size:12px}
+.desktop-pet .input-row{gap:6px}
+.desktop-pet .input-row input{font-size:12px;height:32px}
+.desktop-pet .terminal-input-prompt{height:32px;width:10px}
+.desktop-pet .input-row .send-btn,.desktop-pet .input-row .mic-btn{width:28px;height:28px;min-height:28px}
+.desktop-pet .modal-overlay{width:100vw;height:100vh}
+.desktop-pet-controls{position:fixed;z-index:30;top:10px;left:10px;right:10px;display:flex;align-items:center;gap:6px;pointer-events:auto}
+.desktop-pet-controls .tb{color:var(--text);width:34px;height:34px;background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;app-region:no-drag;-webkit-app-region:no-drag}
+.desktop-pet-grip{flex:1;align-self:stretch;display:flex;align-items:center;gap:4px;padding-left:12px;app-region:drag;-webkit-app-region:drag}
+.desktop-pet-grip i{display:block;width:22px;height:3px;border-radius:4px;background:var(--text-dim);opacity:.6}
+.desktop-pet-controls [role=alert]{position:absolute;top:44px;background:var(--panel-solid);padding:10px;border-radius:8px;font-size:12px}
+.desktop-action-error{position:absolute;right:65px;width:220px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-solid);font-size:12px}

@@ -40,3 +40,21 @@ def test_stop_consumes_once_and_revoke_callback(tmp_path):
  assert e.value.status=='denied'
  called=[];p.on_revoke=called.append;p.remove(grant['appId'])
  assert called==[grant['appId']]
+
+
+def test_grant_gets_five_minutes_from_approval_but_cannot_renew_itself(tmp_path):
+ now=[0];p=AppPermissions(tmp_path/'permissions.json',lambda:now[0]);rid=request(p)
+ now[0]=299;p.decide(rid,'once',1)
+ grant=p.require(TARGET,1,'a',['observe'])
+ now[0]=301;assert p.check(grant,TARGET,1)
+ now[0]=599
+ with pytest.raises(ValueError):p.check(grant,TARGET,1)
+ with pytest.raises(AppApprovalRequired) as error:p.require(TARGET,1,'a',['observe'])
+ assert error.value.status=='expired'
+
+
+def test_pending_request_still_expires_before_approval(tmp_path):
+ now=[0];p=AppPermissions(tmp_path/'permissions.json',lambda:now[0]);rid=request(p)
+ now[0]=300
+ with pytest.raises(ValueError):p.decide(rid,'once',1)
+ assert not p.grants
