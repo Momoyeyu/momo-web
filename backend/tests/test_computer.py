@@ -50,6 +50,7 @@ def test_reactions_require_flags_change_and_cooldown():
     c.signature = (150,) * 256
     c.unknown = False
     with patch.object(c,'gate'), patch('app.services.computer.runtime') as runtime:
+        runtime.interrupt_hold = False
         runtime.active = runtime.presentation = None
         runtime.queue = []
         assert c.claim_reaction(0,'client','lease') is None

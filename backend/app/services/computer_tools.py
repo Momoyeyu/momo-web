@@ -14,11 +14,12 @@ _lock = threading.RLock()
 
 
 def require_local():
+    # interrupt_hold reserves attention for this local run; it only blocks phone work.
     rid = current_run.get()
     activity = runtime.activity or {}
     if (not rid or not runtime.started or not runtime.valid_run(rid) or activity.get('runId') != rid
             or activity.get('source') != 'meeting' or checkpoint.audience() != 'owner'
-            or runtime.focus or runtime.restoring or runtime.interrupt_hold):
+            or runtime.focus or runtime.restoring):
         raise ValueError('Local active owner run required')
     return rid
 

@@ -47,7 +47,7 @@ class Computer:
         except ValueError as error: raise ComputerError(str(error)) from None
         cfg = state.load()['settings']['llm']
         if (not runtime.started or runtime.mode != 'meeting' or runtime.focus
-                or runtime.restoring or runtime.interrupt_hold):
+                or runtime.restoring):
             self.stop('attention')
             raise ComputerError('computer.attention')
         if self.observing and (runtime.epoch != self.epoch or vision.fingerprint(cfg) != self.fingerprint):
@@ -126,7 +126,8 @@ class Computer:
             if (generation != self.generation or not self.observing or not self.frame
                     or time.monotonic()-self.last > 15 or not self.proactive or not self.reactions
                     or not different or getattr(self, "unknown", True) or self.analyses >= 12
-                    or time.monotonic()-self.last_reaction < 30 or runtime.active or runtime.presentation or runtime.queue):
+                    or time.monotonic()-self.last_reaction < 30 or runtime.active or runtime.presentation or runtime.queue
+                    or runtime.interrupt_hold):
                 return None
             self.last_reaction = time.monotonic()
             self.reacted_signature = self.signature

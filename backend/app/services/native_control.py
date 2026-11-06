@@ -24,9 +24,10 @@ class NativeControl:
             require_local()
         else: runtime.require_meeting(client,lease)
         activities.require_enabled(self.plugin)
-        if not runtime.started or runtime.mode!='meeting' or runtime.focus or runtime.restoring or runtime.interrupt_hold:
+        if not runtime.started or runtime.mode!='meeting' or runtime.focus or runtime.restoring:
             raise ValueError('Application attention unavailable')
-        if client is not None and not allow_busy and runtime.active: raise ValueError('Wait for the current response to finish')
+        # The authenticated frame path may keep observing during a local response.
+        if client is not None and not allow_busy and (runtime.active or runtime.interrupt_hold): raise ValueError('Wait for the current response to finish')
         vision.require_enabled(state.load()['settings']['llm'])
         if not runtime.host: raise ValueError('Application executor unavailable')
 
