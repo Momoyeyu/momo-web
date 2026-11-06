@@ -70,3 +70,23 @@ def test_minecraft_frame_is_stripped_and_staged_not_serialized():
         assert result['pixelsFollow']
         assert 'base64' not in json.dumps(result)
         assert stage.call_args.args[0]==data
+
+
+def test_native_failures_expose_only_reviewed_codes():
+    import json
+    from app.core.plugin_host import HostError
+    from app.services.native_control import native_control
+    with patch.object(tools, 'require_local', return_value='r'):
+        for message, expected in [('SCREEN_PERMISSION_REQUIRED', 'SCREEN_PERMISSION_REQUIRED'), ('STALE_OBSERVATION', 'STALE_OBSERVATION'), ('INVALID_PERMIT', 'INVALID_PERMIT'), ('STALE_PERMIT', 'STALE_PERMIT'), ('PAUSED', 'PAUSED'), ('Plugin host timed out', 'NATIVE_TIMEOUT'), ('Plugin host disconnected', 'NATIVE_DISCONNECTED'), ('secret /private/path token=fixture', 'NATIVE_UNAVAILABLE')]:
+            with patch.object(native_control, 'execute', side_effect=HostError(message)):
+                result = json.loads(tools.execute('computer_observe', {}))
+                assert result['code'] == expected
+                assert 'secret' not in json.dumps(result)
+
+
+def test_expired_or_revoked_grant_exposes_safe_permission_code():
+    import json
+    from app.services.native_control import native_control
+    for message, expected in [('Application permission revoked','APPLICATION_PERMISSION_REVOKED'), ('Application grant changed','APPLICATION_GRANT_CHANGED'), ('Local active owner run required','LOCAL_OWNER_RUN_REQUIRED'), ('vision.disabled','VISION_DISABLED')]:
+        with patch.object(tools, 'require_local', return_value='r'), patch.object(native_control, 'execute', side_effect=ValueError(message)):
+            assert json.loads(tools.execute('computer_observe', {}))['code'] == expected

@@ -60,3 +60,10 @@ test('independent watchdog stops ticks when parent remains alive but stops heart
   await req('shutdown');
   await exit;
 });
+
+test('native resource failures retain a bounded code over the pipe', async t => {
+  const {req,token} = child(t);
+  await req('hello', {coreInstance:'native-diagnostics',token});
+  await assert.rejects(req('native.targets'), error => error.code === 'NATIVE_RESOURCE_NOT_PREPARED');
+  await req('shutdown');
+});

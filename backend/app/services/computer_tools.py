@@ -6,9 +6,11 @@ import time
 from .coordinator import runtime, current_run
 from . import checkpoint, vision
 from ..core import state
+from ..core.plugin_host import HostError
 from .context_policy import Budget, estimate
 
 NAMES = {'computer_targets','computer_request','computer_observe','computer_action','screen_observe','browser_observe','browser_inspect','browser_action','browser_open','minecraft_action'}
+NATIVE_ERROR_CODES = frozenset(['SCREEN_PERMISSION_REQUIRED', 'INPUT_PERMISSION_REQUIRED', 'CAPTURE_FAILED', 'TARGET_GONE', 'TARGET_MOVED', 'TARGET_DENIED', 'TARGET_NOT_FOREGROUND', 'FOCUSED_WINDOW_UNAVAILABLE', 'TARGET_WINDOW_NOT_FOCUSED', 'AMBIGUOUS_FOCUSED_WINDOW', 'APP_IDENTITY_CHANGED', 'TARGET_HIDDEN', 'INVALID_COORDINATE', 'INVALID_TEXT', 'INVALID_SCROLL', 'EVENT_FAILED', 'NATIVE_RESOURCE_NOT_PREPARED', 'NATIVE_HELPER_FAILED', 'NATIVE_UNAVAILABLE', 'STALE_OBSERVATION', 'ACTION_DENIED', 'REVOKED', 'NATIVE_STOP_UNCONFIRMED', 'INVALID_PERMIT', 'STALE_PERMIT', 'PAUSED'])
 _pending = {}
 _lock = threading.RLock()
 
@@ -145,5 +147,19 @@ def execute(name,args):
                 stage(raw,validate)
                 result['pixelsFollow']=True
         return json.dumps(result,ensure_ascii=False)
-    except Exception:
-        return json.dumps({'ok':False,'error':'Observation/action unavailable, stale, denied or result unknown. Do not guess pixels, retry mutations, or broaden permissions.'})
+    except Exception as error:
+        diagnostic = {}
+        if name in {'computer_targets','computer_request','computer_observe','computer_action'}:
+            code = str(error) if isinstance(error,HostError) and str(error) in NATIVE_ERROR_CODES else 'NATIVE_UNAVAILABLE'
+            if isinstance(error,HostError):
+                code = {'Plugin host timed out':'NATIVE_TIMEOUT', 'Plugin host disconnected':'NATIVE_DISCONNECTED',
+                        'Plugin host is unavailable':'NATIVE_DISCONNECTED', 'Plugin pipe failed':'NATIVE_DISCONNECTED'}.get(str(error),code)
+            elif isinstance(error,ValueError):
+                code = {'Application permission revoked':'APPLICATION_PERMISSION_REVOKED',
+                        'Application grant changed':'APPLICATION_GRANT_CHANGED',
+                        'Local active owner run required':'LOCAL_OWNER_RUN_REQUIRED',
+                        'Application attention unavailable':'APPLICATION_ATTENTION_UNAVAILABLE',
+                        'Interaction not granted':'INTERACTION_NOT_GRANTED',
+                        'vision.disabled':'VISION_DISABLED'}.get(str(error),code)
+            diagnostic = {'code': code}
+        return json.dumps({'ok':False,**diagnostic,'error':'Observation/action unavailable, stale, denied or result unknown. Do not guess pixels, retry mutations, or broaden permissions.'})

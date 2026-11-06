@@ -8,6 +8,8 @@ from ..core import state
 class NativeControl:
     def __init__(self):
         self.lock=threading.RLock()
+        # Serialize captures and model actions without delaying stop/revocation.
+        self.operation=threading.RLock()
         self.target=None
         self.grant=None
         self.pending=None
@@ -118,6 +120,10 @@ class NativeControl:
         permissions.check(self.grant,self.target,runtime.epoch)
 
     def execute(self,command,version=None):
+        with self.operation:
+            return self._execute(command,version)
+
+    def _execute(self,command,version=None):
         host=runtime.host
         if not host:raise ValueError('Application executor unavailable')
         with self.lock:
@@ -133,6 +139,10 @@ class NativeControl:
             return result
 
     def frame(self,client,lease):
+        with self.operation:
+            return self._frame(client,lease)
+
+    def _frame(self,client,lease):
         import base64
         from .computer import computer
         host=runtime.host
@@ -141,6 +151,8 @@ class NativeControl:
             generation=self.generation
             self.validate(generation,client,lease)
             if self.plugin!='computer':raise ValueError('Desktop frame scope required')
+            # A scheduler observation must not replace the model's version mid-turn.
+            if getattr(runtime,'active',None):return {'skipped':True}
             params={'command':{'action':'observe'},'bindingId':self.session_id,'permit':host.permit('native-frame')}
         result=host.request('native.observe',params)
         with self.lock:

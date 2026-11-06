@@ -46,3 +46,10 @@ test('a delayed old-binding action cannot target a replacement grant',async()=>{
  await assert.rejects(broker.action({action:'type',text:'late'},{},1,old.bindingId),/UNAVAILABLE/);
  assert.equal(calls.length,before);await broker.stop();
 });
+
+test('native diagnostic allowlist never exposes helper text or paths',async()=>{
+ const {nativeErrorCode}=await import('../src/native-control.mjs');
+ assert.equal(nativeErrorCode(Error('SCREEN_PERMISSION_REQUIRED')),'SCREEN_PERMISSION_REQUIRED');
+ assert.equal(nativeErrorCode(Error('STALE_OBSERVATION')),'STALE_OBSERVATION');
+ assert.equal(nativeErrorCode(Error('/private/user token=secret')),'NATIVE_UNAVAILABLE');
+});

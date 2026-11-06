@@ -1,5 +1,6 @@
 import { createInterface } from 'node:readline';
 import { PluginHost, HostError } from './host.mjs';
+import { nativeErrorCode } from './native-control.mjs';
 
 const write = message => process.stdout.write(`${JSON.stringify(message)}\n`);
 const host = new PluginHost({ emit: write });
@@ -26,7 +27,7 @@ input.on('line', line => {
     write({ v: 1, id: message.id, ok: true, result });
     if (message.method === 'shutdown') void shutdown();
   }, error => {
-    write({ v: 1, id: message.id, ok: false, error: { code: error instanceof HostError ? error.code : 'INTERNAL', message: error instanceof HostError ? error.message : 'Host request failed' } });
+    write({ v: 1, id: message.id, ok: false, error: { code: error instanceof HostError ? error.code : typeof message.method === 'string' && message.method.startsWith('native.') ? nativeErrorCode(error) : 'INTERNAL', message: error instanceof HostError ? error.message : 'Host request failed' } });
   });
 });
 input.on('close', () => { void shutdown(); });

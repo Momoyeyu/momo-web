@@ -112,3 +112,57 @@ def test_pre_admission_hold_keeps_capture_but_suppresses_proactive_reaction(loca
     # Completing the admitted local response releases the phone hold.
     with runtime.run('owner-run', client='owner', lease='lease'): pass
     assert screen.claim_reaction(screen.generation, 'owner', 'lease') == {'generation': screen.generation}
+
+
+def test_background_scheduler_does_not_invalidate_model_observation(local):
+    runtime, native, _, _, calls = local
+    runtime.prepare_local('owner', 'lease')
+    with runtime.run('owner-run', client='owner', lease='lease'):
+        token = current_run.set('owner-run')
+        try:
+            native.execute({'action': 'observe'})
+            before = len(calls)
+            assert native.frame('owner', 'lease') == {'skipped': True}
+            assert len(calls) == before
+            native.execute({'action': 'type', 'text': 'fixture'}, 1)
+        finally: current_run.reset(token)
+
+
+def test_model_waits_for_inflight_background_capture(local):
+    runtime, native, _, _, _ = local
+    entered = threading.Event()
+    release = threading.Event()
+    model_entered = threading.Event()
+    errors = []
+    original = runtime.host.request
+    def request(method, params=None):
+        if method == 'native.observe' and not entered.is_set():
+            entered.set()
+            assert release.wait(2)
+        elif method == 'native.observe':
+            model_entered.set()
+        return original(method, params)
+    runtime.host.request = request
+    def background():
+        try: native.frame('owner', 'lease')
+        except Exception as error: errors.append(error)
+    frame = threading.Thread(target=background)
+    frame.start()
+    assert entered.wait(1)
+    runtime.prepare_local('owner', 'lease')
+    with runtime.run('owner-run', client='owner', lease='lease'):
+        def observe():
+            token = current_run.set('owner-run')
+            try: native.execute({'action': 'observe'})
+            except Exception as error: errors.append(error)
+            finally: current_run.reset(token)
+        model = threading.Thread(target=observe)
+        model.start()
+        try:
+            assert not model_entered.wait(.05)
+        finally:
+            release.set()
+            frame.join(2)
+            model.join(2)
+        assert model_entered.is_set()
+        assert not errors
