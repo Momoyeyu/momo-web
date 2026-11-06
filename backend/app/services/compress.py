@@ -29,7 +29,7 @@ _PROMPT = ("Background context maintenance. Summarize ONLY the preceding convers
     "Output summary body only. Previous summary: ")
 
 
-def maybe_compress(prompt_tokens=None, request=None, tools=None) -> bool:
+def maybe_compress(prompt_tokens=None, request=None, tools=None, *, hard=False) -> bool:
     from . import checkpoint, intro
     if intro.restricted():
         return False
@@ -48,7 +48,7 @@ def maybe_compress(prompt_tokens=None, request=None, tools=None) -> bool:
     _done.clear()
     context = copy_context()
     try:
-        Thread(target=lambda: context.run(_worker, copy.deepcopy(request), copy.deepcopy(tools)), daemon=True).start()
+        Thread(target=lambda: context.run(_worker, copy.deepcopy(request), copy.deepcopy(tools), hard), daemon=True).start()
     except BaseException:
         _done.set()
         _lock.release()
@@ -56,9 +56,9 @@ def maybe_compress(prompt_tokens=None, request=None, tools=None) -> bool:
     return True
 
 
-def _worker(request=None, tools=None):
+def _worker(request=None, tools=None, hard=False):
     try:
-        compress_once(request=request, tools=tools)
+        compress_once(request=request, tools=tools, hard=hard)
     except Exception:
         _log.exception('Background context compaction failed')
     finally:
@@ -86,7 +86,7 @@ def guard_request(cfg, messages, tools, *, cancelled, extra_messages=()):
     deadline = monotonic() + 65
     for attempt in range(2):
         before = checkpoint.summary_state()
-        maybe_compress(size, request=[*messages,*extra_messages], tools=tools)
+        maybe_compress(size, request=[*messages,*extra_messages], tools=tools, hard=True)
         while not _done.wait(.1):
             if cancelled():
                 raise llm.LlmError('Context preparation cancelled')
@@ -94,8 +94,11 @@ def guard_request(cfg, messages, tools, *, cancelled, extra_messages=()):
                 raise llm.LlmError('Context maintenance timed out; please retry')
         if cancelled():
             raise llm.LlmError('Context preparation cancelled')
-        if not hasattr(messages, 'refresh') or checkpoint.summary_state() == before:
+        if not hasattr(messages, 'refresh'):
             break
+        if checkpoint.summary_state() == before:
+            # An in-flight soft worker may have found no soft-sized candidate.
+            continue
         messages.refresh()
         size = estimate([*messages,*extra_messages], tools)
         if size <= budget.safe:
@@ -115,7 +118,7 @@ def _summary_messages(state, seg, request, snapshot):
     return [dict(m) for m in request[:first]] + turn._merge_assistant([checkpoint.context_message(r) for r in seg])
 
 
-def compress_once(request=None, tools=None) -> bool:
+def compress_once(request=None, tools=None, *, hard=False) -> bool:
     from . import checkpoint, intro, turn
     if intro.restricted():
         return False
@@ -130,7 +133,7 @@ def compress_once(request=None, tools=None) -> bool:
     header = _summary_messages(state, [], request, snapshot)
     header = [m for m in header if not str(m.get('content','')).startswith(turn.SUMMARY_PREFIX)]
     overhead = max(estimate(header, tools), estimate(request, tools)-estimate(history) if request else 0)
-    selected = policy.select(history, Budget.from_config(llm_cfg), overhead)
+    selected = policy.select(history, Budget.from_config(llm_cfg), overhead, hard=hard)
     if selected is None:
         return False
     fold_n = choose_latest(history, selected)

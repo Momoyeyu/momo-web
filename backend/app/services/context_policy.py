@@ -119,13 +119,15 @@ class Policy:
         return time.time() >= self.data.get('retry_after', 0)
 
     @atomic
-    def select(self, rows, budget, overhead=0):
+    def select(self, rows, budget, overhead=0, *, hard=False):
         """Shadow every candidate; live selection stays near conservative baseline.
 
         Candidate feasibility uses actual retained bytes + conservative summary
         estimate. No LLM decides retention; no sampled candidate bypasses safety.
         """
         previous = self.latest()
+        # Emergency recovery needs a safe request, not the silent worker's larger reserve.
+        limit = max(1, budget.safe - math.ceil(budget.window * .02)) if hard else self.soft_limit(budget)
         scores = []
         for k in range(2, 9):
             cut = choose_latest(rows, k)
@@ -133,7 +135,7 @@ class Policy:
                 continue
             old = estimate(rows[:cut])
             after = overhead + estimate(rows[cut:]) + max(512, old * .35)
-            if after > self.soft_limit(budget):
+            if after > limit:
                 continue
             free = (budget.safe-after)/budget.window
             health = max(0, .2-free)**2 + .25*max(0, free-.55)**2
