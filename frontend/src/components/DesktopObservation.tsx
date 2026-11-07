@@ -1,46 +1,61 @@
-import {useEffect,useState} from 'react';
+import {createPortal} from 'react-dom';
+import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {useT} from '../i18n';
 import {useActivities,type ActivityId} from '../services/extensionActivities';
-import {apiJson} from '../services/http';
-import {startNativeObservation,stopNativeObservation} from '../services/computerClient';
+import {captureDesktop,configureComputer,computerSnapshot,readComputer,setDesktopObservation,subscribeComputer} from '../services/computerClient';
+import {setDesktopPanel,useDesktopWindow} from '../services/desktopWindow';
+import {meetingSnapshot,subscribeMeeting} from '../services/meetingClient';
 import NativeCompanion from '../pages/settings/NativeCompanion';
 import MinecraftCompanion from '../pages/settings/MinecraftCompanion';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
-import Modal from '../ui/Modal';
 import '../styles/plugin-library.css';
 
-/** A scene action, not a second plugin/configuration directory. */
+/** Looking is a sense; application input is a separately authorized activity. */
 export default function DesktopObservation(){
- const t=useT(),enabled=useActivities();
- const [open,setOpen]=useState(false),[selected,setSelected]=useState<ActivityId>('computer');
- const [active,setActive]=useState(false),[activePlugin,setActivePlugin]=useState<'computer'|'browser'>('computer');
+ const t=useT(),enabled=useActivities(),windowState=useDesktopWindow();
+ const view=useSyncExternalStore(subscribeComputer,computerSnapshot);
+ const meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
+ const [open,setOpen]=useState(false),[selected,setSelected]=useState<ActivityId>('computer'),[working,setWorking]=useState(false);
+ const panel=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
+ const allowed=view.status?.desktopAllowed!==false,reacting=!!(view.status?.proactive&&view.status.reactions);
+ const problem=view.status?.desktopError;
  useEffect(()=>{
-  const controller=new AbortController();let timer:ReturnType<typeof setTimeout>;
+  let disposed=false,timer:ReturnType<typeof setTimeout>;let lastReaction=0;
   const poll=async()=>{
-   try{const state=await apiJson<{active:boolean;plugin?:string}>('/api/computer/native/status',{signal:controller.signal});
-    if(!controller.signal.aborted){setActive(state.active);setActivePlugin(state.plugin==='browser'?'browser':'computer');if(state.active&&state.plugin==='computer')startNativeObservation();else stopNativeObservation();}
-   }catch{if(!controller.signal.aborted)setActive(false);}
-   if(!controller.signal.aborted)timer=setTimeout(()=>void poll(),2500);
-  };
-  void poll();return()=>{controller.abort();clearTimeout(timer);};
+   try{
+    await readComputer();const current=computerSnapshot().status;
+    // On-demand screen_observe works without this UI. Only optional proactive viewing polls pixels.
+    if(!disposed&&current?.desktopAllowed!==false&&current?.proactive&&current.reactions&&!current.desktopError&&!meetingSnapshot().attention.focus){
+     await captureDesktop();
+     const fresh=computerSnapshot().status;
+     if(!disposed&&fresh?.observing&&!fresh.desktopError&&Date.now()-lastReaction>=30000){
+      lastReaction=Date.now();const {getChatEngine}=await import('../chat/engineInstance');
+      if(!disposed)getChatEngine().sendScreenReaction(fresh.generation);
+     }
+    }
+   }catch{/* Status failures do not enable capture or input. */}
+   if(!disposed)timer=setTimeout(()=>void poll(),2500);
+  };void poll();return()=>{disposed=true;clearTimeout(timer);};
  },[]);
- const current=enabled[selected]?selected:'computer';
+ useEffect(()=>()=>{void setDesktopPanel(false).catch(()=>{});},[]);
+ const close=()=>{setOpen(false);void setDesktopPanel(false).catch(()=>{});trigger.current?.focus();};
+ useEffect(()=>{if(open)panel.current?.focus();},[open,windowState.panel]);
+ const show=async()=>{if(open){close();return;}try{await setDesktopPanel(true);setOpen(true);}catch{/* Keep the trigger available for retry. */}};
+ const toggle=async()=>{if(working)return;setWorking(true);try{await setDesktopObservation(problem?true:!allowed);if(problem)await captureDesktop();}catch{/* The status store exposes capture/permission failure. */}finally{setWorking(false);}};
+ const title=selected==='computer'?t('desktop.operate'):t(selected+'.title');
  return <>
-  <Button className={`tb tip${active?' is-active':''}`} aria-label={t('desktop.observe')} aria-pressed={active} data-tip={t(active?'desktop.observing':'desktop.observe')} onClick={()=>{setSelected(active?activePlugin:'computer');setOpen(true);}}><Icon name="desktop"/></Button>
-  {open&&<Modal className="extension-modal desktop-observation" label={t('desktop.observe')} onClose={()=>setOpen(false)}>
-   <header className="desktop-observation-heading">
-    {current!=='computer'&&<Button variant="ghost" onClick={()=>setSelected('computer')} aria-label={t('desktop.observe')}><Icon name="back"/></Button>}
-    <span>{t('desktop.observe')}</span>
-    <Button variant="ghost" onClick={()=>setOpen(false)} aria-label={t('browser.dismiss')}><Icon name="close"/></Button>
-   </header>
-   <div className="desktop-observation-body">
-    {current==='minecraft'?<MinecraftCompanion mode="activity"/>:<NativeCompanion key={current} plugin={current} mode="pet"/>}
-    {current==='computer'&&(enabled.browser||enabled.minecraft)&&<details className="desktop-other-activities">
-     <summary>{t('desktop.otherActivities')}</summary>
-     <div>{(['browser','minecraft'] as const).filter(id=>enabled[id]).map(id=><Button key={id} variant="ghost" onClick={()=>setSelected(id)}><Icon name={id==='browser'?'browser':'gamepad'}/>{t(id+'.title')}</Button>)}</div>
-    </details>}
+  <Button className={`tb tip${allowed?' is-active':''}${problem?' has-warning':''}`} aria-label={t('desktop.observe')} aria-pressed={allowed} data-tip={t(problem?'desktop.observationUnavailable':allowed?'desktop.observing':'desktop.observationPaused')} data-tip-detail={t(problem==='screen-permission'?'desktop.screenPermissionHint':'desktop.observeHint')} disabled={working||view.busy} onClick={()=>void toggle()}><Icon name="desktop"/></Button>
+  <Button className={`tb tip${reacting?' is-active':''}`} aria-label={t('desktop.react')} aria-pressed={reacting} data-tip={t('desktop.react')} data-tip-detail={t('desktop.reactHint')} disabled={working||meeting.attention.focus} onClick={()=>{setWorking(true);void configureComputer(!reacting,!reacting).catch(()=>{}).finally(()=>setWorking(false));}}><Icon name="voice"/></Button>
+  <button ref={trigger} type="button" className={`tb tip${open?' is-active':''}`} aria-label={t('desktop.operate')} aria-expanded={open} data-tip={t('desktop.operate')} onClick={()=>void show()}><Icon name="browser"/></button>
+  {open&&createPortal(<div ref={panel} tabIndex={-1} role="dialog" aria-label={t('desktop.operate')} className={`pet-utility${windowState.panel?.width&&windowState.panel.width>=220?' is-beside':''}`} data-pet-interactive onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();close();}}}>
+   <header className="pet-utility-header"><span>{title}</span><button type="button" className="pet-icon" aria-label={t('browser.dismiss')} onClick={close}><Icon name="close"/></button></header>
+   <nav className="pet-utility-tabs" aria-label={t('desktop.otherActivities')}>
+    {(['computer','browser','minecraft'] as const).filter(id=>enabled[id]).map(id=><button key={id} type="button" className="pet-icon tip" aria-label={id==='computer'?t('desktop.operate'):t(id+'.title')} data-tip={id==='computer'?t('desktop.operate'):t(id+'.title')} aria-pressed={selected===id} onClick={()=>setSelected(id)}><Icon name={id==='computer'?'pointer':id==='browser'?'browser':'gamepad'}/></button>)}
+   </nav>
+   <div className="pet-utility-body">
+    {selected==='minecraft'?<MinecraftCompanion mode="activity"/>:<NativeCompanion key={selected} plugin={selected} mode="pet"/>}
    </div>
-  </Modal>}
+  </div>,document.body)}
  </>;
 }

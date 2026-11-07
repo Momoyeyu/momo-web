@@ -72,3 +72,46 @@ def test_black_frame_does_not_react():
     c.unknown = True
     with patch.object(c,'gate'), patch('app.services.computer.runtime'):
         assert c.claim_reaction(0,'client','lease') is None
+
+
+def test_desktop_observation_needs_no_app_grant_and_never_creates_input_binding():
+    import base64
+    from types import SimpleNamespace
+    from app.services import computer as module
+    c = active()
+    calls=[]
+    host=SimpleNamespace(permit=lambda purpose:{'purpose':purpose},request=lambda method,params:(calls.append((method,params)) or {'data':base64.b64encode(frame()).decode()}))
+    with patch.object(c,'gate'), patch.object(module.runtime,'host',host), patch('app.services.app_permissions.permissions.require',side_effect=AssertionError('No app approval for looking')):
+        assert c.desktop_frame()['observationAvailable']
+        assert [method for method,_ in calls] == ['native.screen']
+        c.frames=120;c.last=0
+        assert c.desktop_frame()['observationAvailable']
+        c.set_desktop_allowed(False)
+        with pytest.raises(ComputerError,match='paused'):c.desktop_frame()
+        assert c.frame is None
+    c.stop()
+
+
+def test_stop_during_desktop_capture_discards_late_pixels():
+    import base64
+    from types import SimpleNamespace
+    from app.services import computer as module
+    c=active()
+    def capture(*_):
+        c.set_desktop_allowed(False)
+        return {'data':base64.b64encode(frame()).decode()}
+    host=SimpleNamespace(permit=lambda _: {},request=capture)
+    with patch.object(c,'gate'),patch.object(module.runtime,'host',host):
+        with pytest.raises(ComputerError,match='revoked'):c.desktop_frame()
+        assert c.frame is None
+
+
+def test_browser_share_uses_fresh_shared_pixels_without_native_capture():
+    c=active();c.shared_source=True
+    with patch.object(c,'gate'),patch('app.services.computer.runtime') as runtime:
+        c.capture(frame(),0)
+        assert c.desktop_frame()['observationAvailable']
+        runtime.host.request.assert_not_called()
+        c.last=0
+        with pytest.raises(ComputerError,match='observationExpired'):c.desktop_frame()
+    c.stop()

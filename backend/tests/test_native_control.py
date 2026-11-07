@@ -94,19 +94,13 @@ def test_failed_stop_blocks_restart_until_retry(setup):
  module.runtime.host.request=original
  c.stop();assert not c.status()['stopUnconfirmed']
 
-def test_frame_stages_pixels_without_exposing_them(setup,monkeypatch):
- import base64
+def test_frame_does_not_require_or_modify_application_grants(setup,monkeypatch):
  from app.services.computer import computer
  c,p,calls=setup
- r=c.start(1,12,['observe'],'owner','lease');p.decide(r['requestId'],'once',1);c.start(1,12,['observe'],'owner','lease')
- original=module.runtime.host.request
- module.runtime.host.request=lambda method,params=None: {'data':base64.b64encode(b'pixels').decode()} if method=='native.observe' else original(method,params)
- captured=[]
- monkeypatch.setattr(computer,'capture',lambda raw,generation:captured.append(raw) or {'changed':True,'generation':generation})
- result=c.frame('owner','lease');assert captured==[b'pixels'] and 'data' not in result
- p.remove(c.grant['appId'])
- with pytest.raises(ValueError):c.frame('owner','lease')
- assert len(captured)==1
+ monkeypatch.setattr(computer,'desktop_frame',lambda:{'observationAvailable':True})
+ monkeypatch.setattr(module.runtime,'require_meeting',lambda *_:None,raising=False)
+ result=c.frame('owner','lease')
+ assert result['observationAvailable'] and c.target is None and not calls
 
 def test_start_preserves_configured_reaction_preferences(setup,monkeypatch):
  from app.services.computer import computer
@@ -114,7 +108,8 @@ def test_start_preserves_configured_reaction_preferences(setup,monkeypatch):
  monkeypatch.setattr(computer,'proactive',True);monkeypatch.setattr(computer,'reactions',True)
  monkeypatch.setattr(computer,'start',lambda *args:starts.append(args))
  r=c.start(1,12,['observe'],'owner','lease');p.decide(r['requestId'],'once',1);c.start(1,12,['observe'],'owner','lease')
- assert starts==[('Test',True,True)]
+ assert starts==[]  # Application control must not replace the desktop view.
+ assert computer.proactive and computer.reactions
 
 def test_stop_does_not_wait_for_blocked_action_and_rejects_late_result(setup):
  import time

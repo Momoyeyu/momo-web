@@ -363,6 +363,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/computer/desktop/frame": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Desktop Frame */
+        post: operations["desktop_frame_api_computer_desktop_frame_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/computer/desktop/observation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Desktop Observation */
+        post: operations["desktop_observation_api_computer_desktop_observation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/computer/frames": {
         parameters: {
             query?: never;
@@ -1999,6 +2033,22 @@ export interface components {
             /** Leaseid */
             leaseId: string;
         };
+        /** DesktopFrame */
+        DesktopFrame: {
+            /** Clientid */
+            clientId: string;
+            /** Leaseid */
+            leaseId: string;
+        };
+        /** DesktopObservation */
+        DesktopObservation: {
+            /** Clientid */
+            clientId: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Leaseid */
+            leaseId: string;
+        };
         /** FaceIn */
         FaceIn: {
             /**
@@ -3165,6 +3215,72 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Ask"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    desktop_frame_api_computer_desktop_frame_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesktopFrame"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    desktop_observation_api_computer_desktop_observation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesktopObservation"];
             };
         };
         responses: {

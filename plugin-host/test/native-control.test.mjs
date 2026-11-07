@@ -53,3 +53,12 @@ test('native diagnostic allowlist never exposes helper text or paths',async()=>{
  assert.equal(nativeErrorCode(Error('STALE_OBSERVATION')),'STALE_OBSERVATION');
  assert.equal(nativeErrorCode(Error('/private/user token=secret')),'NATIVE_UNAVAILABLE');
 });
+
+test('desktop pixels do not bind an application or enable input',async()=>{
+ const {writeFile}=await import('node:fs/promises');const calls=[];
+ const broker=new NativeControl(()=>{},async input=>{calls.push(input.action);await writeFile(input.output,'pixels');return {source:'Desktop'};});
+ const result=await broker.screen({},false);
+ assert.equal(result.data,Buffer.from('pixels').toString('base64'));
+ assert.deepEqual(calls,['screen']);assert.equal(broker.binding,null);assert.equal(broker.version,0);
+ await assert.rejects(broker.action({action:'click'}, {},0),/ACTION_DENIED/);
+});

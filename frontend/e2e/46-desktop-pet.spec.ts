@@ -9,11 +9,12 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
  const saved=await readState(request);(saved as any).settings.general.lang=lang;await writeState(request,saved);
  await page.setViewportSize({width:1280,height:720});
  await page.addInitScript(({base})=>{
-  let state={mode:'chat' as 'chat'|'pet',clickThrough:false};
+  let state:{mode:'chat'|'pet';clickThrough:boolean;panel?:{width:number;petWidth:number}}={mode:'chat',clickThrough:false};
   const listeners=new Set<(value:typeof state)=>void>();
   window.momoDesktop={
    getRuntime:async()=>({baseUrl:base,token:'isolated-ui-fixture'}),
    getWindowState:async()=>state,
+   setPetPanel:async open=>{state={...state,panel:open?{width:292,petWidth:320}:undefined};listeners.forEach(fn=>fn(state));return state;},
    dragPetWindow:async phase=>{((window as any).__drag??=[]).push(phase);},
    setPetHitRegions:async regions=>{(window as any).__petRegions=regions;},
    setWindowMode:async mode=>{state={mode,clickThrough:false};listeners.forEach(fn=>fn(state));return state;},
@@ -22,14 +23,15 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
   };
  },{base:baseURL!});
  await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:true}}}));
- let observing=false;
+ let observing=false,allowed=true;let requests=0;
  const target={windowId:42,ownerPid:123,bundleId:'test.editor',path:'/test',name:'Test Editor',title:'Smoke document'};
  await page.route('**/api/computer/native/status',r=>r.fulfill({json:{active:observing,plugin:'computer',target:observing?target:null}}));
- await page.route('**/api/computer/native/targets',r=>r.fulfill({json:{targets:[target],screenPermission:true,inputPermission:true}}));
- await page.route('**/api/computer/native/start',r=>{expect(r.request().postDataJSON().permissions).toEqual(['observe']);observing=true;return r.fulfill({json:{active:true}});});
+ await page.route('**/api/computer/native/targets',r=>r.fulfill({json:{targets:Array.from({length:24},(_,i)=>({...target,windowId:42+i,title:`Smoke document ${i}`})),screenPermission:true,inputPermission:true}}));
+ await page.route('**/api/computer/native/start',r=>{expect(r.request().postDataJSON().permissions).toEqual(['observe','interact']);requests++;observing=true;return r.fulfill({json:{active:true}});});
  await page.route('**/api/computer/native/stop',r=>{observing=false;return r.fulfill({json:{active:false}});});
  await page.route('**/api/computer/native/frame',r=>r.fulfill({json:{}}));
- await page.route('**/api/computer/status',r=>r.fulfill({json:{observing,proactive:false,reactions:false}}));
+ await page.route('**/api/computer/status',r=>r.fulfill({json:{observing:false,desktopAllowed:allowed,desktopError:'',proactive:false,reactions:false}}));
+ await page.route('**/api/computer/desktop/observation',r=>{allowed=r.request().postDataJSON().enabled;return r.fulfill({json:{observing:false,desktopAllowed:allowed,proactive:false,reactions:false}});});
  await bootChat(page);
  await expect(page.getByRole('button',{name:copy.settings.tabs.extend,exact:true})).toHaveCount(0);
  const before=await page.evaluate(()=>({lease:sessionStorage.getItem('momo.meeting-owner.v1'),canvases:document.querySelectorAll('.live2d-canvas').length}));
@@ -76,29 +78,33 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
   await page.screenshot({path:info.outputPath(`pet-expanded-${size.width}.png`)});
   await page.getByRole('button',{name:copy.desktop.collapseDialog,exact:true}).click();
  }
+ // Looking is a direct capability toggle, not an application authorization form.
  await page.getByRole('button',{name:copy.desktop.observe,exact:true}).click();
- const observer=page.getByRole('dialog',{name:copy.desktop.observe,exact:true});
+ expect(allowed).toBe(false);expect(requests).toBe(0);
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await page.getByRole('button',{name:copy.desktop.observe,exact:true}).click();
+ expect(allowed).toBe(true);expect(requests).toBe(0);
+ await page.getByRole('button',{name:copy.desktop.operate,exact:true}).click();
+ await page.setViewportSize({width:612,height:440});
+ const observer=page.getByRole('dialog',{name:copy.desktop.operate,exact:true});
  await expect(observer).toBeVisible();
- await expect(observer.locator('select option[value="42"]')).toHaveCount(1);
- const modalBounds=await observer.boundingBox();expect(modalBounds!.x).toBeGreaterThanOrEqual(0);expect(modalBounds!.y+modalBounds!.height).toBeLessThanOrEqual(440);
- await observer.getByLabel(copy.permissions.window,{exact:true}).selectOption('42');
- await observer.getByRole('button',{name:copy.desktop.startObservation,exact:true}).click();
- await expect(observer.getByText('Test Editor · Smoke document',{exact:true})).toBeVisible();
- await page.screenshot({path:info.outputPath('pet-observation-320.png')});
- await observer.getByRole('button',{name:copy.browser.dismiss,exact:true}).click();
- await expect(page.getByRole('button',{name:copy.desktop.observe,exact:true})).toHaveAttribute('aria-pressed','true');
- await page.getByRole('button',{name:copy.desktop.observe,exact:true}).click();
- await expect(observer.getByText('Test Editor · Smoke document',{exact:true})).toBeVisible();
- await observer.getByRole('button',{name:copy.desktop.stopObservation,exact:true}).click();
- await expect(observer.getByRole('button',{name:copy.desktop.stopObservation,exact:true})).toHaveCount(0);
- await observer.getByText(copy.desktop.otherActivities,{exact:true}).click();
+ await expect(observer.getByRole('listitem')).toHaveCount(24);
+ const modalBounds=await observer.boundingBox(),stageBounds=await page.locator('.app-stage').boundingBox();
+ expect(modalBounds!.x+modalBounds!.width).toBeLessThan(stageBounds!.x);
+ expect(modalBounds!.y+modalBounds!.height).toBeLessThanOrEqual(440);
+ const last=observer.getByRole('listitem').last();await last.scrollIntoViewIfNeeded();await last.click();
+ expect(await observer.locator('.pet-target-list').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+ await observer.getByRole('button',{name:copy.desktop.operate,exact:true}).last().click();
+ await expect(observer.getByText('Smoke document',{exact:true})).toBeVisible();expect(requests).toBe(1);
+ await page.screenshot({path:info.outputPath('pet-control-beside-320.png')});
+ await observer.getByRole('button',{name:copy.browser.stop,exact:true}).click();
  await observer.getByRole('button',{name:copy.browser.title,exact:true}).click();
- await expect(observer.getByRole('heading',{name:copy.browser.title,exact:true})).toBeVisible();
- await observer.getByRole('button',{name:copy.desktop.observe,exact:true}).click();
- await observer.getByText(copy.desktop.otherActivities,{exact:true}).click();
+ await expect(observer.locator('.pet-target-list')).toBeVisible();
  await observer.getByRole('button',{name:copy.minecraft.title,exact:true}).click();
- await expect(observer.getByRole('heading',{name:copy.minecraft.title,exact:true})).toBeVisible();
+ await observer.locator('.pet-utility-body').evaluate(el=>{el.scrollTop=el.scrollHeight;});
+ await page.screenshot({path:info.outputPath('pet-game-scroll-320.png')});
  await observer.getByRole('button',{name:copy.browser.dismiss,exact:true}).click();
+ await page.setViewportSize({width:320,height:440});
  await page.locator('.chat-page').evaluate(el=>{el.inert=true;});
  await page.getByRole('button',{name:copy.desktop.return,exact:true}).click();
  await page.locator('.chat-page').evaluate(el=>{el.inert=false;});

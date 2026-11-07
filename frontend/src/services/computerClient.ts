@@ -1,6 +1,6 @@
 import {apiJson,apiFetch,jsonInit} from './http';
 import {meetingIdentity,subscribeMeeting,meetingSnapshot} from './meetingClient';
-export type ComputerStatus={observing:boolean;generation:number;source:string;proactive:boolean;reactions:boolean;reason:string;executionAvailable:boolean};
+export type ComputerStatus={observing:boolean;generation:number;source:string;proactive:boolean;reactions:boolean;reason:string;executionAvailable:boolean;desktopAllowed?:boolean;desktopError?:string};
 export type ComputerView={status:ComputerStatus|null;busy:boolean;error:boolean;text:string};
 let view:ComputerView={status:null,busy:false,error:false,text:''};
 let stream:MediaStream|null=null,video:HTMLVideoElement|null=null,timer:ReturnType<typeof setTimeout>|undefined,epoch=0;
@@ -59,21 +59,14 @@ export async function askComputer(question:string){
  const identity=meetingIdentity(),generation=view.status?.generation,own=epoch;if(!identity||generation===undefined)return;
  publish({busy:true,error:false});try{const result=await apiJson<{text:string}>('/api/computer/ask',jsonInit('POST',{...identity,generation,question}));if(own===epoch)publish({text:result.text});}catch{if(own===epoch)publish({error:true});}finally{if(own===epoch)publish({busy:false});}
 }
-// Native capture stays in the backend; this scheduler shares the regular reaction path.
-let nativeTimer:ReturnType<typeof setTimeout>|undefined,nativeEpoch=0,nativeRunning=false;
-export function stopNativeObservation(){nativeEpoch++;nativeRunning=false;clearTimeout(nativeTimer);}
-export function startNativeObservation(){
- if(nativeRunning)return;nativeRunning=true;const own=++nativeEpoch;let lastReaction=0;
- const capture=async()=>{
-  if(own!==nativeEpoch)return;
-  const identity=meetingIdentity();if(!identity||meetingSnapshot().attention.focus){stopNativeObservation();return;}
-  try{
-   await apiJson('/api/computer/native/frame',jsonInit('POST',identity));
-   if(own!==nativeEpoch)return;
-   await readComputer();
-   if(view.status?.proactive&&view.status.reactions&&Date.now()-lastReaction>=30000){lastReaction=Date.now();const {getChatEngine}=await import('../chat/engineInstance');if(own===nativeEpoch)getChatEngine().sendScreenReaction(view.status.generation);}
-  }catch{if(own===nativeEpoch){stopNativeObservation();publish({error:true});}return;}
-  if(own===nativeEpoch)nativeTimer=setTimeout(()=>void capture(),2500);
- };void capture();
+export async function setDesktopObservation(enabled:boolean){
+ const identity=meetingIdentity();if(!identity)return;
+ publish({busy:true,error:false});
+ try{publish({status:await apiJson<ComputerStatus>('/api/computer/desktop/observation',jsonInit('POST',{...identity,enabled}))});}
+ catch{publish({error:true});}finally{publish({busy:false});}
 }
-subscribeMeeting(()=>{if(nativeRunning&&(!meetingIdentity()||meetingSnapshot().attention.focus))stopNativeObservation();});
+export async function captureDesktop(){
+ const identity=meetingIdentity();if(!identity||meetingSnapshot().attention.focus)return;
+ try{publish({status:await apiJson<ComputerStatus>('/api/computer/desktop/frame',jsonInit('POST',identity)),error:false});}
+ catch{await readComputer().catch(()=>{});publish({error:true});}
+}

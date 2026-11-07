@@ -155,3 +155,17 @@ def test_reaction_downsampling_preserves_original_deadline_and_authorization(mon
             assert estimate([*messages,*tools.observation_budget()])<=Budget.from_config(cfg).safe
     finally:
         tools._pending.pop('reaction-budget',None);current_run.reset(token)
+
+
+def test_screen_sense_is_available_without_started_observation_or_app_grant():
+    from app.services.computer import computer
+    with patch.object(tools,'require_local',return_value='r'),patch.object(tools.runtime,'focus',False),patch('app.services.activities.snapshot',return_value={'enabled':{'computer':True}}),patch.object(computer,'desktop_allowed',True),patch.object(computer,'observing',False):
+        assert 'screen_observe' in [t['function']['name'] for t in tools.declarations()]
+
+
+def test_screen_permission_failure_is_system_permission_not_app_approval():
+    import json
+    from app.services.computer import computer
+    from app.core.plugin_host import HostError
+    with patch.object(tools,'require_local',return_value='r'),patch.object(computer,'desktop_frame',side_effect=HostError('SCREEN_PERMISSION_REQUIRED')):
+        assert json.loads(tools.execute('screen_observe',{}))['code']=='SCREEN_PERMISSION_REQUIRED'

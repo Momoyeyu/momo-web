@@ -73,6 +73,12 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     }else if(framingBeforePet.current!==null){getStage().setCloseUp(framingBeforePet.current);framingBeforePet.current=null;}
     return()=>{document.documentElement.classList.remove('desktop-pet','desktop-shell');};
   },[desktopWindow.mode]);
+  useLayoutEffect(()=>{
+    const root=document.documentElement,panel=desktopWindow.panel;
+    root.classList.toggle('pet-panel-open',desktopWindow.mode==='pet'&&!!panel&&panel.width>=220);
+    root.style.setProperty('--pet-scene-width',panel?`${panel.petWidth}px`:'100vw');
+    root.style.setProperty('--pet-panel-width',`${panel?.width??0}px`);
+  },[desktopWindow.panel,desktopWindow.mode]);
   useEffect(()=>{if(desktopWindow.mode==='pet'&&route!=='chat')void setDesktopMode('chat').catch(()=>{});},[desktopWindow.mode,route]);
   const audioIntro=useIntro().data?.phase;
   useEffect(()=>ambient.install(),[]);

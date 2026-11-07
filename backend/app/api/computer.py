@@ -55,3 +55,20 @@ class React(BaseModel):
 
 @router.post("/react")
 def react(body: React): raise HTTPException(410, "Use /api/chat/screen-reaction for acknowledged conversation output")
+
+class DesktopFrame(BaseModel):
+    clientId: str
+    leaseId: str
+
+class DesktopObservation(DesktopFrame):
+    enabled: bool
+
+@router.post('/desktop/frame')
+def desktop_frame(body: DesktopFrame):
+    invoke(runtime.require_meeting,body.clientId,body.leaseId)
+    return invoke(computer.desktop_frame)
+
+@router.post('/desktop/observation')
+def desktop_observation(body: DesktopObservation):
+    invoke(runtime.require_meeting,body.clientId,body.leaseId)
+    return computer.set_desktop_allowed(body.enabled)

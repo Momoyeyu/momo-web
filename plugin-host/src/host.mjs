@@ -98,6 +98,7 @@ export class PluginHost {
     this.authenticate(message.token);
     this.nativeControl ??= new NativeControl(permit => this.checkPermit(permit));
     switch (message.method) {
+      case 'native.screen': return this.nativeControl.screen(params.permit,params.prompt);
       case 'native.targets': return this.nativeControl.targets();
       case 'native.start': this.checkPermit(params.permit); return this.nativeControl.start(params);
       case 'native.observe': return this.nativeControl.observe(params.permit, params.bindingId);

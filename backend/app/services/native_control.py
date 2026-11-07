@@ -66,7 +66,7 @@ class NativeControl:
             if self.target or self.stop_unconfirmed or self.stopping: raise ValueError('Stop the current application activity first')
             from .computer import computer
             from .minecraft import minecraft
-            if computer.observing or minecraft.binding:raise ValueError('Another activity owns attention')
+            if minecraft.binding:raise ValueError('Another activity owns attention')
             self.plugin=plugin
             self.gate(client,lease)
             result=runtime.host.request('native.targets')
@@ -89,13 +89,6 @@ class NativeControl:
                 permissions.check(grant,target,runtime.epoch)
                 if 'observe' not in grant['capabilities']:raise ValueError('Observation approval required')
                 started=runtime.host.request('native.start',{'windowId':window,'ownerPid':pid,'permissions':grant['capabilities'],'permit':runtime.host.permit('native-start')})
-                if plugin=='computer':
-                    from .computer import computer
-                    try: computer.start(target.get('name',target['bundleId']),computer.proactive if proactive is None else proactive,computer.reactions if reactions is None else reactions)
-                    except Exception:
-                        runtime.host.request('native.stop')
-                        permissions.revoke_grant(grant)
-                        raise
                 self.session_id=started['bindingId']
                 self.target,self.grant=target,grant
                 self.epoch=runtime.epoch
@@ -183,36 +176,16 @@ class NativeControl:
             return result
 
     def frame(self,client,lease):
-        with self.operation:
-            return self._frame(client,lease)
-
-    def _frame(self,client,lease):
-        import base64
+        # Compatibility endpoint: desktop sense never consumes an input binding/version.
         from .computer import computer
-        host=runtime.host
-        if not host:raise ValueError('Application executor unavailable')
-        with self.lock:
-            generation=self.generation
-            self.validate(generation,client,lease)
-            if self.plugin!='computer':raise ValueError('Desktop frame scope required')
-            # A scheduler observation must not replace the model's version mid-turn.
-            if getattr(runtime,'active',None):return {'skipped':True}
-            self.observation=self.projection=None
-            params={'command':{'action':'observe'},'bindingId':self.session_id,'permit':host.permit('native-frame')}
-        result=host.request('native.observe',params)
-        with self.lock:
-            self.validate(generation,client,lease)
-            raw=base64.b64decode(result['data'],validate=True)
-            return computer.capture(raw,computer.generation)
+        runtime.require_meeting(client,lease)
+        return computer.desktop_frame()
 
     def stop(self,reason='stopped'):
         host=runtime.host
         with self.lock:
             if self.stopping:return self.status()
             had_binding=self.target is not None or self.stop_unconfirmed
-            if had_binding and self.plugin=='computer':
-                from .computer import computer
-                computer.stop(reason)
             self.generation+=1
             from .app_permissions import permissions
             if self.grant: permissions.revoke_grant(self.grant)

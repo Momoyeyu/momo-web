@@ -1,4 +1,4 @@
-import {startNativeObservation,stopNativeObservation,configureComputer,computerSnapshot,subscribeComputer,readComputer} from '../../services/computerClient';
+import {configureComputer,computerSnapshot,subscribeComputer,readComputer} from '../../services/computerClient';
 import {useCallback,useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {useT} from '../../i18n';
 import {apiJson,jsonInit} from '../../services/http';
@@ -7,6 +7,7 @@ import {meetingIdentity,meetingSnapshot,subscribeMeeting} from '../../services/m
 import ExtensionCard from './ExtensionCard';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
+import Icon from '../../ui/Icon';
 import FieldRow from '../../ui/FieldRow';
 import Hint from '../../ui/Hint';
 import Switch from '../../ui/Switch';
@@ -34,7 +35,7 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
    setActiveTarget(s.active&&s.plugin===plugin?s.target??null:null);
    setPending(s.plugin===plugin?s.pendingRequestId??null:null);
    setStopUnconfirmed(Boolean(s.stopUnconfirmed||s.stopping));
-   if(s.active&&s.plugin==='computer')startNativeObservation();
+
   }catch(e){if(!controller.signal.aborted)throw e;}
   finally{if(request.current===controller)request.current=null;}
  },[plugin]);
@@ -66,7 +67,20 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
  };
  useEffect(()=>{if(mode==='pet'&&enabled&&meeting.state==='active'&&!scanned.current){scanned.current=true;void run(findTargets);}},[mode,enabled,meeting.state]);
  const target=targets.find(x=>String(x.windowId)===selected);
- const status=t(stopUnconfirmed?'plugins.stopUnknown':pending?'permissions.waiting':active?(mode==='pet'?'desktop.observing':'browser.active'):'browser.inactive');
+ const status=t(stopUnconfirmed?'plugins.stopUnknown':pending?'permissions.waiting':active?'browser.active':'browser.inactive');
+ if(mode==='pet')return <div className="pet-control">
+  {active&&activeTarget?<div className="pet-current-target"><Icon name="desktop"/><div><strong>{activeTarget.name||activeTarget.bundleId}</strong><small>{activeTarget.title}</small></div><span className="pet-live-dot" aria-label={status}/></div>:<div className="pet-target-list" role="list" aria-label={t('permissions.window')}>
+   {targets.map(x=><button type="button" role="listitem" className="pet-target" key={x.windowId} aria-pressed={selected===String(x.windowId)} disabled={busy||!!pending} onClick={()=>setSelected(String(x.windowId))}><Icon name="desktop"/><span><strong>{x.name||x.bundleId}</strong><small>{x.title||String(x.windowId)}</small></span>{selected===String(x.windowId)&&<Icon name="check"/>}</button>)}
+   {!targets.length&&!busy&&<p className="pet-empty">{t(diagnostics?.screenPermission===false?'permissions.screenPermission':'permissions.noWindows')}</p>}
+  </div>}
+  {pending&&<p className="pet-control-status" role="status">{t('permissions.waiting')}</p>}
+  {error&&<p role="alert" className="pet-control-status">{t('permissions.error')}</p>}
+  <footer className="pet-control-footer">
+   {!active&&!pending&&<button type="button" className="pet-icon tip" aria-label={t('permissions.findWindows')} data-tip={t('permissions.findWindows')} disabled={busy} onClick={()=>void run(findTargets)}><Icon name="load"/></button>}
+   <Hint text={t('desktop.operateHint')}/>
+   {active||pending||stopUnconfirmed?<button type="button" className="pet-icon is-primary tip" aria-label={t('browser.stop')} data-tip={t('browser.stop')} disabled={busy} onClick={()=>void run(async()=>{await post('stop',{...meetingIdentity(),plugin});setPending(null);})}><Icon name="stop"/></button>:<button type="button" className="pet-icon is-primary tip" aria-label={t('desktop.operate')} data-tip={t('desktop.operate')} disabled={!target||busy||!enabled||meeting.state!=='active'} onClick={()=>void run(()=>start({...meetingIdentity(),plugin,windowId:target!.windowId,ownerPid:target!.ownerPid,permissions:['observe','interact']}))}><Icon name="play"/></button>}
+  </footer>
+ </div>;
  const body=<div className="extension-detail">
   <header className="extension-detail-header"><div><h3>{t(plugin+'.title')}</h3><span className={`extension-detail-status${active?' is-active':''}`}>{status}</span></div>{mode==='settings'&&<button type="button" className="icon-btn" aria-label={t('browser.dismiss')} onClick={()=>setOpen(false)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>}</header>
   <section className="extension-detail-section">
@@ -75,15 +89,15 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
      <option value="">{t('permissions.selectWindow')}</option>{targets.map(x=><option key={x.windowId} value={String(x.windowId)}>{x.name||x.bundleId} · {x.title||x.windowId}</option>)}
     </select>}
    </FieldRow>
-   {(!active||mode!=='pet')&&<div className="extension-detail-actions"><Button variant="ghost" disabled={busy||active||Boolean(pending)||meeting.state!=='active'} onClick={()=>void run(findTargets)}>{t('permissions.findWindows')}</Button></div>}
+   {!active&&<div className="extension-detail-actions"><Button variant="ghost" disabled={busy||active||Boolean(pending)||meeting.state!=='active'} onClick={()=>void run(findTargets)}>{t('permissions.findWindows')}</Button></div>}
    <NativeWindowNotice result={diagnostics} interact={interact}/>
-   {mode==='pet'?<details className="extension-detail-advanced"><summary>{t('permissions.interact')}</summary><FieldRow label={t('permissions.interact')} hint={t('permissions.interactHint')}><Switch title={t('permissions.interact')} on={interact} onChange={setInteract} disabled={busy||active||Boolean(pending)}/></FieldRow></details>:<FieldRow label={t('permissions.interact')} hint={t('permissions.interactHint')}><Switch title={t('permissions.interact')} on={interact} onChange={setInteract} disabled={busy||active||Boolean(pending)}/></FieldRow>}
+   {<FieldRow label={t('permissions.interact')} hint={t('permissions.interactHint')}><Switch title={t('permissions.interact')} on={interact} onChange={setInteract} disabled={busy||active||Boolean(pending)}/></FieldRow>}
    <div className="extension-detail-actions">
-    {(mode!=='pet'||(!active&&!pending&&!stopUnconfirmed))&&<Button disabled={!enabled||busy||active||stopUnconfirmed||!target||meeting.state!=='active'||Boolean(pending)} onClick={()=>void run(()=>start({...meetingIdentity(),plugin,windowId:target!.windowId,ownerPid:target!.ownerPid,permissions:interact?['observe','interact']:['observe']}))}>{t(mode==='pet'?'desktop.startObservation':'browser.start')}</Button>}
-    {(mode!=='pet'||active||pending||stopUnconfirmed)&&<Button variant="ghost" disabled={busy||(!active&&!pending&&!stopUnconfirmed)} onClick={()=>void run(async()=>{await post('stop',{...meetingIdentity(),plugin});setPending(null);if(plugin==='computer')stopNativeObservation();})}>{t(mode==='pet'?'desktop.stopObservation':'browser.stop')}</Button>}
+    {(!active&&!pending&&!stopUnconfirmed)&&<Button disabled={!enabled||busy||active||stopUnconfirmed||!target||meeting.state!=='active'||Boolean(pending)} onClick={()=>void run(()=>start({...meetingIdentity(),plugin,windowId:target!.windowId,ownerPid:target!.ownerPid,permissions:interact?['observe','interact']:['observe']}))}>{t('browser.start')}</Button>}
+    {(active||pending||stopUnconfirmed)&&<Button variant="ghost" disabled={busy||(!active&&!pending&&!stopUnconfirmed)} onClick={()=>void run(async()=>{await post('stop',{...meetingIdentity(),plugin});setPending(null);})}>{t('browser.stop')}</Button>}
    </div>
   </section>
-  {plugin==='computer'&&<details className="extension-detail-section extension-detail-advanced" open={mode==='pet'?undefined:true}><summary>{t('computer.companionship')} <Hint text={t('computer.behaviorHint')}/></summary>
+  {plugin==='computer'&&<details className="extension-detail-section extension-detail-advanced" open><summary>{t('computer.companionship')} <Hint text={t('computer.behaviorHint')}/></summary>
    <FieldRow label={t('computer.proactive')}><Switch title={t('computer.proactive')} disabled={busy} on={computer.status?.proactive??false} onChange={v=>void run(async()=>{await configureComputer(v,computer.status?.reactions??false);})}/></FieldRow>
    <FieldRow label={t('computer.reactions')}><Switch title={t('computer.reactions')} disabled={busy} on={computer.status?.reactions??false} onChange={v=>void run(async()=>{await configureComputer(computer.status?.proactive??false,v);})}/></FieldRow>
   </details>}

@@ -1,7 +1,8 @@
 import {useEffect,useSyncExternalStore} from 'react';
 import './runtime';
-export type DesktopWindowState={mode:'chat'|'pet';clickThrough:boolean};
+export type DesktopWindowState={mode:'chat'|'pet';clickThrough:boolean;panel?:{width:number;petWidth:number}};
 export interface DesktopWindowBridge {
+ setPetPanel?(open:boolean):Promise<DesktopWindowState>;
  dragPetWindow?(phase:"start"|"move"|"end"):Promise<void>;
  setPetHitRegions?(regions:{x:number;y:number;width:number;height:number}[]):Promise<void>;
  getWindowState():Promise<DesktopWindowState>;
@@ -55,4 +56,9 @@ export async function setDesktopMode(mode:'chat'|'pet'){
 export async function setDesktopClickThrough(value:boolean){
  const bridge=window.momoDesktop;if(!bridge?.setPetClickThrough || (value&&!bridge.setPetHitRegions))throw new Error('Desktop window unavailable');
  const own=revision;const result=await bridge.setPetClickThrough(value);if(own===revision)publish(result);
+}
+
+export async function setDesktopPanel(open:boolean){
+ const bridge=window.momoDesktop;if(!bridge?.setPetPanel)return;
+ const own=revision;const result=await bridge.setPetPanel(open);if(own===revision)publish(result);
 }

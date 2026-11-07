@@ -7,6 +7,13 @@ export class NativeControl {
  constructor(checkPermit,execute=null){this.checkPermit=checkPermit;this.execute=execute;this.children=new Set();this.generation=0;this.version=0;this.observed=0;this.binding=null;this.busy=false;}
  async invoke(input){if(this.execute)return this.execute(input);const binary=process.env.MOMO_NATIVE_CONTROL_EXECUTABLE;if(!binary)throw new Error('NATIVE_RESOURCE_NOT_PREPARED');return new Promise((resolve,reject)=>{const child=execFile(binary,[],{timeout:12000,maxBuffer:1024*1024},(error,stdout)=>{this.children.delete(child);let result;try{result=JSON.parse(stdout);}catch{reject(new Error('NATIVE_HELPER_FAILED'));return;}error||result.error?reject(new Error(result.error||'NATIVE_HELPER_FAILED')):resolve(result);});this.children.add(child);child.stdin.end(JSON.stringify(input));});}
  async targets(){return this.invoke({action:'targets'});}
+ /** Read the composited display without creating an application binding or input version. */
+ async screen(permit,prompt=false){
+  this.checkPermit(permit);const root=await mkdtemp(join(tmpdir(),'momo-screen-'));
+  try{const output=join(root,'frame.png');const result=await this.invoke({action:'screen',output,prompt:prompt===true});this.checkPermit(permit);return {...result,data:(await readFile(output)).toString('base64')};}
+  finally{await rm(root,{recursive:true,force:true});}
+ }
+
  async start(params){await this.stop();if(!Number.isInteger(params.windowId)||!Number.isInteger(params.ownerPid)||!params.permissions?.includes('observe')||params.permissions.some(p=>!['observe','interact'].includes(p)))throw new Error('INVALID_SCOPE');const generation=this.generation;const {targets}=await this.targets();this.checkPermit(params.permit);if(generation!==this.generation)throw new Error('REVOKED');const target=targets.find(t=>t.windowId===params.windowId&&t.ownerPid===params.ownerPid);if(!target?.bundleId||!target.path)throw new Error('TARGET_GONE');this.binding={...target,permissions:[...params.permissions],bindingId:randomUUID()};return {active:true,...this.binding};}
  async observe(permit,bindingId){return this.run({action:'observe'},permit,bindingId);}
  async action(command,permit,version,bindingId){if(!['click','type','scroll'].includes(command?.action)||!this.binding?.permissions.includes('interact'))throw new Error('ACTION_DENIED');if(version!==this.version||Date.now()-this.observed>15000)throw new Error('STALE_OBSERVATION');return this.run(command,permit,bindingId);}

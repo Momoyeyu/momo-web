@@ -788,6 +788,47 @@
         "title": "Decision",
         "type": "object"
       },
+      "DesktopFrame": {
+        "properties": {
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId"
+        ],
+        "title": "DesktopFrame",
+        "type": "object"
+      },
+      "DesktopObservation": {
+        "properties": {
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId",
+          "enabled"
+        ],
+        "title": "DesktopObservation",
+        "type": "object"
+      },
       "FaceIn": {
         "properties": {
           "intensity": {
@@ -2964,6 +3005,78 @@
           }
         },
         "summary": "Ask"
+      }
+    },
+    "/api/computer/desktop/frame": {
+      "post": {
+        "operationId": "desktop_frame_api_computer_desktop_frame_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesktopFrame"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Desktop Frame"
+      }
+    },
+    "/api/computer/desktop/observation": {
+      "post": {
+        "operationId": "desktop_observation_api_computer_desktop_observation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesktopObservation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Desktop Observation"
       }
     },
     "/api/computer/frames": {

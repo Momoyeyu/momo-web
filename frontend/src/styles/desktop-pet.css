@@ -17,7 +17,7 @@ html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transpa
 .desktop-pet .input-row .send-btn,.desktop-pet .input-row .mic-btn{width:28px;height:28px;min-height:28px}
 .desktop-pet .modal-overlay{width:100vw;height:100vh}
 /* Same rail, icon geometry and progressive tooltips as chat. */
-.desktop-pet .chat-toolbar.desktop-pet-controls{display:block;position:fixed;top:clamp(40px,12vh,64px);transform:none;right:10px;z-index:30;animation:none}
+.desktop-pet .chat-toolbar.desktop-pet-controls{display:block;position:fixed;top:auto;bottom:160px;transform:none;right:10px;z-index:30;animation:none}
 .desktop-pet-controls .tb{app-region:no-drag;-webkit-app-region:no-drag}
 .desktop-pet-controls .is-active{color:var(--accent);background:rgba(231,190,119,.1)}
 .desktop-pet-drag{pointer-events:auto;position:fixed;z-index:1;top:32px;bottom:30px;left:calc((100% - 56px)/2 - 70px);width:140px;cursor:grab;touch-action:none;user-select:none}
@@ -27,18 +27,46 @@ html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transpa
 .desktop-pet .pet-dialog-collapsed .dialog-reopen{display:none}
 @media(prefers-reduced-motion:reduce){.desktop-pet .dialog-drawer,.desktop-pet .pet-dialog-collapsed .dialog-drawer{transition:none}}
 .desktop-action-error{position:absolute;right:65px;width:220px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-solid);font-size:12px}
-/* Primary observation controls fit the pet; secondary activities stay disclosed. */
-.desktop-pet .desktop-pet-controls .tb-side{gap:2px}
-.desktop-pet .desktop-observation{width:calc(100vw - 24px);max-width:420px;max-height:calc(100vh - 24px);padding:14px;gap:12px;box-sizing:border-box;overflow:hidden}
-.desktop-observation-heading{display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:14px;color:var(--accent)}
-.desktop-observation-heading>span{flex:1;min-width:0}
-.desktop-observation-heading .btn{padding:6px;min-width:30px;min-height:30px;display:grid;place-items:center}
-.desktop-observation-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
-.desktop-observation .extension-detail{gap:12px}
-.desktop-observation .extension-detail-header h3{font-size:15px}
-.desktop-observation .extension-detail .opt-row{grid-template-columns:1fr;gap:6px;padding:8px 0}
-.desktop-observation .extension-detail-actions{padding-top:8px;gap:8px}
-.desktop-observation .extension-detail-advanced{padding-top:10px}
-.desktop-other-activities{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;font-size:13px;color:var(--text-dim)}
-.desktop-other-activities>div{display:grid;gap:8px;margin-top:10px}
-.desktop-other-activities .btn{display:flex;align-items:center;gap:8px;text-align:left;white-space:normal}
+
+/* Small scene controls; utility content owns a separate column, not the avatar's space. */
+.desktop-pet .desktop-pet-controls{padding:6px;border-radius:18px}
+.desktop-pet .desktop-pet-controls .tb-side{gap:3px}
+.desktop-pet .desktop-pet-controls .tb{width:28px;height:28px;min-width:28px;min-height:28px;padding:5px;border-radius:7px}
+.desktop-pet .desktop-pet-controls .tb svg{width:18px;height:18px}
+.desktop-pet .desktop-pet-controls .tb-framing{margin-bottom:7px}
+.desktop-pet .desktop-pet-controls .has-warning::before{content:'';position:absolute;width:5px;height:5px;right:3px;top:3px;border-radius:50%;background:var(--accent)}
+.desktop-pet .app-stage{position:fixed;right:0;left:auto;width:var(--pet-scene-width,100vw)}
+.desktop-pet-drag{left:calc(var(--pet-panel-width,0px) + (var(--pet-scene-width,100vw) - 56px)/2 - 70px)}
+.desktop-pet-drag.is-close{left:calc(var(--pet-panel-width,0px) + 14px);width:calc(var(--pet-scene-width,100vw) - 84px)}
+.pet-utility{position:fixed;z-index:40;left:10px;bottom:20px;width:min(270px,calc(100vw - 70px));max-height:calc(100vh - 40px);display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;padding:12px;background:var(--panel-solid);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 32px #0004;font-size:12px;outline:none}
+.pet-utility.is-beside{left:10px;width:calc(var(--pet-panel-width) - 20px);bottom:20px}
+.pet-utility-header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;color:var(--accent);font-size:13px}
+.pet-utility-header>span{min-width:0;overflow-wrap:anywhere}
+.pet-icon{display:inline-flex;align-items:center;justify-content:center;flex:none;width:28px;height:28px;padding:5px;border:0;border-radius:6px;background:transparent;color:var(--text-dim);cursor:pointer}
+.pet-icon svg{width:18px;height:18px;flex:none}
+.pet-icon:hover,.pet-icon[aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}
+.pet-icon.is-primary{background:var(--accent);color:var(--bg);margin-left:auto}
+.pet-icon:disabled{opacity:.35;cursor:default}
+.pet-utility-tabs{display:flex;gap:4px;flex:none;border-bottom:1px solid var(--line);padding:6px 0;margin-bottom:8px}
+.pet-utility-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.pet-control{display:flex;flex-direction:column;gap:10px;min-width:0}
+.pet-target-list{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.pet-target{width:100%;display:flex;align-items:center;gap:8px;padding:7px 5px;border:0;border-radius:6px;background:transparent;color:var(--text);text-align:left;cursor:pointer;flex-shrink:0}
+.pet-target:hover,.pet-target[aria-pressed=true]{background:var(--accent-soft)}
+.pet-target>svg,.pet-current-target>svg{flex:none;width:16px;height:16px;color:var(--text-dim)}
+.pet-target>span,.pet-current-target>div{flex:1;min-width:0;display:grid;gap:3px}
+.pet-target strong,.pet-current-target strong{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pet-target small,.pet-current-target small{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-dim)}
+.pet-current-target{display:flex;align-items:center;gap:8px;padding:8px 0}
+.pet-control-footer{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:8px;flex:none}
+.pet-empty,.pet-control-status{font-size:12px;line-height:1.5;margin:8px 0;color:var(--text-dim)}
+.pet-live-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex:none}
+.pet-utility .extension-detail{gap:10px}
+.pet-utility .extension-detail-header{display:none}
+.pet-utility .extension-detail .opt-row{grid-template-columns:1fr;gap:4px;padding:6px 0;min-height:0}
+.pet-utility .extension-detail .opt-label{font-size:12px}
+.pet-utility .extension-detail input,.pet-utility .extension-detail select{font-size:12px;padding:6px 8px}
+.pet-utility .extension-detail-actions{gap:6px;padding-top:8px}
+.pet-utility .btn{min-height:28px;padding:5px 9px;font-size:12px}
+.pet-utility .extension-detail-advanced{padding-top:8px}
+.pet-utility .extension-detail-notice{font-size:12px}

@@ -15,6 +15,25 @@ if action=="request-input-permission" {
 if action=="targets" {
  output(["screenPermission":CGPreflightScreenCaptureAccess(),"inputPermission":AXIsProcessTrusted(),"targets":windows().filter{($0[kCGWindowLayer as String] as? Int)==0}.map{ w in let r=rect(w);return ["bundleId":NSRunningApplication(processIdentifier:pid_t(w[kCGWindowOwnerPID as String] as? Int ?? 0))?.bundleIdentifier ?? "","path":NSRunningApplication(processIdentifier:pid_t(w[kCGWindowOwnerPID as String] as? Int ?? 0))?.bundleURL?.resolvingSymlinksInPath().path ?? "","windowId":w[kCGWindowNumber as String] as? Int ?? 0,"ownerPid":w[kCGWindowOwnerPID as String] as? Int ?? 0,"name":w[kCGWindowOwnerName as String] as? String ?? "","title":w[kCGWindowName as String] as? String ?? "","bounds":["x":r.minX,"y":r.minY,"width":r.width,"height":r.height]] as [String:Any] }]);exit(0)
 }
+// Read the composited display, with the same occlusion/layering the player sees.
+// Input authorization remains exclusively in the window-bound path below.
+if action=="screen" {
+ if !CGPreflightScreenCaptureAccess() && input["prompt"] as? Bool == true {
+  _ = CGRequestScreenCaptureAccess()
+  if !CGPreflightScreenCaptureAccess(), let url=URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {NSWorkspace.shared.open(url)}
+ }
+ guard CGPreflightScreenCaptureAccess() else { fail("SCREEN_PERMISSION_REQUIRED") }
+ guard let path=input["output"] as? String else { fail("OUTPUT_REQUIRED") }
+ let cursor=CGEvent(source:nil)?.location ?? CGPoint.zero
+ var ids=[CGDirectDisplayID](repeating:0,count:32);var count:UInt32=0
+ guard CGGetActiveDisplayList(32,&ids,&count) == .success, count>0 else {fail("CAPTURE_FAILED")}
+ let display=ids.prefix(Int(count)).first(where:{CGDisplayBounds($0).contains(cursor)}) ?? CGMainDisplayID()
+ let area=CGDisplayBounds(display)
+ let region="\(Int(area.minX)),\(Int(area.minY)),\(Int(area.width)),\(Int(area.height))"
+ let p=Process();p.executableURL=URL(fileURLWithPath:"/usr/sbin/screencapture");p.arguments=["-x","-R",region,path]
+ try p.run();p.waitUntilExit();if p.terminationStatus != 0 {fail("CAPTURE_FAILED")}
+ output(["source":"Desktop","displayId":display]);exit(0)
+}
 guard let id=input["windowId"] as? Int, let pid=input["ownerPid"] as? Int, id>0,pid>0 else { fail("INVALID_TARGET") }
 let denied=["terminal","iterm","warp","1password","keychain","system settings","activity monitor","codex","deepseek harness"]
 func target(_ requireFront:Bool)->CGRect {

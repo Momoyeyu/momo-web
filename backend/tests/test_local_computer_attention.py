@@ -24,7 +24,7 @@ def local(tmp_path, monkeypatch):
     def request(method, params=None):
         calls.append(method)
         if method == 'native.targets': return {'targets': [target]}
-        if method == 'native.observe': return {'data': base64.b64encode(pixels.getvalue()).decode(), 'version': 1}
+        if method in ('native.observe','native.screen'): return {'data': base64.b64encode(pixels.getvalue()).decode(), 'version': 1}
         return {'ok': True, 'bindingId': 'fixture'}
     runtime.host = SimpleNamespace(control=threading.RLock(), request=request, permit=lambda _: {})
     for module in (computer_tools, native_control, computer): monkeypatch.setattr(module, 'runtime', runtime)
@@ -65,6 +65,7 @@ def test_prepared_owner_run_keeps_approved_tools_and_can_observe_and_act(local):
 def test_background_capture_survives_prepare_and_owner_response(local):
     runtime, native, screen, _, _ = local
     runtime.prepare_local('owner', 'lease')
+    screen.desktop_frame()
     generation = screen.generation
     with runtime.run('owner-run', client='owner', lease='lease'):
         native.frame('owner', 'lease')
@@ -122,50 +123,23 @@ def test_background_scheduler_does_not_invalidate_model_observation(local):
         try:
             native.execute({'action': 'observe'})
             before = len(calls)
-            assert native.frame('owner', 'lease') == {'skipped': True}
-            assert len(calls) == before
+            assert native.frame('owner', 'lease')['observationAvailable']
+            assert calls[before:] == ['computer.start','native.screen']
             native.execute({'action': 'type', 'text': 'fixture'}, 1)
         finally: current_run.reset(token)
 
 
-def test_model_waits_for_inflight_background_capture(local):
-    runtime, native, _, _, _ = local
-    entered = threading.Event()
-    release = threading.Event()
-    model_entered = threading.Event()
-    errors = []
-    original = runtime.host.request
-    def request(method, params=None):
-        if method == 'native.observe' and not entered.is_set():
-            entered.set()
-            assert release.wait(2)
-        elif method == 'native.observe':
-            model_entered.set()
-        return original(method, params)
-    runtime.host.request = request
-    def background():
-        try: native.frame('owner', 'lease')
-        except Exception as error: errors.append(error)
-    frame = threading.Thread(target=background)
-    frame.start()
-    assert entered.wait(1)
-    runtime.prepare_local('owner', 'lease')
-    with runtime.run('owner-run', client='owner', lease='lease'):
-        def observe():
-            token = current_run.set('owner-run')
-            try: native.execute({'action': 'observe'})
-            except Exception as error: errors.append(error)
-            finally: current_run.reset(token)
-        model = threading.Thread(target=observe)
-        model.start()
+def test_screen_capture_does_not_replace_model_input_observation(local):
+    runtime,native,screen,_,calls=local
+    runtime.prepare_local('owner','lease')
+    with runtime.run('owner-run',client='owner',lease='lease'):
+        token=current_run.set('owner-run')
         try:
-            assert not model_entered.wait(.05)
-        finally:
-            release.set()
-            frame.join(2)
-            model.join(2)
-        assert model_entered.is_set()
-        assert not errors
+            native.execute({'action':'observe'})
+            screen.desktop_frame()
+            native.execute({'action':'type','text':'fixture'},1)
+            assert 'native.screen' in calls and 'native.action' in calls
+        finally:current_run.reset(token)
 
 
 def test_minecraft_current_owner_run_can_use_existing_game_during_local_hold(local,monkeypatch):
