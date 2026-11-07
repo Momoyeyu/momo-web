@@ -17,7 +17,7 @@ html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transpa
 .desktop-pet .input-row .send-btn,.desktop-pet .input-row .mic-btn{width:28px;height:28px;min-height:28px}
 .desktop-pet .modal-overlay{width:100vw;height:100vh}
 /* Same rail, icon geometry and progressive tooltips as chat. */
-.desktop-pet .chat-toolbar.desktop-pet-controls{display:block;position:fixed;top:24px;transform:none;right:10px;z-index:30;animation:none}
+.desktop-pet .chat-toolbar.desktop-pet-controls{display:block;position:fixed;top:clamp(40px,12vh,64px);transform:none;right:10px;z-index:30;animation:none}
 .desktop-pet-controls .tb{app-region:no-drag;-webkit-app-region:no-drag}
 .desktop-pet-controls .is-active{color:var(--accent);background:rgba(231,190,119,.1)}
 .desktop-pet-drag{pointer-events:auto;position:fixed;z-index:1;top:32px;bottom:30px;left:calc((100% - 56px)/2 - 70px);width:140px;cursor:grab;touch-action:none;user-select:none}
