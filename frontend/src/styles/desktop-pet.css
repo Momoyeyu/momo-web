@@ -70,3 +70,10 @@ html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transpa
 .pet-utility .btn{min-height:28px;padding:5px 9px;font-size:12px}
 .pet-utility .extension-detail-advanced{padding-top:8px}
 .pet-utility .extension-detail-notice{font-size:12px}
+
+/* Persistent state, not hover, tells the player whether sight is permitted. */
+.desktop-pet .desktop-pet-controls .tb-observation{position:relative;transition:background-color .12s,color .12s,box-shadow .12s}
+.desktop-pet .desktop-pet-controls .tb-observation[data-observation-state=on]{color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.desktop-pet .desktop-pet-controls .tb-observation[data-observation-state=off]{color:var(--text-dim);background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.desktop-pet .desktop-pet-controls .tb-observation[data-observation-state=off]:hover{background:rgba(255,255,255,.05)}
+.desktop-pet .desktop-pet-controls .tb-observation[data-observation-state=error]{color:var(--danger,#ef8792);background:rgba(239,135,146,.08);box-shadow:inset 0 0 0 1px currentColor}

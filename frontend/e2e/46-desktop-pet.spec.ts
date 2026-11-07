@@ -23,14 +23,14 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
   };
  },{base:baseURL!});
  await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:true}}}));
- let observing=false,allowed=true;let requests=0;
+ let observing=false,allowed=true,desktopError='';let requests=0;
  const target={windowId:42,ownerPid:123,bundleId:'test.editor',path:'/test',name:'Test Editor',title:'Smoke document'};
  await page.route('**/api/computer/native/status',r=>r.fulfill({json:{active:observing,plugin:'computer',target:observing?target:null}}));
  await page.route('**/api/computer/native/targets',r=>r.fulfill({json:{targets:Array.from({length:24},(_,i)=>({...target,windowId:42+i,title:`Smoke document ${i}`})),screenPermission:true,inputPermission:true}}));
  await page.route('**/api/computer/native/start',r=>{expect(r.request().postDataJSON().permissions).toEqual(['observe','interact']);requests++;observing=true;return r.fulfill({json:{active:true}});});
  await page.route('**/api/computer/native/stop',r=>{observing=false;return r.fulfill({json:{active:false}});});
  await page.route('**/api/computer/native/frame',r=>r.fulfill({json:{}}));
- await page.route('**/api/computer/status',r=>r.fulfill({json:{observing:false,desktopAllowed:allowed,desktopError:'',proactive:false,reactions:false}}));
+ await page.route('**/api/computer/status',r=>r.fulfill({json:{observing:false,desktopAllowed:allowed,desktopError,proactive:false,reactions:false}}));
  await page.route('**/api/computer/desktop/observation',r=>{allowed=r.request().postDataJSON().enabled;return r.fulfill({json:{observing:false,desktopAllowed:allowed,proactive:false,reactions:false}});});
  await bootChat(page);
  await expect(page.getByRole('button',{name:copy.settings.tabs.extend,exact:true})).toHaveCount(0);
@@ -79,11 +79,23 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
   await page.getByRole('button',{name:copy.desktop.collapseDialog,exact:true}).click();
  }
  // Looking is a direct capability toggle, not an application authorization form.
+ const sight=page.getByRole('button',{name:copy.desktop.observe,exact:true});
+ await expect(sight).toHaveAttribute('data-observation-state','on');
+ const onShape=await sight.locator('svg').innerHTML();
+ await page.mouse.move(1,1);await sight.screenshot({path:info.outputPath('observation-on.png')});
  await page.getByRole('button',{name:copy.desktop.observe,exact:true}).click();
  expect(allowed).toBe(false);expect(requests).toBe(0);
+ await expect(sight).toHaveAttribute('data-observation-state','off');
+ expect(await sight.locator('svg').innerHTML()).not.toBe(onShape);
+ await page.mouse.move(1,1);await sight.screenshot({path:info.outputPath('observation-off.png')});
  await expect(page.getByRole('dialog')).toHaveCount(0);
  await page.getByRole('button',{name:copy.desktop.observe,exact:true}).click();
  expect(allowed).toBe(true);expect(requests).toBe(0);
+ desktopError='screen-permission';
+ await expect(sight).toHaveAttribute('data-observation-state','error');
+ expect(await sight.locator('svg').innerHTML()).not.toBe(onShape);
+ await sight.screenshot({path:info.outputPath('observation-error.png')});
+ desktopError='';await expect(sight).toHaveAttribute('data-observation-state','on');
  await page.getByRole('button',{name:copy.desktop.operate,exact:true}).click();
  await page.setViewportSize({width:612,height:440});
  const observer=page.getByRole('dialog',{name:copy.desktop.operate,exact:true});

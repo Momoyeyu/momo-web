@@ -20,6 +20,8 @@ export default function DesktopObservation(){
  const panel=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
  const allowed=view.status?.desktopAllowed!==false,reacting=!!(view.status?.proactive&&view.status.reactions);
  const problem=view.status?.desktopError;
+ const observationState=!view.status?'loading':!allowed?'off':problem?'error':'on';
+ const observationTip=t(observationState==='on'?'desktop.observing':observationState==='off'?'desktop.observationPaused':observationState==='error'?'desktop.observationUnavailable':'desktop.observationLoading');
  useEffect(()=>{
   let disposed=false,timer:ReturnType<typeof setTimeout>;let lastReaction=0;
   const poll=async()=>{
@@ -45,7 +47,7 @@ export default function DesktopObservation(){
  const toggle=async()=>{if(working)return;setWorking(true);try{await setDesktopObservation(problem?true:!allowed);if(problem)await captureDesktop();}catch{/* The status store exposes capture/permission failure. */}finally{setWorking(false);}};
  const title=selected==='computer'?t('desktop.operate'):t(selected+'.title');
  return <>
-  <Button className={`tb tip${allowed?' is-active':''}${problem?' has-warning':''}`} aria-label={t('desktop.observe')} aria-pressed={allowed} data-tip={t(problem?'desktop.observationUnavailable':allowed?'desktop.observing':'desktop.observationPaused')} data-tip-detail={t(problem==='screen-permission'?'desktop.screenPermissionHint':'desktop.observeHint')} disabled={working||view.busy} onClick={()=>void toggle()}><Icon name="desktop"/></Button>
+  <Button className="tb tip tb-observation" data-observation-state={observationState} aria-label={t('desktop.observe')} aria-pressed={allowed} aria-description={observationTip} data-tip={observationTip} data-tip-detail={t(problem==='screen-permission'?'desktop.screenPermissionHint':observationState==='off'?'desktop.resumeObservationHint':observationState==='error'?'desktop.retryObservationHint':'desktop.pauseObservationHint')} disabled={working||view.busy||!view.status} onClick={()=>void toggle()}><Icon name={observationState==='off'?'desktop-off':observationState==='error'?'desktop-alert':'desktop'}/></Button>
   <Button className={`tb tip${reacting?' is-active':''}`} aria-label={t('desktop.react')} aria-pressed={reacting} data-tip={t('desktop.react')} data-tip-detail={t('desktop.reactHint')} disabled={working||meeting.attention.focus} onClick={()=>{setWorking(true);void configureComputer(!reacting,!reacting).catch(()=>{}).finally(()=>setWorking(false));}}><Icon name="voice"/></Button>
   <button ref={trigger} type="button" className={`tb tip${open?' is-active':''}`} aria-label={t('desktop.operate')} aria-expanded={open} data-tip={t('desktop.operate')} onClick={()=>void show()}><Icon name="browser"/></button>
   {open&&createPortal(<div ref={panel} tabIndex={-1} role="dialog" aria-label={t('desktop.operate')} className={`pet-utility${windowState.panel?.width&&windowState.panel.width>=220?' is-beside':''}`} data-pet-interactive onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();close();}}}>

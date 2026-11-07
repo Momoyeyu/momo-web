@@ -7,6 +7,8 @@ export const ICONS = {
   back: ["m14 6-6 6 6 6"],
   close: ["m6 6 12 12M18 6 6 18"],
   desktop: ["M3 4h18v12H3z", "M8 21h8M12 16v5"],
+  "desktop-off": ["M9 4h12v12M15 16H3V4", "M8 21h8M12 16v5", "M2 2l20 20"],
+  "desktop-alert": ["M3 4h18v12H3z", "M8 21h8M12 16v5", "M12 7v3M12 13h.01"],
   browser: ["M3 4h18v16H3z", "M3 9h18M6 6.5h.01M9 6.5h.01", "m9 12-2 2 2 2m6-4 2 2-2 2"],
   gamepad: ["M7 7h10c2 0 3 2 4 8 .5 3-1 5-3 3l-3-3H9l-3 3c-2 2-3.5 0-3-3 1-6 2-8 4-8Z", "M6 11h4M8 9v4M16 10h.01M18 12h.01"],
   extensions: ["M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z", "M14 17h6M17 14v6"],
