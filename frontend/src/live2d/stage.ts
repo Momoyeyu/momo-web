@@ -273,10 +273,14 @@ export class Live2DStage {
     const availH = Math.max(0, screen.height - dialogH);
     const b = this.bounds;
     if (b.width <= 0 || b.height <= 0 || availH <= 0) return;
-    const scale = (availH * MODEL_HEIGHT_FRAC * (this.closeUp ? 1.8 : 1)) / b.height;
+    const heightFrac = this.previewHost ? MODEL_HEIGHT_FRAC : readCssNum("--model-height-frac", MODEL_HEIGHT_FRAC);
+    const closeScale = this.previewHost ? 1.8 : readCssNum("--model-close-scale", 1.8);
+    const closeAnchor = this.previewHost ? .6 : readCssNum("--model-close-anchor", .6);
+    const scale = (availH * heightFrac * (this.closeUp ? closeScale : 1)) / b.height;
     this.model.scale.set(scale);
-    this.model.y = availH - (b.y + b.height * (this.closeUp ? 0.6 : 1)) * scale;
-    const cx = screen.width * MODEL_CENTER_X_FRAC;
+    this.model.y = availH - (b.y + b.height * (this.closeUp ? closeAnchor : 1)) * scale;
+    const sideReserve = this.previewHost ? 0 : readCssNum("--model-side-reserve", 0);
+    const cx = (screen.width - sideReserve) * MODEL_CENTER_X_FRAC;
     this.model.x = cx - (b.x + b.width / 2) * scale;
   }
 

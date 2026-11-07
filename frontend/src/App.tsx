@@ -1,6 +1,5 @@
 import {getStage} from './live2d/stage';
 import {useDesktopWindowBridge,setDesktopMode} from './services/desktopWindow';
-import DesktopPetControls from './components/DesktopPetControls';
 import './styles/desktop-pet.css';
 import {musicDirector} from './audio/director';
 import {useIntro} from './services/introClient';
@@ -323,7 +322,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
         </div>
       </div>}
       <div className="desktop-window-grip" aria-hidden="true"/>
-      <DesktopPetControls/>
+      <div id="desktop-controls-host"/>
       <AppPermissions/>
       <TooltipLayer />
       <IntroGuide ready={ready} />

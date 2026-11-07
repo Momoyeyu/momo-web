@@ -1,7 +1,7 @@
 /* One renderer, one avatar and one voice. Only the host frame changes. */
 .desktop-window-grip{display:none}
 .desktop-shell .desktop-window-grip{display:block;position:fixed;z-index:15;top:0;left:80px;right:0;height:18px;app-region:drag;-webkit-app-region:drag}
-html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transparent!important;--dialog-zone-h:160px;--dialog-bottom-gap:0px}
+html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transparent!important;--dialog-zone-h:24px;--model-side-reserve:56px;--model-height-frac:.95;--model-close-scale:2.2;--model-close-anchor:.5;--dialog-bottom-gap:0px}
 .desktop-pet .app-stage{width:100vw;height:100vh;background:transparent}
 .desktop-pet .grid-backdrop,.desktop-pet .room-background,.desktop-pet .scene-ambient,.desktop-pet .scene-reading-shade{display:none}
 .desktop-pet .stage-scene{background:none!important}
@@ -16,9 +16,14 @@ html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transpa
 .desktop-pet .terminal-input-prompt{height:32px;width:10px}
 .desktop-pet .input-row .send-btn,.desktop-pet .input-row .mic-btn{width:28px;height:28px;min-height:28px}
 .desktop-pet .modal-overlay{width:100vw;height:100vh}
-.desktop-pet-controls{position:fixed;z-index:30;top:10px;left:10px;right:10px;display:flex;align-items:center;gap:6px;pointer-events:auto}
-.desktop-pet-controls .tb{color:var(--text);width:34px;height:34px;background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;app-region:no-drag;-webkit-app-region:no-drag}
-.desktop-pet-grip{flex:1;align-self:stretch;display:flex;align-items:center;gap:4px;padding-left:12px;app-region:drag;-webkit-app-region:drag}
-.desktop-pet-grip i{display:block;width:22px;height:3px;border-radius:4px;background:var(--text-dim);opacity:.6}
-.desktop-pet-controls [role=alert]{position:absolute;top:44px;background:var(--panel-solid);padding:10px;border-radius:8px;font-size:12px}
+/* Same rail, icon geometry and progressive tooltips as chat. */
+.desktop-pet .chat-toolbar.desktop-pet-controls{display:block;position:fixed;top:24px;transform:none;right:10px;z-index:30;animation:none}
+.desktop-pet-controls .tb{app-region:no-drag;-webkit-app-region:no-drag}
+.desktop-pet-controls .is-active{color:var(--accent);background:rgba(231,190,119,.1)}
+.desktop-pet-drag{pointer-events:auto;position:fixed;z-index:1;top:32px;bottom:30px;left:calc((100% - 56px)/2 - 70px);width:140px;cursor:grab;touch-action:none;user-select:none}
+.desktop-pet-controls [role=alert]{position:absolute;right:54px;top:0;width:180px;background:var(--panel-solid);padding:10px;border-radius:8px;font-size:12px}
+.desktop-pet .dialog-drawer{transition:transform .28s ease,opacity .2s ease;z-index:20}
+.desktop-pet .pet-dialog-collapsed .dialog-drawer{transform:translateY(calc(var(--drawer-travel,180px) + 40px));opacity:0;visibility:hidden;pointer-events:none;transition:transform .28s ease,opacity .2s ease,visibility 0s .28s}
+.desktop-pet .pet-dialog-collapsed .dialog-reopen{display:none}
+@media(prefers-reduced-motion:reduce){.desktop-pet .dialog-drawer,.desktop-pet .pet-dialog-collapsed .dialog-drawer{transition:none}}
 .desktop-action-error{position:absolute;right:65px;width:220px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-solid);font-size:12px}

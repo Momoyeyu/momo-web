@@ -1,3 +1,4 @@
+import DesktopPetControls from '../components/DesktopPetControls';
 import {useDesktopWindow} from '../services/desktopWindow';
 import ExtensionActivities from './ExtensionActivities';
 import {useImageDraft} from '../chat/useImageDraft';
@@ -69,7 +70,11 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   const drafts=useImageDraft();
   const [imageSending,setImageSending]=useState(false);
   const imagesEnabled=!!getState().settings.llm.vision&&!introActive;
+  const [petCollapsed,setPetCollapsed]=useState(true);
   const [closeUp, setCloseUp] = useState(() => getStage().getCloseUp());
+  useEffect(()=>{setCloseUp(getStage().getCloseUp());},[desktopWindow.mode]);
+  const toggleFrame=()=>{const next=!getStage().getCloseUp();getStage().setCloseUp(next);setCloseUp(next);};
+  const collapsed=desktopWindow.mode==='pet'?petCollapsed:phoneOpen;
   const [controlling,setControlling]=useState(false);
   const dialog = useRef<HTMLDivElement>(null);
   useEffect(()=>{
@@ -198,14 +203,14 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   };
 
   return (
-    <div className={`chat-page${phoneOpen?' has-phone':''}`} inert={!interactive}>
+    <div className={`chat-page${phoneOpen?' has-phone':''}${desktopWindow.mode==='pet'&&petCollapsed?' pet-dialog-collapsed':''}`} inert={!interactive}>
       {interactive && <FirstMeeting connectionFailed={modelError} />}
       {error && <div className="chat-error">{error}</div>}
 
       <DialogDrawer>
       <div className="dialog-zone" ref={dialog}>
         <DialogBox
-          collapsed={phoneOpen}
+          collapsed={collapsed}
           handle={<DialogHandle active={phoneOpen} onClick={()=>setPhoneClose(v=>v+1)}/>}
           lang={resolveChatLang(getState().settings.general)}
           name={name}
@@ -229,7 +234,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
             </div>)}
           </div>}
           {drafts.error&&<p className="image-draft-error" role="alert">{t(drafts.error)}</p>}
-          <div data-intro="name-input" className="input-row" inert={phoneOpen}>
+          <div data-intro="name-input" className="input-row" inert={collapsed}>
             <span className="terminal-input-prompt" aria-hidden="true"><TerminalPrompt/></span>
             <input
               value={input}
@@ -280,13 +285,14 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
 
       </DialogDrawer>
 
+      <DesktopPetControls closeUp={closeUp} onFrame={toggleFrame} collapsed={petCollapsed} onDialog={()=>setPetCollapsed(v=>!v)} micOn={micOn} micAllowed={micAllowed} onMic={toggleMic}/>
       {/* 固定右侧竖轨，与对话框及手机的显隐独立。 */}
       <div className="chat-toolbar">
         <div className="tb-side">
           <Button
             className="tb tb-framing"
             aria-label={t(closeUp ? "performance.fullBody" : "performance.closeUp")}
-            onClick={() => { const next = !getStage().getCloseUp(); getStage().setCloseUp(next); setCloseUp(next); }}
+            onClick={toggleFrame}
           >
             <Icon name={closeUp ? "frameFull" : "frameClose"} />
           </Button>
