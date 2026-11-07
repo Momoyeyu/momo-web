@@ -27,3 +27,18 @@ html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transpa
 .desktop-pet .pet-dialog-collapsed .dialog-reopen{display:none}
 @media(prefers-reduced-motion:reduce){.desktop-pet .dialog-drawer,.desktop-pet .pet-dialog-collapsed .dialog-drawer{transition:none}}
 .desktop-action-error{position:absolute;right:65px;width:220px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel-solid);font-size:12px}
+/* Primary observation controls fit the pet; secondary activities stay disclosed. */
+.desktop-pet .desktop-pet-controls .tb-side{gap:2px}
+.desktop-pet .desktop-observation{width:calc(100vw - 24px);max-width:420px;max-height:calc(100vh - 24px);padding:14px;gap:12px;box-sizing:border-box;overflow:hidden}
+.desktop-observation-heading{display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:14px;color:var(--accent)}
+.desktop-observation-heading>span{flex:1;min-width:0}
+.desktop-observation-heading .btn{padding:6px;min-width:30px;min-height:30px;display:grid;place-items:center}
+.desktop-observation-body{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
+.desktop-observation .extension-detail{gap:12px}
+.desktop-observation .extension-detail-header h3{font-size:15px}
+.desktop-observation .extension-detail .opt-row{grid-template-columns:1fr;gap:6px;padding:8px 0}
+.desktop-observation .extension-detail-actions{padding-top:8px;gap:8px}
+.desktop-observation .extension-detail-advanced{padding-top:10px}
+.desktop-other-activities{margin-top:16px;border-top:1px solid var(--line);padding-top:12px;font-size:13px;color:var(--text-dim)}
+.desktop-other-activities>div{display:grid;gap:8px;margin-top:10px}
+.desktop-other-activities .btn{display:flex;align-items:center;gap:8px;text-align:left;white-space:normal}

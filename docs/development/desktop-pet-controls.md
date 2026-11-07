@@ -28,3 +28,11 @@ Inspected AIRI's website and local desktop source: `apps/stage-tamagotchi/src/ma
 - Temporary Electron window with the production WindowModeController verified enabling/disabling click-through, underlying test-window input and recovery after stopping region reports. This is not the installed package.
 - The computer-use driver's synthetic drag left Electron's native cursor unchanged. Actual drag distance therefore remains an installed/manual smoke item; browser event routing and host movement/clamping were verified separately.
 - Do not reinstall for each visual edit. Consolidate this source with pending observation/input fixes. 006/017 remain open until the installed candidate passes remaining smoke checks.
+
+## Desktop scene actions (2026-11-07)
+
+Chat has a scene switch to desktop and a phone for QQ; it no longer duplicates the plugin directory in an Extensions modal. The pet rail adds one Observe action with a live active state. Opening it discovers eligible windows; selecting a target and starting uses the existing per-application approval contract. Current window and stop remain available on reopening. Application interaction and proactive reactions are secondary disclosures. Browser and Minecraft activity controls are accessible inside this desktop context; plugin installation, enablement and persistent grants remain in Settings.
+
+The compact observation panel scrolls within the pet viewport, participates in protected click-through regions, and does not create a renderer or conversation. Closing it does not stop observation; the pet's status poll resumes the existing scheduler after delayed authorization. Stopping is explicit. The underlying system recording permission and vision capability requirements remain enforced.
+
+Regression covers three locales, 360×520 and 320×440, observation selection/start/stop/reopen, both secondary activity entries, no duplicate chat menu, protected regions and dialog/rail separation. Native real screen interpretation still requires the separately tracked authorized smoke; UI fixtures are not that evidence.
