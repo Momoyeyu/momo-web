@@ -188,3 +188,32 @@ def test_emergency_selection_keeps_soft_policy_and_additional_safe_reserve():
     assert policy.select(rows,budget,16722) is None
     assert policy.select(rows,budget,16722,hard=True) in range(2,9)
     assert policy.select(rows,budget,budget.safe-655,hard=True) is None
+
+def test_hard_capture_budget_replaces_old_summary_instead_of_counting_both(monkeypatch):
+    from app.core import state, db, llm
+    from app.services import compress, turn, checkpoint
+    from conftest import add_turn
+    from tests.test_checkpoint import _InlineThread
+    cfg=state.load()
+    cfg['settings']['llm'].update(contextWindow=32768,maxOutputTokens=4096)
+    for i in range(8):add_turn('q'*180,'a'*180,at=str(i))
+    old=('Earlier shared experiences. '*210).strip()
+    with db.tx() as c:c.execute('UPDATE sessions SET summary=? WHERE id=?',(old,db.LIVE_ID))
+    monkeypatch.setattr(compress,'load_state',lambda:cfg)
+    monkeypatch.setattr(turn,'build_system_prompt',lambda *a,**k:'H'*15000)
+    messages=turn.build_messages(cfg,'Read the test window.')
+    pair=[{'role':'assistant','content':None,'tool_calls':[{'id':'capture','type':'function','function':{'name':'computer_observe','arguments':'{}'}}]}]
+    messages.extend(pair)
+    reservation=[{'role':'user','content':[{'type':'image_url','image_url':{'url':'momo-observation:pending'},'vision_tokens':3072}]}]
+    assert estimate([*messages,*reservation])>Budget.from_config(cfg['settings']['llm']).safe
+    requests=[]
+    def summarize(config,prompt,**kwargs):
+        requests.append(prompt)
+        assert str(prompt).count(old)==1 and 'momo-observation:' not in str(prompt)
+        return {'content':'Shared experiences and unfinished topics preserved.'}
+    monkeypatch.setattr(llm,'chat_completion',summarize)
+    monkeypatch.setattr(compress,'Thread',_InlineThread)
+    compress.guard_request(cfg['settings']['llm'],messages,[],cancelled=lambda:False,extra_messages=reservation)
+    assert requests and checkpoint.live_summary()!=old
+    assert messages[-1:]==pair
+    assert estimate([*messages,*reservation])<=Budget.from_config(cfg['settings']['llm']).safe

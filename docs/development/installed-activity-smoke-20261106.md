@@ -25,3 +25,17 @@ Validation: 40 relevant backend tests, four Minecraft host tests, four frontend 
 - Browser observation/input using an existing approved browser. No tablet or separate browser profile is planned.
 
 006/007/008/016/017 remain open. Synthetic and unit checks do not replace these remaining real interactions.
+
+
+## 2026-11-07 follow-up on the consolidated installation
+
+Installed desktop `5030d4b` / shared source `e268ee5` replaced the earlier candidate. macOS recording and Accessibility grants now work; window discovery reports available targets. Desktop-pet entry/return and Minecraft UI stop plus model-requested stop were verified on this package.
+
+The maintainer approved TextEdit with **Always allow**, and the application activity reached **active**. The fixture was a new unsaved text document created for this smoke; no other document was read or edited. The model requested observation, but the pre-capture context guard returned `COMPUTER_CONTEXT_CAPACITY`. Therefore this is **not** a successful pixel-read or input test. The activity was stopped through its UI and visibly returned to **inactive**; the user's persistent TextEdit allowlist choice remains intact.
+
+Source-only fixes discovered in this run:
+
+- Expired application approval disappeared from the dialog while the activity panel stayed waiting. Native status now reconciles expired/denied/revoked requests, and the frontend polls that authoritative request ID. Granted requests remain pending until resume completes; expiry never approves or replays an action.
+- Compaction charged the old summary as fixed overhead while also reserving a replacement summary. The candidate now treats the old summary as compressible input. It was also duplicated in the summary request; it now appears once in the stable system prefix. Output reserve, screenshot reservation, recent complete exchanges, cancellation and final hard capacity validation remain enforced.
+
+Validation: 99 relevant isolated backend tests and frontend typecheck passed, including a failing-then-passing 32K screenshot-reservation regression with an existing summary. These changes have **not** been installed; no system permission reset or new package was requested during this follow-up. Real TextEdit pixel-read/input and existing-browser smoke remain open for the next consolidated installation.

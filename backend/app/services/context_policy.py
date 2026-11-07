@@ -119,7 +119,7 @@ class Policy:
         return time.time() >= self.data.get('retry_after', 0)
 
     @atomic
-    def select(self, rows, budget, overhead=0, *, hard=False):
+    def select(self, rows, budget, overhead=0, *, hard=False, previous_summary_size=0):
         """Shadow every candidate; live selection stays near conservative baseline.
 
         Candidate feasibility uses actual retained bytes + conservative summary
@@ -133,7 +133,7 @@ class Policy:
             cut = choose_latest(rows, k)
             if cut < 2:
                 continue
-            old = estimate(rows[:cut])
+            old = estimate(rows[:cut]) + previous_summary_size
             after = overhead + estimate(rows[cut:]) + max(512, old * .35)
             if after > limit:
                 continue

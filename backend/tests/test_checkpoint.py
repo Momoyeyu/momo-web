@@ -195,12 +195,12 @@ def test_compress_rolls_old_summary(monkeypatch):
     got = []
 
     def fake(llm_cfg, messages, tools=None, usage_out=None, **kwargs):
-        got.append(messages[-1]["content"])
+        got.append("\n".join(m["content"] for m in messages))
         return {"role": "assistant", "content": "新摘要"}
 
     monkeypatch.setattr(llm, "chat_completion", fake)
     assert compress.compress_once() is True
-    assert "旧摘要" in got[-1]  # 旧摘要被喂给 LLM 滚入
+    assert got[-1].count("旧摘要") == 1  # 旧摘要滚入，保持前缀且不重复注入
     assert _live_summary() == "新摘要"
     assert len(checkpoint.live_messages()) == 16
 
