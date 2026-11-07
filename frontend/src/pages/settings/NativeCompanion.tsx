@@ -27,9 +27,10 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
  const read=useCallback(async()=>{
   request.current?.abort();const controller=new AbortController();request.current=controller;
   try{
-   const s=await apiJson<{active?:boolean;plugin?:string;stopUnconfirmed?:boolean;stopping?:boolean}>('/api/computer/native/status',{signal:controller.signal});
+   const s=await apiJson<{active?:boolean;plugin?:string;stopUnconfirmed?:boolean;stopping?:boolean;pendingRequestId?:string|null}>('/api/computer/native/status',{signal:controller.signal});
    if(controller.signal.aborted||!mounted.current)return;
    setActive(Boolean(s.active&&s.plugin===plugin));
+   setPending(s.plugin===plugin?s.pendingRequestId??null:null);
    setStopUnconfirmed(Boolean(s.stopUnconfirmed||s.stopping));
    if(s.active&&s.plugin==='computer')startNativeObservation();
   }catch(e){if(!controller.signal.aborted)throw e;}

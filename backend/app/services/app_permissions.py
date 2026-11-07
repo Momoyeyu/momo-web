@@ -34,6 +34,13 @@ class AppPermissions:
  def status(self):
   with self.lock:
    return {'pending':[self.public(r) for r in self.requests.values() if r['status']=='pending' and r['epoch'] not in self.revoked and r['expires']>self.clock()], 'allowlist':list(self.saved().values())}
+ def request_status(self,rid,epoch):
+  with self.lock:
+   r=self.requests.get(rid)
+   if not r or r['epoch']!=epoch or epoch in self.revoked:return 'revoked'
+   if r['status']=='denied':return 'denied'
+   if r['expires']<=self.clock():return 'expired'
+   return r['status']
  def require(self,target,activity_epoch,request_key,capabilities):
   with self.lock:
    app=self.identity(target)

@@ -29,6 +29,33 @@ def test_no_action_before_approval_and_subset(setup):
  with pytest.raises(ValueError):c.execute({'action':'click'})
  assert c.execute({'action':'observe'})['ok']
 
+@pytest.mark.parametrize('outcome',['expired','denied','revoked','epoch_changed'])
+def test_status_releases_terminal_approval_and_allows_fresh_request(setup,outcome):
+ c,p,calls=setup
+ module.runtime.require_meeting=lambda *args:None
+ now=[0];p.clock=lambda:now[0]
+ r=c.start(1,12,['observe'],'owner','lease')
+ assert c.status()['pendingRequestId']==r['requestId']
+ if outcome=='expired':now[0]=301
+ elif outcome=='denied':p.decide(r['requestId'],'deny',1)
+ elif outcome=='revoked':p.revoke_request(r['requestId'])
+ else:module.runtime.epoch=2
+ assert c.status()['pendingRequestId'] is None
+ assert not c.pending and not c.pending_request
+ with pytest.raises(ValueError):c.resume(r['requestId'],'owner','lease')
+ fresh=c.start(1,12,['observe'],'owner','lease')
+ assert fresh['requestId']!=r['requestId']
+ assert all(method!='native.start' for method,_ in calls)
+
+def test_status_preserves_approved_request_until_resume(setup):
+ c,p,calls=setup
+ r=c.start(1,12,['observe'],'owner','lease')
+ p.decide(r['requestId'],'once',1)
+ assert c.status()['pendingRequestId']==r['requestId']
+ c.start(1,12,['observe'],'owner','lease')
+ assert c.status()['pendingRequestId'] is None
+ assert c.status()['active']
+
 def test_stop_cancels_pending_and_consumes_grant(setup):
  c,p,calls=setup
  r=c.start(1,12,['observe'],'owner','lease');c.stop()

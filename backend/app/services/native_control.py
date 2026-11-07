@@ -45,7 +45,15 @@ class NativeControl:
         return runtime.host.request('native.targets')
 
     def status(self):
-        return {'active':self.target is not None,'target':self.target,'generation':self.generation,'plugin':self.plugin,'stopUnconfirmed':self.stop_unconfirmed,'stopping':self.stopping}
+        from .app_permissions import permissions
+        with self.lock:
+            # Keep a granted request while resume is in flight, but release
+            # expired/denied requests even when the permission dialog disappeared.
+            if self.pending_request and permissions.request_status(self.pending_request,runtime.epoch) not in ('pending','granted'):
+                permissions.revoke_request(self.pending_request)
+                self.pending=None
+                self.pending_request=None
+            return {'active':self.target is not None,'target':self.target,'generation':self.generation,'plugin':self.plugin,'stopUnconfirmed':self.stop_unconfirmed,'stopping':self.stopping,'pendingRequestId':self.pending_request}
 
     def start(self,window,pid,capabilities,client,lease,plugin='computer',proactive=None,reactions=None,expected_request=None):
         from .app_permissions import permissions, AppApprovalRequired
