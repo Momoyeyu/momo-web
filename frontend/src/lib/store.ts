@@ -46,6 +46,17 @@ const DEFAULT_SETTINGS: Settings = {
     soundPalette: "warm",
     showStatus: true,
     voiceInput: true,
+    voiceMuted: false,
+    microphoneEnabled: false,
+    chatCloseUp: true,
+    petCloseUp: false,
+    petDialogCollapsed: true,
+    petClickThrough: false,
+    nativeInteract: false,
+    browserInteract: false,
+    minecraftChat: false,
+    minecraftMove: false,
+    phonePresentation: "auto",
   },
   // 服务地址与模型一律留空：新用户按输入框里的灰色提示自己填。
   // 这里曾经预填过 deepseek / 本机端口 / 某台内网 embedding 服务器的地址 ——
@@ -89,6 +100,34 @@ function defaultBackend(): StorageLike {
 }
 
 let backend: StorageLike = defaultBackend();
+
+// A synchronous journal protects switch/level choices if the app quits during
+// the 300 ms debounce or while the backend is unavailable. Only unacknowledged
+// general fields are replayed; credentials and imported state are never copied.
+const GENERAL_PENDING_KEY = 'momo-general.pending.v1';
+function readPendingGeneral(): Partial<Settings['general']> {
+  try {
+    const raw=JSON.parse(backend.getItem(GENERAL_PENDING_KEY)||'{}');
+    return Object.fromEntries(Object.entries(raw).filter(([key,value])=>
+      key in DEFAULT_SETTINGS.general && typeof value===typeof DEFAULT_SETTINGS.general[key as keyof Settings['general']]
+    ));
+  } catch {return {};}
+}
+let pendingGeneral=readPendingGeneral();
+function storePendingGeneral(){
+  try{backend.setItem(GENERAL_PENDING_KEY,JSON.stringify(pendingGeneral));}catch{/* In-memory preferences still work. */}
+}
+async function saveSnapshot(snapshot: Record<string,unknown>): Promise<boolean>{
+  const ok=await putState(snapshot);
+  if(ok){
+    const general=(snapshot as unknown as PersistedState).settings.general;
+    for(const key of Object.keys(pendingGeneral) as (keyof Settings['general'])[]){
+      if(pendingGeneral[key]===general[key])delete pendingGeneral[key];
+    }
+    storePendingGeneral();
+  }
+  return ok;
+}
 
 /**
  * schema 外顶层字段（将来新增字段）：读取时记下、PUT 时原样带上——
@@ -204,7 +243,9 @@ export async function bootPersist(): Promise<void> {
   const remote = await fetchState();
   if (!remote) return;
   state = merge(remote);
+  state.settings.general={...state.settings.general,...pendingGeneral};
   persist();
+  for(const listener of listeners)listener();
 }
 
 /** 防抖 PUT /api/state；失败静默（localStorage 仍兜底）。 */
@@ -220,7 +261,7 @@ function writePendingState(): void {
   clearTimeout(saveTimer);
   saveTimer = null;
   const snapshot = { ...passthrough, ...state };
-  saveInFlight = saveInFlight.then(() => putState(snapshot));
+  saveInFlight = saveInFlight.then(() => saveSnapshot(snapshot));
 }
 
 export async function flushPendingState(): Promise<void> {
@@ -242,7 +283,7 @@ export async function pausePersistence(): Promise<() => void> {
   };
   try {
     await saveInFlight;
-    if (inBrowser() && !await putState({ ...passthrough, ...state }))
+    if (inBrowser() && !await saveSnapshot({ ...passthrough, ...state }))
       throw new Error('Could not save configuration');
     return resume;
   } catch (error) { resume(); throw error; }
@@ -296,6 +337,13 @@ export function getAvatarId(): string {
 
 /** 局部更新 + 持久化 + 通知订阅者。 */
 export function update(patch: Partial<PersistedState>): void {
+  if(patch.settings&&!persistencePaused){
+    for(const key of Object.keys(DEFAULT_SETTINGS.general) as (keyof Settings['general'])[]){
+      const value=patch.settings.general[key];
+      if(value!==undefined&&value!==state.settings.general[key])Object.assign(pendingGeneral,{[key]:value});
+    }
+    storePendingGeneral();
+  }
   state = { ...state, ...patch };
   persist();
   for (const l of listeners) l();
@@ -312,4 +360,9 @@ export function newId(prefix: string): string {
       ? crypto.randomUUID().replaceAll("-", "").slice(0, 12)
       : Math.random().toString(36).slice(2, 14);
   return `${prefix}_${Date.now().toString(36)}${rand}`;
+}
+
+/** Shared preference writes always merge the latest state, not a stale render snapshot. */
+export function updateGeneral(patch: Partial<Settings["general"]>): void {
+  update({settings:{...state.settings,general:{...state.settings.general,...patch}}});
 }

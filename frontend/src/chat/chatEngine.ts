@@ -13,7 +13,7 @@ import { TtsPlayer } from "../audio/player";
 import { getStage } from "../live2d/stage";
 import type { Live2DStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
-import { getSettings, newId, subscribe } from "../lib/store";
+import { getSettings, updateGeneral, newId, subscribe } from "../lib/store";
 import type {
   ImageRef,
   ChatMessage,
@@ -165,7 +165,7 @@ export class ChatEngine {
   private sendQueue: Promise<void> = Promise.resolve();
   private disposed = false;
   private openingScheduled = false;
-  private voiceMuted = false;
+  private voiceMuted = getSettings().general.voiceMuted===true;
   private unsubVolume: (() => void) | null = null;
   /** 最近一次上屏字幕（Chat 页中途挂载时同步用）。 */
   private lastDisplay = "";
@@ -182,7 +182,7 @@ export class ChatEngine {
     if(typeof document!=="undefined")document.addEventListener("visibilitychange",this.visibilityChanged);
     this.applyPresentationVisibility();
     this.applyVolume();
-    this.unsubVolume = subscribe(() => this.applyVolume());
+    this.unsubVolume = subscribe(() => { this.setMuted(getSettings().general.voiceMuted===true); this.applyVolume(); });
     this.player.onMouthOpen = (v) =>
       this.tryStage((s) => s.setMouthOpen(v, this.player.playing));
     this.player.onUnavailable = () => {
@@ -226,7 +226,7 @@ export class ChatEngine {
     return this.micOn || this.micStarting;
   }
 
-  /** 语音输出静音开关（工具栏即时切换，不持久化）。 */
+  /** 语音输出静音开关（工具栏与设置共享持久化偏好）。 */
   get muted(): boolean {
     return this.voiceMuted;
   }
@@ -239,6 +239,7 @@ export class ChatEngine {
   setMuted(m: boolean): void {
     if (this.voiceMuted === m) return;
     this.voiceMuted = m;
+    if(getSettings().general.voiceMuted!==m)updateGeneral({voiceMuted:m});
     this.applyVolume();
     if (m) {
       this.turn?.audioAbort.abort();
@@ -500,10 +501,10 @@ export class ChatEngine {
   /** 回到 chat 页：挂起前麦是开着的 → 恢复监听。幂等。
    *  前置校验语音输入开关与 ASR 配置——挂起期间可能在设置页被关掉。 */
   resumeMic(): void {
-    if (!this.micSuspended) return;
+    if (!this.micSuspended && !getSettings().general.microphoneEnabled) return;
     this.micSuspended = false;
     const cfg = getSettings();
-    if (this.micIntended && cfg.general.voiceInput) {
+    if ((this.micIntended || cfg.general.microphoneEnabled) && cfg.general.voiceInput) {
       void this.startListening();
     }
   }

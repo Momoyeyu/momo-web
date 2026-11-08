@@ -1,3 +1,4 @@
+import {getSettings,updateGeneral} from '../lib/store';
 import {ambient} from '../audio/ambient';
 import {createPortal} from 'react-dom';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
@@ -14,14 +15,16 @@ import {useT} from '../i18n';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
 import '../styles/phone.css';
-// Module state survives settings/backlog, but a new Boot resets visibility preference.
-let session:{lease:string;open:boolean;suppressed:boolean;app:string|null;peer?:string}={lease:'',open:false,suppressed:false,app:null};
+// Navigation is ephemeral; only explicit visibility choices survive a new Boot.
+const preference=()=>getSettings().general.phonePresentation??'auto';
+let session:{lease:string;open:boolean;suppressed:boolean;app:string|null;peer?:string}={lease:'',open:preference()==='open',suppressed:preference()==='closed',app:null};
 export default function PhoneSurface({active,attention,onVisibilityChange,closeSignal=0}:{active:boolean;attention:AttentionState;onVisibilityChange?:(open:boolean)=>void;closeSignal?:number}){
  const t=useT();
 useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const [data,setData]=useState<PhoneSnapshot|null>(null),[failed,setFailed]=useState(false);
  const [open,setOpen]=useState(session.open),[app,setApp]=useState<string|null>(session.app),[peer,setPeer]=useState<string|undefined>(session.peer);
  useEffect(()=>{if(closeSignal){session.open=false;session.suppressed=true;setOpen(false);}},[closeSignal]);
+ useEffect(()=>{if(active&&preference()==='open'){session.open=true;setOpen(true);}},[active]);
  const [older,setOlder]=useState<PhoneMessage[]>([]),[loading,setLoading]=useState(false);
  const [cursor,setCursor]=useState<number|null|undefined>();
  const peerRef=useRef(peer);peerRef.current=peer;
@@ -41,7 +44,7 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const lastNotify=useRef(-Infinity);
  useEffect(()=>{if(data){if(active&&pendingSound.current!==null&&data.pending>pendingSound.current&&performance.now()-lastNotify.current>5000){ambient.sound('notify');lastNotify.current=performance.now();}pendingSound.current=data.pending;}},[data?.pending,active]);
  useEffect(()=>{
-  if(session.lease!==lease){session={lease,open:false,suppressed:false,app:null};revision.current++;accountRef.current='';seenActivity.current='';setOlder([]);setCursor(undefined);setOpen(false);setApp(null);setPeer(undefined);setData(null);}
+  if(session.lease!==lease){session={lease,open:preference()==='open',suppressed:preference()==='closed',app:null};revision.current++;accountRef.current='';seenActivity.current='';setOlder([]);setCursor(undefined);setOpen(session.open);setApp(null);setPeer(undefined);setData(null);}
  },[lease]);
  useEffect(()=>{
   if(!active)return;
@@ -75,7 +78,7 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const choosePeer=(value:string)=>changePeer(value);
  const soundOpen=useRef(open);
  useEffect(()=>{if(soundOpen.current!==open){if(active)ambient.sound(open?'phone-in':'phone-out');soundOpen.current=open;}},[open,active]);
- const toggle=()=>{session.open=!open;if(!session.open)session.suppressed=true;setOpen(session.open);};
+ const toggle=()=>{session.open=!open;session.suppressed=!session.open;updateGeneral({phonePresentation:session.open?'open':'closed'});setOpen(session.open);};
  const current=apps.find(a=>a.id===app);
  const appMissing=!!app&&!!data&&!current;
  useEffect(()=>{if(appMissing)changeApp(null);},[appMissing]);

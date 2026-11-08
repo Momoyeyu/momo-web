@@ -63,16 +63,13 @@ function renderPage(route: Route, active: boolean, attention:AttentionState,onHo
 export default function App({ready, onPrepared}: {ready: boolean; onPrepared: () => void}) {
   const route = useRoute();
   const desktopWindow=useDesktopWindowBridge();
-  const framingBeforePet=useRef<boolean|null>(null);
+  const general=useSyncExternalStore(subscribe,getSettings).general;
   useLayoutEffect(()=>{
     document.documentElement.classList.toggle('desktop-pet',desktopWindow.mode==='pet');
     document.documentElement.classList.toggle('desktop-shell',!!window.momoDesktop?.setWindowMode);
-    if(desktopWindow.mode==='pet'){
-      if(framingBeforePet.current===null)framingBeforePet.current=getStage().getCloseUp();
-      getStage().setCloseUp(false);
-    }else if(framingBeforePet.current!==null){getStage().setCloseUp(framingBeforePet.current);framingBeforePet.current=null;}
+    getStage().setCloseUp(desktopWindow.mode==='pet'?general.petCloseUp===true:general.chatCloseUp!==false);
     return()=>{document.documentElement.classList.remove('desktop-pet','desktop-shell');};
-  },[desktopWindow.mode]);
+  },[desktopWindow.mode,general.petCloseUp,general.chatCloseUp]);
   useLayoutEffect(()=>{
     const root=document.documentElement,panel=desktopWindow.panel;
     root.classList.toggle('pet-panel-open',desktopWindow.mode==='pet'&&!!panel&&panel.width>=220);

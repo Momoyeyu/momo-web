@@ -144,4 +144,22 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
  await expect(page.locator('.chat-toolbar:not(.desktop-pet-controls)')).toBeVisible();
  await expect(proactive).toHaveAttribute('aria-pressed','false');
  await expect(tts).toHaveAttribute('aria-label',ttsLabel!);
+ // Explicit switches survive leaving pet mode and a full renderer restart.
+ await page.getByRole('button',{name:copy.desktop.enter,exact:true}).click();
+ await page.setViewportSize({width:360,height:520});
+ await page.getByRole('button',{name:copy.desktop.halfBody,exact:true}).click();
+ await page.getByRole('button',{name:copy.desktop.expandDialog,exact:true}).click();
+ await page.getByRole('button',{name:copy.desktop.clickThrough,exact:true}).click();
+ await page.getByRole('button',{name:copy.desktop.return,exact:true}).click();
+ await page.reload();await page.setViewportSize({width:1280,height:720});
+ await bootChat(page);
+ await page.getByRole('button',{name:copy.desktop.enter,exact:true}).click();
+ await page.setViewportSize({width:360,height:520});
+ await expect(page.locator('.desktop-pet-controls').getByRole('button',{name:copy.performance.fullBody,exact:true})).toBeVisible();
+ await expect(page.locator('.dialog-box')).toBeVisible();
+ await expect(page.getByRole('button',{name:copy.desktop.clickThrough,exact:true})).toHaveAttribute('aria-pressed','true');
+ await expect.poll(()=>page.evaluate(()=>(window as any).__petRegions?.length??0)).toBeGreaterThan(1);
+ await page.mouse.move(1,1);await page.screenshot({path:info.outputPath('pet-restored.png')});
+ // Keep language cases independent even though the test API owns one state file.
+ await page.evaluate(async()=>{const store=await import('/src/lib/store.ts');store.updateGeneral({petCloseUp:false,petDialogCollapsed:true,petClickThrough:false});await store.flushPendingState();});
 });

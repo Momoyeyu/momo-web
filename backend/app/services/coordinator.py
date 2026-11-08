@@ -94,16 +94,7 @@ class Coordinator:
         self.lock = InstanceLock(state.DATA_DIR).acquire()
         try:
             self.schema()
-            try:
-                policy = json.loads(db.meta_get("attention_policy", "{}"))
-            except (ValueError, TypeError):
-                policy = {}
-            # Focus belongs to the current human meeting. A process restart
-            # begins dormant, while the independent phone pause survives it.
-            self.focus = False
-            self.phone_paused = policy.get("phonePaused") is True
-            if policy.get("focus") is True:
-                self._persist_attention_policy()
+            self._reload_preferences()
             with db.tx() as c:
                 # Unclaimed accepted work survives a process restart. In-flight
                 # inference does not replay its potentially dispatched side effect.
@@ -153,6 +144,17 @@ class Coordinator:
         if self.lock:
             self.lock.close()
         self.started = False
+
+    def _reload_preferences(self):
+        try:
+            policy = json.loads(db.meta_get("attention_policy", "{}"))
+        except (ValueError, TypeError):
+            policy = {}
+        if not isinstance(policy, dict): policy = {}
+        self.focus = policy.get("focus") is True
+        self.phone_paused = policy.get("phonePaused") is True
+        from .computer import computer
+        computer.reload_preferences()
 
     def _persist_attention_policy(self):
         with db.tx() as c:
@@ -727,8 +729,6 @@ class Coordinator:
         if self.owner and self.owner["expiresAt"] < time.monotonic():
             self.owner = None
             self.mode = "paused"
-            self.focus = False
-            self._persist_attention_policy()
             self.presentation = None
             self.epoch += 1
             self._cancel_generation()
@@ -779,8 +779,6 @@ class Coordinator:
                     self.mode = "meeting"
                 else:
                     self.owner, self.mode = None, "dormant"
-                    self.focus = False
-                    self._persist_attention_policy()
                 self.presentation = None
                 self.interrupt_hold = False
                 self._release_held()
@@ -811,8 +809,6 @@ class Coordinator:
                 with self.condition:
                     self.owner = None
                     self.mode = "paused" if self._unresolved_commands() else "dormant"
-                    self.focus = False
-                    self._persist_attention_policy()
                     self.interrupt_hold = False
                     self.paused_presentations.clear()
                     self._release_held()
@@ -1132,6 +1128,7 @@ class Coordinator:
                 yield
             finally:
                 self.schema()
+                self._reload_preferences()
                 with db.tx() as c:
                     c.execute("UPDATE inbox SET status='interrupted' WHERE status IN ('processing','queued','held_inactive','held_focus','held_paused','held_interrupt')")
                     c.execute("UPDATE outbox SET status='unknown' WHERE status IN ('pending','executing')")

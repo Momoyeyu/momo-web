@@ -65,6 +65,18 @@ export interface GeneralConfig {
   showStatus: boolean;
   /** 使用内置识别的语音输入开关。 */
   voiceInput: boolean;
+  /** 用户选择，独立于临时运行/挂起状态。 */
+  voiceMuted?: boolean;
+  microphoneEnabled?: boolean;
+  chatCloseUp?: boolean;
+  petCloseUp?: boolean;
+  petDialogCollapsed?: boolean;
+  petClickThrough?: boolean;
+  nativeInteract?: boolean;
+  browserInteract?: boolean;
+  minecraftChat?: boolean;
+  minecraftMove?: boolean;
+  phonePresentation?: "auto" | "open" | "closed";
 }
 
 /** MCP 拓展登记项：外部 MCP server 的连接配置（backend 每回合按此连接并

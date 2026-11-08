@@ -101,7 +101,7 @@ def test_refresh_rotates_lease_and_expiry_pauses(core):
     with pytest.raises(CoordinationError):
         core.heartbeat("client-one", fresh["leaseId"])
     assert core.mode == "paused" and core.owner is None
-    assert core.focus is False and core.phone_paused is True
+    assert core.focus is True and core.phone_paused is True
 
 
 def test_restore_barrier_revokes_and_never_replays_pending(core):
@@ -191,3 +191,21 @@ def test_delayed_mcp_configuration_cannot_replace_newer_combined_state(monkeypat
     assert instance.mcp_revision == 2
     assert [item["configurationRevision"] for item in applied] == [2, 3]
     assert applied[-1]["plugins"] == current + social_configs
+
+
+def test_restore_adopts_imported_preferences_without_reactivating(core):
+    from app.services.computer import computer
+    lease = core.enter('owner')
+    core.control('owner', lease['leaseId'], 'focus', 'focus_on')
+    computer.configure(True, True)
+    with core.maintenance():
+        # Represents the meta table from the imported backup.
+        with db.tx() as connection:
+            connection.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('attention_policy',?)",
+                               ('{"focus": false, "phonePaused": true}',))
+            connection.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('computer_preferences',?)",
+                               ('{"proactive": false, "reactions": true, "desktopAllowed": false}',))
+    assert not core.focus and core.phone_paused
+    assert core.mode == 'paused' and core.owner is None
+    assert not computer.proactive and computer.reactions and not computer.desktop_allowed
+    assert not computer.observing and computer.frame is None

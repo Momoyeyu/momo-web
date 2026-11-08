@@ -26,9 +26,8 @@ import { lastLocalAssistant } from "../chat/transcript";
 import type { ChatStatus } from "../lib/types";
 import { navigate } from "../router";
 import { useT, resolveChatLang } from "../i18n";
-import { getStage } from "../live2d/stage";
 import { ServiceError } from "../lib/errors";
-import { getState, speakerName, subscribe } from "../lib/store";
+import { getState, updateGeneral, speakerName, subscribe } from "../lib/store";
 import { ttsConfigured } from "../lib/asr";
 import Button from "../ui/Button";
 import Icon from "../ui/Icon";
@@ -57,7 +56,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   const activities=useActivities();
   useComputerReactions(active&&!introActive&&activities.computer);
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
-  useSyncExternalStore(subscribe, getState);
+  const preferences=useSyncExternalStore(subscribe, getState).settings.general;
   const name = speakerName();
   const showStatus = getState().settings.general.showStatus;
   // 内置语音输入与设置页「通用」共用同一个开关。
@@ -66,7 +65,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   const ttsReady = ttsConfigured(getState().settings.tts);
   const [status, setStatus] = useState<ChatStatus>(getChatEngine().status);
   const [micOn, setMicOn] = useState(getChatEngine().listening);
-  const [muted, setMuted] = useState(getChatEngine().muted);
+  const muted=preferences.voiceMuted===true;
   const [streamActive, setStreamActive] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -75,10 +74,9 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   const drafts=useImageDraft();
   const [imageSending,setImageSending]=useState(false);
   const imagesEnabled=!!getState().settings.llm.vision&&!introActive;
-  const [petCollapsed,setPetCollapsed]=useState(true);
-  const [closeUp, setCloseUp] = useState(() => getStage().getCloseUp());
-  useEffect(()=>{setCloseUp(getStage().getCloseUp());},[desktopWindow.mode]);
-  const toggleFrame=()=>{const next=!getStage().getCloseUp();getStage().setCloseUp(next);setCloseUp(next);};
+  const petCollapsed=preferences.petDialogCollapsed!==false;
+  const closeUp=desktopWindow.mode==='pet'?preferences.petCloseUp===true:preferences.chatCloseUp!==false;
+  const toggleFrame=()=>updateGeneral(desktopWindow.mode==='pet'?{petCloseUp:!closeUp}:{chatCloseUp:!closeUp});
   const collapsed=desktopWindow.mode==='pet'?petCollapsed:phoneOpen;
   const [controlling,setControlling]=useState(false);
   const dialog = useRef<HTMLDivElement>(null);
@@ -179,9 +177,11 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   const toggleMic = (): void => {
     const eng = getChatEngine();
     if (eng.microphoneActive) {
+      updateGeneral({microphoneEnabled:false});
       eng.stopListening();
       setMicOn(false);
     } else {
+      updateGeneral({microphoneEnabled:true});
       setMicOn(true);
       void eng.startListening().then(() => setMicOn(eng.listening));
     }
@@ -190,7 +190,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   const toggleVoice = (): void => {
     const eng = getChatEngine();
     eng.setMuted(!eng.muted);
-    setMuted(eng.muted);
+
   };
 
   const lastAssistant = lastLocalAssistant(getChatEngine().history);
@@ -216,7 +216,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
       <div className="dialog-zone" ref={dialog}>
         <DialogBox
           collapsed={collapsed}
-          handle={<DialogHandle active={phoneOpen} onClick={()=>setPhoneClose(v=>v+1)}/>}
+          handle={<DialogHandle active={phoneOpen} onClick={()=>{updateGeneral({phonePresentation:"closed"});setPhoneClose(v=>v+1);}}/>}
           lang={resolveChatLang(getState().settings.general)}
           name={name}
           text={subtitle || <span className="muted">……</span>}
@@ -290,7 +290,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
 
       </DialogDrawer>
 
-      <DesktopPetControls closeUp={closeUp} onFrame={toggleFrame} collapsed={petCollapsed} onDialog={()=>setPetCollapsed(v=>!v)} micOn={micOn} micAllowed={micAllowed} onMic={toggleMic}/>
+      <DesktopPetControls closeUp={closeUp} onFrame={toggleFrame} collapsed={petCollapsed} onDialog={()=>updateGeneral({petDialogCollapsed:!petCollapsed})} micOn={micOn} micAllowed={micAllowed} onMic={toggleMic}/>
       {/* 固定右侧竖轨，与对话框及手机的显隐独立。 */}
       <div className="chat-toolbar">
         <div className="tb-side">

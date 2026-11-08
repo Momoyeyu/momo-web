@@ -38,3 +38,11 @@ Clicking/typing remains a window-bound, separately approved activity. The applic
 The rail sits just above the dialogue, with 28px centered buttons. Panel/list scroll containers have independent bounded height. Both participate in click-through protection. Closing the panel restores window width without stopping observation or changing input grants. Read-only capture cannot create an input version or binding; stopping input does not stop looking. Pause/Home/focus/plugin disable invalidate pending pixels. Web sharing retains the browser's mandatory source picker and uses its existing shared-frame path.
 
 Validation: three-locale browser smoke at 360×520 and 320×440 plus the expanded side panel; independent observation/input, scrolling, panel/avatar separation, framing, folding and recovery. See the current installation report for packaged smoke evidence; browser fixtures alone do not prove real screen interpretation.
+
+## Switch and level persistence (2026-11-08)
+
+- General settings now retain chat/pet framing separately, pet dialog folding, TTS mute, microphone intent, mouse pass-through, and explicit phone visibility. Automatic phone reveal or temporary hiding does not replace the user's choice. Live2D settings preview framing remains temporary.
+- Native/browser interaction and Minecraft chat/move choices are saved as the next request's defaults; they do not grant access, attach a target, or resume an operation.
+- Proactive reactions, screen-observation preference and focus persist in database metadata, including backup/restore. Returning to title, lease expiry or process restart still stops activity and discards captured pixels; it does not reset the user's switches.
+- General preferences use a synchronous local pending-field journal before the debounced API save. Only unacknowledged fields replay on restart; acknowledged fields cannot override a later restore. Failed saves retain the pending choices. API credentials are not journaled.
+- Window movement, open utility dialogs, selected application targets and pending approvals remain session state. Microphone capture only resumes in active chat after Boot; mouse pass-through only resumes in pet mode with toolbar hit-region support.

@@ -535,3 +535,15 @@ describe('screen reactions',()=>{
   expect(chatMock).toHaveBeenCalledTimes(1);expect(interruptMock).not.toHaveBeenCalled();eng.dispose();
  });
 });
+
+it('restores mute and microphone intent in a new engine without recording before resume',async()=>{
+ const settings=getSettings();
+ update({settings:{...settings,general:{...settings.general,voiceInput:true,voiceMuted:true,microphoneEnabled:true}}});
+ const start=vi.spyOn(MicStreamer.prototype,'start');
+ const {eng}=makeEngine();
+ expect(eng.muted).toBe(true);expect(start).not.toHaveBeenCalled();
+ eng.resumeMic();await tick();expect(start).toHaveBeenCalledTimes(1);
+ eng.suspendMic();expect(getSettings().general.microphoneEnabled).toBe(true);
+ eng.setMuted(false);expect(getSettings().general.voiceMuted).toBe(false);
+ eng.dispose();update({settings});
+});

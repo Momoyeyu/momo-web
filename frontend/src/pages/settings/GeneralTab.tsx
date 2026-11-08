@@ -4,7 +4,7 @@ import {useIntro} from "../../services/introClient";
 import DataTransfer from "./DataTransfer";
 // 「通用」tab：界面语言与对话语言、语音输入/输出、对话框透明度与速度、对话框预览。
 // 原先这些都挤在 Settings.tsx 里，状态与补丁函数一并搬过来。
-import { useState, useSyncExternalStore } from "react";
+import { useSyncExternalStore } from "react";
 
 import { getChatEngine } from "../../chat/engineInstance";
 import { useT, tFor, LANGS } from "../../i18n";
@@ -23,13 +23,13 @@ export default function GeneralTab() {
   const guided=!!intro.data && intro.data.phase!=="completed";
   const settings = useSyncExternalStore(subscribe, getState).settings;
 
-  const [voiceMuted, setVoiceMuted] = useState(getChatEngine().muted);
+  const voiceMuted=settings.general.voiceMuted===true;
   const ttsReady = ttsReadyOf(settings.tts);
 
   const toggleVoice = (on: boolean): void => {
     const eng = getChatEngine();
     eng.setMuted(!on);
-    setVoiceMuted(eng.muted);
+
   };
 
   const toggleVoiceInput = (on: boolean): void => {

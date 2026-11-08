@@ -38,3 +38,32 @@ it('preserves restricted MCP policy through boot and the next full state PUT',as
   expect(store.getSettings().extensions[0]).toMatchObject({declaredPermissions:extension.declaredPermissions,grantedPermissions:extension.grantedPermissions});
   expect(putState).toHaveBeenLastCalledWith(expect.objectContaining({settings:expect.objectContaining({extensions:[extension]})}));
 });
+
+it('replays only unacknowledged switches after quitting before debounce, then releases the journal',async()=>{
+ const values=new Map<string,string>();
+ vi.stubGlobal('localStorage',{getItem:(k:string)=>values.get(k)??null,setItem:(k:string,v:string)=>values.set(k,v),removeItem:(k:string)=>values.delete(k)});
+ const first=await browserStore();const remote=JSON.parse(JSON.stringify(first.getState()));
+ first.updateGeneral({petCloseUp:true,petDialogCollapsed:false,voiceMuted:true,textSpeed:37});
+ // Simulate an immediate process exit: no pending timer gets to write the API.
+ vi.clearAllTimers();vi.resetModules();
+ const second=await browserStore();
+ vi.mocked(fetchState).mockResolvedValue(remote);vi.mocked(putState).mockResolvedValue(true);
+ await second.bootPersist();
+ expect(second.getSettings().general).toMatchObject({petCloseUp:true,petDialogCollapsed:false,voiceMuted:true,textSpeed:37});
+ await vi.advanceTimersByTimeAsync(300);
+ expect(JSON.parse(values.get('momo-general.pending.v1')!)).toEqual({});
+ // A later import/remote setting wins once the previous choice was acknowledged.
+ remote.settings.general.petCloseUp=false;
+ vi.resetModules();const third=await browserStore();await third.bootPersist();
+ expect(third.getSettings().general.petCloseUp).toBe(false);
+});
+it('does not erase a newer choice when an older save finishes',async()=>{
+ const values=new Map<string,string>();
+ vi.stubGlobal('localStorage',{getItem:(k:string)=>values.get(k)??null,setItem:(k:string,v:string)=>values.set(k,v),removeItem:(k:string)=>values.delete(k)});
+ let finish!:(ok:boolean)=>void;
+ vi.mocked(putState).mockReturnValueOnce(new Promise(resolve=>finish=resolve));
+ const store=await browserStore();store.updateGeneral({petCloseUp:true});
+ await vi.advanceTimersByTimeAsync(300);store.updateGeneral({petCloseUp:false});
+ finish(true);await Promise.resolve();await Promise.resolve();
+ expect(JSON.parse(values.get('momo-general.pending.v1')!)).toEqual({petCloseUp:false});
+});

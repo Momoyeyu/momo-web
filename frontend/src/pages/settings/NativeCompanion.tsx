@@ -1,5 +1,6 @@
 import {configureComputer,computerSnapshot,subscribeComputer,readComputer} from '../../services/computerClient';
 import {useCallback,useEffect,useRef,useState,useSyncExternalStore} from 'react';
+import {getSettings,subscribe,updateGeneral} from '../../lib/store';
 import {useT} from '../../i18n';
 import {apiJson,jsonInit} from '../../services/http';
 import {useActivities} from '../../services/extensionActivities';
@@ -19,7 +20,10 @@ type Start={approvalRequired?:boolean;requestId?:string;status?:string;active?:b
 export default function NativeCompanion({plugin,mode='settings'}:{plugin:'computer'|'browser';mode?:'settings'|'activity'|'pet'}){
  const computer=useSyncExternalStore(subscribeComputer,computerSnapshot);
  const t=useT(),enabled=useActivities()[plugin],meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
- const [open,setOpen]=useState(false),[targets,setTargets]=useState<Target[]>([]),[selected,setSelected]=useState(''),[interact,setInteract]=useState(false),[busy,setBusy]=useState(false),[active,setActive]=useState(false),[error,setError]=useState(false);
+ const [open,setOpen]=useState(false),[targets,setTargets]=useState<Target[]>([]),[selected,setSelected]=useState(''),[busy,setBusy]=useState(false),[active,setActive]=useState(false),[error,setError]=useState(false);
+ const preferences=useSyncExternalStore(subscribe,getSettings).general;
+ const interact=(plugin==='browser'?preferences.browserInteract:preferences.nativeInteract)===true;
+ const setInteract=(value:boolean)=>updateGeneral(plugin==='browser'?{browserInteract:value}:{nativeInteract:value});
  const [activeTarget,setActiveTarget]=useState<Target|null>(null);
  const [diagnostics,setDiagnostics]=useState<NativeWindowDiagnostics|null>(null);
  const [pending,setPending]=useState<string|null>(null);

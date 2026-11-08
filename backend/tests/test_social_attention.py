@@ -181,7 +181,7 @@ def test_focus_and_phone_pause_are_independent_idempotent_policy():
         core.control("other-client", "lease", "five", "use_phone")
 
 
-def test_focus_clears_on_title_while_phone_pause_survives_new_boot(monkeypatch):
+def test_focus_and_phone_pause_survive_title_boot_and_process_restart(monkeypatch):
     monkeypatch.setenv("MOMO_TEST_VIRTUAL", "1")
     core = Coordinator()
     core.start()
@@ -191,12 +191,18 @@ def test_focus_clears_on_title_while_phone_pause_survives_new_boot(monkeypatch):
         core.control("client-one", first["leaseId"], "focus", "focus_on")
         core.leave("client-one", first["leaseId"])
         assert core.snapshot()["activation"] == "dormant"
-        assert core.snapshot()["focus"] is False
+        assert core.snapshot()["focus"] is True
         assert core.snapshot()["phonePaused"] is True
-        assert db.meta_get("attention_policy") == '{"focus": false, "phonePaused": true}'
+        assert db.meta_get("attention_policy") == '{"focus": true, "phonePaused": true}'
         second = core.enter("client-two")
-        assert second["focus"] is False
+        assert second["focus"] is True
         assert second["phonePaused"] is True
+        core.close()
+        core.start()
+        assert core.snapshot()["activation"] == "dormant"
+        assert core.snapshot()["focus"] is True
+        assert core.owner is None
+        assert core.enter("client-three")["focus"] is True
     finally:
         core.close()
 

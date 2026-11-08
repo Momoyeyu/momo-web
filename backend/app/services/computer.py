@@ -2,11 +2,12 @@
 import base64
 import hashlib
 import io
+import json
 from PIL import Image, ImageStat
 import threading
 import time
 
-from ..core import state
+from ..core import state, db
 from . import vision
 from .coordinator import runtime
 
@@ -34,6 +35,31 @@ class Computer:
         self.desktop_allowed = True
         self.desktop_error = ''
         self.capture_lock = threading.Lock()
+
+    def reload_preferences(self):
+        """Only preferences cross boot/restore; never retain pixels or a running observation."""
+        with self.lock:
+            try:
+                data = json.loads(db.meta_get('computer_preferences', '{}'))
+            except (ValueError, TypeError):
+                data = {}
+            if not isinstance(data, dict): data = {}
+            self.proactive = data.get('proactive') is True
+            self.reactions = data.get('reactions') is True
+            self.desktop_allowed = data.get('desktopAllowed') is not False
+            self.desktop_error = ''
+            self.stop('preferences_reloaded')
+
+    def _persist_preferences(self):
+        with db.tx() as connection:
+            connection.execute("INSERT OR REPLACE INTO meta(key,value) VALUES('computer_preferences',?)",
+                (json.dumps(dict(proactive=self.proactive, reactions=self.reactions, desktopAllowed=self.desktop_allowed)),))
+
+    def configure(self, proactive, reactions):
+        with self.lock:
+            self.proactive, self.reactions = proactive, reactions
+            self._persist_preferences()
+            return self.snapshot()
 
     def stop(self, reason='stopped'):
         with self.lock:
@@ -83,6 +109,7 @@ class Computer:
             self.epoch = runtime.epoch
             self.fingerprint = vision.fingerprint(cfg)
             self.source, self.proactive, self.reactions = source, proactive, reactions
+            self._persist_preferences()
             self.shared_source = shared
             self.frames, self.last, self.digest = 0, 0, ''
             self.signature = self.reacted_signature = None
@@ -124,6 +151,7 @@ class Computer:
     def set_desktop_allowed(self, enabled):
         with self.lock:
             self.desktop_allowed = enabled
+            self._persist_preferences()
             self.desktop_error = ''
             if not enabled: self.stop('paused')
             return self.snapshot()

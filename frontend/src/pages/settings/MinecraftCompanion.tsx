@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useRef,useState,useSyncExternalStore} from 'react';
+import {getSettings,subscribe,updateGeneral} from '../../lib/store';
 import {useT} from '../../i18n';
 import {apiJson,jsonInit} from '../../services/http';
 import {useActivities} from '../../services/extensionActivities';
@@ -15,7 +16,11 @@ type Session={id:string;pid:number;world:string;account:string;playerName:string
 export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'activity'}){
  const t=useT(),enabled=useActivities().minecraft,meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(false),[active,setActive]=useState(false);
- const [sessions,setSessions]=useState<Session[]>([]),[selected,setSelected]=useState(''),[path,setPath]=useState(''),[chat,setChat]=useState(false),[move,setMove]=useState(false);
+ const [sessions,setSessions]=useState<Session[]>([]),[selected,setSelected]=useState(''),[path,setPath]=useState('');
+ const preferences=useSyncExternalStore(subscribe,getSettings).general;
+ const chat=preferences.minecraftChat===true,move=preferences.minecraftMove===true;
+ const setChat=(value:boolean)=>updateGeneral({minecraftChat:value});
+ const setMove=(value:boolean)=>updateGeneral({minecraftMove:value});
  const mounted=useRef(false),operation=useRef(false),request=useRef<AbortController|null>(null);
  const read=useCallback(async()=>{
   request.current?.abort();

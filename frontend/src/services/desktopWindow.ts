@@ -1,5 +1,6 @@
 import {useEffect,useSyncExternalStore} from 'react';
 import './runtime';
+import {getSettings,updateGeneral} from '../lib/store';
 export type DesktopWindowState={mode:'chat'|'pet';clickThrough:boolean;panel?:{width:number;petWidth:number}};
 export interface DesktopWindowBridge {
  setPetPanel?(open:boolean):Promise<DesktopWindowState>;
@@ -13,6 +14,7 @@ export interface DesktopWindowBridge {
 const normal:DesktopWindowState={mode:'chat',clickThrough:false};
 let state=normal;
 let revision=0;
+let modeRequest=0;
 const listeners=new Set<()=>void>();
 const publish=(value:DesktopWindowState)=>{revision++;state=value;listeners.forEach(fn=>fn());};
 const subscribe=(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};};
@@ -51,11 +53,16 @@ export function useDesktopWindowBridge(){
 }
 export async function setDesktopMode(mode:'chat'|'pet'){
  const bridge=window.momoDesktop;if(!bridge?.setWindowMode)throw new Error('Desktop window unavailable');
- const own=revision;const result=await bridge.setWindowMode(mode);if(own===revision)publish(result);
+ const request=++modeRequest;
+ const own=revision;const result=await bridge.setWindowMode(mode);if(request!==modeRequest)return;if(own===revision)publish(result);
+ if(mode==='pet'&&getSettings().general.petClickThrough===true&&bridge.setPetHitRegions&&bridge.setPetClickThrough){
+  const own=revision;const restored=await bridge.setPetClickThrough(true);if(request===modeRequest&&own===revision)publish(restored);
+ }
 }
 export async function setDesktopClickThrough(value:boolean){
  const bridge=window.momoDesktop;if(!bridge?.setPetClickThrough || (value&&!bridge.setPetHitRegions))throw new Error('Desktop window unavailable');
  const own=revision;const result=await bridge.setPetClickThrough(value);if(own===revision)publish(result);
+ updateGeneral({petClickThrough:value});
 }
 
 export async function setDesktopPanel(open:boolean){

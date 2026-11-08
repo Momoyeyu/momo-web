@@ -115,3 +115,31 @@ def test_browser_share_uses_fresh_shared_pixels_without_native_capture():
         c.last=0
         with pytest.raises(ComputerError,match='observationExpired'):c.desktop_frame()
     c.stop()
+
+
+def test_preferences_survive_restart_without_observation_or_pixels():
+    c = Computer()
+    c.configure(True, True)
+    c.set_desktop_allowed(False)
+    c.frame = b'private pixels'
+    c.observing = True
+    fresh = Computer()
+    fresh.reload_preferences()
+    snapshot = fresh.snapshot(check=False)
+    assert snapshot['proactive'] and snapshot['reactions']
+    assert snapshot['desktopAllowed'] is False
+    assert not snapshot['observing'] and not snapshot['observationAvailable']
+    assert fresh.frame is None
+
+
+def test_restore_reloads_preferences_and_discards_current_observation():
+    from app.core import db
+    c = Computer()
+    c.configure(True, True)
+    c.frame = b'private pixels'
+    c.observing = True
+    with db.tx() as connection:
+        connection.execute("DELETE FROM meta WHERE key='computer_preferences'")
+    c.reload_preferences()
+    assert not c.proactive and not c.reactions and c.desktop_allowed
+    assert c.frame is None and not c.observing

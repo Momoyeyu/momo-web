@@ -35,9 +35,7 @@ def stop():
     return result
 @router.patch('/settings')
 def settings(body: Settings):
-    with computer.lock:
-        computer.proactive,computer.reactions = body.proactive,body.reactions
-        return computer.snapshot()
+    return computer.configure(body.proactive,body.reactions)
 @router.post('/frames')
 async def frames(generation: int = Form(...), file: UploadFile = File(...)):
     try:
