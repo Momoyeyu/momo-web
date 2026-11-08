@@ -8,6 +8,7 @@ let pendingStart:Promise<ComputerStatus>|null=null,stopping:Promise<void>|null=n
 const listeners=new Set<()=>void>();
 function publish(patch:Partial<ComputerView>){view={...view,...patch};listeners.forEach(fn=>fn());}
 export const computerSnapshot=()=>view;
+export const hasSharedScreen=()=>stream!==null;
 export const subscribeComputer=(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};};
 export async function readComputer(){publish({status:await apiJson<ComputerStatus>('/api/computer/status')});}
 export function stopComputer():Promise<void>{

@@ -2,9 +2,9 @@ import {createPortal} from 'react-dom';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {useT} from '../i18n';
 import {useActivities,type ActivityId} from '../services/extensionActivities';
-import {captureDesktop,configureComputer,computerSnapshot,readComputer,setDesktopObservation,subscribeComputer} from '../services/computerClient';
+import {captureDesktop,computerSnapshot,setDesktopObservation,subscribeComputer} from '../services/computerClient';
 import {setDesktopPanel,useDesktopWindow} from '../services/desktopWindow';
-import {meetingSnapshot,subscribeMeeting} from '../services/meetingClient';
+import ProactiveResponseToggle from './ProactiveResponseToggle';
 import NativeCompanion from '../pages/settings/NativeCompanion';
 import MinecraftCompanion from '../pages/settings/MinecraftCompanion';
 import Button from '../ui/Button';
@@ -15,31 +15,12 @@ import '../styles/plugin-library.css';
 export default function DesktopObservation(){
  const t=useT(),enabled=useActivities(),windowState=useDesktopWindow();
  const view=useSyncExternalStore(subscribeComputer,computerSnapshot);
- const meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
  const [open,setOpen]=useState(false),[selected,setSelected]=useState<ActivityId>('computer'),[working,setWorking]=useState(false);
  const panel=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
- const allowed=view.status?.desktopAllowed!==false,reacting=!!(view.status?.proactive&&view.status.reactions);
+ const allowed=view.status?.desktopAllowed!==false;
  const problem=view.status?.desktopError;
  const observationState=!view.status?'loading':!allowed?'off':problem?'error':'on';
  const observationTip=t(observationState==='on'?'desktop.observing':observationState==='off'?'desktop.observationPaused':observationState==='error'?'desktop.observationUnavailable':'desktop.observationLoading');
- useEffect(()=>{
-  let disposed=false,timer:ReturnType<typeof setTimeout>;let lastReaction=0;
-  const poll=async()=>{
-   try{
-    await readComputer();const current=computerSnapshot().status;
-    // On-demand screen_observe works without this UI. Only optional proactive viewing polls pixels.
-    if(!disposed&&current?.desktopAllowed!==false&&current?.proactive&&current.reactions&&!current.desktopError&&!meetingSnapshot().attention.focus){
-     await captureDesktop();
-     const fresh=computerSnapshot().status;
-     if(!disposed&&fresh?.observing&&!fresh.desktopError&&Date.now()-lastReaction>=30000){
-      lastReaction=Date.now();const {getChatEngine}=await import('../chat/engineInstance');
-      if(!disposed)getChatEngine().sendScreenReaction(fresh.generation);
-     }
-    }
-   }catch{/* Status failures do not enable capture or input. */}
-   if(!disposed)timer=setTimeout(()=>void poll(),2500);
-  };void poll();return()=>{disposed=true;clearTimeout(timer);};
- },[]);
  useEffect(()=>()=>{void setDesktopPanel(false).catch(()=>{});},[]);
  const close=()=>{setOpen(false);void setDesktopPanel(false).catch(()=>{});trigger.current?.focus();};
  useEffect(()=>{if(open)panel.current?.focus();},[open,windowState.panel]);
@@ -48,7 +29,7 @@ export default function DesktopObservation(){
  const title=selected==='computer'?t('desktop.operate'):t(selected+'.title');
  return <>
   <Button className="tb tip tb-observation" data-observation-state={observationState} aria-label={t('desktop.observe')} aria-pressed={allowed} aria-description={observationTip} data-tip={observationTip} data-tip-detail={t(problem==='screen-permission'?'desktop.screenPermissionHint':observationState==='off'?'desktop.resumeObservationHint':observationState==='error'?'desktop.retryObservationHint':'desktop.pauseObservationHint')} disabled={working||view.busy||!view.status} onClick={()=>void toggle()}><Icon name={observationState==='off'?'desktop-off':observationState==='error'?'desktop-alert':'desktop'}/></Button>
-  <Button className={`tb tip${reacting?' is-active':''}`} aria-label={t('desktop.react')} aria-pressed={reacting} data-tip={t('desktop.react')} data-tip-detail={t('desktop.reactHint')} disabled={working||meeting.attention.focus} onClick={()=>{setWorking(true);void configureComputer(!reacting,!reacting).catch(()=>{}).finally(()=>setWorking(false));}}><Icon name="voice"/></Button>
+  <ProactiveResponseToggle/>
   <button ref={trigger} type="button" className={`tb tip${open?' is-active':''}`} aria-label={t('desktop.operate')} aria-expanded={open} data-tip={t('desktop.operate')} onClick={()=>void show()}><Icon name="browser"/></button>
   {open&&createPortal(<div ref={panel} tabIndex={-1} role="dialog" aria-label={t('desktop.operate')} className={`pet-utility${windowState.panel?.width&&windowState.panel.width>=220?' is-beside':''}`} data-pet-interactive onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();close();}}}>
    <header className="pet-utility-header"><span>{title}</span><button type="button" className="pet-icon" aria-label={t('browser.dismiss')} onClick={close}><Icon name="close"/></button></header>
