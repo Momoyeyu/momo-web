@@ -80,3 +80,12 @@ def test_saved_binding_is_private_and_not_an_account_setting(tmp_path, monkeypat
         binding.unlink(); binding.symlink_to(path)
     else: binding.write_text(json.dumps({'configPath': str(path), 'endpoint': 'untrusted'}))
     with pytest.raises(plugin_host.HostError): config_reader()()
+
+@pytest.mark.parametrize('platform', ['win32', 'linux'])
+def test_nonmac_installed_runtime_never_reads_unix_qq_binding(monkeypatch, platform):
+    monkeypatch.setattr(plugin_host.sys, 'platform', platform)
+    monkeypatch.setenv('MOMO_DESKTOP_TOKEN', 'isolated-test')
+    monkeypatch.setenv('MOMO_QQ_RUNTIME_CONFIG', '/not-a-supported-runtime.json')
+    monkeypatch.delattr(plugin_host.os, 'O_NOFOLLOW', raising=False)
+    monkeypatch.delattr(plugin_host.os, 'getuid', raising=False)
+    assert config_reader()() is None

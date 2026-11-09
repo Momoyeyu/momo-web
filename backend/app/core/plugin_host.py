@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import secrets
 import stat
+import sys
 import subprocess
 import threading
 import uuid
@@ -19,6 +20,8 @@ class HostError(RuntimeError):
 
 def managed_qq_runtime_config():
     """Read a fixed private startup binding, never an account request or model tool."""
+    if sys.platform == "win32" or (sys.platform != "darwin" and (getattr(sys, "frozen", False) or os.environ.get("MOMO_DESKTOP_TOKEN"))):
+        return None  # Native QQ runtime is currently macOS-only.
     configured = os.environ.get("MOMO_QQ_RUNTIME_CONFIG")
     if not configured:
         # Installer/developer-owned local binding, not a browser/account setting.
@@ -113,7 +116,7 @@ class PluginHost:
         resources = Path(
             os.environ.get("MOMO_RESOURCES_DIR", root / "resources/models")
         ).parent
-        if getattr(__import__("sys"), "frozen", False) and not os.environ.get("MOMO_QQ_RUNTIME_CONFIG"):
+        if sys.platform == "darwin" and getattr(sys, "frozen", False) and not os.environ.get("MOMO_QQ_RUNTIME_CONFIG"):
             from .qq_install import prepare_installed_qq
             from .state import DATA_DIR
             prepare_installed_qq(resources, DATA_DIR)

@@ -11,7 +11,11 @@ _lock = threading.RLock()
 
 
 def supported(key):
-    return not (os.environ.get("MOMO_DESKTOP_TOKEN") and sys.platform != "darwin" and key in ("computer", "browser"))
+    if not os.environ.get("MOMO_DESKTOP_TOKEN"):
+        return True
+    if key == "minecraft" and sys.platform == "win32":
+        return False
+    return not (sys.platform != "darwin" and key in ("computer", "browser"))
 
 
 def snapshot():

@@ -8,7 +8,10 @@ def test_desktop_platform_blocks_unimplemented_native_plugins(monkeypatch, platf
     monkeypatch.setattr('sys.platform',platform)
     assert not activities.supported('computer')
     assert not activities.supported('browser')
-    assert activities.supported('minecraft')
+    assert activities.supported('minecraft') is (platform != 'win32')
+    if platform == 'win32':
+        with pytest.raises(ValueError,match='not supported'):
+            activities.set_enabled('minecraft',True)
     with pytest.raises(ValueError,match='not supported'):
         activities.set_enabled('computer',True)
     social=SocialAccounts()
