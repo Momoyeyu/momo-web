@@ -1,7 +1,7 @@
 import {runtimeFetch} from './runtime';
 
 const STATES=['idle','preparing','connecting','qr_pending','awaiting_confirmation','verifying','connected','expired','cancelled','disconnected','identity_mismatch','stopping','stopped','error'] as const;
-const ERROR_CODES=['LOCAL_AUTH_REQUIRED','OWNER_ACTION_REQUIRED','RESOURCE_UNAVAILABLE','RESOURCE_INVALID','INPUT','ATTEMPT_CANCELLED','RUNTIME_FAILED','RUNTIME_UNAVAILABLE','RUNTIME_TIMEOUT','RUNTIME_NOT_QUIESCENT','RUNTIME_STOPPED','IPC_LIMIT','IPC_PROTOCOL','ACCOUNT_MISMATCH','FORGET_UNAVAILABLE','FORGET_FAILED'] as const;
+const ERROR_CODES=['PLATFORM_UNSUPPORTED','LOCAL_AUTH_REQUIRED','OWNER_ACTION_REQUIRED','RESOURCE_UNAVAILABLE','RESOURCE_INVALID','INPUT','ATTEMPT_CANCELLED','RUNTIME_FAILED','RUNTIME_UNAVAILABLE','RUNTIME_TIMEOUT','RUNTIME_NOT_QUIESCENT','RUNTIME_STOPPED','IPC_LIMIT','IPC_PROTOCOL','ACCOUNT_MISMATCH','FORGET_UNAVAILABLE','FORGET_FAILED'] as const;
 const ACTIONS=['begin','refresh','cancel','stop','forget'] as const;
 export type QQRuntimeAction=(typeof ACTIONS)[number];
 export type QQLoginErrorCode=(typeof ERROR_CODES)[number];

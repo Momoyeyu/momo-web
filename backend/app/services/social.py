@@ -10,6 +10,7 @@ import copy
 import hashlib
 import json
 import os
+import sys
 from pathlib import Path
 import re
 import secrets
@@ -27,6 +28,7 @@ class SocialError(ValueError):
 
 QQ_RUNTIME_ERRORS = {
     "OWNER_ACTION_REQUIRED": "QQ login requires an explicit local owner action",
+    "PLATFORM_UNSUPPORTED": "QQ is not supported on this platform",
     "RESOURCE_UNAVAILABLE": "Managed QQ resources are not available",
     "RESOURCE_INVALID": "Managed QQ resources are not qualified",
     "INPUT": "Invalid QQ login action",
@@ -234,6 +236,8 @@ class SocialAccounts:
         The host owns engine/session lifecycle. Login never grants messaging;
         explicit logout withdraws business without changing grants or identity.
         """
+        if os.environ.get("MOMO_DESKTOP_TOKEN") and sys.platform != "darwin":
+            raise QQRuntimeError("PLATFORM_UNSUPPORTED")
         if action != "forget":
             return self._request_qq_runtime(action, bind_identity=True)
         with self.lock:
@@ -394,6 +398,8 @@ class SocialAccounts:
         return self.get(provider)
 
     def host_configs(self):
+        if os.environ.get("MOMO_DESKTOP_TOKEN") and sys.platform != "darwin":
+            return []
         with self.lock:
             result = []
             for provider, row in self._read().items():
@@ -532,6 +538,8 @@ class SocialAccounts:
         self._refresh()
 
     def connect(self, provider, *, transport=None):
+        if os.environ.get("MOMO_DESKTOP_TOKEN") and sys.platform != "darwin":
+            raise SocialError("QQ is not supported on this platform")
         from .coordinator import runtime
         with self.lock:
             if self._qq_logging_out:
