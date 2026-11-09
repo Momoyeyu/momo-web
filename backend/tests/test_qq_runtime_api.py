@@ -53,6 +53,8 @@ def private_host(monkeypatch):
 
 
 def test_qr_is_authenticated_noncacheable_and_never_in_general_account_state(private_host, monkeypatch):
+    # Exercise QQ authentication on its supported native platform, independent of CI host.
+    monkeypatch.setattr("app.services.social.sys.platform", "darwin")
     monkeypatch.setenv("MOMO_DESKTOP_TOKEN", "local-owner-capability")
     client = TestClient(app)
     calls, _ = private_host
@@ -313,6 +315,8 @@ def test_malformed_host_status_is_a_safe_noncacheable_failure(invalid, private_h
 
 @pytest.mark.parametrize("action", ["begin", "refresh", "cancel", "stop", "forget"])
 def test_unauthenticated_login_control_never_reaches_native_host(action, private_host, monkeypatch):
+    # Exercise QQ authentication on its supported native platform, independent of CI host.
+    monkeypatch.setattr("app.services.social.sys.platform", "darwin")
     monkeypatch.setenv("MOMO_DESKTOP_TOKEN", "local-owner-capability")
     client = TestClient(app)
     response = client.post(f"/api/social/accounts/qq/runtime/{action}", json={})
