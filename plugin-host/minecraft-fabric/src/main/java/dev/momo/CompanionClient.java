@@ -11,13 +11,15 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.minecraft.client.MinecraftClient;
 
-/** Dedicated-client bridge. All Minecraft access runs on the game thread. */
+/** Existing-client bridge. All Minecraft access runs on the game thread. */
 public final class CompanionClient implements ClientModInitializer {
  private long epoch = -1, deadline;
  private String target, boundWorld, boundAccount;
  private java.util.List<BoundedPath.Cell> path = java.util.List.of();
  private long nextPlan;
  private boolean playing;
+ private Boolean pauseBeforeControl;
+ private long backgroundUntil;
  private java.nio.file.Path rendezvous;
  private HttpServer server;
  private ExecutorService executor;
@@ -62,8 +64,19 @@ public final class CompanionClient implements ClientModInitializer {
    java.nio.file.Files.createFile(rendezvous,java.nio.file.attribute.PosixFilePermissions.asFileAttribute(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
    java.nio.file.Files.writeString(rendezvous,gson.toJson(discovery));
    ClientTickEvents.END_CLIENT_TICK.register(this::tick);
-   ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { release(client); server.stop(0); executor.shutdownNow(); try { java.nio.file.Files.deleteIfExists(rendezvous); } catch (Exception ignored) {} });
+   ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { release(client); restorePause(client); server.stop(0); executor.shutdownNow(); try { java.nio.file.Files.deleteIfExists(rendezvous); } catch (Exception ignored) {} });
   } catch (Exception error) { if (server != null) server.stop(0); if (executor != null) executor.shutdownNow(); }
+ }
+ private void restorePause(MinecraftClient client) {
+  if(pauseBeforeControl!=null) client.options.pauseOnLostFocus=pauseBeforeControl;
+  pauseBeforeControl=null; backgroundUntil=0;
+ }
+ private void backgroundControl(MinecraftClient client) {
+  if(pauseBeforeControl==null) pauseBeforeControl=client.options.pauseOnLostFocus;
+  client.options.pauseOnLostFocus=false;
+  // Separate from held-key leases: allow the model time to inspect and plan,
+  // but restore the player's preference after a disconnected controller.
+  backgroundUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(60);
  }
  private void release(MinecraftClient client) {
   playing = false;
@@ -85,13 +98,14 @@ public final class CompanionClient implements ClientModInitializer {
    return ready; }
   long version = command.get("epoch").getAsLong();
   if (version < epoch) throw new IllegalArgumentException("Revoked");
-  if (version > epoch) { release(client); epoch = version; }
+  if (version > epoch) { release(client); restorePause(client); epoch = version; }
   JsonObject result = new JsonObject(); result.addProperty("epoch", epoch);
-  if ("stop".equals(type)) { release(client); result.addProperty("stopped", true); result.addProperty("heldControls", 0); return result; }
+  if ("stop".equals(type)) { release(client); restorePause(client); result.addProperty("stopped", true); result.addProperty("heldControls", 0); return result; }
   if (client.player == null || client.world == null) throw new IllegalStateException("Join an authorized world first");
   String world = (client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local") + "/" + client.world.getRegistryKey().getValue();
   String account = client.player.getUuidAsString();
-  if (!world.equals(command.get("world").getAsString()) || !account.equals(command.get("account").getAsString())) { release(client); throw new IllegalArgumentException("Identity mismatch"); }
+  if (!world.equals(command.get("world").getAsString()) || !account.equals(command.get("account").getAsString())) { release(client); restorePause(client); throw new IllegalArgumentException("Identity mismatch"); }
+  if(pauseBeforeControl!=null) backgroundControl(client);
   result.addProperty("world", world); result.addProperty("account", account);
   switch (type) {
    case "observe" -> {
@@ -109,7 +123,11 @@ public final class CompanionClient implements ClientModInitializer {
     result.addProperty("observedAt", System.currentTimeMillis());
     result.addProperty("x",client.player.getX()); result.addProperty("y",client.player.getY()); result.addProperty("z",client.player.getZ());
     result.addProperty("yaw",client.player.getYaw()); result.addProperty("pitch",client.player.getPitch());
-    result.addProperty("screen",client.currentScreen==null?"world":client.currentScreen.getClass().getSimpleName());
+    result.addProperty("screen",client.currentScreen==null?"world":
+     client.currentScreen instanceof net.minecraft.client.gui.screen.GameMenuScreen?"pause":
+     client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.InventoryScreen?"inventory":
+     client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>?"container":
+     client.currentScreen instanceof net.minecraft.client.gui.screen.DeathScreen?"death":"menu");
     JsonObject cursor=new JsonObject();
     var stack=client.player.currentScreenHandler.getCursorStack();
     cursor.addProperty("item",net.minecraft.registry.Registries.ITEM.getId(stack.getItem()).toString());
@@ -138,6 +156,7 @@ public final class CompanionClient implements ClientModInitializer {
    case "follow" -> {
     String player = command.get("player").getAsString(); int duration = command.get("durationMs").getAsInt();
     if (!player.matches("[A-Za-z0-9_]{1,16}") || duration < 1 || duration > 1000) throw new IllegalArgumentException("Invalid follow");
+    backgroundControl(client);
     target = player; boundWorld = world; boundAccount = account; deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(duration);
    }
    default -> throw new IllegalArgumentException("Unsupported command");
@@ -148,6 +167,7 @@ public final class CompanionClient implements ClientModInitializer {
   String key=cmd.get("control").getAsString();
   int duration=cmd.get("durationMs").getAsInt();
   if(duration<1 || duration>10000 || c.interactionManager==null) throw new IllegalArgumentException("Invalid input");
+  backgroundControl(c);
   release(c);
   var p=c.player;
   if(key.equals("respawn") && !p.isAlive()) {p.requestRespawn();return;}
@@ -216,6 +236,7 @@ public final class CompanionClient implements ClientModInitializer {
   playing=true; boundWorld=world; boundAccount=account;deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(duration);
  }
  private void tick(MinecraftClient client) {
+  if(pauseBeforeControl!=null && (System.nanoTime()>=backgroundUntil || client.player==null || client.world==null)) {release(client);restorePause(client);}
   if(playing){
    if(System.nanoTime()>=deadline||client.player==null||!client.player.isAlive()||client.world==null||client.currentScreen!=null||
       !client.player.getUuidAsString().equals(boundAccount)||!((client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local")+"/"+client.world.getRegistryKey().getValue()).equals(boundWorld)) release(client);
