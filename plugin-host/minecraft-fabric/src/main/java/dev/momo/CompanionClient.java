@@ -17,7 +17,10 @@ public final class CompanionClient implements ClientModInitializer {
  private String target, boundWorld, boundAccount;
  private java.util.List<BoundedPath.Cell> path = java.util.List.of();
  private long nextPlan;
- private boolean playing;
+ private static CompanionClient instance;
+ private boolean playing,mining,using,attacking,drivingInput;
+ private int useTicks;
+ public static boolean suppressVanillaBreaking(){return instance!=null && instance.playing && instance.mining && !instance.drivingInput;}
  private Boolean pauseBeforeControl;
  private long backgroundUntil;
  private java.nio.file.Path rendezvous;
@@ -25,6 +28,7 @@ public final class CompanionClient implements ClientModInitializer {
  private ExecutorService executor;
  private final Gson gson = new Gson();
  public void onInitializeClient() {
+  instance=this;
   String token = System.getProperty("momo.bridge.token", "");
   if (token.length() < 32) token = java.util.UUID.randomUUID().toString()+java.util.UUID.randomUUID();
   final String sessionToken = token;
@@ -79,7 +83,9 @@ public final class CompanionClient implements ClientModInitializer {
   backgroundUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(60);
  }
  private void release(MinecraftClient client) {
-  playing = false;
+  if(mining && client.interactionManager!=null)client.interactionManager.cancelBlockBreaking();
+  if(using && client.interactionManager!=null && client.player!=null && client.player.isUsingItem())client.interactionManager.stopUsingItem(client.player);
+  playing = mining = using = attacking = false;
   path = java.util.List.of(); nextPlan = 0;
   target = null; boundWorld = null; boundAccount = null; deadline = 0;
   client.options.forwardKey.setPressed(false); client.options.backKey.setPressed(false);
@@ -244,7 +250,7 @@ public final class CompanionClient implements ClientModInitializer {
    case "jump" -> o.jumpKey;case "sneak" -> o.sneakKey;case "attack","mine" -> o.attackKey;
    case "use","eat" -> o.useKey;case "swapHands" -> o.swapHandsKey;default -> throw new IllegalArgumentException("Unknown control");
   };
-  if(key.equals("attack")||key.equals("mine")||key.equals("use")||key.equals("eat")||key.equals("swapHands"))
+  if(key.equals("swapHands"))
    net.minecraft.client.option.KeyBinding.onKeyPressed(net.minecraft.client.util.InputUtil.fromTranslationKey(binding.getBoundKeyTranslationKey()));
   if(key.equals("swapHands"))return;
   binding.setPressed(true); if(key.equals("sprint"))o.sprintKey.setPressed(true);
@@ -259,13 +265,23 @@ public final class CompanionClient implements ClientModInitializer {
     case "jump" -> o.jumpKey.setPressed(true);
    }
   }
+  mining=key.equals("mine")||key.equals("attack");attacking=key.equals("attack");using=key.equals("use")||key.equals("eat");useTicks=0;
   playing=true; boundWorld=world; boundAccount=account;deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(duration);
  }
  private void tick(MinecraftClient client) {
   if(pauseBeforeControl!=null && (System.nanoTime()>=backgroundUntil || client.player==null || client.world==null)) {release(client);restorePause(client);}
   if(playing){
    if(System.nanoTime()>=deadline||client.player==null||!client.player.isAlive()||client.world==null||client.currentScreen!=null||
-      !client.player.getUuidAsString().equals(boundAccount)||!((client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local")+"/"+client.world.getRegistryKey().getValue()).equals(boundWorld)) release(client);
+      !client.player.getUuidAsString().equals(boundAccount)||!((client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local")+"/"+client.world.getRegistryKey().getValue()).equals(boundWorld)) {release(client);return;}
+   var input=(GameplayInputAccess)client;
+   drivingInput=true;
+   try {
+    if(mining) {
+     if(attacking && client.crosshairTarget instanceof net.minecraft.util.hit.EntityHitResult && client.player.getAttackCooldownProgress(0)>=1)input.momo$attack();
+     else input.momo$breakBlock(true);
+    }
+    if(using && useTicks++%4==0 && !client.player.isUsingItem())input.momo$useItem();
+   } finally {drivingInput=false;}
    return;
   }
   if (target == null) return;

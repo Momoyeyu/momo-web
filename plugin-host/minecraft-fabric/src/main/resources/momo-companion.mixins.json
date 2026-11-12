@@ -1,0 +1,1 @@
+{"required":true,"package":"dev.momo","compatibilityLevel":"JAVA_21","client":["GameplayInputMixin","GameplayInputAccess"],"injectors":{"defaultRequire":1}}
