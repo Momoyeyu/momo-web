@@ -120,6 +120,7 @@ export class PluginHost {
       case 'minecraft.stop': return this.minecraft.stop();
       case 'minecraft.observe': return this.minecraft.observe(params.permission);
       case 'minecraft.chat': return this.minecraft.chat(params.text, params.permission);
+      case 'minecraft.play': return this.minecraft.play(params, params.permission);
       case 'minecraft.follow': return this.minecraft.follow(params.player, params.durationMs, params.permission);
       case 'computer.start': {
         if (this.paused) fail('PAUSED', 'Momo is not activated');

@@ -39,3 +39,16 @@ test('unverified stop is visible and rejected', async () => {
   await assert.rejects(adapter.stop(), /acknowledged/);
   assert.equal(adapter.status().stopVerified, false);
 });
+
+test('gameplay supports combined movement and rejects invalid input before dispatch', async () => {
+  const { adapter, commands } = fixture();
+  await adapter.observe(permission);
+  await adapter.play({ control: 'mine', held: ['sneak'], durationMs: 4000 }, permission);
+  assert.deepEqual(commands.at(-1).held, ['sneak']);
+  assert.equal(commands.at(-1).type, 'play');
+  const count = commands.length;
+  await assert.rejects(adapter.play({ control: 'hotbar', slot: 9 }, permission), /Invalid gameplay/);
+  await assert.rejects(adapter.play({ control: 'look', yaw: NaN }, permission), /Invalid gameplay/);
+  await assert.rejects(adapter.play({ control: 'forward', held: ['command'] }, permission), /Invalid gameplay/);
+  assert.equal(commands.length, count);
+});

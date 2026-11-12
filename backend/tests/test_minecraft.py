@@ -79,3 +79,35 @@ def test_stop_invalidates_inflight_observation_generation():
         with pytest.raises(MinecraftError,match='Late Minecraft result'):
             m.execute('observe',{},m.generation,None,None)
         assert m.binding is None and not m.permissions
+
+def test_gameplay_wait_releases_dispatch_lock_and_revocation_interrupts():
+    m, runtime = active()
+    m.permissions.add('game.modify')
+    result = []
+    sent = threading.Event()
+    runtime.host.request.side_effect = lambda *args: sent.set() or {'ok': True}
+    def execute():
+        try:
+            m.execute('play', {'control':'mine','durationMs':500}, 0, 'owner', 'lease')
+        except MinecraftError as error:
+            result.append(str(error))
+    with patch('app.services.minecraft.runtime', runtime), patch.object(m, 'gate', return_value='verified'):
+        worker = threading.Thread(target=execute)
+        worker.start()
+        assert sent.wait(1)
+        assert runtime.host.control.acquire(timeout=0.2)
+        try:
+            m.stop(notify=False)
+        finally:
+            runtime.host.control.release()
+        worker.join(1)
+        assert not worker.is_alive()
+        assert result == ['Minecraft input interrupted']
+
+def test_gameplay_budget_recovers_after_interval():
+    m, runtime = active()
+    m.actions = 120
+    m.budget_window = 0
+    with patch('app.services.minecraft.runtime', runtime), patch.object(m, 'gate', return_value='verified'):
+        assert m.execute('observe', {}, 0, 'owner', 'lease') == {'ok':True}
+        assert m.actions == 1

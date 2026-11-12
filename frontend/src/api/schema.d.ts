@@ -1837,7 +1837,7 @@ export interface components {
             /** Leaseid */
             leaseId: string;
             /** Permissions */
-            permissions: ("game.observe" | "game.chat" | "game.move")[];
+            permissions: ("game.observe" | "game.chat" | "game.move" | "game.modify")[];
             /** Sessionid */
             sessionId: string;
             /** World */
@@ -1977,7 +1977,7 @@ export interface components {
             /** Leaseid */
             leaseId: string;
             /** Permissions */
-            permissions: ("game.observe" | "game.chat" | "game.move")[];
+            permissions: ("game.observe" | "game.chat" | "game.move" | "game.modify")[];
             /**
              * Port
              * @default 17643
@@ -2562,9 +2562,16 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "observe" | "chat" | "follow";
+            action: "observe" | "chat" | "follow" | "play";
+            /**
+             * Button
+             * @default 0
+             */
+            button: number;
             /** Clientid */
             clientId: string;
+            /** Control */
+            control?: ("respawn" | "screenClick" | "screenScroll" | "screenText" | "screenKey" | "resume" | "forward" | "back" | "left" | "right" | "jump" | "sneak" | "sprint" | "look" | "attack" | "mine" | "use" | "eat" | "hotbar" | "inventory" | "close" | "slot" | "quickMove" | "drop" | "swapHands") | null;
             /**
              * Durationms
              * @default 500
@@ -2572,18 +2579,56 @@ export interface components {
             durationMs: number;
             /** Generation */
             generation: number;
+            /** Held */
+            held?: ("forward" | "back" | "left" | "right" | "jump" | "sneak" | "sprint")[];
+            /**
+             * Key
+             * @default enter
+             * @enum {string}
+             */
+            key: "enter" | "backspace" | "tab" | "left" | "right" | "up" | "down";
             /** Leaseid */
             leaseId: string;
+            /**
+             * Pitch
+             * @default 0
+             */
+            pitch: number;
             /**
              * Player
              * @default
              */
             player: string;
             /**
+             * Scroll
+             * @default 0
+             */
+            scroll: number;
+            /**
+             * Slot
+             * @default 0
+             */
+            slot: number;
+            /**
              * Text
              * @default
              */
             text: string;
+            /**
+             * X
+             * @default 0.5
+             */
+            x: number;
+            /**
+             * Y
+             * @default 0.5
+             */
+            y: number;
+            /**
+             * Yaw
+             * @default 0
+             */
+            yaw: number;
         };
         /** Owner */
         app__api__native_control__Owner: {

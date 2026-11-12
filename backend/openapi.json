@@ -202,7 +202,8 @@
               "enum": [
                 "game.observe",
                 "game.chat",
-                "game.move"
+                "game.move",
+                "game.modify"
               ],
               "type": "string"
             },
@@ -603,7 +604,8 @@
               "enum": [
                 "game.observe",
                 "game.chat",
-                "game.move"
+                "game.move",
+                "game.modify"
               ],
               "type": "string"
             },
@@ -2199,18 +2201,64 @@
             "enum": [
               "observe",
               "chat",
-              "follow"
+              "follow",
+              "play"
             ],
             "title": "Action",
             "type": "string"
+          },
+          "button": {
+            "default": 0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Button",
+            "type": "integer"
           },
           "clientId": {
             "title": "Clientid",
             "type": "string"
           },
+          "control": {
+            "anyOf": [
+              {
+                "enum": [
+                  "respawn",
+                  "screenClick",
+                  "screenScroll",
+                  "screenText",
+                  "screenKey",
+                  "resume",
+                  "forward",
+                  "back",
+                  "left",
+                  "right",
+                  "jump",
+                  "sneak",
+                  "sprint",
+                  "look",
+                  "attack",
+                  "mine",
+                  "use",
+                  "eat",
+                  "hotbar",
+                  "inventory",
+                  "close",
+                  "slot",
+                  "quickMove",
+                  "drop",
+                  "swapHands"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Control"
+          },
           "durationMs": {
             "default": 500,
-            "maximum": 1000.0,
+            "maximum": 10000.0,
             "minimum": 1.0,
             "title": "Durationms",
             "type": "integer"
@@ -2219,9 +2267,47 @@
             "title": "Generation",
             "type": "integer"
           },
+          "held": {
+            "items": {
+              "enum": [
+                "forward",
+                "back",
+                "left",
+                "right",
+                "jump",
+                "sneak",
+                "sprint"
+              ],
+              "type": "string"
+            },
+            "maxItems": 7,
+            "title": "Held",
+            "type": "array"
+          },
+          "key": {
+            "default": "enter",
+            "enum": [
+              "enter",
+              "backspace",
+              "tab",
+              "left",
+              "right",
+              "up",
+              "down"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
           "leaseId": {
             "title": "Leaseid",
             "type": "string"
+          },
+          "pitch": {
+            "default": 0,
+            "maximum": 90.0,
+            "minimum": -90.0,
+            "title": "Pitch",
+            "type": "number"
           },
           "player": {
             "default": "",
@@ -2229,11 +2315,46 @@
             "title": "Player",
             "type": "string"
           },
+          "scroll": {
+            "default": 0,
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Scroll",
+            "type": "number"
+          },
+          "slot": {
+            "default": 0,
+            "maximum": 255.0,
+            "minimum": 0.0,
+            "title": "Slot",
+            "type": "integer"
+          },
           "text": {
             "default": "",
             "maxLength": 256,
             "title": "Text",
             "type": "string"
+          },
+          "x": {
+            "default": 0.5,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "default": 0.5,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Y",
+            "type": "number"
+          },
+          "yaw": {
+            "default": 0,
+            "maximum": 180.0,
+            "minimum": -180.0,
+            "title": "Yaw",
+            "type": "number"
           }
         },
         "required": [

@@ -6,6 +6,8 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
   let stopVerified = false;
   let observation = null;
   let busy = false;
+  const controls = new Set(['respawn', 'screenClick', 'screenScroll', 'screenText', 'screenKey', 'resume', 'forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint', 'look', 'attack', 'mine', 'use', 'eat', 'hotbar', 'inventory', 'close', 'slot', 'quickMove', 'drop', 'swapHands']);
+  const movement = new Set(['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']);
   const available = () => Boolean(transport && typeof transport.request === 'function' && typeof authorize === 'function');
   const status = () => ({ available: available(), stopped, stopVerified, epoch, runtime: 'fabric', liveValidated: false });
   async function request(command) {
@@ -38,7 +40,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
       const grant = await authorize({ type, permission });
       if (!grant || version !== epoch) throw new Error('Minecraft authorization revoked');
       if (!permission?.world || !permission?.account) throw new Error('Minecraft world and account must be bound');
-      if (type !== 'observe' && (!observation || observation.world !== permission.world || observation.account !== permission.account || now() - observation.observedAt > 2000)) throw new Error('Fresh matching Minecraft observation required');
+      if (type !== 'observe' && (!observation || observation.world !== permission.world || observation.account !== permission.account || now() - observation.observedAt > (type === 'play' ? 30000 : 2000))) throw new Error('Fresh matching Minecraft observation required');
       stopped = false;
       stopVerified = false;
       const result = await request({ type, ...args, epoch: version, world: permission.world, account: permission.account, leaseMs: 1500 });
@@ -62,6 +64,18 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
     chat(text, permission) {
       if (typeof text !== 'string' || !text.trim() || text.length > 256 || /[\r\n\x00-\x1f]/u.test(text) || text.trimStart().startsWith('/')) return Promise.reject(new Error('Only bounded plain Minecraft chat is allowed'));
       return execute('chat', { text }, permission);
+    },
+    play({ control, held = [], durationMs = 500, yaw = 0, pitch = 0, slot = 0, button = 0, x = 0.5, y = 0.5, scroll = 0, text = '', key = 'enter' }, permission) {
+      if (!controls.has(control) || !Array.isArray(held) || held.length > 7 || held.some(key => !movement.has(key))
+          || !Number.isInteger(durationMs) || durationMs < 1 || durationMs > 10000
+          || !Number.isFinite(yaw) || Math.abs(yaw) > 180 || !Number.isFinite(pitch) || Math.abs(pitch) > 90
+          || !Number.isInteger(slot) || slot < 0 || slot > (control === 'hotbar' ? 8 : 255)
+          || ![0, 1].includes(button)
+          || !Number.isFinite(x) || x < 0 || x > 1 || !Number.isFinite(y) || y < 0 || y > 1
+          || !Number.isFinite(scroll) || Math.abs(scroll) > 10
+          || typeof text !== 'string' || text.length > 256 || /[\r\n\x00-\x1f]/u.test(text) || text.trimStart().startsWith('/')
+          || !['enter', 'backspace', 'tab', 'left', 'right', 'up', 'down'].includes(key)) return Promise.reject(new Error('Invalid gameplay input'));
+      return execute('play', { control, held, durationMs, yaw, pitch, slot, button, x, y, scroll, text, key }, permission);
     },
     follow(player, durationMs, permission) {
       if (!/^[A-Za-z0-9_]{1,16}$/u.test(player) || !Number.isInteger(durationMs) || durationMs < 1 || durationMs > 1000) return Promise.reject(new Error('Invalid bounded follow request'));

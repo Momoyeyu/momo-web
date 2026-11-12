@@ -75,6 +75,7 @@ export interface GeneralConfig {
   nativeInteract?: boolean;
   browserInteract?: boolean;
   minecraftChat?: boolean;
+  minecraftPlay?: boolean;
   minecraftMove?: boolean;
   phonePresentation?: "auto" | "open" | "closed";
 }

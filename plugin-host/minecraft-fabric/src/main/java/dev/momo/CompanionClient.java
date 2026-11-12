@@ -17,6 +17,7 @@ public final class CompanionClient implements ClientModInitializer {
  private String target, boundWorld, boundAccount;
  private java.util.List<BoundedPath.Cell> path = java.util.List.of();
  private long nextPlan;
+ private boolean playing;
  private java.nio.file.Path rendezvous;
  private HttpServer server;
  private ExecutorService executor;
@@ -65,6 +66,7 @@ public final class CompanionClient implements ClientModInitializer {
   } catch (Exception error) { if (server != null) server.stop(0); if (executor != null) executor.shutdownNow(); }
  }
  private void release(MinecraftClient client) {
+  playing = false;
   path = java.util.List.of(); nextPlan = 0;
   target = null; boundWorld = null; boundAccount = null; deadline = 0;
   client.options.forwardKey.setPressed(false); client.options.backKey.setPressed(false);
@@ -105,11 +107,29 @@ public final class CompanionClient implements ClientModInitializer {
      }
     }
     result.addProperty("observedAt", System.currentTimeMillis());
+    result.addProperty("x",client.player.getX()); result.addProperty("y",client.player.getY()); result.addProperty("z",client.player.getZ());
+    result.addProperty("yaw",client.player.getYaw()); result.addProperty("pitch",client.player.getPitch());
+    result.addProperty("screen",client.currentScreen==null?"world":client.currentScreen.getClass().getSimpleName());
+    JsonObject cursor=new JsonObject();
+    var stack=client.player.currentScreenHandler.getCursorStack();
+    cursor.addProperty("item",net.minecraft.registry.Registries.ITEM.getId(stack.getItem()).toString());
+    cursor.addProperty("count",stack.getCount()); result.add("cursor",cursor);
+    result.addProperty("food",client.player.getHungerManager().getFoodLevel());
+    JsonArray slots=new JsonArray();
+    for(var slot:client.player.currentScreenHandler.slots){
+     JsonObject item=new JsonObject(); item.addProperty("id",slot.id);item.addProperty("item",net.minecraft.registry.Registries.ITEM.getId(slot.getStack().getItem()).toString());item.addProperty("count",slot.getStack().getCount()); slots.add(item);
+    }
+    result.add("slots",slots);
+    result.addProperty("selectedHotbar", client.player.getInventory().selectedSlot);
+    if(client.crosshairTarget instanceof net.minecraft.util.hit.BlockHitResult hit && hit.getType()==net.minecraft.util.hit.HitResult.Type.BLOCK) {
+     result.addProperty("targetBlock",net.minecraft.registry.Registries.BLOCK.getId(client.world.getBlockState(hit.getBlockPos()).getBlock()).toString());
+    }
     result.addProperty("health", client.player.getHealth());
     JsonArray players = new JsonArray();
     for (var player : client.world.getPlayers()) if (player != client.player && client.player.canSee(player) && client.player.squaredDistanceTo(player) <= 1024) players.add(player.getName().getString());
     result.add("visiblePlayers", players);
    }
+   case "play" -> play(client, command, world, account);
    case "chat" -> {
     String text = command.get("text").getAsString();
     if (text.isBlank() || text.length() > 256 || text.stripLeading().startsWith("/") || text.chars().anyMatch(c -> c < 32)) throw new IllegalArgumentException("Invalid chat");
@@ -124,7 +144,83 @@ public final class CompanionClient implements ClientModInitializer {
   }
   return result;
  }
+ private void play(MinecraftClient c,JsonObject cmd,String world,String account) {
+  String key=cmd.get("control").getAsString();
+  int duration=cmd.get("durationMs").getAsInt();
+  if(duration<1 || duration>10000 || c.interactionManager==null) throw new IllegalArgumentException("Invalid input");
+  release(c);
+  var p=c.player;
+  if(key.equals("respawn") && !p.isAlive()) {p.requestRespawn();return;}
+  if(key.equals("screenClick") || key.equals("screenScroll") || key.equals("screenText") || key.equals("screenKey")) {
+   if(c.currentScreen==null)throw new IllegalStateException("No open game screen");
+   double x=cmd.get("x").getAsDouble(), y=cmd.get("y").getAsDouble();
+   if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>1||y<0||y>1)throw new IllegalArgumentException("Invalid screen coordinate");
+   x*=c.currentScreen.width;y*=c.currentScreen.height;
+   switch(key) {
+    case "screenClick" -> c.currentScreen.mouseClicked(x,y,cmd.get("button").getAsInt());
+    case "screenScroll" -> c.currentScreen.mouseScrolled(x,y,0,cmd.get("scroll").getAsDouble());
+    case "screenText" -> {
+     String text=cmd.get("text").getAsString();
+     if(text.length()>256||text.stripLeading().startsWith("/")||text.chars().anyMatch(ch->ch<32))throw new IllegalArgumentException("Invalid game text");
+     for(char ch:text.toCharArray())c.currentScreen.charTyped(ch,0);
+    }
+    case "screenKey" -> {
+     int code=switch(cmd.get("key").getAsString()) {
+      case "enter" -> 257; case "backspace" -> 259;case "tab" -> 258;
+      case "left" -> 263;case "right" -> 262;case "up" -> 265;case "down" -> 264;
+      default -> throw new IllegalArgumentException("Invalid screen key");
+     };
+     c.currentScreen.keyPressed(code,0,0);
+    }
+   }
+   return;
+  }
+  if(key.equals("resume") && c.currentScreen instanceof net.minecraft.client.gui.screen.GameMenuScreen){c.setScreen(null);return;}
+  if(c.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>){
+   if(key.equals("close")) {p.closeHandledScreen();return;}
+   if(!key.equals("slot")&&!key.equals("quickMove")) throw new IllegalStateException("Inventory open");
+   int index=cmd.get("slot").getAsInt(), button=cmd.get("button").getAsInt();
+   if(index<0||index>=p.currentScreenHandler.slots.size()||button<0||button>1)throw new IllegalArgumentException("Invalid slot");
+   c.interactionManager.clickSlot(p.currentScreenHandler.syncId,index,button,key.equals("slot")?net.minecraft.screen.slot.SlotActionType.PICKUP:net.minecraft.screen.slot.SlotActionType.QUICK_MOVE,p);
+   return;
+  }
+  if(c.currentScreen!=null || !p.isAlive())throw new IllegalStateException("Game not active");
+  var o=c.options;
+  switch(key){
+   case "look" -> {float yaw=cmd.get("yaw").getAsFloat(),pitch=cmd.get("pitch").getAsFloat();if(!Float.isFinite(yaw)||!Float.isFinite(pitch)||Math.abs(yaw)>180||Math.abs(pitch)>90)throw new IllegalArgumentException("Invalid look");p.changeLookDirection(yaw/0.15,pitch/0.15);return;}
+   case "hotbar" -> {int slot=cmd.get("slot").getAsInt();if(slot<0||slot>8)throw new IllegalArgumentException("Invalid hotbar slot");p.getInventory().selectedSlot=slot;return;}
+   case "inventory" -> {c.setScreen(new net.minecraft.client.gui.screen.ingame.InventoryScreen(p));return;}
+   case "drop" -> {p.dropSelectedItem(false);return;}
+   default -> {}
+  }
+  var binding=switch(key){
+   case "forward","sprint" -> o.forwardKey;case "back" -> o.backKey;case "left" -> o.leftKey;case "right" -> o.rightKey;
+   case "jump" -> o.jumpKey;case "sneak" -> o.sneakKey;case "attack","mine" -> o.attackKey;
+   case "use","eat" -> o.useKey;case "swapHands" -> o.swapHandsKey;default -> throw new IllegalArgumentException("Unknown control");
+  };
+  if(key.equals("attack")||key.equals("mine")||key.equals("use")||key.equals("eat")||key.equals("swapHands"))
+   net.minecraft.client.option.KeyBinding.onKeyPressed(net.minecraft.client.util.InputUtil.fromTranslationKey(binding.getBoundKeyTranslationKey()));
+  if(key.equals("swapHands"))return;
+  binding.setPressed(true); if(key.equals("sprint"))o.sprintKey.setPressed(true);
+  if(cmd.has("held")) for(var extra:cmd.getAsJsonArray("held")) {
+   switch(extra.getAsString()) {
+    case "forward" -> o.forwardKey.setPressed(true);
+    case "back" -> o.backKey.setPressed(true);
+    case "left" -> o.leftKey.setPressed(true);
+    case "right" -> o.rightKey.setPressed(true);
+    case "sprint" -> o.sprintKey.setPressed(true);
+    case "sneak" -> o.sneakKey.setPressed(true);
+    case "jump" -> o.jumpKey.setPressed(true);
+   }
+  }
+  playing=true; boundWorld=world; boundAccount=account;deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(duration);
+ }
  private void tick(MinecraftClient client) {
+  if(playing){
+   if(System.nanoTime()>=deadline||client.player==null||!client.player.isAlive()||client.world==null||client.currentScreen!=null||
+      !client.player.getUuidAsString().equals(boundAccount)||!((client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local")+"/"+client.world.getRegistryKey().getValue()).equals(boundWorld)) release(client);
+   return;
+  }
   if (target == null) return;
   if (System.nanoTime() >= deadline || client.player == null || client.world == null || !client.player.isAlive() || client.currentScreen != null) { release(client); return; }
   if (!((client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local") + "/" + client.world.getRegistryKey().getValue()).equals(boundWorld) || !client.player.getUuidAsString().equals(boundAccount)) { release(client); return; }

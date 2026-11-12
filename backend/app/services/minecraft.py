@@ -1,5 +1,6 @@
 """Authorized Fabric execution in the existing coordinator, without a reasoning loop."""
 import threading
+import time
 from ..core import state
 from .coordinator import runtime
 from . import vision
@@ -15,6 +16,7 @@ class Minecraft:
         self.permissions = set()
         self.epoch = None
         self.actions = 0
+        self.budget_window = time.monotonic()
 
     def stop(self, reason='stopped', notify=True):
         with self.lock:
@@ -65,7 +67,7 @@ class Minecraft:
                 return self.status()
 
     def execute(self, action, arguments, generation, client, lease):
-        capability = {'observe':'game.observe', 'chat':'game.chat', 'follow':'game.move'}[action]
+        capability = {'observe':'game.observe', 'chat':'game.chat', 'follow':'game.move','play':'game.modify'}[action]
         # Host control serializes dispatch against the coordinator's revoke barrier.
         with runtime.host.control:
             fingerprint = self.gate(client, lease)
@@ -73,6 +75,9 @@ class Minecraft:
                 if (generation != self.generation or self.epoch != runtime.epoch or not self.binding
                         or fingerprint != self.fingerprint or capability not in self.permissions or 'game.observe' not in self.permissions):
                     raise MinecraftError('Minecraft grant revoked or capability denied')
+                if time.monotonic() - self.budget_window >= 60:
+                    self.actions = 0
+                    self.budget_window = time.monotonic()
                 if self.actions >= 120:
                     raise MinecraftError('Minecraft action budget exhausted')
                 self.actions += 1
@@ -82,6 +87,15 @@ class Minecraft:
             with self.lock:
                 if generation != self.generation or self.epoch != runtime.epoch or fingerprint != self.fingerprint:
                     raise MinecraftError('Late Minecraft result discarded')
-            return result
+        # Wait outside the dispatch lock so Home, focus and Stop can revoke held input.
+        if action == 'play':
+            deadline = time.monotonic() + arguments.get('durationMs', 500) / 1000
+            while time.monotonic() < deadline:
+                time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+                with self.lock:
+                    if generation != self.generation or self.epoch != runtime.epoch:
+                        raise MinecraftError('Minecraft input interrupted')
+            result = {**result, 'inputLeaseElapsed': True}
+        return result
 
 minecraft = Minecraft()

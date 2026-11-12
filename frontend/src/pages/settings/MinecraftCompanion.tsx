@@ -63,9 +63,10 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
   <section className="extension-detail-section">
    <h4>{t('minecraft.permissions')} <Hint text={t('minecraft.permissionsHint')}/></h4>
    <FieldRow label={t('minecraft.chat')}><Switch title={t('minecraft.chat')} on={chat} onChange={setChat} disabled={busy||active}/></FieldRow>
+   <FieldRow label={t('minecraft.play')}><Switch title={t('minecraft.play')} on={preferences.minecraftPlay===true} onChange={value=>updateGeneral({minecraftPlay:value})} disabled={busy||active}/></FieldRow>
    <FieldRow label={t('minecraft.move')}><Switch title={t('minecraft.move')} on={move} onChange={setMove} disabled={busy||active}/></FieldRow>
    <div className="extension-detail-actions">
-    <Button disabled={!enabled||busy||active||!current?.ready||meeting.state!=='active'} onClick={()=>void run(()=>apiJson('/api/minecraft/attach',jsonInit('POST',{...meetingIdentity(),sessionId:current!.id,world:current!.world,account:current!.account,permissions:['game.observe',...(chat?['game.chat']:[]),...(move?['game.move']:[])]})))}>{t('minecraft.start')}</Button>
+    <Button disabled={!enabled||busy||active||!current?.ready||meeting.state!=='active'} onClick={()=>void run(()=>apiJson('/api/minecraft/attach',jsonInit('POST',{...meetingIdentity(),sessionId:current!.id,world:current!.world,account:current!.account,permissions:['game.observe',...(chat?['game.chat']:[]),...(move?['game.move']:[]),...(preferences.minecraftPlay?['game.modify']:[])]})))}>{t('minecraft.start')}</Button>
     <Button variant="ghost" disabled={busy||!active} onClick={()=>void run(()=>apiJson('/api/minecraft/stop',jsonInit('POST',{})))}>{t('minecraft.stop')}</Button>
    </div>
   </section>
