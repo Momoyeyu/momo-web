@@ -5,8 +5,9 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
   let stopped = true;
   let stopVerified = false;
   let observation = null;
+  let aimAvailable = false;
   let busy = false;
-  const controls = new Set(['respawn', 'screenClick', 'screenScroll', 'screenText', 'screenKey', 'resume', 'forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint', 'look', 'attack', 'mine', 'use', 'eat', 'hotbar', 'inventory', 'close', 'slot', 'quickMove', 'drop', 'swapHands']);
+  const controls = new Set(['aim', 'respawn', 'screenClick', 'screenScroll', 'screenText', 'screenKey', 'resume', 'forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint', 'look', 'attack', 'mine', 'use', 'eat', 'hotbar', 'inventory', 'close', 'slot', 'quickMove', 'drop', 'swapHands']);
   const movement = new Set(['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']);
   const available = () => Boolean(transport && typeof transport.request === 'function' && typeof authorize === 'function');
   const status = () => ({ available: available(), stopped, stopVerified, epoch, runtime: 'fabric', liveValidated: false });
@@ -24,6 +25,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
     stopped = true;
     stopVerified = false;
     observation = null;
+    aimAvailable = false;
     if (!available()) return status();
     const version = epoch;
     const result = await request({ type: 'stop', epoch: version });
@@ -49,8 +51,10 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
       if (type === 'observe') {
         if (!Number.isFinite(result.observedAt) || now() - result.observedAt > 2000 || result.observedAt > now()) throw new Error('Stale Minecraft observation');
         observation = { ...result, source: 'minecraft-fabric', untrusted: true };
+        aimAvailable = true;
         return observation;
       }
+      if (type === 'play' || type === 'follow') aimAvailable = false;
       return result;
     } catch (error) {
       // Stop invalidates in-flight work; do not silently restore authority on late replies.
@@ -65,7 +69,13 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
       if (typeof text !== 'string' || !text.trim() || text.length > 256 || /[\r\n\x00-\x1f]/u.test(text) || text.trimStart().startsWith('/')) return Promise.reject(new Error('Only bounded plain Minecraft chat is allowed'));
       return execute('chat', { text }, permission);
     },
-    play({ control, held = [], durationMs = 500, yaw = 0, pitch = 0, slot = 0, button = 0, x = 0.5, y = 0.5, scroll = 0, text = '', key = 'enter' }, permission) {
+    play({ control, blockIndex = 0, held = [], durationMs = 500, yaw = 0, pitch = 0, slot = 0, button = 0, x = 0.5, y = 0.5, scroll = 0, text = '', key = 'enter' }, permission) {
+      if (control === 'aim') {
+        const block = aimAvailable && Number.isInteger(blockIndex) && blockIndex >= 0 && blockIndex < 8 ? observation?.visibleBlocks?.[blockIndex] : null;
+        if (!block || !Number.isFinite(block.lookYaw) || Math.abs(block.lookYaw) > 180 || !Number.isFinite(block.lookPitch) || Math.abs(block.lookPitch) > 180)
+          return Promise.reject(new Error('Fresh visible block required'));
+        return execute('play', {control:'look',yaw:block.lookYaw,pitch:Math.max(-90,Math.min(90,block.lookPitch)),durationMs:1}, permission);
+      }
       if (!controls.has(control) || !Array.isArray(held) || held.length > 7 || held.some(key => !movement.has(key))
           || !Number.isInteger(durationMs) || durationMs < 1 || durationMs > 10000
           || !Number.isFinite(yaw) || Math.abs(yaw) > 180 || !Number.isFinite(pitch) || Math.abs(pitch) > 90

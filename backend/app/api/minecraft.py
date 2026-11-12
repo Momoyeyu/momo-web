@@ -29,7 +29,8 @@ class Action(Owner):
     y: float = Field(default=0.5,ge=0,le=1)
     scroll: float = Field(default=0,ge=-10,le=10)
     key: Literal['enter','backspace','tab','left','right','up','down'] = 'enter'
-    control: Literal['respawn','screenClick','screenScroll','screenText','screenKey','resume','forward','back','left','right','jump','sneak','sprint','look','attack','mine','use','eat','hotbar','inventory','close','slot','quickMove','drop','swapHands'] | None = None
+    control: Literal['aim','respawn','screenClick','screenScroll','screenText','screenKey','resume','forward','back','left','right','jump','sneak','sprint','look','attack','mine','use','eat','hotbar','inventory','close','slot','quickMove','drop','swapHands'] | None = None
+    blockIndex: int = Field(default=0,ge=0,le=7)
     yaw: float = Field(default=0,ge=-180,le=180)
     pitch: float = Field(default=0,ge=-90,le=90)
     slot: int = Field(default=0,ge=0,le=255)
@@ -45,7 +46,7 @@ def stop(): return invoke(minecraft.stop)
 @router.post('/actions')
 def action(body: Action):
     args = {'text':body.text} if body.action == 'chat' else {'player':body.player,'durationMs':body.durationMs} if body.action == 'follow' else {}
-    if body.action=='play': args=body.model_dump(include={'control','held','text','x','y','scroll','key','durationMs','yaw','pitch','slot','button'})
+    if body.action=='play': args=body.model_dump(include={'control','blockIndex','held','text','x','y','scroll','key','durationMs','yaw','pitch','slot','button'})
     return invoke(minecraft.execute,body.action,args,body.generation,body.clientId,body.leaseId)
 
 

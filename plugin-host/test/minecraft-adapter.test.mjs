@@ -52,3 +52,20 @@ test('gameplay supports combined movement and rejects invalid input before dispa
   await assert.rejects(adapter.play({ control: 'forward', held: ['command'] }, permission), /Invalid gameplay/);
   assert.equal(commands.length, count);
 });
+
+test('aim uses only the latest observed visible block and bounds pitch', async () => {
+  const commands=[];
+  const adapter=createMinecraftAdapter({now:()=>1000,authorize:async()=>true,transport:{request:async command=>{
+    commands.push(command);return{...command,observedAt:1000,visibleBlocks:[{block:'minecraft:oak_log',lookYaw:35,lookPitch:-120}]};
+  }}});
+  await adapter.observe(permission);
+  await adapter.play({control:'aim',blockIndex:0},permission);
+  assert.equal(commands.at(-1).control,'look');
+  assert.equal(commands.at(-1).yaw,35);
+  assert.equal(commands.at(-1).pitch,-90);
+  const count=commands.length;
+  await assert.rejects(adapter.play({control:'aim',blockIndex:0},permission),/visible block/);
+  assert.equal(commands.length,count);
+  await adapter.observe(permission);
+  await assert.rejects(adapter.play({control:'aim',blockIndex:1},permission),/visible block/);
+});
