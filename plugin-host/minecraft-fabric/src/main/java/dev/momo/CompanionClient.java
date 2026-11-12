@@ -138,6 +138,15 @@ public final class CompanionClient implements ClientModInitializer {
     cursor.addProperty("item",net.minecraft.registry.Registries.ITEM.getId(stack.getItem()).toString());
     cursor.addProperty("count",stack.getCount()); result.add("cursor",cursor);
     result.addProperty("food",client.player.getHungerManager().getFoodLevel());
+    result.addProperty("gameMode",client.interactionManager.getCurrentGameMode().getName());
+    JsonArray drops=new JsonArray();
+    var nearby=client.world.getEntitiesByClass(net.minecraft.entity.ItemEntity.class,client.player.getBoundingBox().expand(6),item->!item.getStack().isEmpty() && item.squaredDistanceTo(client.player)<=36);
+    nearby.sort(java.util.Comparator.comparingDouble(item->item.squaredDistanceTo(client.player)));
+    for(var item:nearby.subList(0,Math.min(8,nearby.size()))) {
+     JsonObject drop=new JsonObject();drop.addProperty("item",net.minecraft.registry.Registries.ITEM.getId(item.getStack().getItem()).toString());drop.addProperty("count",item.getStack().getCount());
+     drop.addProperty("x",Math.round(item.getX()*100)/100.0);drop.addProperty("y",Math.round(item.getY()*100)/100.0);drop.addProperty("z",Math.round(item.getZ()*100)/100.0);drop.addProperty("visible",client.player.canSee(item));drops.add(drop);
+    }
+    result.add("nearbyDrops",drops);
     JsonArray slots=new JsonArray(),emptySlots=new JsonArray();
     for(var slot:client.player.currentScreenHandler.slots){
      if(slot.getStack().isEmpty()){emptySlots.add(slot.id);continue;}
