@@ -22,8 +22,8 @@ public final class CompanionClient implements ClientModInitializer {
  private boolean playing,mining,using,attacking,drivingInput;
  private int useTicks;
  public static boolean suppressVanillaBreaking(){return instance!=null && instance.playing && instance.mining && !instance.drivingInput;}
- private Boolean pauseBeforeControl;
  private long backgroundUntil;
+ public static boolean suppressAutoPause(){return instance!=null && System.nanoTime()<instance.backgroundUntil && !MinecraftClient.getInstance().isWindowFocused();}
  private java.nio.file.Path rendezvous;
  private HttpServer server;
  private ExecutorService executor;
@@ -73,14 +73,12 @@ public final class CompanionClient implements ClientModInitializer {
   } catch (Exception error) { if (server != null) server.stop(0); if (executor != null) executor.shutdownNow(); }
  }
  private void restorePause(MinecraftClient client) {
-  if(pauseBeforeControl!=null) client.options.pauseOnLostFocus=pauseBeforeControl;
-  pauseBeforeControl=null; backgroundUntil=0;
+  boolean controlled=backgroundUntil!=0;
+  backgroundUntil=0;
+  if(controlled && client.player!=null && client.currentScreen==null && client.options.pauseOnLostFocus && !client.isWindowFocused())client.openGameMenu(false);
  }
  private void backgroundControl(MinecraftClient client) {
-  if(pauseBeforeControl==null) pauseBeforeControl=client.options.pauseOnLostFocus;
-  client.options.pauseOnLostFocus=false;
-  // Separate from held-key leases: allow the model time to inspect and plan,
-  // but restore the player's preference after a disconnected controller.
+  // Suppress only automatic unfocused pause; never mutate or serialize preferences.
   backgroundUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(60);
  }
  private void release(MinecraftClient client) {
@@ -112,7 +110,7 @@ public final class CompanionClient implements ClientModInitializer {
   String world = (client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local") + "/" + client.world.getRegistryKey().getValue();
   String account = client.player.getUuidAsString();
   if (!world.equals(command.get("world").getAsString()) || !account.equals(command.get("account").getAsString())) { release(client); restorePause(client); throw new IllegalArgumentException("Identity mismatch"); }
-  if(pauseBeforeControl!=null) backgroundControl(client);
+  if(backgroundUntil!=0) backgroundControl(client);
   result.addProperty("world", world); result.addProperty("account", account);
   switch (type) {
    case "observe" -> {
@@ -270,7 +268,7 @@ public final class CompanionClient implements ClientModInitializer {
   playing=true; boundWorld=world; boundAccount=account;deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(duration);
  }
  private void tick(MinecraftClient client) {
-  if(pauseBeforeControl!=null && (System.nanoTime()>=backgroundUntil || client.player==null || client.world==null)) {release(client);restorePause(client);}
+  if(backgroundUntil!=0 && (System.nanoTime()>=backgroundUntil || client.player==null || client.world==null)) {release(client);restorePause(client);}
   if(playing){
    if(System.nanoTime()>=deadline||client.player==null||!client.player.isAlive()||client.world==null||client.currentScreen!=null||
       !client.player.getUuidAsString().equals(boundAccount)||!((client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local")+"/"+client.world.getRegistryKey().getValue()).equals(boundWorld)) {release(client);return;}
