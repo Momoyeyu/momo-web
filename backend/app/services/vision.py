@@ -207,13 +207,13 @@ def fit_history(messages, cfg, tools=None, *, extra_messages=()):
     request changes, never the gallery or persisted history. Current images
     alone exceeding capacity still fail through the normal hard guard.
     """
-    from .context_policy import Budget, estimate
+    from .context_policy import Budget, estimate_request
     safe = Budget.from_config(cfg).safe
     latest_user = max((i for i,m in enumerate(messages) if m.get('role')=='user'),default=-1)
     for index,message in enumerate(messages):
         if index==latest_user or not isinstance(message.get('content'),list): continue
         for part in list(message['content']):
-            if estimate([*messages,*extra_messages],tools)<=safe: return
+            if estimate_request(messages,tools,extra_messages=extra_messages)<=safe: return
             if part.get('type')=='image_url': message['content'].remove(part)
 
 

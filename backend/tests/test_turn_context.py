@@ -110,3 +110,17 @@ def test_clock_anchor_refreshes_after_history_each_turn(monkeypatch):
         return [m['content'] for m in messages if m['role']=='system' and m['content'].startswith('Current player-computer')]
     assert len(anchor(first))==1 and '17:30:00' in anchor(first)[0]
     assert len(anchor(second))==1 and '17:31:00' in anchor(second)[0]
+
+def test_provider_usage_bounds_unchanged_prefix_and_byte_counts_only_new_suffix():
+    from app.services.turn import ContextMessages
+    from app.services.context_policy import estimate_request, estimate
+    prefix = [{'role':'system','content':'中文上下文'*4000}]
+    tools = [{'type':'function','function':{'name':'observe','description':'pixels'}}]
+    messages = ContextMessages(prefix)
+    messages.usage_anchor = ([dict(row) for row in prefix], tools, 5000)
+    messages.append({'role':'tool','content':'Small result','tool_call_id':'one'})
+    assert estimate_request(messages, tools) == 5000 + estimate(messages[1:])
+    assert estimate_request(messages, tools) < estimate(messages, tools)
+    assert estimate_request(messages, []) == estimate(messages, [])
+    messages[0] = {'role':'system','content':'Changed prefix'}
+    assert estimate_request(messages, tools) == estimate(messages, tools)

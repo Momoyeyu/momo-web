@@ -169,3 +169,10 @@ def test_screen_permission_failure_is_system_permission_not_app_approval():
     from app.core.plugin_host import HostError
     with patch.object(tools,'require_local',return_value='r'),patch.object(computer,'desktop_frame',side_effect=HostError('SCREEN_PERMISSION_REQUIRED')):
         assert json.loads(tools.execute('screen_observe',{}))['code']=='SCREEN_PERMISSION_REQUIRED'
+
+def test_browser_plugin_can_request_its_window_without_desktop_plugin():
+    from app.services import activities, native_control
+    with patch.object(tools, 'require_local', return_value='owner'), patch.object(activities, 'snapshot', return_value={'enabled':{'computer':False,'browser':True}}), patch.object(native_control.native_control, 'start', return_value={'approvalRequired':True}) as start:
+        result=tools.execute('computer_request',{'windowId':123,'ownerPid':456,'permissions':['observe','interact']})
+        assert __import__('json').loads(result)['approvalRequired']
+        start.assert_called_once_with(123,456,['observe','interact'],None,None,'browser')

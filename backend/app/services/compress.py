@@ -73,7 +73,8 @@ def guard_request(cfg, messages, tools, *, cancelled, extra_messages=()):
     prepared oversized tool round is rejected rather than dropping tool pairs.
     """
     budget = Budget.from_config(cfg)
-    size = estimate([*messages,*extra_messages], tools)
+    from .context_policy import estimate_request
+    size = estimate_request(messages, tools, extra_messages=extra_messages)
     from . import checkpoint
     policy = Policy(cfg, checkpoint.audience(), tools)
     policy.record_request(size)
@@ -100,7 +101,7 @@ def guard_request(cfg, messages, tools, *, cancelled, extra_messages=()):
             # An in-flight soft worker may have found no soft-sized candidate.
             continue
         messages.refresh()
-        size = estimate([*messages,*extra_messages], tools)
+        size = estimate_request(messages, tools, extra_messages=extra_messages)
         if size <= budget.safe:
             return
     raise llm.LlmError('Context capacity reached; please retry after maintenance')

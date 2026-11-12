@@ -33,6 +33,22 @@ def estimate(messages, tools=None):
     return len(json.dumps({'messages': clean, 'tools': tools or []}, ensure_ascii=False).encode('utf-8')) + image_tokens + 64
 
 
+def estimate_request(messages, tools=None, *, extra_messages=()):
+    """Bound appended tool rounds using the provider's measured prefix usage."""
+    raw = estimate([*messages, *extra_messages], tools)
+    anchor = getattr(messages, "usage_anchor", None)
+    if not anchor:
+        return raw
+    prefix, previous_tools, tokens = anchor
+    if (previous_tools != tools or len(messages) < len(prefix)
+            or messages[:len(prefix)] != prefix):
+        return raw
+    # The measured prompt included this entire prefix and the same tool schema.
+    # New text remains byte-bounded, including any fresh observation image.
+    growth = estimate([*messages[len(prefix):], *extra_messages])
+    return min(raw, tokens + growth)
+
+
 @dataclass(frozen=True)
 class Budget:
     window: int

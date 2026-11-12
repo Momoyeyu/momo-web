@@ -373,11 +373,14 @@ def react(
                     computer_tools.fit_observation(messages,llm_cfg,tools)
                     observation_budget=computer_tools.observation_budget()
                     if not observation_budget:raise vision.VisionError("computer.observationExpired")
-                from .context_policy import Budget, estimate
-                if observation_budget and estimate([*messages,*observation_budget],tools)>Budget.from_config(llm_cfg).safe:
+                from .context_policy import Budget, estimate_request
+                if observation_budget and estimate_request(messages,tools,extra_messages=observation_budget)>Budget.from_config(llm_cfg).safe:
                     # Fresh pixels must never wait behind hard maintenance.
                     raise vision.VisionError('computer.budget')
                 compress.guard_request(llm_cfg, messages, tools, cancelled=lambda: checkpoint.generation() != gen, extra_messages=observation_budget)
+                import copy
+                measured_prefix = copy.deepcopy(list(messages))
+                usage.clear()
                 for ev in llm.chat_stream(
                     llm_cfg,
                     computer_tools.project(messages, llm_cfg, tools, materialize=True, require_observation=bool(observation_budget)),
@@ -399,6 +402,9 @@ def react(
                             yield out
                     elif ev["type"] == "tool_calls":
                         calls = ev["calls"]
+                prompt_tokens = usage.get("prompt_tokens")
+                if isinstance(messages, ContextMessages) and type(prompt_tokens) is int and prompt_tokens > 0:
+                    messages.usage_anchor = (measured_prefix, copy.deepcopy(tools), prompt_tokens)
                 from .context_policy import Policy
                 Policy(llm_cfg, checkpoint.audience(), tools).record_usage(usage)
         except (llm.LlmError, vision.VisionError) as e:
