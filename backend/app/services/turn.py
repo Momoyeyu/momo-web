@@ -369,7 +369,10 @@ def react(
                 if isinstance(messages, ContextMessages):
                     messages.fit_images = lambda: vision.fit_history(messages, llm_cfg, tools, extra_messages=observation_budget)
                 vision.fit_history(messages, llm_cfg, tools, extra_messages=observation_budget)
-                if observation_only and observation_budget:
+                # Tool receipts (notably game inventories) can exceed the
+                # pre-capture metadata reservation. Fit the actual frame again
+                # after receiving them, for both reactions and active play.
+                if observation_budget:
                     computer_tools.fit_observation(messages,llm_cfg,tools)
                     observation_budget=computer_tools.observation_budget()
                     if not observation_budget:raise vision.VisionError("computer.observationExpired")

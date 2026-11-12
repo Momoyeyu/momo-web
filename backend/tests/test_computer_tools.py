@@ -176,3 +176,41 @@ def test_browser_plugin_can_request_its_window_without_desktop_plugin():
         result=tools.execute('computer_request',{'windowId':123,'ownerPid':456,'permissions':['observe','interact']})
         assert __import__('json').loads(result)['approvalRequired']
         start.assert_called_once_with(123,456,['observe','interact'],None,None,'browser')
+
+
+def test_active_tool_frame_refits_after_large_inventory_receipt(monkeypatch):
+    from types import SimpleNamespace
+    from app.core import state
+    from app.services import turn, checkpoint
+    from app.services.context_policy import Budget
+    cfg=state.load(); cfg['settings']['llm'].update(contextWindow=32768,maxOutputTokens=4096)
+    monkeypatch.setattr(turn,'TOOLS',[])
+    monkeypatch.setattr(tools,'declarations',lambda *_:[])
+    monkeypatch.setattr(tools,'require_local',lambda **_: 'active-inventory')
+    monkeypatch.setattr(tools.state,'load',lambda:cfg)
+    monkeypatch.setattr(vision,'require_enabled',lambda *_:None)
+    raw=io.BytesIO();Image.new('RGB',(1536,1536),'white').save(raw,'PNG')
+    seen=[]
+    def provider(_cfg,messages,**kwargs):
+        seen.append(messages)
+        if len(seen)==1:
+            yield {'type':'tool_calls','calls':[{'id':'inventory','type':'function','function':{'name':'minecraft_action','arguments':'{"action":"observe"}'}}]}
+        else:
+            yield {'type':'text','delta':'Verified.'}
+    monkeypatch.setattr(checkpoint,'append_sentence',lambda *args:True)
+    monkeypatch.setattr(checkpoint,'event_metadata',lambda *args:{})
+    def receipt(call,ext):
+        tools.stage(raw.getvalue(),lambda:None)
+        return {'role':'tool','tool_call_id':'inventory','content':'J'*4000}
+    monkeypatch.setattr(turn.llm,'chat_stream',provider)
+    monkeypatch.setattr(turn,'run_call',receipt)
+    messages=[{'role':'system','content':'H'*(Budget.from_config(cfg['settings']['llm']).safe-12500)}]
+    token=current_run.set('active-inventory')
+    try:
+        events=list(turn.react(messages,SimpleNamespace(decls=[]),cfg,checkpoint.generation(),'fixture'))
+        assert not [e for e in events if e['t']=='error']
+        assert len(seen)==2
+        url=seen[-1][-1]['content'][1]['image_url']['url']
+        assert Image.open(io.BytesIO(base64.b64decode(url.split(',')[1]))).size==(1024,1024)
+    finally:
+        tools._pending.pop('active-inventory',None);current_run.reset(token)
