@@ -201,10 +201,10 @@ def test_active_tool_frame_refits_after_large_inventory_receipt(monkeypatch):
     monkeypatch.setattr(checkpoint,'event_metadata',lambda *args:{})
     def receipt(call,ext):
         tools.stage(raw.getvalue(),lambda:None)
-        return {'role':'tool','tool_call_id':'inventory','content':'J'*4000}
+        return {'role':'tool','tool_call_id':'inventory','content':'J'*10000}
     monkeypatch.setattr(turn.llm,'chat_stream',provider)
     monkeypatch.setattr(turn,'run_call',receipt)
-    messages=[{'role':'system','content':'H'*(Budget.from_config(cfg['settings']['llm']).safe-12500)}]
+    messages=[{'role':'system','content':'H'*(Budget.from_config(cfg['settings']['llm']).safe-20000)}]
     token=current_run.set('active-inventory')
     try:
         events=list(turn.react(messages,SimpleNamespace(decls=[]),cfg,checkpoint.generation(),'fixture'))

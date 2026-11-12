@@ -72,7 +72,7 @@ def capture_budget(call,max_edge=1536):
     # of normalization rather than trusting its earlier logical bounds.
     image=_observation_message('momo-observation:pending',max_edge,max_edge)
     # Native receipts carry bounded window/version metadata after the tool call.
-    image['content'][1]['vision_tokens']+=1024
+    image['content'][1]['vision_tokens']+=8192 if name=='minecraft_action' else 1024
     return [image]
 
 

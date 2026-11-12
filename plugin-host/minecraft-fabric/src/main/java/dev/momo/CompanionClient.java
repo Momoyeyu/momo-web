@@ -133,11 +133,13 @@ public final class CompanionClient implements ClientModInitializer {
     cursor.addProperty("item",net.minecraft.registry.Registries.ITEM.getId(stack.getItem()).toString());
     cursor.addProperty("count",stack.getCount()); result.add("cursor",cursor);
     result.addProperty("food",client.player.getHungerManager().getFoodLevel());
-    JsonArray slots=new JsonArray();
+    JsonArray slots=new JsonArray(),emptySlots=new JsonArray();
     for(var slot:client.player.currentScreenHandler.slots){
+     if(slot.getStack().isEmpty()){emptySlots.add(slot.id);continue;}
      JsonObject item=new JsonObject(); item.addProperty("id",slot.id);item.addProperty("item",net.minecraft.registry.Registries.ITEM.getId(slot.getStack().getItem()).toString());item.addProperty("count",slot.getStack().getCount()); slots.add(item);
     }
     result.add("slots",slots);
+    result.add("emptySlots",emptySlots);
     result.addProperty("selectedHotbar", client.player.getInventory().selectedSlot);
     if(client.crosshairTarget instanceof net.minecraft.util.hit.BlockHitResult hit && hit.getType()==net.minecraft.util.hit.HitResult.Type.BLOCK) {
      result.addProperty("targetBlock",net.minecraft.registry.Registries.BLOCK.getId(client.world.getBlockState(hit.getBlockPos()).getBlock()).toString());
@@ -156,13 +158,13 @@ public final class CompanionClient implements ClientModInitializer {
     }
     candidates.sort(java.util.Comparator.<net.minecraft.util.math.BlockPos>comparingInt(pos->{var block=client.world.getBlockState(pos);return block.isIn(net.minecraft.registry.tag.BlockTags.LOGS)||block.hasBlockEntity()?0:1;}).thenComparingDouble(pos->eye.squaredDistanceTo(pos.toCenterPos())));
     JsonArray visible=new JsonArray();
-    for(var pos:candidates.subList(0,Math.min(24,candidates.size()))) {
+    for(var pos:candidates.subList(0,Math.min(8,candidates.size()))) {
      var offset=pos.toCenterPos().subtract(eye);JsonObject block=new JsonObject();
      block.addProperty("block",net.minecraft.registry.Registries.BLOCK.getId(client.world.getBlockState(pos).getBlock()).toString());
      block.addProperty("x",pos.getX());block.addProperty("y",pos.getY());block.addProperty("z",pos.getZ());
      block.addProperty("distance",Math.round(offset.length()*100)/100.0);
-     block.addProperty("lookYaw",net.minecraft.util.math.MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(-offset.x,offset.z))-client.player.getYaw()));
-     block.addProperty("lookPitch",Math.toDegrees(-Math.atan2(offset.y,Math.sqrt(offset.x*offset.x+offset.z*offset.z)))-client.player.getPitch());
+     block.addProperty("lookYaw",Math.round(net.minecraft.util.math.MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(-offset.x,offset.z))-client.player.getYaw())*10)/10.0);
+     block.addProperty("lookPitch",Math.round((Math.toDegrees(-Math.atan2(offset.y,Math.sqrt(offset.x*offset.x+offset.z*offset.z)))-client.player.getPitch())*10)/10.0);
      visible.add(block);
     }
     result.add("visibleBlocks",visible);
