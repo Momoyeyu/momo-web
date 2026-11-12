@@ -53,7 +53,7 @@ class NativeControl:
                 permissions.revoke_request(self.pending_request)
                 self.pending=None
                 self.pending_request=None
-            return {'active':self.target is not None,'target':self.target,'generation':self.generation,'plugin':self.plugin,'stopUnconfirmed':self.stop_unconfirmed,'stopping':self.stopping,'pendingRequestId':self.pending_request}
+            return {'active':self.target is not None,'target':self.target,'generation':self.generation,'plugin':self.plugin,'permissions':sorted(self.grant['capabilities']) if self.grant else [],'stopUnconfirmed':self.stop_unconfirmed,'stopping':self.stopping,'pendingRequestId':self.pending_request}
 
     def start(self,window,pid,capabilities,client,lease,plugin='computer',proactive=None,reactions=None,expected_request=None):
         from .app_permissions import permissions, AppApprovalRequired
@@ -63,6 +63,14 @@ class NativeControl:
         with runtime.host.control, self.lock:
             if expected_request is not None and (self.pending_request != expected_request or not self.pending or self.pending[0][3] != runtime.epoch):
                 raise ValueError('Approval request no longer current')
+            # Repeating the same proposal must not invalidate an existing grant
+            # or force another permission dialog. Never expand its scope here.
+            if (self.target and not self.stop_unconfirmed and not self.stopping
+                    and plugin == self.plugin and window == self.target['windowId']
+                    and pid == self.target['ownerPid']
+                    and set(capabilities) <= set(self.grant['capabilities'])):
+                self.validate(self.generation,client,lease)
+                return self.status()
             if self.target or self.stop_unconfirmed or self.stopping: raise ValueError('Stop the current application activity first')
             from .computer import computer
             from .minecraft import minecraft

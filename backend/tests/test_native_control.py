@@ -205,3 +205,21 @@ def test_observation_mapping_expires_without_refreshing_input_authority(setup):
  before=len(calls)
  with pytest.raises(ValueError):c.execute({'action':'click','x':100,'y':100},7)
  assert len(calls)==before
+
+def test_same_window_request_reuses_checked_grant_without_restart(setup):
+ c,p,calls=setup
+ r=c.start(1,12,['observe','interact'],'owner','lease')
+ p.decide(r['requestId'],'once',1)
+ c.start(1,12,['observe','interact'],'owner','lease')
+ starts=sum(method=='native.start' for method,_ in calls)
+ result=c.start(1,12,['observe','interact'],None,None)
+ assert result['active'] and result['permissions']==['interact','observe']
+ assert sum(method=='native.start' for method,_ in calls)==starts
+ p.revoke_grant(c.grant)
+ with pytest.raises(ValueError):c.start(1,12,['observe'],None,None)
+
+def test_same_window_request_cannot_expand_scope(setup):
+ c,p,calls=setup
+ r=c.start(1,12,['observe'],'owner','lease');p.decide(r['requestId'],'once',1)
+ c.start(1,12,['observe'],'owner','lease')
+ with pytest.raises(ValueError):c.start(1,12,['observe','interact'],None,None)
