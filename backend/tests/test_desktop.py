@@ -455,3 +455,36 @@ def test_native_view_can_read_audio_rate_and_interrupt_generation(monkeypatch, o
     )
     assert denied.status_code == 403
     assert "access-control-allow-origin" not in denied.headers
+
+
+def test_heartbeat_does_not_race_backup_maintenance():
+    import asyncio
+    import httpx
+    from app.core.maintenance import DataMaintenance
+
+    async def run():
+        heartbeat_entered, release_heartbeat = asyncio.Event(), asyncio.Event()
+        transfer_entered, release_transfer = asyncio.Event(), asyncio.Event()
+
+        async def endpoint(scope, receive, send):
+            if scope["path"] == "/api/meeting/heartbeat":
+                heartbeat_entered.set()
+                await release_heartbeat.wait()
+            if scope["path"] == "/api/data/export":
+                transfer_entered.set()
+                await release_transfer.wait()
+            await send({"type":"http.response.start", "status":200, "headers":[]})
+            await send({"type":"http.response.body", "body":b"ok"})
+
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(DataMaintenance(endpoint)),base_url="http://test") as client:
+            heartbeat = asyncio.create_task(client.post("/api/meeting/heartbeat"))
+            await heartbeat_entered.wait()
+            transfer = asyncio.create_task(client.get("/api/data/export"))
+            await asyncio.wait_for(transfer_entered.wait(), 1)
+            release_heartbeat.set()
+            assert (await heartbeat).status_code == 200
+            assert (await client.post("/api/meeting/heartbeat")).status_code == 200
+            assert (await client.post("/work")).status_code == 409
+            release_transfer.set()
+            assert (await transfer).status_code == 200
+    asyncio.run(run())

@@ -8,6 +8,8 @@ test('selected identity and fresh observation gate input; stop revokes',async()=
  const {bindingId}=await broker.start({...target,permissions:['observe','interact'],permit:{}});
  await assert.rejects(broker.action({action:'click',x:1,y:1},{},0,bindingId),/STALE/);
  broker.version=2;broker.observed=Date.now();
+ // Native JSON objects may emit the same rectangle in a different key order.
+ current={...target,bounds:{height:100,width:100,y:0,x:0}};
  await broker.action({action:'type',text:'hello'},{},2,bindingId);
  assert.equal(actions[0].ownerPid,99);
  current={...target,bounds:{...target.bounds,x:10}};

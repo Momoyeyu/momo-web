@@ -3,8 +3,9 @@ import './runtime';
 import {getSettings,updateGeneral} from '../lib/store';
 export type DesktopWindowState={mode:'chat'|'pet';clickThrough:boolean;panel?:{width:number;petWidth:number}};
 export interface DesktopWindowBridge {
+ requestSystemPermission?(kind:"screen"|"input"):Promise<void>;
  setPetPanel?(open:boolean):Promise<DesktopWindowState>;
- dragPetWindow?(phase:"start"|"move"|"end"):Promise<void>;
+ dragPetWindow?(phase:"start"|"move"|"end",point?:{x:number;y:number}):Promise<void>;
  setPetHitRegions?(regions:{x:number;y:number;width:number;height:number}[]):Promise<void>;
  getWindowState():Promise<DesktopWindowState>;
  setWindowMode(mode:'chat'|'pet'):Promise<DesktopWindowState>;

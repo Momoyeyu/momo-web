@@ -21,6 +21,10 @@ class DataMaintenance:
             "/api/data/import",
             "/api/data/validate",
         }
+        # Lease renewal changes only coordinator memory. Treating it as a data
+        # writer makes chat-page transfers race their background heartbeat.
+        if kind == "http" and scope.get("method") == "POST" and scope.get("path") == "/api/meeting/heartbeat":
+            return await self.app(scope, receive, send)
         mutation = kind == "websocket" or scope.get("method") not in (
             "GET",
             "HEAD",

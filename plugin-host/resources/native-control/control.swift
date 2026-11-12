@@ -66,10 +66,37 @@ if action=="observe" {
  _=target(false);output(["bounds":["x":initial.minX,"y":initial.minY,"width":initial.width,"height":initial.height]]);exit(0)
 }
 guard AXIsProcessTrusted() else { fail("INPUT_PERMISSION_REQUIRED") }
+if action=="focus" {
+ let app=AXUIElementCreateApplication(pid_t(pid));var value:CFTypeRef?
+ guard AXUIElementCopyAttributeValue(app,kAXWindowsAttribute as CFString,&value) == .success,let rows=value as? [AXUIElement] else {fail("FOCUSED_WINDOW_UNAVAILABLE")}
+ let matches=rows.filter { window in
+  var position:CFTypeRef?;var size:CFTypeRef?;var point=CGPoint.zero;var dimensions=CGSize.zero
+  guard AXUIElementCopyAttributeValue(window,kAXPositionAttribute as CFString,&position) == .success,
+        AXUIElementCopyAttributeValue(window,kAXSizeAttribute as CFString,&size) == .success,
+        let position,let size else {return false}
+  return AXValueGetValue(position as! AXValue,.cgPoint,&point) && AXValueGetValue(size as! AXValue,.cgSize,&dimensions) && CGRect(origin:point,size:dimensions)==initial
+ }
+ guard matches.count==1 else {fail("AMBIGUOUS_FOCUSED_WINDOW")}
+ guard let application=NSRunningApplication(processIdentifier:pid_t(pid)),application.activate() else {fail("TARGET_NOT_FOREGROUND")}
+ guard AXUIElementPerformAction(matches[0],kAXRaiseAction as CFString) == .success else {fail("FOCUSED_WINDOW_UNAVAILABLE")}
+ Thread.sleep(forTimeInterval:0.2);_=target(true)
+ output(["ok":true]);exit(0)
+}
 func check() { let now=target(true);if now != initial { fail("TARGET_MOVED") } }
 func point()->CGPoint { guard let x=input["x"] as? Double,let y=input["y"] as? Double,x.isFinite,y.isFinite,x>=0,y>=0,x<initial.width,y<initial.height else { fail("INVALID_COORDINATE") };return CGPoint(x:initial.minX+x,y:initial.minY+y) }
 if action=="click" {let p=point();check();guard let down=CGEvent(mouseEventSource:nil,mouseType:.leftMouseDown,mouseCursorPosition:p,mouseButton:.left),let up=CGEvent(mouseEventSource:nil,mouseType:.leftMouseUp,mouseCursorPosition:p,mouseButton:.left) else { fail("EVENT_FAILED") };down.postToPid(pid_t(pid));up.postToPid(pid_t(pid))}
 else if action=="type" { guard let text=input["text"] as? String,text.count<=500,!text.unicodeScalars.contains(where:{$0.value<32 || $0.value==127}) else { fail("INVALID_TEXT") };for character in text {check();let chars=Array(String(character).utf16);chars.withUnsafeBufferPointer{buffer in let down=CGEvent(keyboardEventSource:nil,virtualKey:0,keyDown:true)!;let up=CGEvent(keyboardEventSource:nil,virtualKey:0,keyDown:false)!;down.keyboardSetUnicodeString(stringLength:chars.count,unicodeString:buffer.baseAddress!);up.keyboardSetUnicodeString(stringLength:chars.count,unicodeString:buffer.baseAddress!);down.postToPid(pid_t(pid));up.postToPid(pid_t(pid))};usleep(12000)}}
+else if action=="key" {
+ guard let key=input["key"] as? String else {fail("INVALID_TEXT")}
+ let keys:[String:CGKeyCode]=["enter":36,"tab":48,"escape":53,"backspace":51,"delete":117,"left":123,"right":124,"up":126,"down":125,"home":115,"end":119,"pageUp":116,"pageDown":121,"address":37,"back":33,"forward":30,"reload":15]
+ guard let code=keys[key] else {fail("INVALID_TEXT")}
+ check()
+ for pressed in [true,false] {
+  guard let event=CGEvent(keyboardEventSource:nil,virtualKey:code,keyDown:pressed) else {fail("EVENT_FAILED")}
+  if ["address","back","forward","reload"].contains(key) {event.flags = .maskCommand}
+  event.postToPid(pid_t(pid))
+ }
+}
 else if action=="scroll" {let p=point();guard let delta=input["delta"] as? Int,abs(delta)<=768 else { fail("INVALID_SCROLL") };check();let event=CGEvent(scrollWheelEvent2Source:nil,units:.pixel,wheelCount:1,wheel1:Int32(delta),wheel2:0,wheel3:0)!;event.location=p;event.postToPid(pid_t(pid))}
 else {fail("UNSUPPORTED_ACTION")}
 output(["executed":true])

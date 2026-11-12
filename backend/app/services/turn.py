@@ -344,7 +344,15 @@ def react(
         seq += 1
         return ev
 
-    for _ in range(MAX_ROUNDS):
+    round_limit = MAX_ROUNDS
+    if source == "meeting" and not observation_only:
+        from .minecraft import minecraft
+        from .native_control import native_control
+        if minecraft.binding and "game.modify" in minecraft.permissions:
+            round_limit = 64
+        elif native_control.target and native_control.grant and "interact" in native_control.grant.get("capabilities", []):
+            round_limit = 24
+    for _ in range(round_limit):
         calls: list[dict[str, Any]] | None = None
         round_text = ""
         reasoning: dict[str, Any] = {}  # Private protocol state, never a TurnEvent.
@@ -474,7 +482,7 @@ def react(
         compress.maybe_compress(usage.get("prompt_tokens"), request=messages, tools=tools)  # 不阻塞推流
         return
 
-    yield _error(f"llm produced no response within {MAX_ROUNDS} rounds")
+    yield _error(f"llm produced no response within {round_limit} rounds")
 
 
 def _error(message: str) -> ErrorEvent:

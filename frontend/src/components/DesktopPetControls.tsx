@@ -13,7 +13,7 @@ export default function DesktopPetControls({closeUp,onFrame,collapsed,onDialog,m
  const [host,setHost]=useState<HTMLElement|null>(null);
  useLayoutEffect(()=>setHost(document.getElementById('desktop-controls-host')),[]);
  const dragging=useRef(false);
- const drag=(phase:'start'|'move'|'end')=>{void window.momoDesktop?.dragPetWindow?.(phase).catch(()=>{dragging.current=false;});};
+ const drag=(phase:'start'|'move'|'end',point?:{x:number;y:number})=>{void window.momoDesktop?.dragPetWindow?.(phase,point).catch(()=>{dragging.current=false;});};
  useEffect(()=>{const stop=()=>{dragging.current=false;drag('end');};window.addEventListener('blur',stop);return()=>{window.removeEventListener('blur',stop);stop();};},[]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(false);
  useEffect(()=>{if(state.mode==='pet'&&!enabled.computer)void setDesktopMode('chat').catch(()=>setError(true));},[state.mode,enabled.computer]);
@@ -29,7 +29,7 @@ export default function DesktopPetControls({closeUp,onFrame,collapsed,onDialog,m
  const run=async(action:()=>Promise<void>)=>{if(busy)return;setBusy(true);setError(false);try{await action();}catch{setError(true);}finally{setBusy(false);}};
  return <>
   <div className={`desktop-pet-drag${closeUp?' is-close':''}`} aria-hidden="true" style={{pointerEvents:state.clickThrough?'none':undefined}}
-   onPointerDown={e=>{if(e.button!==0||!window.momoDesktop?.dragPetWindow)return;e.preventDefault();dragging.current=true;e.currentTarget.setPointerCapture(e.pointerId);drag('start');}}
+   onPointerDown={e=>{if(e.button!==0||!window.momoDesktop?.dragPetWindow)return;e.preventDefault();dragging.current=true;e.currentTarget.setPointerCapture(e.pointerId);drag('start',{x:e.screenX,y:e.screenY});}}
    onPointerMove={()=>{if(dragging.current)drag('move');}}
    onPointerUp={()=>{dragging.current=false;drag('end');}}
    onPointerCancel={()=>{dragging.current=false;drag('end');}}
