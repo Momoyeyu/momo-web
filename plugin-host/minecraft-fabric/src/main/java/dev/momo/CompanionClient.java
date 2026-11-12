@@ -156,7 +156,7 @@ public final class CompanionClient implements ClientModInitializer {
      var ray=client.world.raycast(new net.minecraft.world.RaycastContext(eye,center,net.minecraft.world.RaycastContext.ShapeType.OUTLINE,net.minecraft.world.RaycastContext.FluidHandling.NONE,client.player));
      if(ray.getType()==net.minecraft.util.hit.HitResult.Type.BLOCK && ray.getBlockPos().equals(pos))candidates.add(pos.toImmutable());
     }
-    candidates.sort(java.util.Comparator.<net.minecraft.util.math.BlockPos>comparingInt(pos->{var block=client.world.getBlockState(pos);return block.isIn(net.minecraft.registry.tag.BlockTags.LOGS)||block.hasBlockEntity()?0:1;}).thenComparingDouble(pos->eye.squaredDistanceTo(pos.toCenterPos())));
+    candidates.sort(java.util.Comparator.<net.minecraft.util.math.BlockPos>comparingInt(pos->{var block=client.world.getBlockState(pos);return block.isIn(net.minecraft.registry.tag.BlockTags.LOGS)?0:block.isIn(net.minecraft.registry.tag.BlockTags.LEAVES)||block.isOf(net.minecraft.block.Blocks.CRAFTING_TABLE)||block.hasBlockEntity()?1:2;}).thenComparingDouble(pos->eye.squaredDistanceTo(pos.toCenterPos())));
     JsonArray visible=new JsonArray();
     for(var pos:candidates.subList(0,Math.min(8,candidates.size()))) {
      var offset=pos.toCenterPos().subtract(eye);JsonObject block=new JsonObject();
