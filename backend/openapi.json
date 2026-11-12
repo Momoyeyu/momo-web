@@ -2207,6 +2207,13 @@
             "title": "Action",
             "type": "string"
           },
+          "blockIndex": {
+            "default": 0,
+            "maximum": 7.0,
+            "minimum": 0.0,
+            "title": "Blockindex",
+            "type": "integer"
+          },
           "button": {
             "default": 0,
             "maximum": 1.0,
@@ -2222,6 +2229,7 @@
             "anyOf": [
               {
                 "enum": [
+                  "aim",
                   "respawn",
                   "screenClick",
                   "screenScroll",

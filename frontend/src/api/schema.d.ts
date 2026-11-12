@@ -2564,6 +2564,11 @@ export interface components {
              */
             action: "observe" | "chat" | "follow" | "play";
             /**
+             * Blockindex
+             * @default 0
+             */
+            blockIndex: number;
+            /**
              * Button
              * @default 0
              */
@@ -2571,7 +2576,7 @@ export interface components {
             /** Clientid */
             clientId: string;
             /** Control */
-            control?: ("respawn" | "screenClick" | "screenScroll" | "screenText" | "screenKey" | "resume" | "forward" | "back" | "left" | "right" | "jump" | "sneak" | "sprint" | "look" | "attack" | "mine" | "use" | "eat" | "hotbar" | "inventory" | "close" | "slot" | "quickMove" | "drop" | "swapHands") | null;
+            control?: ("aim" | "respawn" | "screenClick" | "screenScroll" | "screenText" | "screenKey" | "resume" | "forward" | "back" | "left" | "right" | "jump" | "sneak" | "sprint" | "look" | "attack" | "mine" | "use" | "eat" | "hotbar" | "inventory" | "close" | "slot" | "quickMove" | "drop" | "swapHands") | null;
             /**
              * Durationms
              * @default 500
