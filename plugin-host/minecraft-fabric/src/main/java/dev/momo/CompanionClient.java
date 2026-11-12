@@ -142,6 +142,30 @@ public final class CompanionClient implements ClientModInitializer {
     if(client.crosshairTarget instanceof net.minecraft.util.hit.BlockHitResult hit && hit.getType()==net.minecraft.util.hit.HitResult.Type.BLOCK) {
      result.addProperty("targetBlock",net.minecraft.registry.Registries.BLOCK.getId(client.world.getBlockState(hit.getBlockPos()).getBlock()).toString());
     }
+    // Local visible geometry, like AIRI's block observations. Never expose
+    // unloaded terrain or resources hidden behind another solid block.
+    var eye=client.player.getEyePos();
+    var candidates=new java.util.ArrayList<net.minecraft.util.math.BlockPos>();
+    var origin=client.player.getBlockPos();
+    for(var pos:net.minecraft.util.math.BlockPos.iterate(origin.add(-5,-3,-5),origin.add(5,4,5))) {
+     if(!client.world.isChunkLoaded(pos) || client.world.getBlockState(pos).isAir())continue;
+     var center=pos.toCenterPos();
+     if(eye.squaredDistanceTo(center)>36)continue;
+     var ray=client.world.raycast(new net.minecraft.world.RaycastContext(eye,center,net.minecraft.world.RaycastContext.ShapeType.OUTLINE,net.minecraft.world.RaycastContext.FluidHandling.NONE,client.player));
+     if(ray.getType()==net.minecraft.util.hit.HitResult.Type.BLOCK && ray.getBlockPos().equals(pos))candidates.add(pos.toImmutable());
+    }
+    candidates.sort(java.util.Comparator.<net.minecraft.util.math.BlockPos>comparingInt(pos->{var block=client.world.getBlockState(pos);return block.isIn(net.minecraft.registry.tag.BlockTags.LOGS)||block.hasBlockEntity()?0:1;}).thenComparingDouble(pos->eye.squaredDistanceTo(pos.toCenterPos())));
+    JsonArray visible=new JsonArray();
+    for(var pos:candidates.subList(0,Math.min(24,candidates.size()))) {
+     var offset=pos.toCenterPos().subtract(eye);JsonObject block=new JsonObject();
+     block.addProperty("block",net.minecraft.registry.Registries.BLOCK.getId(client.world.getBlockState(pos).getBlock()).toString());
+     block.addProperty("x",pos.getX());block.addProperty("y",pos.getY());block.addProperty("z",pos.getZ());
+     block.addProperty("distance",Math.round(offset.length()*100)/100.0);
+     block.addProperty("lookYaw",net.minecraft.util.math.MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(-offset.x,offset.z))-client.player.getYaw()));
+     block.addProperty("lookPitch",Math.toDegrees(-Math.atan2(offset.y,Math.sqrt(offset.x*offset.x+offset.z*offset.z)))-client.player.getPitch());
+     visible.add(block);
+    }
+    result.add("visibleBlocks",visible);
     result.addProperty("health", client.player.getHealth());
     JsonArray players = new JsonArray();
     for (var player : client.world.getPlayers()) if (player != client.player && client.player.canSee(player) && client.player.squaredDistanceTo(player) <= 1024) players.add(player.getName().getString());
