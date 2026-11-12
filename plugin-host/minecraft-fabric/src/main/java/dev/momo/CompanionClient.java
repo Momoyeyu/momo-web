@@ -1,6 +1,7 @@
 package dev.momo;
 
 import com.google.gson.*;
+import dev.momo.mixin.GameplayInputAccess;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;

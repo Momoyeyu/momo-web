@@ -1,4 +1,6 @@
-package dev.momo;
+package dev.momo.mixin;
+
+import dev.momo.CompanionClient;
 
 import net.minecraft.client.MinecraftClient;
 import org.spongepowered.asm.mixin.Mixin;
