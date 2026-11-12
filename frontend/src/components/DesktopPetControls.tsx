@@ -30,7 +30,7 @@ export default function DesktopPetControls({closeUp,onFrame,collapsed,onDialog,m
  return <>
   <div className={`desktop-pet-drag${closeUp?' is-close':''}`} aria-hidden="true" style={{pointerEvents:state.clickThrough?'none':undefined}}
    onPointerDown={e=>{if(e.button!==0||!window.momoDesktop?.dragPetWindow)return;e.preventDefault();dragging.current=true;e.currentTarget.setPointerCapture(e.pointerId);drag('start',{x:e.screenX,y:e.screenY});}}
-   onPointerMove={()=>{if(dragging.current)drag('move');}}
+   onPointerMove={e=>{if(dragging.current)drag('move',{x:e.screenX,y:e.screenY});}}
    onPointerUp={()=>{dragging.current=false;drag('end');}}
    onPointerCancel={()=>{dragging.current=false;drag('end');}}
    onLostPointerCapture={()=>{dragging.current=false;drag('end');}}/>
