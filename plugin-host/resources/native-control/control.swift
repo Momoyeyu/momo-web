@@ -11,6 +11,11 @@ func title(_ window:AXUIElement)->String? {
  guard AXUIElementCopyAttributeValue(window,kAXTitleAttribute as CFString,&value) == .success else {return nil}
  return value as? String
 }
+func matchesTitle(_ accessibility:String?,_ visible:String)->Bool {
+ guard let accessibility else {return false}
+ // Chromium appends its application/profile to the accessibility window title.
+ return accessibility==visible || (!visible.isEmpty && accessibility.hasPrefix(visible+" - "))
+}
 func output(_ value:[String:Any]) { let d=try! JSONSerialization.data(withJSONObject:value);print(String(data:d,encoding:.utf8)!) }
 // Only the explicit local setup flow invokes this; never exposed as a model action.
 if action=="request-input-permission" {
@@ -58,9 +63,9 @@ func target(_ requireFront:Bool)->CGRect {
   // Normal browser windows often share bounds. Cross-check the focused AX
   // title with the selected CG window, retaining fail-closed ambiguity checks.
   let selectedTitle=w[kCGWindowName as String] as? String ?? ""
-  guard title(window)==selectedTitle else {fail("TARGET_WINDOW_NOT_FOCUSED")}
-  let matches=windows().filter{($0[kCGWindowOwnerPID as String] as? Int)==pid && ($0[kCGWindowLayer as String] as? Int)==0 && rect($0)==r && ($0[kCGWindowName as String] as? String ?? "")==selectedTitle}
-  guard matches.count==1 else { fail("AMBIGUOUS_FOCUSED_WINDOW") }
+  guard matchesTitle(title(window),selectedTitle) else {fail("TARGET_WINDOW_NOT_FOCUSED")}
+  let matches=windows().filter{($0[kCGWindowOwnerPID as String] as? Int)==pid && ($0[kCGWindowLayer as String] as? Int)==0 && rect($0)==r && matchesTitle(title(window),$0[kCGWindowName as String] as? String ?? "")}
+  guard matches.count==1 && (matches[0][kCGWindowNumber as String] as? Int)==id else { fail("AMBIGUOUS_FOCUSED_WINDOW") }
  }
  return r
 }
@@ -83,7 +88,7 @@ if action=="focus" {
   guard AXUIElementCopyAttributeValue(window,kAXPositionAttribute as CFString,&position) == .success,
         AXUIElementCopyAttributeValue(window,kAXSizeAttribute as CFString,&size) == .success,
         let position,let size else {return false}
-  return AXValueGetValue(position as! AXValue,.cgPoint,&point) && AXValueGetValue(size as! AXValue,.cgSize,&dimensions) && CGRect(origin:point,size:dimensions)==initial && title(window)==selectedTitle
+  return AXValueGetValue(position as! AXValue,.cgPoint,&point) && AXValueGetValue(size as! AXValue,.cgSize,&dimensions) && CGRect(origin:point,size:dimensions)==initial && matchesTitle(title(window),selectedTitle)
  }
  guard matches.count==1 else {fail("AMBIGUOUS_FOCUSED_WINDOW")}
  guard let application=NSRunningApplication(processIdentifier:pid_t(pid)),application.activate() else {fail("TARGET_NOT_FOREGROUND")}
