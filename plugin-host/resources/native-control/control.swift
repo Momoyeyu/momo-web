@@ -98,7 +98,14 @@ if action=="focus" {
 }
 func check() { let now=target(true);if now != initial { fail("TARGET_MOVED") } }
 func point()->CGPoint { guard let x=input["x"] as? Double,let y=input["y"] as? Double,x.isFinite,y.isFinite,x>=0,y>=0,x<initial.width,y<initial.height else { fail("INVALID_COORDINATE") };return CGPoint(x:initial.minX+x,y:initial.minY+y) }
-if action=="click" {let p=point();check();guard let down=CGEvent(mouseEventSource:nil,mouseType:.leftMouseDown,mouseCursorPosition:p,mouseButton:.left),let up=CGEvent(mouseEventSource:nil,mouseType:.leftMouseUp,mouseCursorPosition:p,mouseButton:.left) else { fail("EVENT_FAILED") };down.postToPid(pid_t(pid));up.postToPid(pid_t(pid))}
+func checkVisible(_ point:CGPoint) {
+ check()
+ // HID routing supplies the window-server annotations Chromium requires.
+ // Reject occluded coordinates rather than send an event to a covering app.
+ guard let first=windows().first(where:{rect($0).contains(point) && ($0[kCGWindowAlpha as String] as? Double ?? 1)>0.01}),
+       (first[kCGWindowNumber as String] as? Int)==id else {fail("TARGET_WINDOW_NOT_FOCUSED")}
+}
+if action=="click" {let p=point();checkVisible(p);guard let down=CGEvent(mouseEventSource:nil,mouseType:.leftMouseDown,mouseCursorPosition:p,mouseButton:.left),let up=CGEvent(mouseEventSource:nil,mouseType:.leftMouseUp,mouseCursorPosition:p,mouseButton:.left) else { fail("EVENT_FAILED") };down.setIntegerValueField(.mouseEventClickState,value:1);up.setIntegerValueField(.mouseEventClickState,value:1);down.post(tap:.cghidEventTap);usleep(20000);up.post(tap:.cghidEventTap)}
 else if action=="type" { guard let text=input["text"] as? String,text.count<=500,!text.unicodeScalars.contains(where:{$0.value<32 || $0.value==127}) else { fail("INVALID_TEXT") };for character in text {check();let chars=Array(String(character).utf16);chars.withUnsafeBufferPointer{buffer in let down=CGEvent(keyboardEventSource:nil,virtualKey:0,keyDown:true)!;let up=CGEvent(keyboardEventSource:nil,virtualKey:0,keyDown:false)!;down.keyboardSetUnicodeString(stringLength:chars.count,unicodeString:buffer.baseAddress!);up.keyboardSetUnicodeString(stringLength:chars.count,unicodeString:buffer.baseAddress!);down.postToPid(pid_t(pid));up.postToPid(pid_t(pid))};usleep(12000)}}
 else if action=="key" {
  guard let key=input["key"] as? String else {fail("INVALID_TEXT")}
@@ -111,6 +118,6 @@ else if action=="key" {
   event.postToPid(pid_t(pid))
  }
 }
-else if action=="scroll" {let p=point();guard let delta=input["delta"] as? Int,abs(delta)<=768 else { fail("INVALID_SCROLL") };check();let event=CGEvent(scrollWheelEvent2Source:nil,units:.pixel,wheelCount:1,wheel1:Int32(delta),wheel2:0,wheel3:0)!;event.location=p;event.postToPid(pid_t(pid))}
+else if action=="scroll" {let p=point();guard let delta=input["delta"] as? Int,abs(delta)<=768 else { fail("INVALID_SCROLL") };checkVisible(p);let event=CGEvent(scrollWheelEvent2Source:nil,units:.pixel,wheelCount:1,wheel1:Int32(delta),wheel2:0,wheel3:0)!;event.location=p;event.post(tap:.cghidEventTap)}
 else {fail("UNSUPPORTED_ACTION")}
 output(["executed":true])
