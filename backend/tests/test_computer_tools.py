@@ -214,3 +214,22 @@ def test_active_tool_frame_refits_after_large_inventory_receipt(monkeypatch):
         assert Image.open(io.BytesIO(base64.b64decode(url.split(',')[1]))).size==(1024,1024)
     finally:
         tools._pending.pop('active-inventory',None);current_run.reset(token)
+
+
+def test_bound_game_exposes_only_its_observation_lane():
+    from app.services.minecraft import minecraft
+    with patch.object(tools,'require_local',return_value='r'), patch.object(minecraft,'binding',{'world':'fixture'}), patch.object(minecraft,'permissions',{'game.observe','game.modify'}), patch('app.services.activities.snapshot',return_value={'enabled':{'computer':True,'browser':True,'minecraft':True}}):
+        names={row['function']['name'] for row in tools.declarations()}
+        assert 'minecraft_action' in names
+        assert not names & {'screen_observe','computer_targets','computer_request'}
+
+
+def test_desktop_observation_cannot_steal_bound_game_attention():
+    from app.services.computer import Computer, ComputerError
+    from app.services.minecraft import minecraft
+    computer=Computer()
+    with patch('app.services.activities.require_enabled'), patch.object(minecraft,'binding',{'world':'fixture'}), patch.object(tools.state,'load',return_value={'settings':{'llm':{}}}), patch.object(tools.runtime,'started',True), patch.object(tools.runtime,'mode','meeting'), patch.object(tools.runtime,'focus',False), patch.object(tools.runtime,'restoring',False), patch.object(vision,'require_enabled'):
+        with pytest.raises(ComputerError,match='attention'):
+            computer.desktop_frame()
+        assert not computer.observing
+        assert minecraft.binding == {'world':'fixture'}

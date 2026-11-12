@@ -76,6 +76,9 @@ class Computer:
         from .activities import require_enabled
         try: require_enabled('computer')
         except ValueError as error: raise ComputerError(str(error)) from None
+        from .minecraft import minecraft
+        if minecraft.binding:
+            raise ComputerError('computer.attention')
         cfg = state.load()['settings']['llm']
         if (not runtime.started or runtime.mode != 'meeting' or runtime.focus
                 or runtime.restoring):
