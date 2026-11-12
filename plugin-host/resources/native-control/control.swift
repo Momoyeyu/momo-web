@@ -101,9 +101,15 @@ func point()->CGPoint { guard let x=input["x"] as? Double,let y=input["y"] as? D
 func checkVisible(_ point:CGPoint) {
  check()
  // HID routing supplies the window-server annotations Chromium requires.
- // Reject occluded coordinates rather than send an event to a covering app.
- guard let first=windows().first(where:{rect($0).contains(point) && ($0[kCGWindowAlpha as String] as? Double ?? 1)>0.01}),
-       (first[kCGWindowNumber as String] as? Int)==id else {fail("TARGET_WINDOW_NOT_FOCUSED")}
+ // Actual AX hit testing ignores click-through remote-control/Dock overlays;
+ // their fullscreen rectangles alone do not tell us who receives the click.
+ var hit:AXUIElement?
+ guard AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(),Float(point.x),Float(point.y),&hit) == .success,let hit else {fail("TARGET_WINDOW_NOT_FOCUSED")}
+ var hitPid:pid_t=0;var focused:CFTypeRef?;var hitWindow:CFTypeRef?
+ guard AXUIElementGetPid(hit,&hitPid) == .success,hitPid==pid_t(pid),
+       AXUIElementCopyAttributeValue(AXUIElementCreateApplication(pid_t(pid)),kAXFocusedWindowAttribute as CFString,&focused) == .success,let focused else {fail("TARGET_WINDOW_NOT_FOCUSED")}
+ if CFEqual(hit,focused) {return}
+ guard AXUIElementCopyAttributeValue(hit,kAXWindowAttribute as CFString,&hitWindow) == .success,let hitWindow,CFEqual(hitWindow,focused) else {fail("TARGET_WINDOW_NOT_FOCUSED")}
 }
 if action=="click" {let p=point();checkVisible(p);guard let down=CGEvent(mouseEventSource:nil,mouseType:.leftMouseDown,mouseCursorPosition:p,mouseButton:.left),let up=CGEvent(mouseEventSource:nil,mouseType:.leftMouseUp,mouseCursorPosition:p,mouseButton:.left) else { fail("EVENT_FAILED") };down.setIntegerValueField(.mouseEventClickState,value:1);up.setIntegerValueField(.mouseEventClickState,value:1);down.post(tap:.cghidEventTap);usleep(20000);up.post(tap:.cghidEventTap)}
 else if action=="type" { guard let text=input["text"] as? String,text.count<=500,!text.unicodeScalars.contains(where:{$0.value<32 || $0.value==127}) else { fail("INVALID_TEXT") };for character in text {check();let chars=Array(String(character).utf16);chars.withUnsafeBufferPointer{buffer in let down=CGEvent(keyboardEventSource:nil,virtualKey:0,keyDown:true)!;let up=CGEvent(keyboardEventSource:nil,virtualKey:0,keyDown:false)!;down.keyboardSetUnicodeString(stringLength:chars.count,unicodeString:buffer.baseAddress!);up.keyboardSetUnicodeString(stringLength:chars.count,unicodeString:buffer.baseAddress!);down.postToPid(pid_t(pid));up.postToPid(pid_t(pid))};usleep(12000)}}
