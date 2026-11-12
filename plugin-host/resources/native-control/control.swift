@@ -6,6 +6,11 @@ let raw=FileHandle.standardInput.readDataToEndOfFile()
 guard let input=(try? JSONSerialization.jsonObject(with:raw)) as? [String:Any], let action=input["action"] as? String else { fail("INVALID_INPUT") }
 func windows()->[[String:Any]] { CGWindowListCopyWindowInfo([.optionOnScreenOnly,.excludeDesktopElements],kCGNullWindowID) as? [[String:Any]] ?? [] }
 func rect(_ w:[String:Any])->CGRect { var r=CGRect.zero; if let b=w[kCGWindowBounds as String] as? NSDictionary { _ = CGRectMakeWithDictionaryRepresentation(b,&r) }; return r }
+func title(_ window:AXUIElement)->String? {
+ var value:CFTypeRef?
+ guard AXUIElementCopyAttributeValue(window,kAXTitleAttribute as CFString,&value) == .success else {return nil}
+ return value as? String
+}
 func output(_ value:[String:Any]) { let d=try! JSONSerialization.data(withJSONObject:value);print(String(data:d,encoding:.utf8)!) }
 // Only the explicit local setup flow invokes this; never exposed as a model action.
 if action=="request-input-permission" {
@@ -50,8 +55,11 @@ func target(_ requireFront:Bool)->CGRect {
   guard AXUIElementCopyAttributeValue(window,kAXPositionAttribute as CFString,&position) == .success,AXUIElementCopyAttributeValue(window,kAXSizeAttribute as CFString,&size) == .success,let position,let size else { fail("FOCUSED_WINDOW_UNAVAILABLE") }
   var point=CGPoint.zero;var dimensions=CGSize.zero
   guard AXValueGetValue(position as! AXValue,.cgPoint,&point),AXValueGetValue(size as! AXValue,.cgSize,&dimensions),CGRect(origin:point,size:dimensions)==r else { fail("TARGET_WINDOW_NOT_FOCUSED") }
-  // Bounds alone are ambiguous when sibling windows exactly overlap: fail closed.
-  let matches=windows().filter{($0[kCGWindowOwnerPID as String] as? Int)==pid && ($0[kCGWindowLayer as String] as? Int)==0 && rect($0)==r}
+  // Normal browser windows often share bounds. Cross-check the focused AX
+  // title with the selected CG window, retaining fail-closed ambiguity checks.
+  let selectedTitle=w[kCGWindowName as String] as? String ?? ""
+  guard title(window)==selectedTitle else {fail("TARGET_WINDOW_NOT_FOCUSED")}
+  let matches=windows().filter{($0[kCGWindowOwnerPID as String] as? Int)==pid && ($0[kCGWindowLayer as String] as? Int)==0 && rect($0)==r && ($0[kCGWindowName as String] as? String ?? "")==selectedTitle}
   guard matches.count==1 else { fail("AMBIGUOUS_FOCUSED_WINDOW") }
  }
  return r
@@ -67,6 +75,7 @@ if action=="observe" {
 }
 guard AXIsProcessTrusted() else { fail("INPUT_PERMISSION_REQUIRED") }
 if action=="focus" {
+ guard let selected=windows().first(where:{($0[kCGWindowNumber as String] as? Int)==id && ($0[kCGWindowOwnerPID as String] as? Int)==pid}),let selectedTitle=selected[kCGWindowName as String] as? String else {fail("TARGET_GONE")}
  let app=AXUIElementCreateApplication(pid_t(pid));var value:CFTypeRef?
  guard AXUIElementCopyAttributeValue(app,kAXWindowsAttribute as CFString,&value) == .success,let rows=value as? [AXUIElement] else {fail("FOCUSED_WINDOW_UNAVAILABLE")}
  let matches=rows.filter { window in
@@ -74,7 +83,7 @@ if action=="focus" {
   guard AXUIElementCopyAttributeValue(window,kAXPositionAttribute as CFString,&position) == .success,
         AXUIElementCopyAttributeValue(window,kAXSizeAttribute as CFString,&size) == .success,
         let position,let size else {return false}
-  return AXValueGetValue(position as! AXValue,.cgPoint,&point) && AXValueGetValue(size as! AXValue,.cgSize,&dimensions) && CGRect(origin:point,size:dimensions)==initial
+  return AXValueGetValue(position as! AXValue,.cgPoint,&point) && AXValueGetValue(size as! AXValue,.cgSize,&dimensions) && CGRect(origin:point,size:dimensions)==initial && title(window)==selectedTitle
  }
  guard matches.count==1 else {fail("AMBIGUOUS_FOCUSED_WINDOW")}
  guard let application=NSRunningApplication(processIdentifier:pid_t(pid)),application.activate() else {fail("TARGET_NOT_FOREGROUND")}
