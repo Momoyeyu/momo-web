@@ -31,3 +31,12 @@ def test_installed_mod_uses_packaged_resource_root(tmp_path,monkeypatch):
  monkeypatch.setenv('MOMO_RESOURCES_DIR',str(tmp_path/'models'))
  monkeypatch.setattr(bridge.sys,'frozen',True,raising=False)
  assert bridge.mod_resource()==tmp_path/'plugin-host/resources/minecraft/momo-fabric-companion-0.1.0.jar'
+
+def test_discovery_limit_counts_live_sessions_instead_of_old_client_files(tmp_path,monkeypatch):
+ monkeypatch.setattr(bridge,'DIRECTORY',tmp_path)
+ for i in range(24):(tmp_path/f'{i}.json').write_text('{}')
+ def inspect(session):
+  if session!='23':raise MinecraftError('Game session unavailable')
+  return {'pid':23},{'world':'w','account':'p'}
+ monkeypatch.setattr(bridge,'inspect',inspect)
+ assert bridge.sessions()['sessions'][0]['pid']==23

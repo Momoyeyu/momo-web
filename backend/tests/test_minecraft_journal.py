@@ -44,3 +44,18 @@ def test_old_integer_generation_table_migrates_without_losing_facts():
  journal.record({'world':'w'},1,[{'taskId':'old','state':'succeeded','evidence':{'x':1}}])
  journal.record({'world':'w'},'game-new',[{'taskId':'old','state':'succeeded','evidence':{'x':2}}])
  assert len(journal.recent({'world':'w'}))==2
+
+def test_exploration_remembers_only_observed_visits_and_isolated_dimensions():
+ b={'world':'w','account':'p'}
+ obs={**b,'dimension':'minecraft:overworld','x':-1.5,'y':64,'z':2,
+      'visibleBlocks':[{'block':'minecraft:crafting_table','x':1,'y':64,'z':2},
+                       {'block':'minecraft:diamond_ore','x':100,'y':1,'z':2}]}
+ journal.observe_visit(b,obs)
+ places=journal.explored(b)
+ assert len(places)==1 and places[0]['dimension']=='minecraft:overworld'
+ assert places[0]['landmarks']==[{'block':'minecraft:crafting_table','x':1,'y':64,'z':2}]
+ journal.observe_visit(b,{**obs,'dimension':'minecraft:the_nether'})
+ assert len(journal.explored(b))==2
+ assert journal.explored({'world':'other','account':'p'})==[]
+ journal.observe_visit(b,{**obs,'world':'spoofed','x':999})
+ assert len(journal.explored(b))==2

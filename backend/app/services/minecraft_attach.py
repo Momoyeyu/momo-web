@@ -36,10 +36,14 @@ def inspect(session):
 
 def sessions():
     rows=[]
-    for path in list(DIRECTORY.glob('*.json'))[:16]:
+    # Old JVM session files must not consume the live-client result limit.
+    # Prefer newest files, while bounding both discovery and network probes.
+    candidates=sorted(DIRECTORY.glob('*.json'),key=lambda path:path.lstat().st_mtime_ns,reverse=True)[:256]
+    for path in candidates:
         try:
             value,data=inspect(path.stem)
             rows.append({'id':path.stem,'pid':value['pid'],'ready':bool(data.get('world')),'world':data.get('world'),'account':data.get('account'),'playerName':data.get('playerName'),'worldName':data.get('worldName'),'dimension':data.get('dimension')})
+            if len(rows)>=16:break
         except MinecraftError: continue
     return {'sessions':rows}
 

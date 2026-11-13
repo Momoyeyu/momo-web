@@ -16,6 +16,36 @@ NATIVE_ERROR_CODES = frozenset(['SCREEN_PERMISSION_REQUIRED', 'INPUT_PERMISSION_
 _capture_edge = ContextVar('computer_capture_edge',default=1536)
 _pending = {}
 _lock = threading.RLock()
+GAME_EVENT_PREFIX = 'This is a gameplay decision event, not a player utterance. Continue or reconsider your durable goal using current evidence and granted skills. You may remain silent, but keep local gameplay purposeful. Do not claim pending actions are complete. Newly observed game data: '
+
+
+def retire_game_observations(messages):
+    """Replace obsolete request-local read snapshots, preserving action receipts.
+
+    Pixels already have a one-use lifetime. Repeated inventory/world snapshots
+    must not accumulate either. This never edits durable dialogue or task facts.
+    """
+    reads=set()
+    for message in messages:
+        if message.get('role')!='assistant':continue
+        for call in message.get('tool_calls',[]):
+            function=call.get('function',{})
+            if function.get('name')!='minecraft_action':continue
+            try:args=json.loads(function.get('arguments','{}'))
+            except (ValueError,TypeError):continue
+            if isinstance(args,dict) and args.get('action')=='observe':reads.add(call.get('id'))
+    for message in messages:
+        content=message.get('content')
+        if not isinstance(content,str):continue
+        event=message.get('role')=='system' and content.startswith(GAME_EVENT_PREFIX)
+        if not event and not (message.get('role')=='tool' and message.get('tool_call_id') in reads):continue
+        try:old=json.loads(content[len(GAME_EVENT_PREFIX):] if event else content)
+        except (ValueError,TypeError):continue
+        if not isinstance(old,dict) or not isinstance(old.get('observedAt'),(int,float)):continue
+        brief={k:old[k] for k in ('observedAt','world','account','dimension','x','y','z','health','hunger','screen','screenHandler') if k in old}
+        brief.update(superseded=True,notice='Past read-only snapshot; do not treat this as the current world. New observations replace its inventory, terrain and entities. Action outcomes remain separate task facts.')
+        message['content']=(GAME_EVENT_PREFIX if event else '')+json.dumps(brief,ensure_ascii=False)
+    if hasattr(messages,'refresh'):messages.game_observation_retired=True
 
 
 def require_local(*, allow_focus=False):
@@ -250,6 +280,7 @@ def execute(name,args):
                 if parsed.action=='submit' and (not parsed.taskId or not parsed.skill):raise ValueError('Task ID and skill required')
             else:command=parsed.model_dump(exclude={'clientId','leaseId','generation','action'})
             result=dict(minecraft.execute(parsed.action,command,parsed.generation,None,None))
+            if parsed.action=='observe':result=minecraft.model_observation(result)
             frame=result.pop('frame',None)
             if frame is not None:
                 prefix='data:image/png;base64,'

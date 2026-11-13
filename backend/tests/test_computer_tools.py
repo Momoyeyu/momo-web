@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import time
 from unittest.mock import patch
 import pytest
@@ -233,3 +234,37 @@ def test_desktop_observation_cannot_steal_bound_game_attention():
             computer.desktop_frame()
         assert not computer.observing
         assert minecraft.binding == {'world':'fixture'}
+
+def test_new_game_observation_retires_only_old_read_snapshot_not_action_receipts():
+ old={'observedAt':123,'x':1,'y':64,'z':2,'visibleEntities':[{'name':'x'*12000}]}
+ calls=[{'id':'read','function':{'name':'minecraft_action','arguments':'{"action":"observe"}'}},
+        {'id':'move','function':{'name':'minecraft_action','arguments':'{"action":"submit"}'}}]
+ messages=[{'role':'assistant','tool_calls':calls},
+           {'role':'tool','tool_call_id':'read','content':json.dumps(old)},
+           {'role':'tool','tool_call_id':'move','content':'{"task":{"state":"succeeded","evidence":{"x":2}}}'}]
+ action=dict(messages[2])
+ tools.retire_game_observations(messages)
+ assert messages[2]==action
+ retired=json.loads(messages[1]['content'])
+ assert retired['observedAt']==123 and retired['x']==1 and retired['superseded']
+ assert 'visibleEntities' not in retired and len(messages[1]['content'])<500
+
+def test_compaction_refresh_does_not_restore_retired_large_game_snapshot():
+ from app.services.turn import ContextMessages
+ event={'role':'system','content':tools.GAME_EVENT_PREFIX+json.dumps({'observedAt':1,'x':2,'visibleEntities':['x'*12000]})}
+ messages=ContextMessages([dict(event)]);messages.base_count=1
+ messages.rebuild=lambda:[dict(event)]
+ tools.retire_game_observations(messages)
+ messages.refresh()
+ assert len(messages[0]['content'])<1000 and 'superseded' in messages[0]['content']
+
+def test_game_model_projection_keeps_slot_addresses_and_requests_recipes_on_demand():
+ from app.services.minecraft import Minecraft
+ raw={'observedAt':1,'x':2,'slots':[{'id':0,'item':'minecraft:air','count':0,'components':{}},
+                                   {'id':9,'item':'minecraft:oak_log','count':4,'name':'橡木原木'}],
+      'knownRecipes':[{'id':'minecraft:oak_planks','ingredients':['x'*10000]}],
+      'task':{'state':'failed','evidence':{'blocksBroken':1}}}
+ result=Minecraft.model_observation(raw)
+ assert result['slots']==[{'id':0,'empty':True},raw['slots'][1]]
+ assert 'knownRecipes' not in result and result['recipeQueryAvailable']
+ assert result['task']==raw['task'] and 'knownRecipes' in raw

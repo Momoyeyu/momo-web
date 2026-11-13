@@ -132,6 +132,10 @@ class Minecraft:
                     try:self.stop('game_result_unknown')
                     except HostError:pass
                 raise
+            if action=='observe':
+                from . import minecraft_journal as journal
+                with self.lock:
+                    if generation==self.generation and self.binding:journal.observe_visit(self.binding,result)
             if action=='capabilities' and 'skillDefinitions' in result:
                 result=dict(result)
                 definitions=result.pop('skillDefinitions')
@@ -233,14 +237,26 @@ class Minecraft:
             prefix='data:image/png;base64,'
             if not frame.startswith(prefix) or len(frame)>5400000:raise MinecraftError('Invalid game frame')
             stage(base64.b64decode(frame[len(prefix):],validate=True),lambda:self.validate_decision(generation))
-        return {'kind':'minecraft','source':'Minecraft','observedAt':result.get('observedAt',time.time()*1000),'generation':generation,'state':result}
+        return {'kind':'minecraft','source':'Minecraft','observedAt':result.get('observedAt',time.time()*1000),'generation':generation,'state':self.model_observation(result)}
+
+    @staticmethod
+    def model_observation(value):
+        # Keep real slot addresses and facts, not a repeated catalogue of recipes
+        # and verbose empty stacks. Full unlocked recipes remain queryable.
+        result={k:v for k,v in value.items() if k!='knownRecipes'}
+        if 'knownRecipes' in value:result['recipeQueryAvailable']=True
+        if isinstance(value.get('slots'),list):
+            result['slots']=[{'id':slot['id'],'empty':True} if slot.get('item')=='minecraft:air' or slot.get('count')==0 else slot
+                             for slot in value['slots']]
+        return result
 
     def goal_context(self):
         import json
         from . import minecraft_journal as journal
         with self.lock:
             if not self.binding:return ''
-            data={'goal':journal.goal(self.binding),'tasks':list(self.tasks.values())[-4:],'paused':self.paused}
+            data={'goal':journal.goal(self.binding),'tasks':list(self.tasks.values())[-4:],'paused':self.paused,
+                  'exploredPlaces':journal.explored(self.binding)}
         return ('You are the same momo, currently sharing the player’s Minecraft character. Preserve your personality and agreements. '
             'Choose meaningful goals from curiosity, companionship, beauty, helping, survival or game progress; no fixed technology tree. '
             'Keep an active goal until a player instruction, significant event, blocked path or completion justifies changing it. '
