@@ -22,6 +22,7 @@ public final class GameSkills {
  private GameSkills(){}
  public static TaskRuntime.Work create(String skill,JsonObject args){
   SkillArguments.validate(skill,args);
+  if(skill.equals("gather"))return new GatherSkill(args);
   if(skill.equals("plan")){
    var work=new ArrayList<TaskPlan.Node>();
    for(var value:args.getAsJsonArray("steps")){
@@ -52,53 +53,53 @@ public final class GameSkills {
   BlockPos pos,placed,pathTarget,lastSeen;Entity entity;Screen ownedScreen;boolean navigating,startedUse;int ticks,actionIndex,phase,startFood,beforeCount,lostTicks;String beforeState,inventoryBefore,outputItem;InventoryEvidence inventoryProof;int mutationTick,craftPhase;final long pickupBoundary=PickupLedger.CURRENT.cursor();float startHealth;int targetSlot;
   Skill(String skill,JsonObject args){this.skill=skill;this.args=args;ownedScreen=c.currentScreen;}
   public void start(){
-   if(c.player==null||c.world==null||c.interactionManager==null)throw new IllegalStateException("No world");
+   if(c.player==null||c.world==null||c.interactionManager==null)throw new TaskRuntime.Rejected("world_unavailable");
    inventoryBefore=inventoryState();startFood=c.player.getHungerManager().getFoodLevel();startHealth=c.player.getHealth();
    ownedScreen=c.currentScreen;
    if(Set.of("navigate","mine","place","interactBlock").contains(skill)){
-    pos=position(args);if(!c.world.isChunkLoaded(pos)||c.player.squaredDistanceTo(pos.toCenterPos())>4096)throw new IllegalArgumentException("Outside known local terrain");
-    if(!skill.equals("navigate")&&!visible(pos))throw new IllegalArgumentException("Target is not visible");
+    pos=position(args);if(!c.world.isChunkLoaded(pos)||c.player.squaredDistanceTo(pos.toCenterPos())>4096)throw new TaskRuntime.Rejected("outside_known_terrain");
+    if(!skill.equals("navigate")&&!visible(pos))throw new TaskRuntime.Rejected("target_not_visible");
     beforeState=c.world.getBlockState(pos).toString();
    }
    if(Set.of("follow","interactEntity","attack").contains(skill)){
     entity=c.world.getEntityById(args.get("entityId").getAsInt());
-    if(entity==null||!c.player.canSee(entity)||entity.squaredDistanceTo(c.player)>1024)throw new IllegalArgumentException("Entity is not visible");lastSeen=entity.getBlockPos();
+    if(entity==null||!c.player.canSee(entity)||entity.squaredDistanceTo(c.player)>1024)throw new TaskRuntime.Rejected("target_not_visible");lastSeen=entity.getBlockPos();
    }
    if(skill.equals("navigate"))go(pos);
    if(skill.equals("mine")&&!c.world.getBlockState(pos).isAir())selectTool();
-   if(skill.equals("place")){targetSlot=args.get("slot").getAsInt();placed=pos.offset(direction(args));c.player.getInventory().selectedSlot=targetSlot;if(c.player.getMainHandStack().isEmpty())throw new IllegalArgumentException("Missing material");beforeState=c.world.getBlockState(placed).toString();}
+   if(skill.equals("place")){targetSlot=args.get("slot").getAsInt();placed=pos.offset(direction(args));c.player.getInventory().selectedSlot=targetSlot;if(c.player.getMainHandStack().isEmpty())throw new TaskRuntime.Rejected("material_missing");beforeState=c.world.getBlockState(placed).toString();}
    if(skill.equals("pickup")){
     int id=args.get("entityId").getAsInt();
     if(PickupLedger.CURRENT.since(c.world,id,c.player.getId(),pickupBoundary)==null){
      entity=c.world.getEntityById(id);
-     if(!(entity instanceof net.minecraft.entity.ItemEntity drop)||!c.player.canSee(entity))throw new IllegalArgumentException("Dropped item is not visible");
+     if(!(entity instanceof net.minecraft.entity.ItemEntity drop)||!c.player.canSee(entity))throw new TaskRuntime.Rejected("target_not_visible");
      outputItem=Registries.ITEM.getId(drop.getStack().getItem()).toString();beforeCount=count(outputItem);
     }
    }
    if(skill.equals("trade")){
-    if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.MerchantScreenHandler merchant))throw new IllegalArgumentException("Open a merchant first");
-    int index=args.get("index").getAsInt();if(index>=merchant.getRecipes().size()||merchant.getRecipes().get(index).isDisabled())throw new IllegalArgumentException("Trade unavailable");
+    if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.MerchantScreenHandler merchant))throw new TaskRuntime.Rejected("station_required");
+    int index=args.get("index").getAsInt();if(index>=merchant.getRecipes().size()||merchant.getRecipes().get(index).isDisabled())throw new TaskRuntime.Rejected("trade_unavailable");
     var offer=merchant.getRecipes().get(index);outputItem=Registries.ITEM.getId(offer.getSellItem().getItem()).toString();beforeCount=count(outputItem);targetSlot=offer.getSellItem().getCount()*args.get("count").getAsInt();
     merchant.setRecipeIndex(index);merchant.switchTo(index);c.player.networkHandler.sendPacket(new net.minecraft.network.packet.c2s.play.SelectMerchantTradeC2SPacket(index));
    }
-   if(skill.equals("eat")){targetSlot=foodSlot();if(targetSlot<0)throw new IllegalArgumentException("No food");c.player.getInventory().selectedSlot=targetSlot;beforeCount=c.player.getMainHandStack().getCount();}
+   if(skill.equals("eat")){targetSlot=foodSlot();if(targetSlot<0)throw new TaskRuntime.Rejected("food_missing");c.player.getInventory().selectedSlot=targetSlot;beforeCount=c.player.getMainHandStack().getCount();}
    if(skill.equals("useItem")){c.player.getInventory().selectedSlot=args.get("slot").getAsInt();beforeCount=c.player.getMainHandStack().getCount();}
    if(skill.equals("inventory")||skill.equals("workstation")){
     if(skill.equals("inventory")&&c.currentScreen==null)c.setScreen(new InventoryScreen(c.player));
     ownedScreen=c.currentScreen;
-    if(!screenName().equals(args.get("screen").getAsString()))throw new IllegalArgumentException("Screen changed");
+    if(!screenName().equals(args.get("screen").getAsString()))throw new TaskRuntime.Rejected("screen_changed");
    }
    if(skill.equals("craft")){
     if(c.currentScreen==null)c.setScreen(new InventoryScreen(c.player));ownedScreen=c.currentScreen;
     var recipe=c.world.getRecipeManager().get(identifier(args,"recipe")).orElseThrow(()->new IllegalArgumentException("Unknown recipe"));
-    if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.CraftingScreenHandler||c.player.currentScreenHandler instanceof net.minecraft.screen.PlayerScreenHandler))throw new IllegalArgumentException("Open a crafting station");
-    if(!c.player.getRecipeBook().contains(recipe))throw new IllegalArgumentException("Recipe not known to player");
+    if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.CraftingScreenHandler||c.player.currentScreenHandler instanceof net.minecraft.screen.PlayerScreenHandler))throw new TaskRuntime.Rejected("station_required");
+    if(!c.player.getRecipeBook().contains(recipe))throw new TaskRuntime.Rejected("recipe_unknown");
     var output=recipe.value().getResult(c.world.getRegistryManager());outputItem=Registries.ITEM.getId(output.getItem()).toString();beforeCount=count(outputItem);
-    if(!c.player.currentScreenHandler.getCursorStack().isEmpty())throw new IllegalArgumentException("Empty the cursor first");
+    if(!c.player.currentScreenHandler.getCursorStack().isEmpty())throw new TaskRuntime.Rejected("cursor_not_empty");
     inventoryProof=new InventoryEvidence(beforeCount,c.player.currentScreenHandler.getRevision());
    }
    if(skill.equals("closeScreen"))c.player.closeHandledScreen();
-   if(skill.equals("respawn")){if(c.player.isAlive())throw new IllegalArgumentException("Already alive");c.player.requestRespawn();}
+   if(skill.equals("respawn")){if(c.player.isAlive())throw new TaskRuntime.Rejected("already_alive");c.player.requestRespawn();}
   }
   public TaskRuntime.Step tick(){
    if(++ticks>2400)return TaskRuntime.Step.failed("skill_timeout");

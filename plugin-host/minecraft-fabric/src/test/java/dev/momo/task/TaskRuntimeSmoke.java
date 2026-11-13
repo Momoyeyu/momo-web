@@ -13,6 +13,10 @@ public final class TaskRuntimeSmoke {
  }
  static void check(boolean ok,String why){if(!ok)throw new AssertionError(why);}
  public static void main(String[] args){
+  TaskRuntime invalid=new TaskRuntime();
+  Work missing=new Work(){public void start(){throw new TaskRuntime.Rejected("target_not_visible");}};
+  invalid.submit("missing","mine",missing,0,10000);invalid.tick(1);
+  check(invalid.snapshot("missing").reason().equals("target_not_visible"),"expected game conditions return a useful reason, not a transport failure");
   TaskRuntime runtime=new TaskRuntime();Work a=new Work(),b=new Work();
   runtime.submit("a","mine",a,0,10000);runtime.submit("b","craft",b,0,10000);
   check(runtime.snapshot("a").state().equals("queued"),"accepted is not success");

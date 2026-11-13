@@ -15,7 +15,7 @@ public final class TaskPlan implements TaskRuntime.Work {
   while(index<steps.size()&&!steps.get(index).condition.getAsBoolean()){outcomes.add(Map.of("step",index,"skipped","condition_false"));index++;}
   if(index==steps.size()){finished=true;return;}
   running=true;
-  try{steps.get(index).work.start();}catch(RuntimeException error){failed("start_failed");}
+  try{steps.get(index).work.start();}catch(RuntimeException error){failed(TaskRuntime.reason(error,"start_failed"));}
  }
  public TaskRuntime.Step tick(){
   if(failure!=null)return failure;
@@ -37,6 +37,7 @@ public final class TaskPlan implements TaskRuntime.Work {
  public void pause(){if(running)steps.get(index).work.pause();}
  public void resume(){if(running)steps.get(index).work.resume();}
  public void stop(){release();}
+ public Map<String,Object> partialEvidence(){return outcomes.isEmpty()?Map.of():Map.of("steps",List.copyOf(outcomes));}
  public Map<String,Object> progress(){return finished?Map.of("completedSteps",index):Map.of("step",index,"completedSteps",outcomes.size(),"action",steps.get(index).work.progress());}
  public boolean acceptsScreen(Object screen){return !finished&&failure==null&&steps.get(index).work.acceptsScreen(screen);}
 }

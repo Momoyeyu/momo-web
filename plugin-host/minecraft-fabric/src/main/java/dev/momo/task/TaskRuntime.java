@@ -8,6 +8,11 @@ import java.util.Map;
 
 /** Game-thread owned bounded task queue. Never waits for a network or model response. */
 public final class TaskRuntime {
+ public static final class Rejected extends IllegalStateException {
+  public final String reason;
+  public Rejected(String reason){super(reason);if(!reason.matches("[a-z_]{1,64}"))throw new IllegalArgumentException("Invalid failure code");this.reason=reason;}
+ }
+ public static String reason(RuntimeException error,String fallback){return error instanceof Rejected rejected?rejected.reason:fallback;}
  public interface Work {
   void start();
   Step tick();
@@ -16,6 +21,7 @@ public final class TaskRuntime {
   void stop();
   default boolean acceptsScreen(Object screen){return false;}
   default Map<String,Object> progress(){return Map.of();}
+  default Map<String,Object> partialEvidence(){return Map.of();}
  }
  public record Step(String state,String reason,Map<String,Object> evidence){
   public static Step running(){return new Step("running","",Map.of());}
@@ -63,7 +69,7 @@ public final class TaskRuntime {
   if(paused)return;
   if(current==null&&!queue.isEmpty()){
    current=queue.remove();current.state="running";publish(current);
-   try{current.work.start();}catch(RuntimeException error){finish(current,"failed","start_failed",Map.of());}
+   try{current.work.start();}catch(RuntimeException error){finish(current,"failed",reason(error,"start_failed"),Map.of());}
   }
   if(current==null)return;
   try{
@@ -72,13 +78,13 @@ public final class TaskRuntime {
    if(step.state.equals("succeeded")){
     if(step.evidence.isEmpty())finish(current,"failed","unverified_result",Map.of());
     else finish(current,"succeeded","",Map.copyOf(step.evidence));
-   }else if(step.state.equals("failed"))finish(current,"failed",step.reason,Map.of());
+   }else if(step.state.equals("failed"))finish(current,"failed",step.reason,step.evidence);
    else if(step.state.equals("running")&&now-current.lastProgress>=1000){
     var progress=Map.copyOf(current.work.progress());
     if(!progress.equals(current.progress)){current.progress=progress;publish(current);}current.lastProgress=now;
    }
    else if(!step.state.equals("running"))throw new IllegalArgumentException("Invalid outcome");
-  }catch(RuntimeException error){System.getLogger("momo-minecraft").log(System.Logger.Level.WARNING,"Local skill failed",error);if(current!=null)finish(current,"failed","execution_failed",Map.of());}
+  }catch(RuntimeException error){System.getLogger("momo-minecraft").log(System.Logger.Level.WARNING,"Local skill failed",error);if(current!=null)finish(current,"failed",reason(error,"execution_failed"),Map.of());}
  }
  public void heartbeat(long now,long leaseMs){
   validateLease(leaseMs);
@@ -141,7 +147,9 @@ public final class TaskRuntime {
   boolean owns=job==current;
   job.state=state;job.reason=reason;job.evidence=evidence;
   if(owns){
-   try{job.work.stop();}catch(RuntimeException error){job.state="failed";job.reason="stop_unconfirmed";job.evidence=Map.of();uncertainStop=job.work;}
+   try{var partial=new LinkedHashMap<>(job.work.partialEvidence());partial.putAll(evidence);job.evidence=Map.copyOf(partial);}
+   catch(RuntimeException ignored){/* Receipt collection must never prevent releasing the body. */}
+   try{job.work.stop();}catch(RuntimeException error){job.state="failed";job.reason="stop_unconfirmed";uncertainStop=job.work;}
    current=null;
   }
   publish(job);

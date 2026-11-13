@@ -481,7 +481,8 @@
                   "respawn",
                   "pickup",
                   "waitFor",
-                  "trade"
+                  "trade",
+                  "gather"
                 ]
               },
               "args": {
@@ -544,6 +545,29 @@
       },
       "required": [
         "steps"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "gather": {
+    "description": "Continuously collect additional items locally: find normal line-of-sight sources or dropped stacks, navigate, use a suitable tool, break and pick up, until inventory really gains count. No hidden ore/resource scans. If no source is visible, explore another area rather than repeatedly retrying the same spot.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "item": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 128
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      },
+      "required": [
+        "item",
+        "count"
       ],
       "additionalProperties": false
     }

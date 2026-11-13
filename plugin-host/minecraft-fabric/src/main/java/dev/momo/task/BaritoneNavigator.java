@@ -16,8 +16,8 @@ public final class BaritoneNavigator {
  private int warmup,pendingTicks;
  private boolean started,pending;
  private static IBaritone releasedByUs;
- private final Map<Settings.Setting<Boolean>,Boolean> settings=new LinkedHashMap<>();
- private void override(Settings.Setting<Boolean> setting,boolean value){settings.putIfAbsent(setting,setting.value);setting.value=value;}
+ private final Map<Settings.Setting<?>,Runnable> settings=new LinkedHashMap<>();
+ private <T> void override(Settings.Setting<T> setting,T value){T previous=setting.value;settings.putIfAbsent(setting,()->setting.value=previous);setting.value=value;}
  public void start(int x,int y,int z){
   baritone=BaritoneAPI.getProvider().getPrimaryBaritone();
   if(baritone.getPathingBehavior().isPathing()||baritone.getCustomGoalProcess().isActive()||(baritone.getPathingBehavior().getInProgress().isPresent()&&baritone!=releasedByUs))throw new IllegalStateException("Another navigator owns control");
@@ -27,6 +27,10 @@ public final class BaritoneNavigator {
   override(config.chatControl,false);override(config.chatControlAnyway,false);override(config.prefixControl,false);
   override(config.freeLook,false);override(config.renderPath,false);override(config.renderGoal,false);
   override(config.chunkCaching,false);
+  override(config.primaryTimeoutMS,Math.min(1000L,Math.max(1L,config.primaryTimeoutMS.value)));
+  override(config.failureTimeoutMS,Math.min(3000L,Math.max(1L,config.failureTimeoutMS.value)));
+  override(config.planAheadPrimaryTimeoutMS,Math.min(500L,Math.max(1L,config.planAheadPrimaryTimeoutMS.value)));
+  override(config.planAheadFailureTimeoutMS,Math.min(1500L,Math.max(1L,config.planAheadFailureTimeoutMS.value)));
   goal=new GoalNear(new BlockPos(x,y,z),1);
   warmup=4;
   pendingTicks=0;started=false;pending=baritone.getPathingBehavior().getInProgress().isPresent();
@@ -36,7 +40,7 @@ public final class BaritoneNavigator {
  public void stop(){
   if(baritone!=null&&goal!=null&&started){baritone.getCustomGoalProcess().setGoal(null);baritone.getPathingBehavior().cancelEverything();baritone.getInputOverrideHandler().clearAllKeys();releasedByUs=baritone;}
   goal=null;pending=started=false;
-  settings.forEach((key,value)->key.value=value);settings.clear();
+  settings.values().forEach(Runnable::run);settings.clear();
  }
  public boolean arrived(){
   var client=MinecraftClient.getInstance();
