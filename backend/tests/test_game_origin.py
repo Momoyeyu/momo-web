@@ -29,3 +29,20 @@ def test_game_event_does_not_open_owner_extensions_and_filters_declarations(monk
  monkeypatch.setattr(llm,'chat_stream',chat)
  events=list(turn.run_turn('',observation={'kind':'minecraft','source':'Minecraft','observedAt':1,'state':{}}))
  assert not [event for event in events if event['t']=='error']
+
+
+def test_game_event_stops_its_turn_after_releasing_its_binding(monkeypatch):
+ calls=[]
+ def chat(*args,**kwargs):
+  assert not calls, 'stopped activity must not start another model request'
+  yield {'type':'tool_calls','calls':[
+   {'id':'stop','function':{'name':'minecraft_action','arguments':'{"action":"stop"}'}},
+   {'id':'late','function':{'name':'minecraft_goal','arguments':'{}'}}]}
+ def execute(call,ext,**kwargs):
+  calls.append(call['id'])
+  return {'role':'tool','tool_call_id':call['id'],'content':json.dumps({'stopped':True,'active':False})}
+ monkeypatch.setattr(llm,'chat_stream',chat)
+ monkeypatch.setattr(turn,'run_call',execute)
+ events=list(turn.run_turn('',observation={'kind':'minecraft','source':'Minecraft','observedAt':1,'state':{}}))
+ assert calls==['stop']
+ assert not [event for event in events if event['t']=='error']

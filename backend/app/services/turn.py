@@ -488,6 +488,11 @@ def react(
                         import json
                         try:
                             task_result=json.loads(result['content'])
+                            action_args=json.loads(call.get('function',{}).get('arguments','{}'))
+                            if game_event and action_args.get('action')=='stop' and task_result.get('active') is False:
+                                # This event deliberately retired its own binding. Do not
+                                # dispatch later calls or generate speech under old authority.
+                                return
                             game_yield=game_yield or task_result.get('task',{}).get('state') in {'queued','running','paused'} and 'accepted' in task_result
                         except (ValueError,TypeError,AttributeError):pass
                     if call.get('function', {}).get('name') == 'image_read':
