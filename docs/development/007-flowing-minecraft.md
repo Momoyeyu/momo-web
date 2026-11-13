@@ -2,6 +2,10 @@
 
 Approved replacement specification, 2026-11-13. Status: implementation in progress; not accepted/done. This is the single active implementation specification. Historical plan and research are evidence, not competing designs.
 
+### 当前交付状态（2026-11-14）
+
+007 尚未完成。已实测导航、视线内采集、精确合成、方块破坏／放置、背包交换、工作台物品转移和暂停释放；这些是分项证据。完整战斗、原版加工／交易／交通／维度等能力组、连续自主游玩、接管／恢复以及最终安装版仍需集中验证。不能因为工具已声明或单项 smoke 通过就标记 done。
+
 ## Product contract
 
 Control the player's existing Fabric Java 1.21.1 client, account and world. No extra client/account, Docker, Bash, arbitrary generated script, cheats or second reasoning personality. Vanilla common gameplay is supported; modded mechanics are best effort with explicit unsupported feedback. Use normal player knowledge, visible discoveries and exploration memory; collision navigation is allowed, underground resource scanning is not. Unified gameplay permission includes PvP. Target continuous normal-player combat rather than competitive win rates.
@@ -177,5 +181,13 @@ Fabric 增加严格声明的语义技能与最多 24 步的本地顺序计划，
 - 保留 momo 自己打开的具体工作站界面，允许跨任务观察和操作；不接管玩家已经打开的界面。玩家在 momo 的界面点击、滚动或输入会交还控制。死亡画面仍允许观察与重生决策。
 - 未确认释放时不启动排队任务或生存反应。取消计划保留当前子步骤的真实部分收获；制作／交易的不确定确认超时不能跳过后继续副作用。
 - 连接协商失败撤销临时绑定；已知前台／参数／忙碌拒绝不误报未知结果。暂停入口匹配实际游玩权限，切换后强制刷新，旧在途状态不能覆盖新状态。
+
+### 槽位与工作台回执复核
+
+原版在客户端预测正确时不会为每次槽位点击返回更新。momo 对自己发出的原版点击使用不同的槽位版本请求服务端完整重同步；槽位、按钮、操作和物品内容保持原点击含义，不追加第二次操作，也不改变真人点击。每一步等待当前世界／界面、实际目标槽位与光标一致的服务端快照，不能用无关背包变化证明加工成功。加工等待只检查相应原版工作站的输出槽。
+
+真实客户端已通过背包交换及换回，工作台中 14 块泥土取放后全部归还；界面可跨任务保留，停止时仅关闭 momo 自己打开且光标为空、控制已释放的界面，真人接管时保留界面。放置工作台替换草丛也已核对服务端实际工作台方块，不再把草丛消失后的空气误认成放置完成。暂停前仍持有前进键的回归测得 350ms 内位移为零，最终释放按键为零；这是单次实测，不是 P99 或完整反应时限结论。
+
+失败采集现在保留物品、维度、位置、视线探测数和实际失败原因；同一地点重复失败会向唯一协调器提供换区域／换方法的事实提示，不硬编码下一个目标。战斗技能不再被重复的防御反应打断；危急脱险仍优先于进食和战斗。后两项生存策略目前为确定性测试证据，实际战斗仍未验收。
 
 上述增量已有确定性回归和真实协议管道测试；最终战斗、加工、交通、维度与安装版测试仍未完成，007 保持进行中。

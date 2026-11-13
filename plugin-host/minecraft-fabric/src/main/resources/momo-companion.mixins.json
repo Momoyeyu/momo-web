@@ -1,1 +1,1 @@
-{"required":true,"package":"dev.momo.mixin","compatibilityLevel":"JAVA_21","client":["GameplayInputMixin","GameplayInputAccess","PhysicalInputMixin","PhysicalKeyboardMixin","PickupReceiptMixin","BlockReceiptMixin"],"injectors":{"defaultRequire":1}}
+{"required":true,"package":"dev.momo.mixin","compatibilityLevel":"JAVA_21","client":["GameplayInputMixin","GameplayInputAccess","PhysicalInputMixin","PhysicalKeyboardMixin","PickupReceiptMixin","BlockReceiptMixin","InventoryReceiptMixin","SlotConfirmationMixin"],"injectors":{"defaultRequire":1}}

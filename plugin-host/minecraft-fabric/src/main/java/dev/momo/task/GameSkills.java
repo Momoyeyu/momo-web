@@ -53,11 +53,15 @@ public final class GameSkills {
   final BaritoneNavigator navigation=new BaritoneNavigator();
   BlockPos pos,placed,pathTarget,lastSeen;Entity entity;Screen ownedScreen;boolean navigating,startedUse;int ticks,actionIndex,phase,startFood,beforeCount,lostTicks;String beforeState,inventoryBefore,outputItem;InventoryEvidence inventoryProof;int mutationTick,craftPhase;final long pickupBoundary=PickupLedger.CURRENT.cursor();float startHealth;int targetSlot;
   long blockBoundary;String beforeBlock;int predictedChangeTick;
+  boolean placeSent,inventoryPending,buttonPending;String placedItem;int verifiedActions;
+  net.minecraft.client.world.ClientWorld proofWorld;int proofHandler;long slotBoundary;SlotProof slotProof;
+  Map<String,Object> verifiedGain=Map.of(),verifiedSlots=Map.of();
   Skill(String skill,JsonObject args){this.skill=skill;this.args=args;ownedScreen=c.currentScreen;}
   public void start(){
    if(c.player==null||c.world==null||c.interactionManager==null)throw new TaskRuntime.Rejected("world_unavailable");
    ticks=0;phase=0;predictedChangeTick=0;inventoryBefore=inventoryState();startFood=c.player.getHungerManager().getFoodLevel();startHealth=c.player.getHealth();
    ownedScreen=c.currentScreen;
+   proofWorld=c.world;proofHandler=c.player.currentScreenHandler.syncId;placeSent=inventoryPending=buttonPending=false;verifiedActions=0;
    if(Set.of("navigate","mine","place","interactBlock").contains(skill)){
     pos=position(args);if(!c.world.isChunkLoaded(pos)||c.player.squaredDistanceTo(pos.toCenterPos())>4096)throw new TaskRuntime.Rejected("outside_known_terrain");
     if(!skill.equals("navigate")&&!visible(pos))throw new TaskRuntime.Rejected("target_not_visible");
@@ -69,7 +73,12 @@ public final class GameSkills {
    }
    if(skill.equals("navigate"))go(pos);
    if(skill.equals("mine")&&!c.world.getBlockState(pos).isAir())selectTool();
-   if(skill.equals("place")){targetSlot=args.get("slot").getAsInt();placed=pos.offset(direction(args));c.player.getInventory().selectedSlot=targetSlot;if(c.player.getMainHandStack().isEmpty())throw new TaskRuntime.Rejected("material_missing");beforeState=c.world.getBlockState(placed).toString();}
+   if(skill.equals("place")){
+    targetSlot=args.get("slot").getAsInt();c.player.getInventory().selectedSlot=targetSlot;var stack=c.player.getMainHandStack();
+    if(!(stack.getItem() instanceof BlockItem))throw new TaskRuntime.Rejected("block_item_required");
+    placedItem=Registries.ITEM.getId(stack.getItem()).toString();var dir=direction(args);var hit=new BlockHitResult(pos.toCenterPos().add(Vec3d.of(dir.getVector()).multiply(.5)),dir,pos,false);
+    placed=new ItemPlacementContext(c.player,Hand.MAIN_HAND,stack,hit).getBlockPos();beforeState=c.world.getBlockState(placed).toString();
+   }
    if(skill.equals("pickup")){
     int id=args.get("entityId").getAsInt();
     if(PickupLedger.CURRENT.since(c.world,id,c.player.getId(),pickupBoundary)==null){
@@ -93,6 +102,7 @@ public final class GameSkills {
     if(!screenName().equals(args.get("screen").getAsString()))throw new TaskRuntime.Rejected("screen_changed");
     inventoryProof=new InventoryEvidence(0,c.player.currentScreenHandler.getRevision());
    }
+   if(skill.equals("waitFor")&&args.get("area").getAsString().equals("screen")&&StationOutputs.indices(screenName()).isEmpty())throw new TaskRuntime.Rejected("station_required");
    if(skill.equals("craft")){
     if(c.currentScreen==null)c.setScreen(new InventoryScreen(c.player));ownedScreen=c.currentScreen;
     var recipe=c.world.getRecipeManager().get(identifier(args,"recipe")).orElseThrow(()->new IllegalArgumentException("Unknown recipe"));
@@ -132,12 +142,13 @@ public final class GameSkills {
      c.interactionManager.updateBlockBreakingProgress(pos,face(pos));c.player.swingHand(Hand.MAIN_HAND);break;
     case "place":
      var built=BlockReceipts.CURRENT.after(c.world,placed.getX(),placed.getY(),placed.getZ(),blockBoundary);
-     if(built!=null&&!built.state().equals(beforeState))return done(Map.of("x",placed.getX(),"y",placed.getY(),"z",placed.getZ(),"block",built.state(),"serverBlockSeq",built.seq()));
-     if(!c.world.getBlockState(placed).toString().equals(beforeState)){if(predictedChangeTick==0)predictedChangeTick=ticks;if(ticks-predictedChangeTick>100)return TaskRuntime.Step.failed("server_confirmation_missing");break;}
-     if(predictedChangeTick!=0&&built!=null)return TaskRuntime.Step.failed("block_change_rejected");
+     if(placeSent&&built!=null&&!built.state().equals(beforeState)){
+      var actual=Registries.BLOCK.get(Identifier.of(built.block()));
+      if(PlacementEvidence.matches(placedItem,Registries.ITEM.getId(actual.asItem()).toString(),actual.getDefaultState().isAir(),built.seq(),blockBoundary))return done(Map.of("x",placed.getX(),"y",placed.getY(),"z",placed.getZ(),"block",built.state(),"serverBlockSeq",built.seq()));
+     }
      if(!reachable(pos)){approach(pos,20);break;}haltNavigation();
-     if(++phase>40)return TaskRuntime.Step.failed("placement_blocked_or_material_missing");
-     if(ticks%6==1){var direction=direction(args);var hit=new BlockHitResult(pos.toCenterPos().add(Vec3d.of(direction.getVector()).multiply(.5)),direction,pos,false);look(hit.getPos());c.interactionManager.interactBlock(c.player,Hand.MAIN_HAND,hit);c.player.swingHand(Hand.MAIN_HAND);}break;
+     if(++phase>100)return TaskRuntime.Step.failed(built==null&&placeSent?"server_confirmation_missing":"placement_blocked_or_material_missing");
+     if(ticks%6==1){var direction=direction(args);var hit=new BlockHitResult(pos.toCenterPos().add(Vec3d.of(direction.getVector()).multiply(.5)),direction,pos,false);look(hit.getPos());if(!placeSent){blockBoundary=BlockReceipts.CURRENT.cursor();placeSent=true;}c.interactionManager.interactBlock(c.player,Hand.MAIN_HAND,hit);c.player.swingHand(Hand.MAIN_HAND);}break;
     case "interactBlock":
      if(!reachable(pos)){approach(pos,20);break;}haltNavigation();
      if(phase++==0){look(pos.toCenterPos());c.interactionManager.interactBlock(c.player,Hand.MAIN_HAND,new BlockHitResult(pos.toCenterPos(),face(pos),pos,false));}
@@ -158,13 +169,14 @@ public final class GameSkills {
     case "waitFor":
      int present=0;
      if(args.get("area").getAsString().equals("inventory")){for(int i=0;i<c.player.getInventory().size();i++){var stack=c.player.getInventory().getStack(i);if(expectedStack(stack))present+=stack.getCount();}}
-     else for(var slot:c.player.currentScreenHandler.slots)if(expectedStack(slot.getStack()))present+=slot.getStack().getCount();
+     else for(int index:StationOutputs.indices(screenName()))if(index<c.player.currentScreenHandler.slots.size()){var stack=c.player.currentScreenHandler.getSlot(index).getStack();if(expectedStack(stack))present+=stack.getCount();}
      if(present>=args.get("count").getAsInt())return done(Map.of("item",args.get("item").getAsString(),"count",present));
      if(ticks>=args.get("ticks").getAsInt())return TaskRuntime.Step.failed("processing_result_timeout");break;
     case "trade":
      if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.MerchantScreenHandler))return TaskRuntime.Step.failed("merchant_closed");
-     if(craftPhase==3&&inventoryProof.settled(ticks,count(outputItem),c.player.currentScreenHandler.getCursorStack().isEmpty(),c.player.currentScreenHandler.getRevision())){
-      if(count(outputItem)-beforeCount>=targetSlot)return done(Map.of("item",outputItem,"countBefore",beforeCount,"countAfter",count(outputItem),"serverRevision",c.player.currentScreenHandler.getRevision()));
+     if(gainSettled()){
+      verifiedGain=gainReceipt();
+      if(count(outputItem)-beforeCount>=targetSlot)return done(verifiedGain);
       craftPhase=1;mutationTick=ticks;
      }
      takeOneOutput(2);
@@ -180,21 +192,28 @@ public final class GameSkills {
      if(ticks>=args.get("ticks").getAsInt())return done(Map.of("ticks",ticks,"item",Registries.ITEM.getId(c.player.getMainHandStack().getItem()).toString(),"countBefore",beforeCount,"countAfter",c.player.getMainHandStack().getCount(),"using",c.player.isUsingItem()));break;
     case "inventory","workstation":
      if(!screenName().equals(args.get("screen").getAsString()))return TaskRuntime.Step.failed("screen_changed");
-     if(ticks%4==1&&actionIndex<args.getAsJsonArray("actions").size()){
-      var a=args.getAsJsonArray("actions").get(actionIndex++).getAsJsonObject();int slot=a.get("slot").getAsInt(),button=a.get("button").getAsInt();String mode=a.get("mode").getAsString();
-      if(mode.equals("button"))c.interactionManager.clickButton(c.player.currentScreenHandler.syncId,slot);
-      else {if(slot>=c.player.currentScreenHandler.slots.size())return TaskRuntime.Step.failed("slot_missing");c.interactionManager.clickSlot(c.player.currentScreenHandler.syncId,slot,button,switch(mode){case "quickMove"->SlotActionType.QUICK_MOVE;case "swap"->SlotActionType.SWAP;case "throw"->SlotActionType.THROW;default->SlotActionType.PICKUP;},c.player);}
-      mutationTick=ticks;inventoryProof.mutated(ticks,c.player.currentScreenHandler.getRevision());
+     if(inventoryPending){
+      boolean confirmed=slotSettled()||(buttonPending&&slotProof.settledButton(ticks,InventoryReceipts.CURRENT.changes(proofWorld,proofHandler,slotBoundary)));
+      if(confirmed){inventoryPending=false;verifiedActions++;verifiedSlots=inventoryReceipt(inventoryState());if(actionIndex>=args.getAsJsonArray("actions").size())return done(verifiedSlots);}
+      else if(ticks-mutationTick>100)return TaskRuntime.Step.failed(slotReceipt()==null&&!buttonPending?"server_confirmation_missing":"slot_change_rejected");
      }
-     if(actionIndex>=args.getAsJsonArray("actions").size()){
-      String after=inventoryState();boolean changed=!after.equals(inventoryBefore);
-      if(inventoryProof.settledMutation(ticks,changed,c.player.currentScreenHandler.getRevision()))return done(inventoryReceipt(after));
-      if(ticks-mutationTick>100)return TaskRuntime.Step.failed(changed?"server_confirmation_missing":"no_inventory_change");
-     }break;
+     if(!inventoryPending&&ticks%4==1&&actionIndex<args.getAsJsonArray("actions").size()){
+      var a=args.getAsJsonArray("actions").get(actionIndex++).getAsJsonObject();int slot=a.get("slot").getAsInt(),button=a.get("button").getAsInt();String mode=a.get("mode").getAsString();
+      buttonPending=mode.equals("button");
+      if(buttonPending){
+       if(!StationOutputs.hasButtons(screenName()))return TaskRuntime.Step.failed("station_button_unsupported");
+       slotBoundary=InventoryReceipts.CURRENT.cursor();slotProof=new SlotProof(SlotConfirmation.snapshot(c),SlotConfirmation.fingerprint(c.player.currentScreenHandler.getCursorStack()));
+       var watched=new HashSet<Integer>();for(var target:c.player.currentScreenHandler.slots)if(target.inventory!=c.player.getInventory())watched.add(target.id);slotProof.buttonSlots(watched);
+       c.interactionManager.clickButton(c.player.currentScreenHandler.syncId,slot);slotProof.mutated(ticks,slotBoundary,SlotConfirmation.snapshot(c),SlotConfirmation.fingerprint(c.player.currentScreenHandler.getCursorStack()));mutationTick=ticks;
+      }else {if(slot>=c.player.currentScreenHandler.slots.size())return TaskRuntime.Step.failed("slot_missing");verifiedClick(slot,button,switch(mode){case "quickMove"->SlotActionType.QUICK_MOVE;case "swap"->SlotActionType.SWAP;case "throw"->SlotActionType.THROW;default->SlotActionType.PICKUP;});}
+      inventoryPending=true;
+     }
+     break;
     case "craft":
      int gained=count(outputItem)-beforeCount;
-     if(craftPhase==3&&inventoryProof.settled(ticks,count(outputItem),c.player.currentScreenHandler.getCursorStack().isEmpty(),c.player.currentScreenHandler.getRevision())){
-      if(gained>=args.get("count").getAsInt())return done(Map.of("item",outputItem,"countBefore",beforeCount,"countAfter",count(outputItem),"serverRevision",c.player.currentScreenHandler.getRevision()));
+     if(gainSettled()){
+      verifiedGain=gainReceipt();
+      if(gained>=args.get("count").getAsInt())return done(verifiedGain);
       craftPhase=0;
      }
      if(craftPhase==0){c.interactionManager.clickRecipe(c.player.currentScreenHandler.syncId,c.world.getRecipeManager().get(identifier(args,"recipe")).orElseThrow(),false);mutationTick=ticks;craftPhase=1;}
@@ -208,13 +227,13 @@ public final class GameSkills {
   private void takeOneOutput(int outputSlot){
    if(craftPhase==1&&ticks-mutationTick>=4&&!c.player.currentScreenHandler.getSlot(outputSlot).getStack().isEmpty()){
       // Pickup exactly one recipe output, rather than shift-crafting every available ingredient.
-      c.interactionManager.clickSlot(c.player.currentScreenHandler.syncId,outputSlot,0,SlotActionType.PICKUP,c.player);mutationTick=ticks;craftPhase=2;
+      verifiedClick(outputSlot,0,SlotActionType.PICKUP);craftPhase=2;
      }else if(craftPhase==2&&ticks-mutationTick>=3&&!c.player.currentScreenHandler.getCursorStack().isEmpty()){
       var cursor=c.player.currentScreenHandler.getCursorStack();
       var destination=c.player.currentScreenHandler.slots.stream().filter(slot->slot.inventory==c.player.getInventory()&&slot.canInsert(cursor)&&slot.getStack().isEmpty()).findFirst();
       if(destination.isEmpty())destination=c.player.currentScreenHandler.slots.stream().filter(slot->slot.inventory==c.player.getInventory()&&slot.canInsert(cursor)&&net.minecraft.item.ItemStack.areItemsAndComponentsEqual(slot.getStack(),cursor)&&slot.getStack().getCount()+cursor.getCount()<=slot.getMaxItemCount(cursor)).findFirst();
       if(destination.isEmpty())throw new TaskRuntime.Rejected("inventory_full");
-      c.interactionManager.clickSlot(c.player.currentScreenHandler.syncId,destination.get().id,0,SlotActionType.PICKUP,c.player);mutationTick=ticks;inventoryProof.mutated(ticks,c.player.currentScreenHandler.getRevision());craftPhase=3;
+      verifiedClick(destination.get().id,0,SlotActionType.PICKUP);inventoryProof.mutated(ticks,c.player.currentScreenHandler.getRevision());craftPhase=3;
      }
   }
   private TaskRuntime.Step combat(){
@@ -244,6 +263,14 @@ public final class GameSkills {
    else if(c.player.isUsingItem()&&c.player.getActiveHand()==Hand.OFF_HAND)c.interactionManager.stopUsingItem(c.player);
    return TaskRuntime.Step.running();
   }
+  private void verifiedClick(int slot,int button,SlotActionType mode){
+   proofHandler=c.player.currentScreenHandler.syncId;slotBoundary=InventoryReceipts.CURRENT.cursor();slotProof=new SlotProof(SlotConfirmation.snapshot(c),SlotConfirmation.fingerprint(c.player.currentScreenHandler.getCursorStack()));
+   SlotConfirmation.click(c,slot,button,mode);mutationTick=ticks;slotProof.mutated(ticks,slotBoundary,SlotConfirmation.snapshot(c),SlotConfirmation.fingerprint(c.player.currentScreenHandler.getCursorStack()));
+  }
+  private InventoryReceipts.Receipt slotReceipt(){return c.world==proofWorld?InventoryReceipts.CURRENT.after(proofWorld,proofHandler,slotBoundary):null;}
+  private boolean slotSettled(){return slotProof!=null&&slotProof.settled(ticks,slotReceipt());}
+  private boolean gainSettled(){return craftPhase==3&&c.world==proofWorld&&slotSettled()&&inventoryProof.settled(ticks,count(outputItem),c.player.currentScreenHandler.getCursorStack().isEmpty(),c.player.currentScreenHandler.getRevision());}
+  private Map<String,Object> gainReceipt(){return Map.of("item",outputItem,"countBefore",beforeCount,"countAfter",count(outputItem),"serverRevision",c.player.currentScreenHandler.getRevision(),"serverSnapshotSeq",slotReceipt().sequence());}
   private TaskRuntime.Step done(Map<String,Object> evidence){return TaskRuntime.Step.done(evidence);}
   private boolean expectedStack(ItemStack stack){
    if(!Registries.ITEM.getId(stack.getItem()).equals(identifier(args,"item")))return false;
@@ -254,7 +281,7 @@ public final class GameSkills {
   private Map<String,Object> inventoryReceipt(String after){
    var ids=new LinkedHashSet<Integer>();for(var action:args.getAsJsonArray("actions"))ids.add(action.getAsJsonObject().get("slot").getAsInt());
    var slots=new ArrayList<Map<String,Object>>();for(int id:ids)if(id>=0&&id<c.player.currentScreenHandler.slots.size()){var stack=c.player.currentScreenHandler.getSlot(id).getStack();slots.add(Map.of("id",id,"item",Registries.ITEM.getId(stack.getItem()).toString(),"count",stack.getCount()));}
-   return Map.of("beforeDigest",digest(inventoryBefore),"afterDigest",digest(after),"screen",screenName(),"slots",slots,"cursor",GameObservation.stack(c.player.currentScreenHandler.getCursorStack()));
+   return Map.of("beforeDigest",digest(inventoryBefore),"afterDigest",digest(after),"screen",screenName(),"slots",slots,"cursor",GameObservation.stack(c.player.currentScreenHandler.getCursorStack()),"completedActions",verifiedActions,"serverConfirmationSeq",InventoryReceipts.CURRENT.cursor());
   }
   private static String digest(String value){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}}
   private void go(BlockPos target){navigation.start(target.getX(),target.getY(),target.getZ(),skill.equals("navigate")&&args.has("height")&&args.get("height").getAsString().equals("surface"));navigating=true;pathTarget=target;}
@@ -271,10 +298,11 @@ public final class GameSkills {
   private String screenName(){return GameObservation.screenId(c.player.currentScreenHandler);}
   public void pause(){haltNavigation();release();}
   public boolean controlsMining(){return skill.equals("mine")&&!navigating;}
+  public boolean handlesCombat(){return skill.equals("attack");}
   public boolean retrySafe(String reason){return Set.of("navigate","follow","wait","waitFor").contains(skill)||Set.of("target_not_visible","outside_known_terrain","block_change_rejected").contains(reason);}
   public Map<String,Object> partialEvidence(){
-   if(c.player!=null&&inventoryProof!=null&&outputItem!=null&&inventoryProof.settled(ticks,count(outputItem),c.player.currentScreenHandler.getCursorStack().isEmpty(),c.player.currentScreenHandler.getRevision()))return Map.of("item",outputItem,"countBefore",beforeCount,"countAfter",count(outputItem));
-   return Map.of();
+   if(c.player!=null&&inventoryProof!=null&&outputItem!=null&&gainSettled())return gainReceipt();
+   return !verifiedSlots.isEmpty()?verifiedSlots:verifiedGain;
   }
   public void resume(){if(Set.of("inventory","workstation","craft","trade","waitFor").contains(skill)&&c.currentScreen!=ownedScreen)throw new IllegalStateException("station_screen_changed");if(skill.equals("navigate"))go(pos);}
   public void stop(){haltNavigation();release();}

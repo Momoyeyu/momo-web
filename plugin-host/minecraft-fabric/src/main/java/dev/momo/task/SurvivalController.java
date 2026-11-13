@@ -15,14 +15,16 @@ public final class SurvivalController {
  public boolean interruptOwnedScreen(SurvivalPolicy.Mode desired,boolean owned){return policy.interruptOwnedScreen(desired,owned);}
  private int foodSlot(){var p=client().player;for(int i=0;i<9;i++)if(p.getInventory().getStack(i).contains(DataComponentTypes.FOOD))return i;return -1;}
  public SurvivalPolicy.Mode choose(){
+  return choose(false);
+ }
+ public SurvivalPolicy.Mode choose(boolean combatOwned){
   var c=client();var p=c.player;
   if(p==null||c.world==null||!p.isAlive())return SurvivalPolicy.Mode.NONE;
   threat=c.world.getEntitiesByClass(HostileEntity.class,p.getBoundingBox().expand(4),e->e.isAlive()&&p.canSee(e)&&p.squaredDistanceTo(e)<16).stream().min(java.util.Comparator.comparingDouble(e->e.squaredDistanceTo(p))).orElse(null);
   boolean eating=p.isUsingItem()&&p.getActiveItem().contains(DataComponentTypes.FOOD);
-  // A skill already eating owns its use lifecycle; do not cancel it to start the same action.
-  if(mode==SurvivalPolicy.Mode.NONE&&eating)return SurvivalPolicy.Mode.NONE;
   boolean critical=p.isInLava()||p.getAir()<35||(p.isOnFire()&&p.getHealth()<8);
-  return policy.choose(true,false,critical,p.getHealth(),p.getHungerManager().getFoodLevel(),foodSlot()>=0,eating,threat!=null);
+  var desired=policy.choose(true,false,critical,p.getHealth(),p.getHungerManager().getFoodLevel(),foodSlot()>=0,eating,threat!=null);
+  return policy.forBody(desired,mode==SurvivalPolicy.Mode.NONE&&eating,combatOwned);
  }
  public void drive(SurvivalPolicy.Mode desired){
   var c=client();var p=c.player;
@@ -34,6 +36,9 @@ public final class SurvivalController {
     if(threat==null)return;
     if(ticks==1)for(int i=0;i<9;i++)if(p.getInventory().getStack(i).getItem() instanceof SwordItem){p.getInventory().selectedSlot=i;break;}
     look(threat.getEyePos());
+    var ahead=BlockPos.ofFloored(p.getX()-Math.sin(Math.toRadians(p.getYaw())),p.getY(),p.getZ()+Math.cos(Math.toRadians(p.getYaw())));
+    boolean canClose=!p.canInteractWithEntity(threat,0)&&c.world.isChunkLoaded(ahead)&&c.world.getBlockState(ahead).getCollisionShape(c.world,ahead).isEmpty()&&c.world.getBlockState(ahead.down()).isSolidBlock(c.world,ahead.down())&&!c.world.getFluidState(ahead).isIn(net.minecraft.registry.tag.FluidTags.LAVA);
+    c.options.forwardKey.setPressed(canClose);c.options.jumpKey.setPressed(canClose&&p.horizontalCollision);
     if(p.canInteractWithEntity(threat,0)&&p.getAttackCooldownProgress(0)>=.95){c.options.useKey.setPressed(false);if(p.isUsingItem())c.interactionManager.stopUsingItem(p);c.interactionManager.attackEntity(p,threat);p.swingHand(Hand.MAIN_HAND);}
     else if(p.getOffHandStack().isOf(Items.SHIELD)){c.options.useKey.setPressed(true);if(!p.isUsingItem())c.interactionManager.interactItem(p,Hand.OFF_HAND);}
    }

@@ -75,6 +75,13 @@ def test_goal_recheck_is_event_driven_with_a_30_second_idle_floor():
   rt.active='player-conversation'
   with patch('app.services.minecraft.time.monotonic',return_value=170):assert m.claim_decision(0,'owner','lease') is None
 
+def test_equivalent_failed_searches_expose_replanning_evidence_without_a_fixed_goal():
+ from app.services.minecraft import Minecraft
+ def failed(item,x,dimension='minecraft:overworld'):
+  return {'state':'failed','evidence':{'item':item,'dimension':dimension,'searchResult':'source_not_visible','searchOrigin':{'x':x,'y':64,'z':0},'lastObservedPosition':{'x':x,'y':64,'z':0},'countBefore':0,'countAfter':0}}
+ repeated=Minecraft.repeated_searches([failed('minecraft:oak_log',0),failed('minecraft:oak_log',1),failed('minecraft:oak_log',1,'minecraft:the_nether'),failed('minecraft:iron_ore',0)])
+ assert len(repeated)==1 and repeated[0]['item']=='minecraft:oak_log' and repeated[0]['attempts']==2
+
 def test_model_capabilities_are_bounded_and_schemas_are_requested_per_skill():
  m,rt=setup()
  definitions={'navigate':{'description':'Reach known position','parameters':{'type':'object','properties':{'x':{'type':'integer'}}}},'craft':{'description':'Craft an item','parameters':{'type':'object','properties':{'recipe':{'type':'string'}}}}}

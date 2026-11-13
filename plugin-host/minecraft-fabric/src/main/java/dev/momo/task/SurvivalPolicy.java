@@ -2,6 +2,11 @@ package dev.momo.task;
 /** Small deterministic arbiter; no LLM decisions or permission changes. */
 public final class SurvivalPolicy {
  public enum Mode {NONE,EAT,DEFEND,ESCAPE}
+ public Mode forBody(Mode desired,boolean skillEating,boolean combatOwned){
+  if(desired==Mode.ESCAPE)return desired;
+  if(skillEating||(combatOwned&&desired==Mode.DEFEND))return Mode.NONE;
+  return desired;
+ }
  public boolean interruptOwnedScreen(Mode mode,boolean owned){return owned&&(mode==Mode.DEFEND||mode==Mode.ESCAPE);}
  public Mode choose(boolean authorized,boolean stopped,boolean critical,float health,int food,boolean hasFood,boolean eating,boolean hostile){
   if(!authorized||stopped)return Mode.NONE;

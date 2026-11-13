@@ -14,21 +14,23 @@ public final class GatherSkill implements TaskRuntime.Work {
  private final String item;private final int requested;
  private final Map<BlockPos,Integer> blocked=new HashMap<>();
  private TaskRuntime.Work child;private BlockPos target,origin,foliage;
- private int baseline,ticks,scan,idle,clearedLeaves;private String phase="search",lastFailure="";
+ private int baseline,observedCount,totalRays,ticks,scan,idle,clearedLeaves;private String phase="search",lastFailure="",dimension="";
+ private BlockPos lastPosition;private net.minecraft.client.world.ClientWorld searchWorld;
  public GatherSkill(JsonObject args){item=SkillArguments.resourceId(args.get("item").getAsString());requested=args.get("count").getAsInt();}
- public void start(){if(c.player==null||c.world==null)throw new TaskRuntime.Rejected("world_unavailable");if(!Registries.ITEM.containsId(net.minecraft.util.Identifier.of(item)))throw new TaskRuntime.Rejected("item_unknown");if(origin==null){baseline=count();origin=c.player.getBlockPos();}scan=idle=0;lastFailure="";foliage=null;phase="search";}
+ public void start(){if(c.player==null||c.world==null)throw new TaskRuntime.Rejected("world_unavailable");if(!Registries.ITEM.containsId(net.minecraft.util.Identifier.of(item)))throw new TaskRuntime.Rejected("item_unknown");if(origin==null){baseline=observedCount=count();origin=lastPosition=c.player.getBlockPos();searchWorld=c.world;dimension=c.world.getRegistryKey().getValue().toString();}scan=idle=0;lastFailure="";foliage=null;phase="search";}
  private int count(){int total=0;for(int i=0;i<c.player.getInventory().size();i++){var stack=c.player.getInventory().getStack(i);if(Registries.ITEM.getId(stack.getItem()).toString().equals(item))total+=stack.getCount();}return total;}
  public TaskRuntime.Step tick(){
-  if(++ticks>2400)return TaskRuntime.Step.failed("gather_timeout");
-  if(c.player==null||c.world==null||!c.player.isAlive())return TaskRuntime.Step.failed("world_unavailable");
+  if(++ticks>2400)return fail("gather_timeout");
+  if(c.player==null||c.world==null||c.world!=searchWorld||!c.player.isAlive())return fail("world_unavailable");
+  observedCount=count();lastPosition=c.player.getBlockPos();
   if(count()-baseline>=requested)return TaskRuntime.Step.done(Map.of("item",item,"countBefore",baseline,"countAfter",count()));
-  if(c.player.getBlockPos().getSquaredDistance(origin)>1024)return TaskRuntime.Step.failed("outside_known_terrain");
+  if(c.player.getBlockPos().getSquaredDistance(origin)>1024)return fail("outside_known_terrain");
   if(child!=null){
    TaskRuntime.Step outcome;
    try{outcome=child.tick();}catch(RuntimeException error){outcome=TaskRuntime.Step.failed(TaskRuntime.reason(error,"execution_failed"));}
    if(outcome.state().equals("running"))return outcome;
    child.stop();child=null;
-   if(Set.of("server_confirmation_missing","execution_failed","stop_unconfirmed").contains(outcome.reason()))return outcome;
+   if(Set.of("server_confirmation_missing","execution_failed","stop_unconfirmed").contains(outcome.reason()))return fail(outcome.reason());
    if(outcome.state().equals("failed")){lastFailure=outcome.reason();if(target!=null)blocked.put(target,ticks+200);}
    target=null;foliage=null;phase="search";idle=0;scan=0;return TaskRuntime.Step.running();
   }
@@ -38,6 +40,7 @@ public final class GatherSkill implements TaskRuntime.Work {
   if(++idle<12)return TaskRuntime.Step.running(); // Allow normal drops/server inventory updates to arrive.
   // At most sixteen sight rays per tick; read only the first visible hit of each.
   for(int n=0;n<16&&scan<512;n++,scan++){
+   totalRays++;
    double[] direction=GatherSight.direction(scan);var eye=c.player.getEyePos();var end=eye.add(direction[0]*16,direction[1]*16,direction[2]*16);
    var hit=c.world.raycast(new RaycastContext(eye,end,RaycastContext.ShapeType.OUTLINE,RaycastContext.FluidHandling.NONE,c.player));
    if(hit.getType()!=HitResult.Type.BLOCK)continue;
@@ -54,7 +57,7 @@ public final class GatherSkill implements TaskRuntime.Work {
   }
   if(scan>=512){
    if(foliage!=null){target=foliage;foliage=null;clearedLeaves++;var args=new JsonObject();args.addProperty("x",target.getX());args.addProperty("y",target.getY());args.addProperty("z",target.getZ());begin("mine",args);scan=0;return TaskRuntime.Step.running();}
-   return TaskRuntime.Step.failed(lastFailure.isEmpty()?"source_not_visible":lastFailure);
+   return fail(lastFailure.isEmpty()?"source_not_visible":lastFailure);
   }
   return TaskRuntime.Step.running();
  }
@@ -67,6 +70,8 @@ public final class GatherSkill implements TaskRuntime.Work {
  public boolean retrySafe(String reason){return Set.of("source_not_visible","target_not_visible","tool_required","unreachable").contains(reason);}
  public void resume(){if(child!=null)child.resume();}
  public void stop(){if(child!=null){child.stop();child=null;}}
- public Map<String,Object> partialEvidence(){return c.player==null||count()<=baseline?Map.of():Map.of("item",item,"countBefore",baseline,"countAfter",count());}
+ private TaskRuntime.Step fail(String reason){lastFailure=reason;return TaskRuntime.Step.failed(reason);}
+ private static Map<String,Integer> position(BlockPos pos){return Map.of("x",pos.getX(),"y",pos.getY(),"z",pos.getZ());}
+ public Map<String,Object> partialEvidence(){return origin==null?Map.of():Map.of("item",item,"requested",requested,"dimension",dimension,"searchOrigin",position(origin),"lastObservedPosition",position(lastPosition),"countBefore",baseline,"countAfter",observedCount,"searchedRays",totalRays,"searchResult",lastFailure);}
  public Map<String,Object> progress(){return Map.of("skill","gather","phase",phase,"item",item,"gained",Math.max(0,count()-baseline),"requested",requested);}
 }

@@ -91,3 +91,10 @@ tasks.register('controlAdmissionSmoke', JavaExec) {
  mainClass = 'dev.momo.task.ControlAdmissionSmoke'
 }
 check.dependsOn controlAdmissionSmoke
+
+tasks.register('slotProofSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.SlotProofSmoke'
+}
+check.dependsOn slotProofSmoke

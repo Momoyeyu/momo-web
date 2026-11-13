@@ -12,6 +12,9 @@ public final class SurvivalPolicySmoke {
   check(p.interruptOwnedScreen(SurvivalPolicy.Mode.ESCAPE,true),"danger can interrupt our station");
   check(!p.interruptOwnedScreen(SurvivalPolicy.Mode.EAT,true),"hunger alone must not discard station work");
   check(!p.interruptOwnedScreen(SurvivalPolicy.Mode.DEFEND,false),"player menus cannot be dismissed by a reflex");
+  check(p.forBody(SurvivalPolicy.Mode.ESCAPE,true,false)==SurvivalPolicy.Mode.ESCAPE,"lava/air danger interrupts even an eating skill");
+  check(p.forBody(SurvivalPolicy.Mode.EAT,true,false)==SurvivalPolicy.Mode.NONE,"a skill already eating keeps its own lifecycle");
+  check(p.forBody(SurvivalPolicy.Mode.DEFEND,false,true)==SurvivalPolicy.Mode.NONE,"a compatible combat task keeps pursuing instead of being stalled");
   System.out.println("PASS survival priority, food continuity and stop barrier");
  }
 }

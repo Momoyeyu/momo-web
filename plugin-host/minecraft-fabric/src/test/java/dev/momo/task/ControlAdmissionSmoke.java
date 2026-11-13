@@ -15,6 +15,7 @@ public final class ControlAdmissionSmoke {
   check("","submit",true,false,false,false,true,false,true,"respawn");
   check("DEAD_REPLAN","submit",true,false,false,false,true,false,true,"place");
   check("","observe",false,true,true,true,true,false,true,"");
+  if(!ControlAdmission.closeOnRelease(false,true,true,true)||ControlAdmission.closeOnRelease(true,true,true,true)||ControlAdmission.closeOnRelease(false,false,true,true)||ControlAdmission.closeOnRelease(false,true,false,true)||ControlAdmission.closeOnRelease(false,true,true,false))throw new AssertionError("release closes only our confirmed empty-cursor screen; manual takeover preserves it");
   System.out.println("PASS physical, foreground, scene and screen admission");
  }
 }
