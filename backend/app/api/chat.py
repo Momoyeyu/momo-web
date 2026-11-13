@@ -118,6 +118,15 @@ def screen_reaction(req: ScreenReactionIn) -> StreamingResponse:
     return _chat(ChatIn(clientId=req.clientId, leaseId=req.leaseId, messageId=req.messageId, presentation=req.presentation), observation=observation)
 
 
+@router.post("/api/chat/minecraft-decision")
+def minecraft_decision(req: ScreenReactionIn) -> StreamingResponse:
+    from ..services.minecraft import minecraft, MinecraftError
+    try: observation=minecraft.claim_decision(req.generation,req.clientId,req.leaseId)
+    except (MinecraftError,CoordinationError,vision.VisionError) as error:raise HTTPException(409,str(error)) from error
+    if observation is None:return StreamingResponse(iter([_sse({"t":"done","suppressed":True})]),media_type="text/event-stream")
+    return _chat(ChatIn(clientId=req.clientId,leaseId=req.leaseId,messageId=req.messageId,presentation=req.presentation),observation=observation)
+
+
 def _chat(req: ChatIn, observation=None) -> StreamingResponse:
     if observation is None and not req.text.strip() and not req.images:
         raise HTTPException(status_code=400, detail="empty text")
@@ -161,7 +170,10 @@ def _chat(req: ChatIn, observation=None) -> StreamingResponse:
                     from ..services.computer import computer
                     token = current_run.set(inbox["run_id"])
                     try:
-                        observed = computer.stage_reaction(observation["generation"])
+                        if observation.get('kind')=='minecraft':
+                            from ..services.minecraft import minecraft
+                            observed=minecraft.stage_decision(observation['generation'])
+                        else:observed = computer.stage_reaction(observation["generation"])
                     finally:
                         current_run.reset(token)
                 iterator = iter(
@@ -184,12 +196,17 @@ def _chat(req: ChatIn, observation=None) -> StreamingResponse:
                     finally:
                         current_run.reset(token)
                     if observation is not None:
-                        from ..services.computer import computer, ComputerError
-                        with computer.lock:
-                            computer.gate()
-                            if (computer.generation != observation["generation"] or not computer.observing
-                                    or not computer.proactive or not computer.reactions):
-                                raise ComputerError("computer.revoked")
+                        token=current_run.set(inbox["run_id"])
+                        try:
+                            if observation.get('kind')=='minecraft':
+                                from ..services.minecraft import minecraft
+                                minecraft.validate_decision(observation['generation'])
+                            else:
+                                from ..services.computer import computer, ComputerError
+                                with computer.lock:
+                                    computer.gate()
+                                    if (computer.generation != observation["generation"] or not computer.observing or not computer.proactive or not computer.reactions):raise ComputerError("computer.revoked")
+                        finally:current_run.reset(token)
                     if ev["t"] == "error":
                         errored = True
                     if ev["t"] == "sentence" and ev.get("text"):

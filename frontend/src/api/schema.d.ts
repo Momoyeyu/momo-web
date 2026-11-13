@@ -149,6 +149,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat/minecraft-decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Minecraft Decision */
+        post: operations["minecraft_decision_api_chat_minecraft_decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/screen-reaction": {
         parameters: {
             query?: never;
@@ -1221,6 +1238,23 @@ export interface paths {
         put?: never;
         /** Stop */
         post: operations["stop_api_minecraft_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/minecraft/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Tasks */
+        post: operations["tasks_api_minecraft_tasks_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2449,6 +2483,33 @@ export interface components {
             /** Voices */
             voices?: string[];
         };
+        /** TaskCommand */
+        TaskCommand: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "capabilities" | "submit" | "task" | "events" | "pause" | "resume" | "cancel";
+            /**
+             * After
+             * @default 0
+             */
+            after: number;
+            /** Args */
+            args?: {
+                [key: string]: unknown;
+            };
+            /** Clientid */
+            clientId: string;
+            /** Generation */
+            generation: number;
+            /** Leaseid */
+            leaseId: string;
+            /** Skill */
+            skill?: string | null;
+            /** Taskid */
+            taskId?: string | null;
+        };
         /** Update */
         Update: {
             /** Enabled */
@@ -2889,6 +2950,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    minecraft_decision_api_chat_minecraft_decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScreenReactionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {
@@ -4818,6 +4912,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    tasks_api_minecraft_tasks_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskCommand"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

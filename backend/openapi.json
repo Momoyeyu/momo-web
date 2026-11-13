@@ -1961,6 +1961,79 @@
         "title": "StoredMessage",
         "type": "object"
       },
+      "TaskCommand": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "capabilities",
+              "submit",
+              "task",
+              "events",
+              "pause",
+              "resume",
+              "cancel"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "after": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "After",
+            "type": "integer"
+          },
+          "args": {
+            "additionalProperties": true,
+            "title": "Args",
+            "type": "object"
+          },
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "generation": {
+            "title": "Generation",
+            "type": "integer"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          },
+          "skill": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skill"
+          },
+          "taskId": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9_-]{1,80}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Taskid"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId",
+          "generation",
+          "action"
+        ],
+        "title": "TaskCommand",
+        "type": "object"
+      },
       "Update": {
         "properties": {
           "enabled": {
@@ -2687,6 +2760,42 @@
           }
         },
         "summary": "Interrupt"
+      }
+    },
+    "/api/chat/minecraft-decision": {
+      "post": {
+        "operationId": "minecraft_decision_api_chat_minecraft_decision_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenReactionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Minecraft Decision"
       }
     },
     "/api/chat/screen-reaction": {
@@ -4732,6 +4841,42 @@
           }
         },
         "summary": "Stop"
+      }
+    },
+    "/api/minecraft/tasks": {
+      "post": {
+        "operationId": "tasks_api_minecraft_tasks_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Tasks"
       }
     },
     "/api/onboarding": {

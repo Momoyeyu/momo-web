@@ -64,3 +64,25 @@ def sessions(): return invoke(minecraft_attach.sessions)
 def attach(body: Attach): return invoke(minecraft_attach.attach,body.sessionId,body.world,body.account,body.permissions,body.clientId,body.leaseId)
 @router.post('/install')
 def install(body: Install): return invoke(minecraft_attach.install,body.instancePath)
+
+from pydantic import ConfigDict
+class TaskCommand(Owner):
+    model_config = ConfigDict(extra='forbid')
+    generation: int
+    action: Literal['capabilities','submit','task','events','pause','resume','cancel']
+    taskId: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{1,80}$')
+    skill: str | None = Field(default=None,max_length=32)
+    args: dict = Field(default_factory=dict)
+    after: int = Field(default=0,ge=0)
+
+@router.post('/tasks')
+def tasks(body: TaskCommand):
+    arguments={}
+    if body.action=='submit':
+        if not body.taskId or not body.skill:raise HTTPException(422,'Task ID and skill required')
+        arguments={'taskId':body.taskId,'skill':body.skill,'args':body.args}
+    elif body.action in {'task','cancel'}:
+        if body.action=='cancel' and not body.taskId:raise HTTPException(422,'Task ID required')
+        if body.taskId:arguments={'taskId':body.taskId}
+    elif body.action=='events':arguments={'after':body.after}
+    return invoke(minecraft.execute,body.action,arguments,body.generation,body.clientId,body.leaseId)

@@ -1,3 +1,4 @@
+import {useMinecraftDecisions} from '../services/useMinecraftDecisions';
 import ProactiveResponseToggle from '../components/ProactiveResponseToggle';
 import {useComputerReactions} from '../services/useComputerReactions';
 import {useActivities} from '../services/extensionActivities';
@@ -55,6 +56,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   const introActive=!!intro.data && intro.data.phase!=="completed";
   const activities=useActivities();
   useComputerReactions(active&&!introActive&&activities.computer);
+  useMinecraftDecisions(active&&!introActive&&activities.minecraft);
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
   const preferences=useSyncExternalStore(subscribe, getState).settings.general;
   const name = speakerName();

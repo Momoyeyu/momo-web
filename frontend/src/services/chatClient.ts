@@ -129,14 +129,14 @@ export async function* chat(
   opening = false,
   messageId: string = crypto.randomUUID(),
   images: string[] = [],
-  screenGeneration?: number,
+  screenGeneration?: number | {game:number},
 ): AsyncGenerator<ChatEvent> {
   let res: Response;
   try {
-    res = await runtimeFetch(screenGeneration !== undefined ? "/api/chat/screen-reaction" : opening ? "/api/onboarding/opening" : "/api/chat", {
+    res = await runtimeFetch(typeof screenGeneration === "object" ? "/api/chat/minecraft-decision" : screenGeneration !== undefined ? "/api/chat/screen-reaction" : opening ? "/api/onboarding/opening" : "/api/chat", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(screenGeneration !== undefined ? {generation:screenGeneration,messageId,presentation,...meetingIdentity()} : { text, images, messageId, presentation, firstMeeting: firstMeetingPending(), ...meetingIdentity() }),
+      body: JSON.stringify(screenGeneration !== undefined ? {generation:typeof screenGeneration === "object" ? screenGeneration.game : screenGeneration,messageId,presentation,...meetingIdentity()} : { text, images, messageId, presentation, firstMeeting: firstMeetingPending(), ...meetingIdentity() }),
       signal: signal ?? null,
     });
   } catch (e) {

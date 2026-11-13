@@ -1,3 +1,4 @@
+import {minecraftSnapshot,subscribeMinecraft,readMinecraftStatus} from '../../services/minecraftClient';
 import {useCallback,useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {getSettings,subscribe,updateGeneral} from '../../lib/store';
 import {useT} from '../../i18n';
@@ -18,20 +19,19 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(false),[active,setActive]=useState(false);
  const [sessions,setSessions]=useState<Session[]>([]),[selected,setSelected]=useState(''),[path,setPath]=useState('');
  const preferences=useSyncExternalStore(subscribe,getSettings).general;
- const chat=preferences.minecraftChat===true,move=preferences.minecraftMove===true;
- const setChat=(value:boolean)=>updateGeneral({minecraftChat:value});
- const setMove=(value:boolean)=>updateGeneral({minecraftMove:value});
+ const game=useSyncExternalStore(subscribeMinecraft,minecraftSnapshot);
+ const gameplay=preferences.minecraftPlay===true;
  const mounted=useRef(false),operation=useRef(false),request=useRef<AbortController|null>(null);
  const read=useCallback(async()=>{
   request.current?.abort();
   const controller=new AbortController();request.current=controller;
   try{
    const [status,list]=await Promise.all([
-    apiJson<{active?:boolean;connected?:boolean}>('/api/minecraft/status',{signal:controller.signal}),
+    readMinecraftStatus(),
     apiJson<{sessions:Session[]}>('/api/minecraft/sessions',{signal:controller.signal}),
    ]);
    if(!mounted.current||controller.signal.aborted)return;
-   setActive(Boolean(status.active||status.connected));setSessions(list.sessions);
+   setActive(Boolean(status.active));setSessions(list.sessions);
    setSelected(value=>list.sessions.some(s=>s.id===value&&s.ready)?value:'');
   }catch(error){if(!controller.signal.aborted)throw error;}
   finally{if(request.current===controller)request.current=null;}
@@ -62,14 +62,17 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
   </section>
   <section className="extension-detail-section">
    <h4>{t('minecraft.permissions')} <Hint text={t('minecraft.permissionsHint')}/></h4>
-   <FieldRow label={t('minecraft.chat')}><Switch title={t('minecraft.chat')} on={chat} onChange={setChat} disabled={busy||active}/></FieldRow>
    <FieldRow label={t('minecraft.play')}><Switch title={t('minecraft.play')} on={preferences.minecraftPlay===true} onChange={value=>updateGeneral({minecraftPlay:value})} disabled={busy||active}/></FieldRow>
-   <FieldRow label={t('minecraft.move')}><Switch title={t('minecraft.move')} on={move} onChange={setMove} disabled={busy||active}/></FieldRow>
    <div className="extension-detail-actions">
-    <Button disabled={!enabled||busy||active||!current?.ready||meeting.state!=='active'} onClick={()=>void run(()=>apiJson('/api/minecraft/attach',jsonInit('POST',{...meetingIdentity(),sessionId:current!.id,world:current!.world,account:current!.account,permissions:['game.observe',...(chat?['game.chat']:[]),...(move?['game.move']:[]),...(preferences.minecraftPlay?['game.modify']:[])]})))}>{t('minecraft.start')}</Button>
+    <Button disabled={!enabled||busy||active||!current?.ready||meeting.state!=='active'} onClick={()=>void run(()=>apiJson('/api/minecraft/attach',jsonInit('POST',{...meetingIdentity(),sessionId:current!.id,world:current!.world,account:current!.account,permissions:['game.observe',...(gameplay?['game.chat','game.move','game.modify']:[])]})))}>{t('minecraft.start')}</Button>
+    {active&&<Button variant="ghost" disabled={busy} onClick={()=>void run(()=>apiJson('/api/minecraft/tasks',jsonInit('POST',{...meetingIdentity(),generation:game!.generation,action:game?.paused?'resume':'pause'})))}>{t(game?.paused?'minecraft.resumePlay':'minecraft.pausePlay')}</Button>}
     <Button variant="ghost" disabled={busy||!active} onClick={()=>void run(()=>apiJson('/api/minecraft/stop',jsonInit('POST',{})))}>{t('minecraft.stop')}</Button>
    </div>
   </section>
+  {active&&game&&<section className="extension-detail-section game-progress" aria-live="polite">
+   {game.goal&&<div className="game-goal"><span>{t('minecraft.currentGoal')}</span><strong>{game.goal.title}</strong></div>}
+   {game.tasks.filter(task=>['running','queued','paused','failed'].includes(task.state)).slice(-3).map(task=><div className="game-task" key={task.taskId}><span>{t(`minecraft.skill.${task.skill}`)}</span><span>{t(`minecraft.taskState.${task.state}`)}</span>{task.state==='failed'&&<Hint text={t('minecraft.blockedHint')}/>}</div>)}
+  </section>}
   {mode==='settings'&&<details className="extension-detail-section extension-detail-advanced"><summary>{t('minecraft.install')}</summary><FieldRow label={t('minecraft.instancePath')} hint={t('minecraft.installHint')}><input type="text" value={path} onChange={e=>setPath(e.target.value)} disabled={busy}/></FieldRow><div className="extension-detail-actions"><Button disabled={busy||!path.trim()} onClick={()=>void run(()=>apiJson('/api/minecraft/install',jsonInit('POST',{instancePath:path.trim()})))}>{t('minecraft.install')}</Button></div></details>}
   {meeting.state!=='active'&&<p className="extension-detail-notice">{t('computer.requiresBoot')}</p>}
   {error&&<p role="alert" className="extension-detail-notice">{t('minecraft.error')}</p>}

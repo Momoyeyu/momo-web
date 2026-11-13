@@ -826,3 +826,10 @@
 .general-language .opt-group { margin-top:0; }
 .general-language { padding-block:14px; }
 @media(max-width:760px) { .general-language .opt-list { grid-template-columns:1fr; gap:0; } }
+
+.game-progress{display:grid;gap:.65rem;}
+.game-goal{display:grid;gap:.3rem;min-width:0;}
+.game-goal>span,.game-task>span:last-of-type{color:var(--text-muted);font-size:.86em;}
+.game-goal strong{font-weight:500;overflow-wrap:anywhere;}
+.game-task{display:flex;align-items:center;gap:.6rem;min-width:0;}
+.game-task>span:first-child{flex:1;}

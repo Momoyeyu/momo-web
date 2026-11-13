@@ -547,3 +547,13 @@ it('restores mute and microphone intent in a new engine without recording before
  eng.setMuted(false);expect(getSettings().general.voiceMuted).toBe(false);
  eng.dispose();update({settings});
 });
+
+it('game decisions share the normal engine without a fabricated player message',async()=>{
+ vi.mocked(meetingIdentity).mockReturnValue({clientId:'owner',leaseId:'lease'});
+ chatMock.mockImplementation(async function*(){yield {t:'done'};});
+ const user=vi.fn(),start=vi.fn();
+ const eng=new ChatEngine({onStatus:()=>{},onUserMessage:user,onAssistantStart:start,onDisplay:()=>{},onSentence:()=>{},onAssistantDone:()=>{},onError:()=>{}});
+ eng.sendGameDecision(7);await tick(5);
+ expect(chatMock).toHaveBeenCalledWith('',expect.anything(),expect.anything(),false,expect.any(String),[],{game:7});
+ expect(user).not.toHaveBeenCalled();expect(start).not.toHaveBeenCalled();eng.dispose();
+});

@@ -84,7 +84,7 @@ interface DisplayState {
 }
 
 interface Turn {
-  screenGeneration?:number;
+  screenGeneration?:number | {game:number};
   images?: ImageRef[];
   imageResult?: (ok:boolean)=>void;
   presentation: PresentationSnapshot | null;
@@ -358,6 +358,15 @@ export class ChatEngine {
     }).catch(()=>{});
   }
 
+  /** Gameplay events reuse the same serialized inference/display pipeline. */
+  sendGameDecision(generation:number):void {
+    if(this.disposed||this.phase!=="idle"||this.turn||!meetingIdentity()||this.presentationPaused)return;
+    this.sendQueue=this.sendQueue.then(async()=>{
+      if(this.phase!=="idle"||this.turn||this.presentationPaused)return;
+      await this.doSend("",false,[],undefined,{game:generation});
+    }).catch(()=>{});
+  }
+
   /** First meeting uses normal pacing / TTS / ACT, without a fictitious user. */
   beginFirstMeeting(): void {
     if (this.disposed || this.openingScheduled || this.phase !== "idle") return;
@@ -365,7 +374,7 @@ export class ChatEngine {
     this.sendQueue = this.sendQueue.then(() => this.doSend("", true)).catch(() => {});
   }
 
-  private async doSend(trimmed: string, opening = false, images: ImageRef[] = [], imageResult?: (ok:boolean)=>void, screenGeneration?:number): Promise<void> {
+  private async doSend(trimmed: string, opening = false, images: ImageRef[] = [], imageResult?: (ok:boolean)=>void, screenGeneration?:number | {game:number}): Promise<void> {
     if (this.disposed) return;
     await this.stopReplay();
     // 新输入隐式打断在途回合（绕过防抖，保证打断一定生效）；
