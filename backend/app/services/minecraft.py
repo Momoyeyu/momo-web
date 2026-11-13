@@ -13,6 +13,7 @@ class Minecraft:
     def __init__(self):
         self.lock = threading.RLock()
         self.generation = 0
+        self.activity_id = 'game-' + uuid.uuid4().hex
         self.binding = None
         self.permissions = set()
         self.epoch = None
@@ -30,7 +31,7 @@ class Minecraft:
 
     def stop(self, reason='stopped', notify=True):
         with self.lock:
-            binding,generation=self.binding,self.generation
+            binding,activity_id=self.binding,self.activity_id
             self.monitor_stop.set()
             self.autonomous = self.decision_needed = False
             self.capabilities = {}
@@ -38,13 +39,16 @@ class Minecraft:
             self.generation += 1
             self.permissions.clear()
             self.binding = None
-        if notify and runtime.host:
-            result=runtime.host.request('minecraft.stop')
-            if binding and result.get('stopVerified') and result.get('retiredTasks'):
-                from . import minecraft_journal as journal
-                journal.record(binding,generation,result['retiredTasks'])
-            return result
-        return {'stopped': True, 'generation': self.generation}
+        from . import minecraft_journal as journal
+        try:
+            if notify and runtime.host:
+                result=runtime.host.request('minecraft.stop')
+                if binding and result.get('stopVerified') and result.get('retiredTasks'):
+                    journal.record(binding,activity_id,result['retiredTasks'])
+                return result
+            return {'stopped': True, 'generation': self.generation}
+        finally:
+            if binding:journal.reconcile(binding,activity=activity_id)
 
     def status(self):
         result = runtime.host.request('minecraft.status') if runtime.host else {'available': False}
@@ -83,6 +87,9 @@ class Minecraft:
             runtime.host.request('minecraft.configure', {'port': port, 'token': token})
             with self.lock:
                 self.binding = {'world': world, 'account': account}
+                self.activity_id = 'game-' + uuid.uuid4().hex
+                from . import minecraft_journal as journal
+                journal.reconcile(self.binding)
                 self.permissions = set(permissions)
                 self.actions = 0
                 self.epoch, self.fingerprint = runtime.epoch, fingerprint
@@ -173,7 +180,7 @@ class Minecraft:
         from . import minecraft_journal as journal
         with self.lock:
             if not self.binding or generation != self.generation:return
-            changed=journal.record(self.binding,generation,tasks)
+            changed=journal.record(self.binding,self.activity_id,tasks)
             for task in changed:
                 self.tasks[task['taskId']]=task
                 if task['state'] in {'succeeded','failed','cancelled'}:self.decision_needed=self.autonomous
@@ -253,7 +260,9 @@ class Minecraft:
                 if generation==self.generation:self.stop('game_activity_expired')
                 return
             with self.lock:permission={**self.binding,'activityEpoch':self.epoch};cursor=self.cursor
-            runtime.host.request('minecraft.heartbeat', {'permission':permission})
+            body=runtime.host.request('minecraft.heartbeat', {'permission':permission})
+            if body.get('controlPaused'):
+                with self.lock:self.paused=True;self.autonomous=False;self.decision_needed=False
             packet=runtime.host.request('minecraft.events', {'after':cursor,'permission':permission})['events']
             rows=runtime.host.request('minecraft.task', {'permission':permission}).get('tasks',[]) if packet.get('gap') else [event['task'] for event in packet.get('events',[])]
             self.record_tasks(rows,generation)

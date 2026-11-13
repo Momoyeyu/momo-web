@@ -18,3 +18,29 @@ def test_receipts_are_idempotent_and_acceptance_is_not_completion():
  with pytest.raises(ValueError,match='Unverified'):journal.record(b,1,[{**task,'state':'succeeded'}])
  journal.record(b,1,[{**task,'state':'succeeded','evidence':{'item':'minecraft:stick','countAfter':4}}])
  assert journal.recent(b)[0]['state']=='succeeded'
+
+def test_restart_uses_new_activity_identity_even_if_ui_generation_and_task_id_repeat():
+ from app.services.minecraft import Minecraft
+ binding={'world':'w','account':'p'}
+ a,b=Minecraft(),Minecraft();a.binding=b.binding=binding
+ first={'taskId':'walk','state':'succeeded','skill':'navigate','evidence':{'x':1}}
+ a.record_tasks([first],a.generation)
+ b.record_tasks([{**first,'evidence':{'x':2}}],b.generation)
+ assert len(journal.recent(binding))==2
+
+def test_rebind_marks_old_unconfirmed_tasks_unknown_without_replay_or_false_success():
+ b={'world':'w','account':'p'}
+ journal.record(b,'old',[{'taskId':'dig','state':'running','evidence':{'blocksBroken':1}},
+                         {'taskId':'walk','state':'succeeded','evidence':{'x':1}}])
+ journal.reconcile(b)
+ tasks={t['taskId']:t for t in journal.recent(b)}
+ assert tasks['dig']['state']=='unknown'
+ assert tasks['dig']['evidence']=={'blocksBroken':1}
+ assert tasks['walk']['state']=='succeeded'
+
+def test_old_integer_generation_table_migrates_without_losing_facts():
+ with db.tx() as c:
+  c.execute('CREATE TABLE minecraft_tasks(scope TEXT NOT NULL,generation INTEGER NOT NULL,task_id TEXT NOT NULL,data TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(scope,generation,task_id))')
+ journal.record({'world':'w'},1,[{'taskId':'old','state':'succeeded','evidence':{'x':1}}])
+ journal.record({'world':'w'},'game-new',[{'taskId':'old','state':'succeeded','evidence':{'x':2}}])
+ assert len(journal.recent({'world':'w'}))==2

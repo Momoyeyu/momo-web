@@ -12,7 +12,11 @@ def scope(binding):
 def schema():
     with db.tx() as c:
         c.execute('CREATE TABLE IF NOT EXISTS minecraft_goals(scope TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT NOT NULL)')
-        c.execute('CREATE TABLE IF NOT EXISTS minecraft_tasks(scope TEXT NOT NULL,generation INTEGER NOT NULL,task_id TEXT NOT NULL,data TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(scope,generation,task_id))')
+        c.execute('CREATE TABLE IF NOT EXISTS minecraft_tasks(scope TEXT NOT NULL,activity TEXT NOT NULL,task_id TEXT NOT NULL,data TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(scope,activity,task_id))')
+        # Early development journals used an in-process UI counter. Preserve their
+        # facts, but use unique activity identities across subsequent app restarts.
+        if 'generation' in {row['name'] for row in c.execute('PRAGMA table_info(minecraft_tasks)')}:
+            c.execute('ALTER TABLE minecraft_tasks RENAME COLUMN generation TO activity')
 def goal(binding):
     schema()
     rows=db.query('SELECT data FROM minecraft_goals WHERE scope=?',(scope(binding),))
@@ -27,7 +31,7 @@ def set_goal(binding, value):
     with db.tx() as c:c.execute('INSERT INTO minecraft_goals VALUES(?,?,?) ON CONFLICT(scope) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',(scope(binding),json.dumps(value,ensure_ascii=False),db.now_iso()))
     return value
 
-def record(binding,generation,tasks):
+def record(binding,activity,tasks):
     schema();changed=[]
     with db.tx() as c:
         for task in tasks[:256]:
@@ -36,11 +40,27 @@ def record(binding,generation,tasks):
             if task['state']=='succeeded' and not task.get('evidence'):raise ValueError('Unverified task completion')
             data=json.dumps(task,sort_keys=True,ensure_ascii=False)
             if len(data)>64000:raise ValueError('Task evidence too large')
-            old=c.execute('SELECT data FROM minecraft_tasks WHERE scope=? AND generation=? AND task_id=?',(scope(binding),generation,task['taskId'])).fetchone()
+            old=c.execute('SELECT data FROM minecraft_tasks WHERE scope=? AND activity=? AND task_id=?',(scope(binding),activity,task['taskId'])).fetchone()
             if old and old['data']==data:continue
-            c.execute('INSERT INTO minecraft_tasks VALUES(?,?,?,?,?) ON CONFLICT(scope,generation,task_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',(scope(binding),generation,task['taskId'],data,db.now_iso()))
+            c.execute('INSERT INTO minecraft_tasks VALUES(?,?,?,?,?) ON CONFLICT(scope,activity,task_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',(scope(binding),activity,task['taskId'],data,db.now_iso()))
             changed.append(task)
     return changed
+
+def reconcile(binding, *, activity=None):
+    """Close unconfirmed execution records without inventing a gameplay outcome.
+
+    A reconnect restores intentions only. It never resumes or replays these tasks.
+    Known terminal receipts and any partial evidence remain intact.
+    """
+    schema()
+    with db.tx() as c:
+        for row in c.execute('SELECT activity,task_id,data FROM minecraft_tasks WHERE scope=?',(scope(binding),)).fetchall():
+            if activity is not None and row['activity'] != activity:continue
+            task=json.loads(row['data'])
+            if task.get('state') not in {'queued','running','paused'}:continue
+            task={**task,'state':'unknown','reason':'activity_ended_without_terminal_receipt'}
+            c.execute('UPDATE minecraft_tasks SET data=?,updated_at=? WHERE scope=? AND activity=? AND task_id=?',
+                      (json.dumps(task,ensure_ascii=False),db.now_iso(),scope(binding),row['activity'],row['task_id']))
 
 def recent(binding,limit=12):
     schema()
