@@ -125,7 +125,7 @@ export class PluginHost {
       case 'minecraft.events': return this.minecraft.events(params.after, params.permission);
       case 'minecraft.heartbeat': return this.minecraft.heartbeat(params.permission);
       case 'minecraft.pause': return this.minecraft.pause(params.permission);
-      case 'minecraft.resume': return this.minecraft.resume(params.permission);
+      case 'minecraft.resume': return this.minecraft.resume(params.permission, params.issuedAt ?? 0);
       case 'minecraft.cancel': return this.minecraft.cancel(params.taskId, params.permission);
       case 'minecraft.observe': return this.minecraft.observe(params.permission);
       case 'minecraft.chat': return this.minecraft.chat(params.text, params.permission);

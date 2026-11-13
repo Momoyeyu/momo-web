@@ -389,7 +389,7 @@
     }
   },
   "waitFor": {
-    "description": "Wait locally for an actual item quantity in the inventory or open station. Use before collecting processing output; not model polling. 20 ticks per second.",
+    "description": "Wait locally for an actual item quantity in the inventory or open station. Use before collecting processing output; not model polling. 20 ticks per second. Optional potion matches the exact potion registry ID, so water bottles do not count as a completed brew.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -416,6 +416,11 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 2400
+        },
+        "potion": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 128
         }
       },
       "required": [
@@ -482,7 +487,8 @@
                   "pickup",
                   "waitFor",
                   "trade",
-                  "gather"
+                  "gather",
+                  "wait"
                 ]
               },
               "args": {
@@ -568,6 +574,23 @@
       "required": [
         "item",
         "count"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "wait": {
+    "description": "Wait locally for a bounded number of game ticks, e.g. rest or let the world progress. No model polling. This proves elapsed game ticks, not successful processing.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "ticks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2400
+        }
+      },
+      "required": [
+        "ticks"
       ],
       "additionalProperties": false
     }

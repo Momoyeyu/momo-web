@@ -39,9 +39,10 @@ def set_goal(binding, value):
     return value
 
 def record(binding,activity,tasks):
+    if len(tasks)>4096:raise ValueError('Too many task receipts')
     schema();changed=[]
     with db.tx() as c:
-        for task in tasks[:256]:
+        for task in tasks:
             if not isinstance(task,dict) or not isinstance(task.get('taskId'),str) or len(task['taskId'])>80:raise ValueError('Invalid task receipt')
             if task.get('state') not in {'queued','running','paused','succeeded','failed','cancelled'}:raise ValueError('Invalid task state')
             if task['state']=='succeeded' and not task.get('evidence'):raise ValueError('Unverified task completion')

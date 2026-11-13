@@ -22,6 +22,8 @@ public final class TaskRuntime {
   default boolean acceptsScreen(Object screen){return false;}
   default Map<String,Object> progress(){return Map.of();}
   default Map<String,Object> partialEvidence(){return Map.of();}
+  default boolean controlsMining(){return false;}
+  default boolean retrySafe(String reason){return false;}
  }
  public record Step(String state,String reason,Map<String,Object> evidence){
   public static Step running(){return new Step("running","",Map.of());}
@@ -34,7 +36,7 @@ public final class TaskRuntime {
  private static final int MAX_PENDING=5,MAX_HISTORY=4096,MAX_EVENTS=256;
  private static final long MAX_LIFETIME=600000;
  private static final class Job {
-  final String id,skill,key;final Work work;final long deadline;
+  final String id,skill,key;Work work;final long deadline;
   long lease;String state="queued",reason="";Map<String,Object> evidence=Map.of(),progress=Map.of();long lastProgress;
   Job(String id,String skill,String key,Work work,long now,long duration){this.id=id;this.skill=skill;this.key=key;this.work=work;lease=now+duration;deadline=now+MAX_LIFETIME;}
   boolean terminal(){return state.equals("succeeded")||state.equals("failed")||state.equals("cancelled");}
@@ -49,7 +51,7 @@ public final class TaskRuntime {
  private boolean paused;
  public boolean submit(String id,String skill,Work work,long now,long leaseMs){return submit(id,skill,skill,work,now,leaseMs);}
  public boolean submit(String id,String skill,String key,Work work,long now,long leaseMs){
-  if(id==null||!id.matches("[A-Za-z0-9_-]{1,80}")||skill==null||key==null||key.length()>2048||work==null)throw new IllegalArgumentException("Invalid task");
+  if(id==null||!id.matches("[A-Za-z0-9_-]{1,80}")||skill==null||key==null||key.length()>3500||work==null)throw new IllegalArgumentException("Invalid task");
   validateLease(leaseMs);
   if(uncertainStop!=null)throw new IllegalStateException("Previous stop unconfirmed");
   if(history.containsKey(id)){
@@ -141,6 +143,7 @@ public final class TaskRuntime {
  }
  public boolean acceptsScreen(Object screen){return current!=null?current.work.acceptsScreen(screen):!queue.isEmpty()&&queue.peek().work.acceptsScreen(screen);}
  public boolean active(){return uncertainStop!=null||current!=null||!queue.isEmpty();}
+ public boolean controlsMining(){return current!=null&&current.state.equals("running")&&current.work.controlsMining();}
  public boolean stopConfirmed(){return uncertainStop==null&&current==null&&queue.isEmpty();}
  private void finish(Job job,String state,String reason,Map<String,Object> evidence){
   if(job==null||job.terminal())return;
@@ -152,6 +155,8 @@ public final class TaskRuntime {
    try{job.work.stop();}catch(RuntimeException error){job.state="failed";job.reason="stop_unconfirmed";uncertainStop=job.work;}
    current=null;
   }
+  // Keep immutable facts/idempotency keys, never a screen/player/world graph.
+  job.work=null;
   publish(job);
  }
  private void publish(Job job){

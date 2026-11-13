@@ -25,16 +25,16 @@ public final class SurvivalController {
  }
  public void drive(SurvivalPolicy.Mode desired){
   var c=client();var p=c.player;
-  if(desired!=mode){stop();mode=desired;savedSlot=p.getInventory().selectedSlot;ticks=0;escapeYaw=p.getYaw();}
+  if(desired!=mode){var selectedThreat=threat;stop();threat=selectedThreat;mode=desired;savedSlot=p.getInventory().selectedSlot;ticks=0;escapeYaw=p.getYaw();}
   ticks++;
   switch(mode){
-   case EAT -> {int slot=foodSlot();if(slot>=0){p.getInventory().selectedSlot=slot;if(!p.isUsingItem()&&ticks%4==1)c.interactionManager.interactItem(p,Hand.MAIN_HAND);}}
+   case EAT -> {int slot=foodSlot();if(slot>=0){p.getInventory().selectedSlot=slot;c.options.useKey.setPressed(true);if(!p.isUsingItem()&&ticks%4==1)c.interactionManager.interactItem(p,Hand.MAIN_HAND);}}
    case DEFEND -> {
     if(threat==null)return;
     if(ticks==1)for(int i=0;i<9;i++)if(p.getInventory().getStack(i).getItem() instanceof SwordItem){p.getInventory().selectedSlot=i;break;}
     look(threat.getEyePos());
-    if(p.canInteractWithEntity(threat,0)&&p.getAttackCooldownProgress(0)>=.95){if(p.isUsingItem())c.interactionManager.stopUsingItem(p);c.interactionManager.attackEntity(p,threat);p.swingHand(Hand.MAIN_HAND);}
-    else if(p.getOffHandStack().isOf(Items.SHIELD)&&!p.isUsingItem())c.interactionManager.interactItem(p,Hand.OFF_HAND);
+    if(p.canInteractWithEntity(threat,0)&&p.getAttackCooldownProgress(0)>=.95){c.options.useKey.setPressed(false);if(p.isUsingItem())c.interactionManager.stopUsingItem(p);c.interactionManager.attackEntity(p,threat);p.swingHand(Hand.MAIN_HAND);}
+    else if(p.getOffHandStack().isOf(Items.SHIELD)){c.options.useKey.setPressed(true);if(!p.isUsingItem())c.interactionManager.interactItem(p,Hand.OFF_HAND);}
    }
    case ESCAPE -> {
     // Evaluate a few nearby collision cells, never hidden resources or global terrain.
@@ -52,9 +52,9 @@ public final class SurvivalController {
  }
  private void look(Vec3d target){var p=client().player;var d=target.subtract(p.getEyePos());float yaw=(float)Math.toDegrees(Math.atan2(-d.x,d.z));p.setYaw(p.getYaw()+MathHelper.clamp(MathHelper.wrapDegrees(yaw-p.getYaw()),-20,20));p.setPitch((float)-Math.toDegrees(Math.atan2(d.y,Math.sqrt(d.x*d.x+d.z*d.z))));}
  public void stop(){
-  if(mode==SurvivalPolicy.Mode.NONE)return;
+  if(mode==SurvivalPolicy.Mode.NONE){threat=null;return;}
   var c=client();if(c.player!=null){if(c.player.isUsingItem()&&c.interactionManager!=null)c.interactionManager.stopUsingItem(c.player);if(savedSlot>=0)c.player.getInventory().selectedSlot=savedSlot;}
-  c.options.forwardKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.jumpKey.setPressed(false);
-  savedSlot=-1;mode=SurvivalPolicy.Mode.NONE;
+  c.options.forwardKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.useKey.setPressed(false);
+  savedSlot=-1;mode=SurvivalPolicy.Mode.NONE;threat=null;
  }
 }

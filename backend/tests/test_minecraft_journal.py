@@ -59,3 +59,9 @@ def test_exploration_remembers_only_observed_visits_and_isolated_dimensions():
  assert journal.explored({'world':'other','account':'p'})==[]
  journal.observe_visit(b,{**obs,'world':'spoofed','x':999})
  assert len(journal.explored(b))==2
+
+def test_stop_snapshot_does_not_drop_newest_facts_after_256_tasks():
+ b={'world':'long-session','account':'p'}
+ tasks=[{'taskId':f't{i}','state':'succeeded','evidence':{'x':i}} for i in range(257)]
+ journal.record(b,'game-one',tasks)
+ assert journal.recent(b)[-1]['taskId']=='t256'

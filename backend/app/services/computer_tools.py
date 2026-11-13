@@ -298,6 +298,16 @@ def execute(name,args):
                 result['pixelsFollow']=True
         return json.dumps(result,ensure_ascii=False)
     except Exception as error:
+        if name in {'minecraft_goal','minecraft_action'}:
+            from .minecraft import MinecraftError
+            code=error.code if isinstance(error,MinecraftError) else str(error) if isinstance(error,HostError) else ''
+            recovery={
+                'MINECRAFT_TASKS_ACTIVE':'Finish or cancel the live task before replacing/completing the goal. Keep its observed progress.',
+                'MINECRAFT_PAUSED':'Gameplay is paused. A new direct player request or Resume button is required. Do not resume from an automatic game event.',
+                'MINECRAFT_INPUT':'Arguments were rejected before dispatch. Query the exact skill schema before changing arguments.',
+                'MINECRAFT_STALE':'Read a fresh game observation before another action; do not infer completion from this rejection.',
+            }
+            if code in recovery:return json.dumps({'ok':False,'code':code,'error':recovery[code]})
         if name in {'computer_observe','screen_observe'}:
             with _lock:_pending.pop(current_run.get(),None)
         diagnostic = {}

@@ -63,3 +63,24 @@ tasks.register('pickupLedgerSmoke', JavaExec) {
  mainClass = 'dev.momo.task.PickupLedgerSmoke'
 }
 check.dependsOn pickupLedgerSmoke
+
+tasks.register('combatOutcomeSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.CombatOutcomeSmoke'
+}
+check.dependsOn combatOutcomeSmoke
+
+tasks.register('blockReceiptsSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.BlockReceiptsSmoke'
+}
+check.dependsOn blockReceiptsSmoke
+
+tasks.register('pauseBarrierSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.PauseBarrierSmoke'
+}
+check.dependsOn pauseBarrierSmoke

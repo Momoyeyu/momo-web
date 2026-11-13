@@ -13,6 +13,14 @@ public final class TaskRuntimeSmoke {
  }
  static void check(boolean ok,String why){if(!ok)throw new AssertionError(why);}
  public static void main(String[] args){
+  TaskRuntime digging=new TaskRuntime();
+  Work dig=new Work(){public boolean controlsMining(){return true;}};
+  digging.submit("dig","mine",dig,0,10000);check(!digging.controlsMining(),"queued work does not own vanilla mining input");
+  digging.tick(1);check(digging.controlsMining(),"running semantic mining owns input arbitration");
+  digging.pause();check(!digging.controlsMining(),"paused body cannot suppress player input");
+  digging.resume();digging.stop("takeover");check(!digging.controlsMining(),"takeover restores vanilla input");
+  TaskRuntime boundedPlan=new TaskRuntime();
+  check(boundedPlan.submit("full-plan","plan","x".repeat(3000),new Work(),0,10000),"runtime must accept a plan key within the shared 3500 byte contract");
   TaskRuntime invalid=new TaskRuntime();
   Work missing=new Work(){public void start(){throw new TaskRuntime.Rejected("target_not_visible");}};
   invalid.submit("missing","mine",missing,0,10000);invalid.tick(1);

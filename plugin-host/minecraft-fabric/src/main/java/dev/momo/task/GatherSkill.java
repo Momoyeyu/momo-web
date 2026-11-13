@@ -16,7 +16,7 @@ public final class GatherSkill implements TaskRuntime.Work {
  private TaskRuntime.Work child;private BlockPos target,origin,foliage;
  private int baseline,ticks,scan,idle,clearedLeaves;private String phase="search",lastFailure="";
  public GatherSkill(JsonObject args){item=args.get("item").getAsString();requested=args.get("count").getAsInt();}
- public void start(){if(c.player==null||c.world==null)throw new TaskRuntime.Rejected("world_unavailable");if(!Registries.ITEM.containsId(net.minecraft.util.Identifier.of(item)))throw new TaskRuntime.Rejected("item_unknown");if(origin==null){baseline=count();origin=c.player.getBlockPos();}}
+ public void start(){if(c.player==null||c.world==null)throw new TaskRuntime.Rejected("world_unavailable");if(!Registries.ITEM.containsId(net.minecraft.util.Identifier.of(item)))throw new TaskRuntime.Rejected("item_unknown");if(origin==null){baseline=count();origin=c.player.getBlockPos();}scan=idle=0;lastFailure="";foliage=null;phase="search";}
  private int count(){int total=0;for(int i=0;i<c.player.getInventory().size();i++){var stack=c.player.getInventory().getStack(i);if(Registries.ITEM.getId(stack.getItem()).toString().equals(item))total+=stack.getCount();}return total;}
  public TaskRuntime.Step tick(){
   if(++ticks>2400)return TaskRuntime.Step.failed("gather_timeout");
@@ -28,6 +28,7 @@ public final class GatherSkill implements TaskRuntime.Work {
    try{outcome=child.tick();}catch(RuntimeException error){outcome=TaskRuntime.Step.failed(TaskRuntime.reason(error,"execution_failed"));}
    if(outcome.state().equals("running"))return outcome;
    child.stop();child=null;
+   if(Set.of("server_confirmation_missing","execution_failed","stop_unconfirmed").contains(outcome.reason()))return outcome;
    if(outcome.state().equals("failed")){lastFailure=outcome.reason();if(target!=null)blocked.put(target,ticks+200);}
    target=null;foliage=null;phase="search";idle=0;scan=0;return TaskRuntime.Step.running();
   }
@@ -62,6 +63,8 @@ public final class GatherSkill implements TaskRuntime.Work {
   try{child.start();}catch(RuntimeException error){child.stop();child=null;lastFailure=TaskRuntime.reason(error,"start_failed");if(target!=null)blocked.put(target,ticks+200);target=null;phase="search";}
  }
  public void pause(){if(child!=null)child.pause();}
+ public boolean controlsMining(){return child!=null&&child.controlsMining();}
+ public boolean retrySafe(String reason){return Set.of("source_not_visible","target_not_visible","tool_required","unreachable").contains(reason);}
  public void resume(){if(child!=null)child.resume();}
  public void stop(){if(child!=null){child.stop();child=null;}}
  public Map<String,Object> partialEvidence(){return c.player==null||count()<=baseline?Map.of():Map.of("item",item,"countBefore",baseline,"countAfter",count());}

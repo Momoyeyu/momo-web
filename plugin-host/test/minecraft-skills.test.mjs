@@ -13,6 +13,8 @@ test('unknown fields, nested programs, overlong plans and nonfinite values fail 
  assert.throws(()=>validateSkill('bash',{command:'x'}),/Unsupported/);
 });
 test('pickup, wait for processing, and a bounded merchant trade have typed paths',()=>{
+ validateSkill('wait',{ticks:40});
+ validateSkill('waitFor',{item:'minecraft:potion',potion:'minecraft:swiftness',count:3,area:'screen',ticks:600});
  validateSkill('gather',{item:'minecraft:oak_log',count:4});
  validateSkill('pickup',{entityId:3});
  validateSkill('waitFor',{item:'minecraft:iron_ingot',count:1,area:'screen',ticks:1200});

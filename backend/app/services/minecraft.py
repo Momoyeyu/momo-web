@@ -7,7 +7,9 @@ from .coordinator import runtime
 from . import vision
 
 class MinecraftError(ValueError):
-    pass
+    def __init__(self,message,*,code='MINECRAFT_STATE'):
+        super().__init__(message)
+        self.code=code
 
 class Minecraft:
     def __init__(self):
@@ -100,7 +102,7 @@ class Minecraft:
                 permission = {**self.binding, 'activityEpoch': self.epoch}
             capabilities = runtime.host.request('minecraft.capabilities', {'permission':permission})
             if capabilities.get('taskProtocol')==1 and 'game.modify' in self.permissions:
-                runtime.host.request('minecraft.resume',{'permission':permission})
+                runtime.host.request('minecraft.resume',{'permission':permission,'issuedAt':int(time.time()*1000)})
             with self.lock:
                 self.capabilities = capabilities
                 self.autonomous = 'game.modify' in self.permissions and capabilities.get('taskProtocol') == 1
@@ -112,6 +114,7 @@ class Minecraft:
             return self.status()
 
     def execute(self, action, arguments, generation, client, lease):
+        if action=='resume':arguments={**arguments,'issuedAt':self._resume_input_time(client)}
         capability = {'observe':'game.observe','chat':'game.chat','follow':'game.move','play':'game.modify','submit':'game.modify','task':'game.observe','events':'game.observe','capabilities':'game.observe','recipes':'game.observe','pause':'game.modify','resume':'game.modify','cancel':'game.modify'}[action]
         # Host control serializes dispatch against the coordinator's revoke barrier.
         with runtime.host.control:
@@ -120,7 +123,7 @@ class Minecraft:
                 if (generation != self.generation or self.epoch != runtime.epoch or not self.binding
                         or fingerprint != self.fingerprint or capability not in self.permissions or 'game.observe' not in self.permissions):
                     raise MinecraftError('Minecraft grant revoked or capability denied')
-                if (self.paused or self.suspended) and action in {'submit','play','follow','chat'}:raise MinecraftError('Minecraft gameplay paused')
+                if (self.paused or self.suspended) and action in {'submit','play','follow','chat'}:raise MinecraftError('Minecraft gameplay paused',code='MINECRAFT_PAUSED')
                 if action in {'observe','chat','play','follow'} and time.monotonic() - self.budget_window >= 60:
                     self.actions = 0
                     self.budget_window = time.monotonic()
@@ -136,6 +139,9 @@ class Minecraft:
                     try:self.stop('game_result_unknown')
                     except HostError:pass
                 raise
+            if result.get('error') in {'BODY_PAUSED','NEW_PLAYER_INPUT_REQUIRED'}:
+                with self.lock:self.paused=True;self.autonomous=self.decision_needed=False
+                raise MinecraftError('Fresh player input is required to resume Minecraft',code='MINECRAFT_PAUSED')
             if action=='observe':
                 from . import minecraft_journal as journal
                 with self.lock:
@@ -170,6 +176,16 @@ class Minecraft:
             result = {**result, 'inputLeaseElapsed': True}
         return result
 
+    @staticmethod
+    def _resume_input_time(client):
+        if client is not None:return int(time.time()*1000)
+        from .coordinator import current_run
+        from ..core import db
+        from datetime import datetime
+        rows=db.query("SELECT r.created_at FROM runs r JOIN messages m ON m.run_id=r.id WHERE r.id=? AND r.source='meeting' AND m.source='meeting' AND m.role='user' LIMIT 1",(current_run.get(),))
+        if not rows:raise MinecraftError('Fresh player input is required to resume Minecraft',code='MINECRAFT_PAUSED')
+        return int(datetime.fromisoformat(rows[0]['created_at']).timestamp()*1000)
+
     def current_goal(self):
         from . import minecraft_journal as journal
         return journal.goal(self.binding) if self.binding else None
@@ -187,7 +203,7 @@ class Minecraft:
                 previous=self.current_goal()
                 replacing=previous and any(previous.get(k)!=value.get(k) for k in ('title','expected'))
                 if live and (value['status']=='completed' or replacing):
-                    raise MinecraftError('Resolve or cancel the live task before replacing/completing its goal')
+                    raise MinecraftError('Resolve or cancel the live task before replacing/completing its goal',code='MINECRAFT_TASKS_ACTIVE')
             if value['status'] in {'paused','abandoned'}:
                 self.execute('pause',{},generation,None,None)
                 if value['status']=='abandoned':

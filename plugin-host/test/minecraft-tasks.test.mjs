@@ -50,6 +50,12 @@ test('event cursors and task identifiers are checked before dispatch',async()=>{
  assert.equal(commands.length,count);
 });
 
+test('resume forwards only the backend supplied player input timestamp',async()=>{
+ const {adapter,commands}=fixture();await adapter.capabilities(permission);
+ await adapter.resume(permission,123);
+ assert.equal(commands.at(-1).type,'resumeTask');assert.equal(commands.at(-1).issuedAt,123);
+});
+
 test('event polling and heartbeat do not wait for a model dispatch; revoke rejects the late task reply',async()=>{
  let resolveSubmit;let entered;
  const submitted=new Promise(resolve=>{entered=resolve;});

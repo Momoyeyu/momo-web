@@ -128,3 +128,18 @@ def test_unfocused_game_suspends_decisions_without_revoking_or_mistaking_it_for_
   rt.host.request.side_effect=[{'suspended':False},{'events':{'cursor':0,'gap':False,'events':[]}}]
   m.poll_tasks(0)
   assert not m.suspended and m.claim_decision(0,'owner','lease')
+
+def test_automatic_game_event_cannot_resume_after_player_handoff():
+ from app.services.coordinator import current_run
+ m,rt=setup();token=current_run.set('automatic-game-event')
+ try:
+  with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+   with pytest.raises(MinecraftError,match='player input'):m.execute('resume',{},0,None,None)
+   rt.host.request.assert_not_called()
+ finally:current_run.reset(token)
+
+def test_explicit_owner_resume_carries_server_generated_input_time():
+ m,rt=setup()
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  m.execute('resume',{},0,'owner','lease')
+  assert isinstance(rt.host.request.call_args.args[1]['issuedAt'],int)

@@ -108,7 +108,10 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
     },
     heartbeat: permission => execute('heartbeat', {}, permission),
     pause: permission => execute('pause', {}, permission),
-    resume: permission => execute('resumeTask', {}, permission),
+    resume(permission, issuedAt = 0) {
+      if(!Number.isSafeInteger(issuedAt)||issuedAt<0||issuedAt>now()+5000)return Promise.reject(problem('Invalid player input time'));
+      return execute('resumeTask', {issuedAt}, permission);
+    },
     cancel(taskId, permission) {
       if (!validId(taskId)) return Promise.reject(problem('Invalid task identifier'));
       return execute('cancel', {taskId}, permission);

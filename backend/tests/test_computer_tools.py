@@ -268,3 +268,9 @@ def test_game_model_projection_keeps_slot_addresses_and_requests_recipes_on_dema
  assert result['slots']==[{'id':0,'empty':True},raw['slots'][1]]
  assert 'knownRecipes' not in result and result['recipeQueryAvailable']
  assert result['task']==raw['task'] and 'knownRecipes' in raw
+
+def test_game_goal_conflict_reports_recovery_instead_of_an_ambiguous_permission_failure():
+ from app.services.minecraft import minecraft,MinecraftError
+ with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'update_goal',side_effect=MinecraftError('Live task must settle',code='MINECRAFT_TASKS_ACTIVE')):
+  result=json.loads(tools.execute('minecraft_goal',{}))
+ assert result['code']=='MINECRAFT_TASKS_ACTIVE' and 'cancel' in result['error'].lower()
