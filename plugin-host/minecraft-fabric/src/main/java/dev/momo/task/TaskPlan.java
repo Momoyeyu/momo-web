@@ -37,5 +37,6 @@ public final class TaskPlan implements TaskRuntime.Work {
  public void pause(){if(running)steps.get(index).work.pause();}
  public void resume(){if(running)steps.get(index).work.resume();}
  public void stop(){release();}
+ public Map<String,Object> progress(){return finished?Map.of("completedSteps",index):Map.of("step",index,"completedSteps",outcomes.size(),"action",steps.get(index).work.progress());}
  public boolean acceptsScreen(Object screen){return !finished&&failure==null&&steps.get(index).work.acceptsScreen(screen);}
 }

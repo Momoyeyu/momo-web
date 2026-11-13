@@ -6,6 +6,8 @@ import dev.momo.task.TaskRuntime;
 import dev.momo.task.BaritoneNavigator;
 import dev.momo.task.GameSkills;
 import dev.momo.task.GameObservation;
+import dev.momo.task.SurvivalController;
+import dev.momo.task.SurvivalPolicy;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -19,14 +21,13 @@ import net.minecraft.client.MinecraftClient;
 /** Existing-client bridge. All Minecraft access runs on the game thread. */
 public final class CompanionClient implements ClientModInitializer {
  private long epoch = -1, deadline;
- private String target, boundWorld, boundAccount;
- private java.util.List<BoundedPath.Cell> path = java.util.List.of();
- private long nextPlan;
+ private String boundWorld, boundAccount;
  private final TaskRuntime tasks=new TaskRuntime();
+ private final SurvivalController survival=new SurvivalController();
  private String taskWorld, taskAccount;
  private net.minecraft.client.world.ClientWorld taskWorldInstance;
  private boolean taskPaused,physicalTakeover;
- public static boolean controlling(){return instance!=null&&(instance.tasks.active()||instance.playing||instance.target!=null);}
+ public static boolean controlling(){return instance!=null&&(instance.tasks.active()||instance.playing);}
  public static void physicalInput(){if(instance!=null&&controlling())instance.physicalTakeover=true;}
  private static CompanionClient instance;
  private boolean playing,mining,using,attacking,drivingInput;
@@ -38,6 +39,7 @@ public final class CompanionClient implements ClientModInitializer {
  private HttpServer server;
  private ExecutorService executor;
  private final Gson gson = new Gson();
+ private record CapturedReply(JsonObject body,net.minecraft.client.texture.NativeImage frame){}
  public void onInitializeClient() {
   instance=this;
   String token = System.getProperty("momo.bridge.token", "");
@@ -57,12 +59,29 @@ public final class CompanionClient implements ClientModInitializer {
      if (body.length > 4096) throw new IllegalArgumentException("Too large");
      JsonObject command = JsonParser.parseString(new String(body, StandardCharsets.UTF_8)).getAsJsonObject();
      long expires = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
-     CompletableFuture<JsonObject> result = new CompletableFuture<>();
+     CompletableFuture<CapturedReply> result = new CompletableFuture<>();
      MinecraftClient.getInstance().execute(() -> {
-      try { if (System.nanoTime() > expires) throw new IllegalStateException("Expired"); result.complete(command(command)); }
-      catch (Exception error) { result.completeExceptionally(error); }
+      var frame=new java.util.concurrent.atomic.AtomicReference<net.minecraft.client.texture.NativeImage>();
+      try {
+       if (System.nanoTime() > expires || result.isCancelled()) throw new IllegalStateException("Expired");
+       var bodyResult=command(command,frame::set);
+       if(!result.complete(new CapturedReply(bodyResult,frame.get()))&&frame.get()!=null)frame.get().close();
+      } catch (Exception error) {if(frame.get()!=null)frame.get().close();result.completeExceptionally(error);}
      });
-     response = gson.toJson(result.get(2500, TimeUnit.MILLISECONDS)).getBytes(StandardCharsets.UTF_8);
+     CapturedReply reply;
+     try{reply=result.get(2500,TimeUnit.MILLISECONDS);}catch(Exception error){result.cancel(false);throw error;}
+     // GL capture stays on the client thread; scaling/PNG encoding never blocks its ticks.
+     try(var raw=reply.frame()){
+      if(raw!=null){
+       int width=Math.min(960,raw.getWidth()),height=Math.max(1,raw.getHeight()*width/raw.getWidth());
+       try(var scaled=new net.minecraft.client.texture.NativeImage(width,height,false)){
+        raw.resizeSubRectTo(0,0,raw.getWidth(),raw.getHeight(),scaled);
+        byte[] png=scaled.getBytes();if(png.length>4000000)throw new IllegalStateException("Frame too large");
+        reply.body().addProperty("frame","data:image/png;base64,"+java.util.Base64.getEncoder().encodeToString(png));
+       }
+      }
+      response=gson.toJson(reply.body()).getBytes(StandardCharsets.UTF_8);
+     }
     } catch (Exception error) { code = 400; response = "{\"error\":\"Command rejected\"}".getBytes(StandardCharsets.UTF_8); }
     exchange.getResponseHeaders().set("Content-Type", "application/json");
     exchange.sendResponseHeaders(code, response.length);
@@ -92,32 +111,36 @@ public final class CompanionClient implements ClientModInitializer {
   backgroundUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(60);
  }
  private void release(MinecraftClient client) {
-  tasks.stop("control_released");taskPaused=false;
+  survival.stop();tasks.stop("control_released");taskPaused=false;
   if(mining && client.interactionManager!=null)client.interactionManager.cancelBlockBreaking();
   if(using && client.interactionManager!=null && client.player!=null && client.player.isUsingItem())client.interactionManager.stopUsingItem(client.player);
   playing = mining = using = attacking = false;
-  path = java.util.List.of(); nextPlan = 0;
-  target = null; boundWorld = null; boundAccount = null; deadline = 0;
+  boundWorld = null; boundAccount = null; deadline = 0;
   client.options.forwardKey.setPressed(false); client.options.backKey.setPressed(false);
   client.options.leftKey.setPressed(false); client.options.rightKey.setPressed(false);
   client.options.jumpKey.setPressed(false); client.options.sneakKey.setPressed(false);
   client.options.sprintKey.setPressed(false); client.options.attackKey.setPressed(false); client.options.useKey.setPressed(false);
  }
+ private boolean isCommandText(String text){
+  String stripped=text.stripLeading(),prefix=baritone.api.BaritoneAPI.getSettings().prefix.value;
+  return stripped.startsWith("/")||stripped.startsWith("#")||(!prefix.isEmpty()&&stripped.startsWith(prefix));
+ }
+ private String serverName(MinecraftClient client){return client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().name:"Minecraft";}
  private String worldScope(MinecraftClient client){
   String server=client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local";
   if(client.getServer()!=null){
    String path=client.getServer().getSavePath(net.minecraft.util.WorldSavePath.ROOT).toAbsolutePath().normalize().toString();
    try{server="local:"+java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(path.getBytes(StandardCharsets.UTF_8))).substring(0,24);}catch(java.security.NoSuchAlgorithmException error){throw new IllegalStateException(error);}
   }
-  return server+"/"+client.world.getRegistryKey().getValue();
+  return server;
  }
- private JsonObject command(JsonObject command) throws Exception {
+ private JsonObject command(JsonObject command,java.util.function.Consumer<net.minecraft.client.texture.NativeImage> capture) throws Exception {
   MinecraftClient client = MinecraftClient.getInstance();
   String type = command.get("type").getAsString();
   if ("ping".equals(type)) { JsonObject ready = new JsonObject(); ready.addProperty("ready", true); ready.addProperty("protocol", 1);
    if (client.player!=null && client.world!=null) {
     String scope=worldScope(client);
-    ready.addProperty("world",scope);ready.addProperty("account",client.player.getUuidAsString());ready.addProperty("playerName",client.player.getName().getString());
+    ready.addProperty("world",scope);ready.addProperty("dimension",client.world.getRegistryKey().getValue().toString());ready.addProperty("worldName",client.getServer()!=null?client.getServer().getSaveProperties().getLevelName():serverName(client));ready.addProperty("account",client.player.getUuidAsString());ready.addProperty("playerName",client.player.getName().getString());
    }
    return ready; }
   long version = command.get("epoch").getAsLong();
@@ -136,17 +159,21 @@ public final class CompanionClient implements ClientModInitializer {
   String account = client.player.getUuidAsString();
   if (!world.equals(command.get("world").getAsString()) || !account.equals(command.get("account").getAsString())) { release(client); restorePause(client); throw new IllegalArgumentException("Identity mismatch"); }
   if(backgroundUntil!=0) backgroundControl(client);
-  result.addProperty("world", world); result.addProperty("account", account);
+  result.addProperty("world", world);result.addProperty("dimension",client.world.getRegistryKey().getValue().toString()); result.addProperty("account", account);
   switch (type) {
    case "capabilities" -> {
     result.addProperty("protocol",1);result.addProperty("taskProtocol",1);
     result.addProperty("navigation",BaritoneNavigator.available());result.addProperty("navigationBackend","baritone-1.11.3");
     result.add("skills",gson.toJsonTree(GameSkills.NAMES));result.add("skillDefinitions",dev.momo.task.SkillArguments.contract());
    }
+   case "recipes" -> {
+    String query=command.get("query").getAsString();if(query.length()>64||query.chars().anyMatch(c->c<32))throw new IllegalArgumentException("Invalid query");
+    result.add("recipes",GameObservation.recipes(client,query,16));
+   }
    case "submit" -> {
     String skill=command.get("skill").getAsString();
     if(client.currentScreen!=null&&!(client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>)&&!skill.equals("respawn"))throw new IllegalStateException("Close the menu first");
-    if(playing||target!=null)throw new IllegalStateException("Another action owns the body");
+    if(playing)throw new IllegalStateException("Another action owns the body");
     String id=command.get("taskId").getAsString();
     JsonObject args=command.has("args")?command.getAsJsonObject("args"):new JsonObject();
     if(skill.equals("navigate")&&!command.has("args"))for(String key:new String[]{"x","y","z"})args.add(key,command.get(key));
@@ -161,7 +188,7 @@ public final class CompanionClient implements ClientModInitializer {
    }
    case "events" -> result.add("events",gson.toJsonTree(tasks.events(command.get("after").getAsLong())));
    case "heartbeat" -> {tasks.heartbeat(System.nanoTime()/1000000,command.get("leaseMs").getAsLong());result.addProperty("active",tasks.active());}
-   case "pause" -> {taskPaused=true;tasks.pause();result.addProperty("paused",true);}
+   case "pause" -> {survival.stop();taskPaused=true;tasks.pause();result.addProperty("paused",true);}
    case "resumeTask" -> {taskPaused=false;if(client.currentScreen==null)tasks.resume();result.addProperty("paused",false);}
    case "cancel" -> {
     tasks.cancel(command.get("taskId").getAsString(),"requested");
@@ -170,16 +197,7 @@ public final class CompanionClient implements ClientModInitializer {
    }
    case "observe" -> {
     if (!client.options.getPerspective().isFirstPerson()) throw new IllegalStateException("First person required");
-    try (var raw = net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer())) {
-     int width = Math.min(960, raw.getWidth());
-     int height = Math.max(1, raw.getHeight() * width / raw.getWidth());
-     try (var scaled = new net.minecraft.client.texture.NativeImage(width, height, false)) {
-      raw.resizeSubRectTo(0, 0, raw.getWidth(), raw.getHeight(), scaled);
-      byte[] png = scaled.getBytes();
-      if (png.length > 4_000_000) throw new IllegalStateException("Frame too large");
-      result.addProperty("frame", "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(png));
-     }
-    }
+    capture.accept(net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer()));
     GameObservation.append(client,result);
     result.addProperty("observedAt", System.currentTimeMillis());
     result.addProperty("x",client.player.getX()); result.addProperty("y",client.player.getY()); result.addProperty("z",client.player.getZ());
@@ -206,7 +224,7 @@ public final class CompanionClient implements ClientModInitializer {
     JsonArray slots=new JsonArray(),emptySlots=new JsonArray();
     for(var slot:client.player.currentScreenHandler.slots){
      if(slot.getStack().isEmpty()){emptySlots.add(slot.id);continue;}
-     JsonObject item=new JsonObject(); item.addProperty("id",slot.id);item.addProperty("item",net.minecraft.registry.Registries.ITEM.getId(slot.getStack().getItem()).toString());item.addProperty("count",slot.getStack().getCount()); slots.add(item);
+     JsonObject item=GameObservation.stack(slot.getStack()); item.addProperty("id",slot.id);slots.add(item);
     }
     result.add("slots",slots);
     result.add("emptySlots",emptySlots);
@@ -246,15 +264,18 @@ public final class CompanionClient implements ClientModInitializer {
    case "play" -> play(client, command, world, account);
    case "chat" -> {
     String text = command.get("text").getAsString();
-    if (text.isBlank() || text.length() > 256 || text.stripLeading().startsWith("/") || text.chars().anyMatch(c -> c < 32)) throw new IllegalArgumentException("Invalid chat");
+    if (text.isBlank() || text.length() > 256 || isCommandText(text) || text.chars().anyMatch(c -> c < 32)) throw new IllegalArgumentException("Invalid chat");
     client.player.networkHandler.sendChatMessage(text);
    }
    case "follow" -> {
-    if(tasks.active())throw new IllegalStateException("Navigation owns the body");
-    String player = command.get("player").getAsString(); int duration = command.get("durationMs").getAsInt();
-    if (!player.matches("[A-Za-z0-9_]{1,16}") || duration < 1 || duration > 1000) throw new IllegalArgumentException("Invalid follow");
-    backgroundControl(client);
-    target = player; boundWorld = world; boundAccount = account; deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(duration);
+    if(playing)throw new IllegalStateException("Another action owns the body");
+    String name=command.get("player").getAsString();
+    if(!name.matches("[A-Za-z0-9_]{1,16}"))throw new IllegalArgumentException("Invalid player");
+    var player=client.world.getPlayers().stream().filter(p->p!=client.player&&p.getName().getString().equals(name)&&client.player.canSee(p)).findFirst().orElseThrow(()->new IllegalArgumentException("Player is not visible"));
+    var args=new JsonObject();args.addProperty("entityId",player.getId());String id="follow-"+java.util.UUID.randomUUID();
+    tasks.submit(id,"follow",args.toString(),GameSkills.create("follow",args),System.nanoTime()/1000000,10000);
+    taskWorld=world;taskAccount=account;taskWorldInstance=client.world;backgroundControl(client);
+    result.addProperty("accepted",true);result.add("task",gson.toJsonTree(tasks.snapshot(id)));
    }
    default -> throw new IllegalArgumentException("Unsupported command");
   }
@@ -279,7 +300,7 @@ public final class CompanionClient implements ClientModInitializer {
     case "screenScroll" -> c.currentScreen.mouseScrolled(x,y,0,cmd.get("scroll").getAsDouble());
     case "screenText" -> {
      String text=cmd.get("text").getAsString();
-     if(text.length()>256||text.stripLeading().startsWith("/")||text.chars().anyMatch(ch->ch<32))throw new IllegalArgumentException("Invalid game text");
+     if(text.length()>256||isCommandText(text)||text.chars().anyMatch(ch->ch<32))throw new IllegalArgumentException("Invalid game text");
      for(char ch:text.toCharArray())c.currentScreen.charTyped(ch,0);
     }
     case "screenKey" -> {
@@ -344,6 +365,11 @@ public final class CompanionClient implements ClientModInitializer {
    if(client.isWindowFocused())for(int key:new int[]{87,65,83,68,32,340,341})manual|=net.minecraft.client.util.InputUtil.isKeyPressed(window,key);
    if(manual){tasks.stop("manual_takeover");release(client);restorePause(client);return;}
    if(client.currentScreen!=null&&!tasks.acceptsScreen(client.currentScreen)){tasks.pause();tasks.tick(System.nanoTime()/1000000);return;}
+   if(!taskPaused&&client.currentScreen==null){
+    var reflex=survival.choose();
+    if(reflex!=SurvivalPolicy.Mode.NONE){tasks.pause();tasks.tick(System.nanoTime()/1000000);if(tasks.active())survival.drive(reflex);else survival.stop();return;}
+   }
+   survival.stop();
    if(!taskPaused)tasks.resume();
    tasks.tick(System.nanoTime()/1000000);
    return;
@@ -363,33 +389,5 @@ public final class CompanionClient implements ClientModInitializer {
    } finally {drivingInput=false;}
    return;
   }
-  if (target == null) return;
-  if (System.nanoTime() >= deadline || client.player == null || client.world == null || !client.player.isAlive() || client.currentScreen != null) { release(client); return; }
-  if (!worldScope(client).equals(boundWorld) || !client.player.getUuidAsString().equals(boundAccount)) { release(client); return; }
-  var player = client.world.getPlayers().stream().filter(p -> p.getName().getString().equals(target)).findFirst().orElse(null);
-  // Replan at 5 Hz within known terrain; stop rather than jump/dig across hazards.
-  if (player == null || !client.player.canSee(player) || client.player.squaredDistanceTo(player) > 256 || !client.player.isOnGround()) { release(client); return; }
-  if (client.player.squaredDistanceTo(player) <= 9) { client.options.forwardKey.setPressed(false); return; }
-  int y = client.player.getBlockPos().getY();
-  java.util.function.Predicate<BoundedPath.Cell> safe = c -> {
-   var feet = new net.minecraft.util.math.BlockPos(c.x(), y, c.z());
-   if (!client.world.isChunkLoaded(feet)) return false;
-   var floor = client.world.getBlockState(feet.down());
-   return floor.isFullCube(client.world, feet.down()) && !floor.isOf(net.minecraft.block.Blocks.MAGMA_BLOCK)
-    && !floor.isOf(net.minecraft.block.Blocks.CACTUS) && !floor.isOf(net.minecraft.block.Blocks.CAMPFIRE)
-    && client.world.getBlockState(feet).isAir() && client.world.getBlockState(feet.up()).isAir()
-    && client.world.getFluidState(feet).isEmpty();
-  };
-  if (System.nanoTime() >= nextPlan || path.isEmpty() || client.player.horizontalCollision) {
-   path = BoundedPath.find(new BoundedPath.Cell(client.player.getBlockPos().getX(),client.player.getBlockPos().getZ()),
-    new BoundedPath.Cell(player.getBlockPos().getX(),player.getBlockPos().getZ()),safe,512);
-   nextPlan = System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(200);
-  }
-  if (path.isEmpty() || !safe.test(path.get(0))) { release(client); return; }
-  var waypoint = path.get(0);
-  double dx = waypoint.x()+.5-client.player.getX(), dz = waypoint.z()+.5-client.player.getZ();
-  if (dx*dx+dz*dz<.08) { path=path.subList(1,path.size());client.options.forwardKey.setPressed(false);return; }
-  client.player.setYaw((float)Math.toDegrees(Math.atan2(-dx,dz)));
-  client.options.forwardKey.setPressed(true);
  }
 }

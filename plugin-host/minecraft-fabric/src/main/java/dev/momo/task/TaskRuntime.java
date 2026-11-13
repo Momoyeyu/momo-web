@@ -15,23 +15,24 @@ public final class TaskRuntime {
   void resume();
   void stop();
   default boolean acceptsScreen(Object screen){return false;}
+  default Map<String,Object> progress(){return Map.of();}
  }
  public record Step(String state,String reason,Map<String,Object> evidence){
   public static Step running(){return new Step("running","",Map.of());}
   public static Step done(Map<String,Object> evidence){return new Step("succeeded","",Map.copyOf(evidence));}
   public static Step failed(String reason){return new Step("failed",reason,Map.of());}
  }
- public record Snapshot(String taskId,String skill,String state,String reason,Map<String,Object> evidence){}
+ public record Snapshot(String taskId,String skill,String state,String reason,Map<String,Object> evidence,Map<String,Object> progress){}
  public record Event(long seq,Snapshot task){}
  public record Events(long cursor,boolean gap,List<Event> events){}
  private static final int MAX_PENDING=5,MAX_HISTORY=4096,MAX_EVENTS=256;
  private static final long MAX_LIFETIME=600000;
  private static final class Job {
   final String id,skill,key;final Work work;final long deadline;
-  long lease;String state="queued",reason="";Map<String,Object> evidence=Map.of();
+  long lease;String state="queued",reason="";Map<String,Object> evidence=Map.of(),progress=Map.of();long lastProgress;
   Job(String id,String skill,String key,Work work,long now,long duration){this.id=id;this.skill=skill;this.key=key;this.work=work;lease=now+duration;deadline=now+MAX_LIFETIME;}
   boolean terminal(){return state.equals("succeeded")||state.equals("failed")||state.equals("cancelled");}
-  Snapshot snapshot(){return new Snapshot(id,skill,state,reason,evidence);}
+  Snapshot snapshot(){return new Snapshot(id,skill,state,reason,evidence,progress);}
  }
  private final Map<String,Job> history=new LinkedHashMap<>();
  private final ArrayDeque<Job> queue=new ArrayDeque<>();
@@ -72,6 +73,10 @@ public final class TaskRuntime {
     if(step.evidence.isEmpty())finish(current,"failed","unverified_result",Map.of());
     else finish(current,"succeeded","",Map.copyOf(step.evidence));
    }else if(step.state.equals("failed"))finish(current,"failed",step.reason,Map.of());
+   else if(step.state.equals("running")&&now-current.lastProgress>=1000){
+    var progress=Map.copyOf(current.work.progress());
+    if(!progress.equals(current.progress)){current.progress=progress;publish(current);}current.lastProgress=now;
+   }
    else if(!step.state.equals("running"))throw new IllegalArgumentException("Invalid outcome");
   }catch(RuntimeException error){if(current!=null)finish(current,"failed","execution_failed",Map.of());}
  }

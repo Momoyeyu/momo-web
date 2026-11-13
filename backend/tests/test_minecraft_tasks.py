@@ -54,3 +54,13 @@ def test_goal_recheck_is_event_driven_with_a_30_second_idle_floor():
   with patch('app.services.minecraft.time.monotonic',return_value=133):assert m.claim_decision(0,'owner','lease')
   rt.active='player-conversation'
   with patch('app.services.minecraft.time.monotonic',return_value=170):assert m.claim_decision(0,'owner','lease') is None
+
+def test_model_capabilities_are_bounded_and_schemas_are_requested_per_skill():
+ m,rt=setup()
+ definitions={'navigate':{'description':'Reach known position','parameters':{'type':'object','properties':{'x':{'type':'integer'}}}},'craft':{'description':'Craft an item','parameters':{'type':'object','properties':{'recipe':{'type':'string'}}}}}
+ rt.host.request.return_value={'taskProtocol':1,'skills':list(definitions),'skillDefinitions':definitions}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  small=m.execute('capabilities',{},0,None,None)
+  assert 'skillDefinitions' not in small
+  selected=m.execute('capabilities',{'skill':'craft'},0,None,None)
+  assert selected['skillDefinitions']=={'craft':definitions['craft']}

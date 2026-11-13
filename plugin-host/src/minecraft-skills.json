@@ -371,6 +371,85 @@
       "additionalProperties": false
     }
   },
+  "pickup": {
+    "description": "Approach a visible dropped item and verify actual inventory gain. Disappearance alone is not success.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "entityId": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "entityId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "waitFor": {
+    "description": "Wait locally for an actual item quantity in the inventory or open station. Use before collecting processing output; not model polling. 20 ticks per second.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "item": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096
+        },
+        "area": {
+          "type": "string",
+          "enum": [
+            "inventory",
+            "screen"
+          ],
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "ticks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2400
+        }
+      },
+      "required": [
+        "item",
+        "count",
+        "area",
+        "ticks"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "trade": {
+    "description": "Complete up to 16 of an observed merchant offer by its zero-based index. Uses the normal selection packet and server-validated output. Confirms actual sell-item gain, never adds stock or currency.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 31
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        }
+      },
+      "required": [
+        "index",
+        "count"
+      ],
+      "additionalProperties": false
+    }
+  },
   "plan": {
     "description": "Run up to 24 bounded steps locally without model round trips. Optional when checks current inventory; retries max2; onFailure stop by default. No scripts or nested plans.",
     "parameters": {
@@ -399,7 +478,10 @@
                   "craft",
                   "workstation",
                   "closeScreen",
-                  "respawn"
+                  "respawn",
+                  "pickup",
+                  "waitFor",
+                  "trade"
                 ]
               },
               "args": {

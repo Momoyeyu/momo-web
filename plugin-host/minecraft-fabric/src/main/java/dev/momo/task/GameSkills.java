@@ -18,7 +18,7 @@ import net.minecraft.world.RaycastContext;
 
 /** Typed, bounded vanilla skills. Uses the current player's normal interactions only. */
 public final class GameSkills {
- public static final List<String> NAMES=List.of("navigate","follow","mine","place","interactBlock","interactEntity","attack","eat","useItem","inventory","craft","workstation","closeScreen","respawn","plan");
+ public static final List<String> NAMES=List.copyOf(SkillArguments.contract().keySet());
  private GameSkills(){}
  public static TaskRuntime.Work create(String skill,JsonObject args){
   SkillArguments.validate(skill,args);
@@ -49,7 +49,7 @@ public final class GameSkills {
  private static final class Skill implements TaskRuntime.Work {
   final String skill;final JsonObject args;final MinecraftClient c=MinecraftClient.getInstance();
   final BaritoneNavigator navigation=new BaritoneNavigator();
-  BlockPos pos,placed,pathTarget;Entity entity;Screen ownedScreen;boolean navigating,startedUse;int ticks,actionIndex,phase,startFood,beforeCount;String beforeState,inventoryBefore,outputItem;float startHealth;int targetSlot;
+  BlockPos pos,placed,pathTarget,lastSeen;Entity entity;Screen ownedScreen;boolean navigating,startedUse;int ticks,actionIndex,phase,startFood,beforeCount,lostTicks;String beforeState,inventoryBefore,outputItem;float startHealth;int targetSlot;
   Skill(String skill,JsonObject args){this.skill=skill;this.args=args;ownedScreen=c.currentScreen;}
   public void start(){
    if(c.player==null||c.world==null||c.interactionManager==null)throw new IllegalStateException("No world");
@@ -60,13 +60,23 @@ public final class GameSkills {
     if(!skill.equals("navigate")&&!visible(pos))throw new IllegalArgumentException("Target is not visible");
     beforeState=c.world.getBlockState(pos).toString();
    }
-   if(Set.of("follow","interactEntity","attack").contains(skill)){
+   if(Set.of("follow","interactEntity","attack","pickup").contains(skill)){
     entity=c.world.getEntityById(args.get("entityId").getAsInt());
-    if(entity==null||!c.player.canSee(entity)||entity.squaredDistanceTo(c.player)>1024)throw new IllegalArgumentException("Entity is not visible");
+    if(entity==null||!c.player.canSee(entity)||entity.squaredDistanceTo(c.player)>1024)throw new IllegalArgumentException("Entity is not visible");lastSeen=entity.getBlockPos();
    }
    if(skill.equals("navigate"))go(pos);
    if(skill.equals("mine")&&!c.world.getBlockState(pos).isAir())selectTool();
    if(skill.equals("place")){targetSlot=args.get("slot").getAsInt();placed=pos.offset(direction(args));c.player.getInventory().selectedSlot=targetSlot;if(c.player.getMainHandStack().isEmpty())throw new IllegalArgumentException("Missing material");beforeState=c.world.getBlockState(placed).toString();}
+   if(skill.equals("pickup")){
+    if(!(entity instanceof net.minecraft.entity.ItemEntity drop))throw new IllegalArgumentException("Not a dropped item");
+    outputItem=Registries.ITEM.getId(drop.getStack().getItem()).toString();beforeCount=count(outputItem);
+   }
+   if(skill.equals("trade")){
+    if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.MerchantScreenHandler merchant))throw new IllegalArgumentException("Open a merchant first");
+    int index=args.get("index").getAsInt();if(index>=merchant.getRecipes().size()||merchant.getRecipes().get(index).isDisabled())throw new IllegalArgumentException("Trade unavailable");
+    var offer=merchant.getRecipes().get(index);outputItem=Registries.ITEM.getId(offer.getSellItem().getItem()).toString();beforeCount=count(outputItem);targetSlot=offer.getSellItem().getCount()*args.get("count").getAsInt();
+    merchant.setRecipeIndex(index);merchant.switchTo(index);c.player.networkHandler.sendPacket(new net.minecraft.network.packet.c2s.play.SelectMerchantTradeC2SPacket(index));
+   }
    if(skill.equals("eat")){targetSlot=foodSlot();if(targetSlot<0)throw new IllegalArgumentException("No food");c.player.getInventory().selectedSlot=targetSlot;beforeCount=c.player.getMainHandStack().getCount();}
    if(skill.equals("useItem")){c.player.getInventory().selectedSlot=args.get("slot").getAsInt();beforeCount=c.player.getMainHandStack().getCount();}
    if(skill.equals("inventory")||skill.equals("workstation")){
@@ -93,7 +103,8 @@ public final class GameSkills {
      if(navigation.arrived())return done(Map.of("x",c.player.getX(),"y",c.player.getY(),"z",c.player.getZ(),"arrived",true));
      if(navigation.failed())return TaskRuntime.Step.failed("unreachable");break;
     case "follow":
-     if(!entity.isAlive()||!c.player.canSee(entity))return TaskRuntime.Step.failed("target_lost");
+     if(!entity.isAlive())return TaskRuntime.Step.failed("target_lost");
+     if(!c.player.canSee(entity)){if(++lostTicks>60)return TaskRuntime.Step.failed("target_lost");approach(lastSeen,20);break;}lostTicks=0;lastSeen=entity.getBlockPos();
      if(entity.squaredDistanceTo(c.player)<9){haltNavigation();return done(Map.of("entityId",entity.getId(),"distance",Math.sqrt(entity.squaredDistanceTo(c.player))));}
      approach(entity.getBlockPos(),20);break;
     case "mine":
@@ -115,6 +126,21 @@ public final class GameSkills {
      if(phase++==0){look(entity.getEyePos());c.interactionManager.interactEntity(c.player,entity,Hand.MAIN_HAND);}
      if(ticks>4&&(c.currentScreen!=ownedScreen||c.player.hasVehicle()||!inventoryState().equals(inventoryBefore)))return done(Map.of("entityId",entity.getId(),"screen",screenName(),"riding",c.player.hasVehicle(),"inventory",inventoryState()));
      if(phase>80)return TaskRuntime.Step.failed("no_interaction_result");break;
+    case "pickup":
+     if(count(outputItem)>beforeCount)return done(Map.of("item",outputItem,"countBefore",beforeCount,"countAfter",count(outputItem)));
+     if(entity.isRemoved())return TaskRuntime.Step.failed("drop_gone_without_inventory_gain");
+     approach(entity.getBlockPos(),20);break;
+    case "waitFor":
+     int present=0;
+     if(args.get("area").getAsString().equals("inventory"))present=count(args.get("item").getAsString());
+     else for(var slot:c.player.currentScreenHandler.slots)if(Registries.ITEM.getId(slot.getStack().getItem()).toString().equals(args.get("item").getAsString()))present+=slot.getStack().getCount();
+     if(present>=args.get("count").getAsInt())return done(Map.of("item",args.get("item").getAsString(),"count",present));
+     if(ticks>=args.get("ticks").getAsInt())return TaskRuntime.Step.failed("processing_result_timeout");break;
+    case "trade":
+     if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.MerchantScreenHandler))return TaskRuntime.Step.failed("merchant_closed");
+     if(count(outputItem)-beforeCount>=targetSlot)return done(Map.of("item",outputItem,"countBefore",beforeCount,"countAfter",count(outputItem)));
+     if(ticks%8==4&&!c.player.currentScreenHandler.getSlot(2).getStack().isEmpty())c.interactionManager.clickSlot(c.player.currentScreenHandler.syncId,2,0,SlotActionType.QUICK_MOVE,c.player);
+     if(ticks>100)return TaskRuntime.Step.failed("trade_stock_or_currency_missing");break;
     case "attack": return combat();
     case "eat":
      if(c.player.getHungerManager().getFoodLevel()>startFood||c.player.getMainHandStack().getCount()<beforeCount)return done(Map.of("foodBefore",startFood,"foodAfter",c.player.getHungerManager().getFoodLevel(),"remaining",c.player.getMainHandStack().getCount()));
@@ -173,6 +199,7 @@ public final class GameSkills {
   public void resume(){if(skill.equals("navigate"))go(pos);}
   public void stop(){haltNavigation();release();}
   private void release(){if(c.interactionManager!=null){c.interactionManager.cancelBlockBreaking();if(c.player!=null&&c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);}c.options.forwardKey.setPressed(false);c.options.backKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.attackKey.setPressed(false);c.options.useKey.setPressed(false);}
+  public Map<String,Object> progress(){return Map.of("skill",skill,"ticks",ticks);}
   public boolean acceptsScreen(Object screen){return screen==ownedScreen||((skill.equals("interactBlock")||skill.equals("interactEntity"))&&phase>0&&screen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>);}
  }
 }

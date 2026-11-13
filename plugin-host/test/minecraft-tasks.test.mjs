@@ -66,3 +66,8 @@ test('event polling and heartbeat do not wait for a model dispatch; revoke rejec
  await assert.rejects(task,/Late/);
  assert.equal(adapter.status().stopped,true);
 });
+test('game chat cannot route raw Baritone commands around the knowledge boundary',async()=>{
+ const {adapter,commands}=fixture();
+ await assert.rejects(adapter.chat('#mine diamond_ore',permission),/plain/);
+ assert.equal(commands.length,0);
+});

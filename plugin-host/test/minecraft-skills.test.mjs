@@ -9,3 +9,8 @@ test('unknown fields, nested programs, overlong plans and nonfinite values fail 
  for(const [skill,args] of [['mine',{x:NaN,y:64,z:1}],['eat',{script:'run'}],['plan',{steps:[{skill:'plan',args:{steps:[]}}]}],['plan',{steps:Array(25).fill({skill:'eat',args:{}})}],['workstation',{screen:'MerchantScreenHandler',actions:[{slot:1,button:9,mode:'button'}]}]])assert.throws(()=>validateSkill(skill,args),/Invalid|Unsupported/);
  assert.throws(()=>validateSkill('bash',{command:'x'}),/Unsupported/);
 });
+test('pickup, wait for processing, and a bounded merchant trade have typed paths',()=>{
+ validateSkill('pickup',{entityId:3});
+ validateSkill('waitFor',{item:'minecraft:iron_ingot',count:1,area:'screen',ticks:1200});
+ validateSkill('trade',{index:0,count:1});
+});

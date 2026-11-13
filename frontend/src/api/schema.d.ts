@@ -2489,7 +2489,7 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "capabilities" | "submit" | "task" | "events" | "pause" | "resume" | "cancel";
+            action: "capabilities" | "recipes" | "submit" | "task" | "events" | "pause" | "resume" | "cancel";
             /**
              * After
              * @default 0
@@ -2505,6 +2505,11 @@ export interface components {
             generation: number;
             /** Leaseid */
             leaseId: string;
+            /**
+             * Query
+             * @default
+             */
+            query: string;
             /** Skill */
             skill?: string | null;
             /** Taskid */

@@ -13,7 +13,7 @@ import Modal from '../../ui/Modal';
 import Select from '../../ui/Select';
 import Switch from '../../ui/Switch';
 
-type Session={id:string;pid:number;world:string;account:string;playerName:string;ready:boolean};
+type Session={id:string;pid:number;world:string;account:string;playerName:string;worldName?:string;ready:boolean};
 export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'activity'}){
  const t=useT(),enabled=useActivities().minecraft,meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(false),[active,setActive]=useState(false);
@@ -56,7 +56,7 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
   </header>
   <section className="extension-detail-section">
    <FieldRow label={t('minecraft.session')} hint={t('minecraft.existingHint')}>
-    {busy||active?<span>{current?`${current.playerName} · ${current.world}`:t('minecraft.selectSession')}</span>:<Select value={selected} options={[{value:'',label:t('minecraft.selectSession')},...sessions.filter(s=>s.ready).map(s=>({value:s.id,label:`${s.playerName} · ${s.world}`}))]} onChange={setSelected}/>}
+    {busy||active?<span>{current?`${current.playerName} · ${current.worldName||current.world}`:t('minecraft.selectSession')}</span>:<Select value={selected} options={[{value:'',label:t('minecraft.selectSession')},...sessions.filter(s=>s.ready).map(s=>({value:s.id,label:`${s.playerName} · ${s.worldName||s.world}`}))]} onChange={setSelected}/>}
    </FieldRow>
    <div className="extension-detail-actions"><Button variant="ghost" disabled={busy} onClick={()=>void run(async()=>{})}>{t('minecraft.refresh')}</Button></div>
   </section>
@@ -71,7 +71,7 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
   </section>
   {active&&game&&<section className="extension-detail-section game-progress" aria-live="polite">
    {game.goal&&<div className="game-goal"><span>{t('minecraft.currentGoal')}</span><strong>{game.goal.title}</strong></div>}
-   {game.tasks.filter(task=>['running','queued','paused','failed'].includes(task.state)).slice(-3).map(task=><div className="game-task" key={task.taskId}><span>{t(`minecraft.skill.${task.skill}`)}</span><span>{t(`minecraft.taskState.${task.state}`)}</span>{task.state==='failed'&&<Hint text={t('minecraft.blockedHint')}/>}</div>)}
+   {game.tasks.filter(task=>['running','queued','paused','failed'].includes(task.state)).slice(-3).map(task=><div className="game-task" key={task.taskId}><span>{t(`minecraft.skill.${task.progress?.action?.skill||task.progress?.skill||task.skill}`)}</span><span>{t(`minecraft.taskState.${task.state}`)}</span>{task.state==='failed'&&<Hint text={t('minecraft.blockedHint')}/>}</div>)}
   </section>}
   {mode==='settings'&&<details className="extension-detail-section extension-detail-advanced"><summary>{t('minecraft.install')}</summary><FieldRow label={t('minecraft.instancePath')} hint={t('minecraft.installHint')}><input type="text" value={path} onChange={e=>setPath(e.target.value)} disabled={busy}/></FieldRow><div className="extension-detail-actions"><Button disabled={busy||!path.trim()} onClick={()=>void run(()=>apiJson('/api/minecraft/install',jsonInit('POST',{instancePath:path.trim()})))}>{t('minecraft.install')}</Button></div></details>}
   {meeting.state!=='active'&&<p className="extension-detail-notice">{t('computer.requiresBoot')}</p>}

@@ -52,6 +52,11 @@ public final class TaskRuntimeSmoke {
   check(!recovering.stopConfirmed(),"first stop uncertain");
   recovering.stop("world_left");
   check(recovering.stopConfirmed(),"stop must retry even after world tick becomes unavailable");
+  TaskRuntime report=new TaskRuntime();
+  Work evolving=new Work(){public Map<String,Object> progress(){return Map.of("skill","craft","ticks",starts);}};
+  report.submit("progress","plan",evolving,0,5000);report.tick(1000);
+  check(report.snapshot("progress").progress().get("skill").equals("craft"),"progress is separate from verified completion evidence");
+  check(report.snapshot("progress").evidence().isEmpty(),"running progress is not a completed result");
   System.out.println("PASS task queue, evidence, duplicate barrier, pause/resume, stop, heartbeat and event gap");
  }
 }

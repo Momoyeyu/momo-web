@@ -39,7 +39,7 @@ def sessions():
     for path in list(DIRECTORY.glob('*.json'))[:16]:
         try:
             value,data=inspect(path.stem)
-            rows.append({'id':path.stem,'pid':value['pid'],'ready':bool(data.get('world')),'world':data.get('world'),'account':data.get('account'),'playerName':data.get('playerName')})
+            rows.append({'id':path.stem,'pid':value['pid'],'ready':bool(data.get('world')),'world':data.get('world'),'account':data.get('account'),'playerName':data.get('playerName'),'worldName':data.get('worldName'),'dimension':data.get('dimension')})
         except MinecraftError: continue
     return {'sessions':rows}
 

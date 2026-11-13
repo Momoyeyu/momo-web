@@ -1967,6 +1967,7 @@
           "action": {
             "enum": [
               "capabilities",
+              "recipes",
               "submit",
               "task",
               "events",
@@ -1998,6 +1999,12 @@
           },
           "leaseId": {
             "title": "Leaseid",
+            "type": "string"
+          },
+          "query": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Query",
             "type": "string"
           },
           "skill": {

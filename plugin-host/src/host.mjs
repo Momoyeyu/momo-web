@@ -118,6 +118,7 @@ export class PluginHost {
       }
       case 'minecraft.status': return this.minecraft.status();
       case 'minecraft.stop': return this.minecraft.stop();
+      case 'minecraft.recipes': return this.minecraft.recipes(params.query,params.permission);
       case 'minecraft.capabilities': return this.minecraft.capabilities(params.permission);
       case 'minecraft.submit': return this.minecraft.submit(params, params.permission);
       case 'minecraft.task': return this.minecraft.task(params.taskId ?? null, params.permission);

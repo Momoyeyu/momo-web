@@ -6,10 +6,25 @@ import net.minecraft.item.ItemStack;
 
 /** Bounded normal-player facts; no hidden entities, underground scans or server privileges. */
 public final class GameObservation {
- private static JsonObject stack(ItemStack stack){var o=new JsonObject();o.addProperty("item",Registries.ITEM.getId(stack.getItem()).toString());o.addProperty("count",stack.getCount());o.addProperty("damage",stack.getDamage());o.addProperty("maxDamage",stack.getMaxDamage());return o;}
+ public static JsonObject stack(ItemStack stack){var o=new JsonObject();o.addProperty("item",Registries.ITEM.getId(stack.getItem()).toString());o.addProperty("count",stack.getCount());o.addProperty("name",stack.getName().getString());o.addProperty("damage",stack.getDamage());o.addProperty("maxDamage",stack.getMaxDamage());
+  var components=new JsonObject();
+  for(var type:java.util.List.of(net.minecraft.component.DataComponentTypes.ENCHANTMENTS,net.minecraft.component.DataComponentTypes.STORED_ENCHANTMENTS,net.minecraft.component.DataComponentTypes.POTION_CONTENTS,net.minecraft.component.DataComponentTypes.FOOD)){
+   var value=stack.get(type);if(value!=null){String text=value.toString();components.addProperty(net.minecraft.registry.Registries.DATA_COMPONENT_TYPE.getId(type).toString(),text.substring(0,Math.min(1000,text.length())));}
+  }
+  o.add("components",components);return o;}
  public static String screenId(net.minecraft.screen.ScreenHandler handler){
   if(handler instanceof net.minecraft.screen.PlayerScreenHandler)return "minecraft:inventory";
   return Registries.SCREEN_HANDLER.getId(handler.getType()).toString();
+ }
+ public static JsonArray recipes(MinecraftClient c,String query,int limit){
+  var p=c.player;
+  var recipes=new JsonArray();
+  for(var recipe:c.world.getRecipeManager().values().stream().filter(r->p.getRecipeBook().contains(r)&&(query.isBlank()||r.id().toString().contains(query)||Registries.ITEM.getId(r.value().getResult(c.world.getRegistryManager()).getItem()).toString().contains(query))).sorted(java.util.Comparator.comparing(r->r.id().toString())).limit(limit).toList()){
+   var row=new JsonObject();row.addProperty("id",recipe.id().toString());row.add("output",stack(recipe.value().getResult(c.world.getRegistryManager())));var ingredients=new JsonArray();
+   for(var ingredient:recipe.value().getIngredients()){var choices=new JsonArray();for(var choice:java.util.Arrays.stream(ingredient.getMatchingStacks()).limit(4).toList())choices.add(Registries.ITEM.getId(choice.getItem()).toString());ingredients.add(choices);}
+   row.add("ingredients",ingredients);recipes.add(row);
+  }
+  return recipes;
  }
  public static void append(MinecraftClient c,JsonObject result){
   var p=c.player;var handler=p.currentScreenHandler;
@@ -21,13 +36,8 @@ public final class GameObservation {
    if(e instanceof net.minecraft.entity.LivingEntity living)row.addProperty("health",living.getHealth());entities.add(row);
   }
   result.add("visibleEntities",entities);
-  var recipes=new JsonArray();
-  for(var recipe:c.world.getRecipeManager().values().stream().filter(r->p.getRecipeBook().contains(r)).sorted(java.util.Comparator.comparing(r->r.id().toString())).limit(64).toList()){
-   var row=new JsonObject();row.addProperty("id",recipe.id().toString());row.add("output",stack(recipe.value().getResult(c.world.getRegistryManager())));var ingredients=new JsonArray();
-   for(var ingredient:recipe.value().getIngredients()){var choices=new JsonArray();for(var choice:java.util.Arrays.stream(ingredient.getMatchingStacks()).limit(8).toList())choices.add(Registries.ITEM.getId(choice.getItem()).toString());ingredients.add(choices);}
-   row.add("ingredients",ingredients);recipes.add(row);
-  }
-  result.add("knownRecipes",recipes);
+  result.add("knownRecipes",recipes(c,"",8));
+  result.addProperty("recipeQueryAvailable",true);
   var station=new JsonObject();
   if(handler instanceof net.minecraft.screen.AbstractFurnaceScreenHandler furnace){station.addProperty("cookProgress",furnace.getCookProgress());station.addProperty("fuelProgress",furnace.getFuelProgress());}
   if(handler instanceof net.minecraft.screen.BrewingStandScreenHandler brewing){station.addProperty("brewTime",brewing.getBrewTime());station.addProperty("fuel",brewing.getFuel());}

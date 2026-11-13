@@ -10,7 +10,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
   let busy = false;
   let readers = 0;
   let capabilities = null;
-  const taskReads = new Set(['capabilities', 'task', 'events', 'heartbeat']);
+  const taskReads = new Set(['capabilities', 'recipes', 'task', 'events', 'heartbeat']);
   const continuous = new Set([...taskReads, 'submit', 'pause', 'resumeTask', 'cancel']);
   const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,80}$/u.test(id);
   const controls = new Set(['aim', 'respawn', 'screenClick', 'screenScroll', 'screenText', 'screenKey', 'resume', 'forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint', 'look', 'attack', 'mine', 'use', 'eat', 'hotbar', 'inventory', 'close', 'slot', 'quickMove', 'drop', 'swapHands']);
@@ -77,6 +77,10 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
   return {
     status, stop,
     capabilities: permission => execute('capabilities', {}, permission),
+    recipes(query, permission) {
+      if(typeof query !== 'string' || query.length > 64 || /[\x00-\x1f]/u.test(query))return Promise.reject(new Error('Invalid recipe query'));
+      return execute('recipes',{query},permission);
+    },
     submit({ taskId, skill, args = {} }, permission) {
       if (!capabilities || capabilities.world !== permission?.world || capabilities.account !== permission?.account || !capabilities.skills.includes(skill))
         return Promise.reject(new Error('Unsupported Minecraft skill; query capabilities first'));
@@ -101,7 +105,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
     },
     observe: permission => execute('observe', {}, permission),
     chat(text, permission) {
-      if (typeof text !== 'string' || !text.trim() || text.length > 256 || /[\r\n\x00-\x1f]/u.test(text) || text.trimStart().startsWith('/')) return Promise.reject(new Error('Only bounded plain Minecraft chat is allowed'));
+      if (typeof text !== 'string' || !text.trim() || text.length > 256 || /[\r\n\x00-\x1f]/u.test(text) || /^[/#]/u.test(text.trimStart())) return Promise.reject(new Error('Only bounded plain Minecraft chat is allowed'));
       return execute('chat', { text }, permission);
     },
     play({ control, blockIndex = 0, held = [], durationMs = 500, yaw = 0, pitch = 0, slot = 0, button = 0, x = 0.5, y = 0.5, scroll = 0, text = '', key = 'enter' }, permission) {
@@ -118,7 +122,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
           || ![0, 1].includes(button)
           || !Number.isFinite(x) || x < 0 || x > 1 || !Number.isFinite(y) || y < 0 || y > 1
           || !Number.isFinite(scroll) || Math.abs(scroll) > 10
-          || typeof text !== 'string' || text.length > 256 || /[\r\n\x00-\x1f]/u.test(text) || text.trimStart().startsWith('/')
+          || typeof text !== 'string' || text.length > 256 || /[\r\n\x00-\x1f]/u.test(text) || /^[/#]/u.test(text.trimStart())
           || !['enter', 'backspace', 'tab', 'left', 'right', 'up', 'down'].includes(key)) return Promise.reject(new Error('Invalid gameplay input'));
       return execute('play', { control, held, durationMs, yaw, pitch, slot, button, x, y, scroll, text, key }, permission);
     },

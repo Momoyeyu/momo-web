@@ -12,13 +12,6 @@ dependencies {
 }
 java { toolchain.languageVersion = JavaLanguageVersion.of(21) }
 
-tasks.register('pathSmoke', JavaExec) {
- dependsOn testClasses
- classpath = sourceSets.test.runtimeClasspath
- mainClass = 'dev.momo.BoundedPathSmoke'
-}
-check.dependsOn pathSmoke
-
 // The pinned upstream is already an intermediary Fabric mod; preserve its nested jars.
 tasks.named('jar') {
  from('deps/baritone-api-fabric-1.11.3.jar') { into 'META-INF/jars' }
@@ -49,3 +42,10 @@ tasks.register('skillArgumentsSmoke', JavaExec) {
  mainClass = 'dev.momo.task.SkillArgumentsSmoke'
 }
 check.dependsOn skillArgumentsSmoke
+
+tasks.register('survivalPolicySmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.SurvivalPolicySmoke'
+}
+check.dependsOn survivalPolicySmoke
