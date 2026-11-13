@@ -1,9 +1,10 @@
 {
   "navigate": {
-    "description": "Reach a known local position through Baritone; no implicit digging or placing.",
+    "description": "Reach a loaded local position within 64 blocks through Baritone. Use height=surface for outdoor exploration (y is then only a local range anchor); exact is the default for a known floor. No implicit digging or placing.",
     "parameters": {
       "type": "object",
       "properties": {
+        "height": {"type":"string","minLength":5,"maxLength":7,"enum":["exact","surface"]},
         "x": {
           "type": "integer",
           "minimum": -30000000,
@@ -75,7 +76,7 @@
     }
   },
   "place": {
-    "description": "Use hotbar slot on a visible support face. Coordinates identify the support block, not the destination.",
+    "description": "Use hotbar slot 0..8 on a visible support face (not screen-handler slot 36..44). Coordinates identify the support block, not the destination.",
     "parameters": {
       "type": "object",
       "properties": {

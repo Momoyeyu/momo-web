@@ -1,6 +1,9 @@
 import {validateSkill} from './minecraft-skills.mjs';
 let bridgeEpoch = Date.now();
 const problem=(message,code='MINECRAFT_INPUT')=>Object.assign(new Error(message),{code});
+const publicCodes=new Set(['MINECRAFT_INPUT','MINECRAFT_STALE','MINECRAFT_REVOKED','MINECRAFT_UNKNOWN']);
+// Preserve known pre-dispatch rejection without exposing arbitrary transport diagnostics.
+export const minecraftErrorCode=error=>publicCodes.has(error?.code)?error.code:'MINECRAFT_UNKNOWN';
 /** Bounded Fabric transport adapter. No inference, login, downloads, or code execution. */
 export function createMinecraftAdapter({ transport, authorize, now = Date.now } = {}) {
   let epoch = ++bridgeEpoch;

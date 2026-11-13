@@ -67,3 +67,10 @@ test('native resource failures retain a bounded code over the pipe', async t => 
   await assert.rejects(req('native.targets'), error => error.code === 'NATIVE_RESOURCE_NOT_PREPARED');
   await req('shutdown');
 });
+
+test('Minecraft argument rejections keep their known outcome over the real pipe', async t => {
+  const {req,token} = child(t);
+  await req('hello', {coreInstance:'minecraft-diagnostics',token});
+  await assert.rejects(req('minecraft.submit', {taskId:'bad-input',skill:'plan',args:{steps:[]},permission:{world:'w',account:'a'}}), error => error.code === 'MINECRAFT_INPUT');
+  await req('shutdown');
+});

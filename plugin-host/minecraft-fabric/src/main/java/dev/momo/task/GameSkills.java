@@ -250,7 +250,7 @@ public final class GameSkills {
    return Map.of("beforeDigest",digest(inventoryBefore),"afterDigest",digest(after),"screen",screenName(),"slots",slots,"cursor",GameObservation.stack(c.player.currentScreenHandler.getCursorStack()));
   }
   private static String digest(String value){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}}
-  private void go(BlockPos target){navigation.start(target.getX(),target.getY(),target.getZ());navigating=true;pathTarget=target;}
+  private void go(BlockPos target){navigation.start(target.getX(),target.getY(),target.getZ(),skill.equals("navigate")&&args.has("height")&&args.get("height").getAsString().equals("surface"));navigating=true;pathTarget=target;}
   private void approach(BlockPos target,int interval){if(!navigating||(ticks%interval==1&&pathTarget.getSquaredDistance(target)>9)){haltNavigation();go(target);}if(navigation.failed())throw new IllegalStateException("unreachable");}
   private void haltNavigation(){if(navigating){navigation.stop();navigating=false;}}
   private boolean visible(BlockPos target){var eye=c.player.getEyePos();if(eye.squaredDistanceTo(target.toCenterPos())>1024)return false;var hit=c.world.raycast(new RaycastContext(eye,target.toCenterPos(),RaycastContext.ShapeType.OUTLINE,RaycastContext.FluidHandling.NONE,c.player));return hit.getType()==HitResult.Type.BLOCK&&hit.getBlockPos().equals(target);}
