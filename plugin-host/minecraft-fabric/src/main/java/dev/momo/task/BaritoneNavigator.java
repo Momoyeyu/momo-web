@@ -10,7 +10,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
 
 /** API-only ownership. Discovery/mining scans and arbitrary Baritone commands are not exposed. */
-public final class BaritoneNavigator implements NavigationTask.Driver {
+public final class BaritoneNavigator {
  private IBaritone baritone;
  private GoalNear goal;
  private int warmup;

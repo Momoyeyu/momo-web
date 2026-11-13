@@ -2,7 +2,7 @@ package dev.momo;
 
 import com.google.gson.*;
 import dev.momo.mixin.GameplayInputAccess;
-import dev.momo.task.NavigationTask;
+import dev.momo.task.TaskRuntime;
 import dev.momo.task.BaritoneNavigator;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
@@ -20,8 +20,9 @@ public final class CompanionClient implements ClientModInitializer {
  private String target, boundWorld, boundAccount;
  private java.util.List<BoundedPath.Cell> path = java.util.List.of();
  private long nextPlan;
- private final NavigationTask navigation=new NavigationTask(new BaritoneNavigator());
- private String navigationWorld, navigationAccount;
+ private final TaskRuntime tasks=new TaskRuntime();
+ private String taskWorld, taskAccount;
+ private boolean taskPaused;
  private static CompanionClient instance;
  private boolean playing,mining,using,attacking,drivingInput;
  private int useTicks;
@@ -86,7 +87,7 @@ public final class CompanionClient implements ClientModInitializer {
   backgroundUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(60);
  }
  private void release(MinecraftClient client) {
-  navigation.cancel("control_released");
+  tasks.stop("control_released");taskPaused=false;
   if(mining && client.interactionManager!=null)client.interactionManager.cancelBlockBreaking();
   if(using && client.interactionManager!=null && client.player!=null && client.player.isUsingItem())client.interactionManager.stopUsingItem(client.player);
   playing = mining = using = attacking = false;
@@ -108,9 +109,15 @@ public final class CompanionClient implements ClientModInitializer {
    return ready; }
   long version = command.get("epoch").getAsLong();
   if (version < epoch) throw new IllegalArgumentException("Revoked");
-  if (version > epoch) { release(client); restorePause(client); epoch = version; }
+  JsonElement retiredTasks=null;
+  if (version > epoch) {
+   release(client);restorePause(client);
+   retiredTasks=gson.toJsonTree(tasks.recentSnapshots());
+   tasks.resetSession();epoch=version;
+  }
   JsonObject result = new JsonObject(); result.addProperty("epoch", epoch);
-  if ("stop".equals(type)) { release(client); restorePause(client); result.addProperty("stopped", true); result.addProperty("heldControls", 0); return result; }
+  if(retiredTasks!=null)result.add("retiredTasks",retiredTasks);
+  if ("stop".equals(type)) { release(client); restorePause(client); result.addProperty("stopped", tasks.stopConfirmed()); result.addProperty("heldControls", tasks.stopConfirmed()?0:-1); return result; }
   if (client.player == null || client.world == null) throw new IllegalStateException("Join an authorized world first");
   String world = (client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local") + "/" + client.world.getRegistryKey().getValue();
   String account = client.player.getUuidAsString();
@@ -119,8 +126,9 @@ public final class CompanionClient implements ClientModInitializer {
   result.addProperty("world", world); result.addProperty("account", account);
   switch (type) {
    case "capabilities" -> {
-    result.addProperty("protocol",2);result.addProperty("navigation",BaritoneNavigator.available());
-    result.addProperty("navigationBackend","baritone-1.11.3");
+    result.addProperty("protocol",1);result.addProperty("taskProtocol",1);
+    result.addProperty("navigation",BaritoneNavigator.available());result.addProperty("navigationBackend","baritone-1.11.3");
+    JsonArray skills=new JsonArray();skills.add("navigate");result.add("skills",skills);
    }
    case "submit" -> {
     if(!"navigate".equals(command.get("skill").getAsString()))throw new IllegalArgumentException("Unsupported skill");
@@ -129,18 +137,23 @@ public final class CompanionClient implements ClientModInitializer {
     var destination=new net.minecraft.util.math.BlockPos(x,y,z);
     if(!client.world.isChunkLoaded(destination)||client.player.squaredDistanceTo(x+.5,y,z+.5)>4096)throw new IllegalArgumentException("Destination outside local known terrain");
     if(playing||target!=null)throw new IllegalStateException("Another action owns the body");
-    boolean accepted=navigation.start(command.get("taskId").getAsString(),x,y,z,System.nanoTime()/1000000,Math.min(30000,command.get("leaseMs").getAsLong()));
-    navigationWorld=world;navigationAccount=account;backgroundControl(client);
-    result.addProperty("accepted",accepted);navigationSnapshot(result);
+    String id=command.get("taskId").getAsString();
+    boolean accepted=tasks.submit(id,"navigate",x+","+y+","+z,new NavigationWork(x,y,z),System.nanoTime()/1000000,command.get("leaseMs").getAsLong());
+    taskWorld=world;taskAccount=account;backgroundControl(client);
+    result.addProperty("accepted",accepted);result.add("task",gson.toJsonTree(tasks.snapshot(id)));
    }
-   case "task" -> navigationSnapshot(result);
-   case "heartbeat" -> {
-    if(!navigation.id().equals(command.get("taskId").getAsString()))throw new IllegalArgumentException("Task identity mismatch");
-    navigation.renew(System.nanoTime()/1000000,command.get("leaseMs").getAsLong());navigationSnapshot(result);
+   case "task" -> {
+    if(command.has("taskId"))result.add("task",gson.toJsonTree(tasks.snapshot(command.get("taskId").getAsString())));
+    else result.add("tasks",gson.toJsonTree(tasks.snapshots()));
    }
+   case "events" -> result.add("events",gson.toJsonTree(tasks.events(command.get("after").getAsLong())));
+   case "heartbeat" -> {tasks.heartbeat(System.nanoTime()/1000000,command.get("leaseMs").getAsLong());result.addProperty("active",tasks.active());}
+   case "pause" -> {taskPaused=true;tasks.pause();result.addProperty("paused",true);}
+   case "resumeTask" -> {taskPaused=false;if(client.currentScreen==null)tasks.resume();result.addProperty("paused",false);}
    case "cancel" -> {
-    if(!navigation.id().equals(command.get("taskId").getAsString()))throw new IllegalArgumentException("Task identity mismatch");
-    navigation.cancel("requested");release(client);restorePause(client);navigationSnapshot(result);
+    tasks.cancel(command.get("taskId").getAsString(),"requested");
+    result.add("task",gson.toJsonTree(tasks.snapshot(command.get("taskId").getAsString())));
+    if(!tasks.active()){release(client);restorePause(client);}
    }
    case "observe" -> {
     if (!client.options.getPerspective().isFirstPerson()) throw new IllegalStateException("First person required");
@@ -223,7 +236,7 @@ public final class CompanionClient implements ClientModInitializer {
     client.player.networkHandler.sendChatMessage(text);
    }
    case "follow" -> {
-    if(navigation.active())throw new IllegalStateException("Navigation owns the body");
+    if(tasks.active())throw new IllegalStateException("Navigation owns the body");
     String player = command.get("player").getAsString(); int duration = command.get("durationMs").getAsInt();
     if (!player.matches("[A-Za-z0-9_]{1,16}") || duration < 1 || duration > 1000) throw new IllegalArgumentException("Invalid follow");
     backgroundControl(client);
@@ -234,7 +247,7 @@ public final class CompanionClient implements ClientModInitializer {
   return result;
  }
  private void play(MinecraftClient c,JsonObject cmd,String world,String account) {
-  if(navigation.active())throw new IllegalStateException("Navigation owns the body");
+  if(tasks.active())throw new IllegalStateException("Navigation owns the body");
   String key=cmd.get("control").getAsString();
   int duration=cmd.get("durationMs").getAsInt();
   if(duration<1 || duration>10000 || c.interactionManager==null) throw new IllegalArgumentException("Invalid input");
@@ -307,22 +320,31 @@ public final class CompanionClient implements ClientModInitializer {
   mining=key.equals("mine")||key.equals("attack");attacking=key.equals("attack");using=key.equals("use")||key.equals("eat");useTicks=0;
   playing=true; boundWorld=world; boundAccount=account;deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(duration);
  }
- private void navigationSnapshot(JsonObject result){
-  result.addProperty("taskId",navigation.id());result.addProperty("state",navigation.state());result.addProperty("reason",navigation.reason());
-  var player=MinecraftClient.getInstance().player;
-  if(player!=null){result.addProperty("x",player.getX());result.addProperty("y",player.getY());result.addProperty("z",player.getZ());}
+ private final class NavigationWork implements TaskRuntime.Work {
+  private final BaritoneNavigator driver=new BaritoneNavigator();
+  private final int x,y,z;
+  NavigationWork(int x,int y,int z){this.x=x;this.y=y;this.z=z;}
+  public void start(){driver.start(x,y,z);}
+  public TaskRuntime.Step tick(){
+   var player=MinecraftClient.getInstance().player;
+   if(driver.arrived())return TaskRuntime.Step.done(java.util.Map.of("x",player.getX(),"y",player.getY(),"z",player.getZ(),"arrived",true));
+   return driver.failed()?TaskRuntime.Step.failed("unreachable"):TaskRuntime.Step.running();
+  }
+  public void pause(){driver.stop();}
+  public void resume(){driver.start(x,y,z);}
+  public void stop(){driver.stop();}
  }
  private void tick(MinecraftClient client) {
-  if(navigation.active()){
+  if(tasks.active()){
    String currentWorld=client.world==null?"":((client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local")+"/"+client.world.getRegistryKey().getValue());
-   if(client.player==null||!client.player.isAlive()||!navigationWorld.equals(currentWorld)||!navigationAccount.equals(client.player.getUuidAsString())){navigation.cancel("identity_or_life_changed");release(client);restorePause(client);return;}
+   if(client.player==null||!client.player.isAlive()||!taskWorld.equals(currentWorld)||!taskAccount.equals(client.player.getUuidAsString())){tasks.stop("identity_or_life_changed");release(client);restorePause(client);return;}
    long window=client.getWindow().getHandle();
    boolean manual=false;
    if(client.isWindowFocused())for(int key:new int[]{87,65,83,68,32,340,341})manual|=net.minecraft.client.util.InputUtil.isKeyPressed(window,key);
-   if(manual){navigation.cancel("manual_takeover");release(client);restorePause(client);return;}
-   if(client.currentScreen!=null){navigation.pause();navigation.tick(System.nanoTime()/1000000);return;}
-   navigation.resume(System.nanoTime()/1000000);
-   navigation.tick(System.nanoTime()/1000000);
+   if(manual){tasks.stop("manual_takeover");release(client);restorePause(client);return;}
+   if(client.currentScreen!=null){tasks.pause();tasks.tick(System.nanoTime()/1000000);return;}
+   if(!taskPaused)tasks.resume();
+   tasks.tick(System.nanoTime()/1000000);
    return;
   }
   if(backgroundUntil!=0 && (System.nanoTime()>=backgroundUntil || client.player==null || client.world==null)) {release(client);restorePause(client);}

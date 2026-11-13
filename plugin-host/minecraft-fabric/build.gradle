@@ -24,9 +24,11 @@ tasks.named('jar') {
  from('deps/baritone-api-fabric-1.11.3.jar') { into 'META-INF/jars' }
 }
 
-tasks.register('navigationSmoke', JavaExec) {
+
+
+tasks.register('taskRuntimeSmoke', JavaExec) {
  dependsOn testClasses
  classpath = sourceSets.test.runtimeClasspath
- mainClass = 'dev.momo.task.NavigationSmoke'
+ mainClass = 'dev.momo.task.TaskRuntimeSmoke'
 }
-check.dependsOn navigationSmoke
+check.dependsOn taskRuntimeSmoke
