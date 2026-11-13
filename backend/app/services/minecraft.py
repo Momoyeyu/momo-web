@@ -167,14 +167,29 @@ class Minecraft:
         return journal.goal(self.binding) if self.binding else None
 
     def update_goal(self, value):
-        self.gate(None,None)
         from . import minecraft_journal as journal
-        with self.lock:
-            if not self.binding or 'game.modify' not in self.permissions:raise MinecraftError('Minecraft gameplay denied')
-            result=journal.set_goal(self.binding,value)
-            if value['status'] in {'paused','completed','abandoned'}:self.autonomous=False
-            else:self.autonomous=True
-            return result
+        journal.validate_goal(value)
+        # Serialize intent changes with body mutations and the existing revoke barrier.
+        with runtime.host.control:
+            self.gate(None,None)
+            with self.lock:
+                if not self.binding or 'game.modify' not in self.permissions:raise MinecraftError('Minecraft gameplay denied')
+                generation=self.generation
+                live=[t for t in self.tasks.values() if t['state'] in {'queued','running','paused'}]
+                previous=self.current_goal()
+                replacing=previous and any(previous.get(k)!=value.get(k) for k in ('title','expected'))
+                if live and (value['status']=='completed' or replacing):
+                    raise MinecraftError('Resolve or cancel the live task before replacing/completing its goal')
+            if value['status'] in {'paused','abandoned'}:
+                self.execute('pause',{},generation,None,None)
+                if value['status']=='abandoned':
+                    for task in live:self.execute('cancel',{'taskId':task['taskId']},generation,None,None)
+            with self.lock:
+                if generation!=self.generation or not self.binding:raise MinecraftError('Minecraft goal revoked')
+                result=journal.set_goal(self.binding,value)
+                self.autonomous=value['status'] in {'active','blocked'} and not self.paused
+                self.decision_needed=self.autonomous
+                return result
 
     def record_tasks(self, tasks, generation):
         from . import minecraft_journal as journal

@@ -93,3 +93,27 @@ def test_focus_releases_game_body_immediately_without_cancelling_the_local_conve
   c.control('owner','lease','focus-request','focus_on')
   stop.assert_called_once()
   assert c.focus
+
+def test_pausing_goal_pauses_body_before_persisting_intention():
+ m,rt=setup();m.autonomous=True
+ value={'title':'看花','reason':'好奇','source':'curiosity','expected':'见到花','status':'paused'}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  m.update_goal(value)
+  assert m.paused and not m.autonomous
+  assert rt.host.request.call_args.args[0]=='minecraft.pause'
+  assert m.current_goal()['status']=='paused'
+
+def test_goal_cannot_claim_completion_or_replace_intent_while_body_task_is_live():
+ m,rt=setup();m.tasks={'t1':{'taskId':'t1','state':'running'}}
+ value={'title':'看花','reason':'好奇','source':'curiosity','expected':'见到花','status':'completed'}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  with pytest.raises(MinecraftError,match='live task'):m.update_goal(value)
+  assert m.current_goal() is None
+
+def test_goal_activation_never_undoes_manual_takeover_pause():
+ m,rt=setup();m.paused=True
+ value={'title':'看花','reason':'好奇','source':'curiosity','expected':'见到花','status':'active'}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  m.update_goal(value)
+  assert m.paused and not m.autonomous
+  rt.host.request.assert_not_called()

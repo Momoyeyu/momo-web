@@ -22,11 +22,15 @@ def goal(binding):
     rows=db.query('SELECT data FROM minecraft_goals WHERE scope=?',(scope(binding),))
     return json.loads(rows[0]['data']) if rows else None
 
-def set_goal(binding, value):
+def validate_goal(value):
     allowed={'title','reason','source','expected','constraints','status','progress','next'}
     if not isinstance(value,dict) or set(value)-allowed or not {'title','reason','source','expected','status'} <= set(value):raise ValueError('Invalid game goal')
     if value['status'] not in STATUSES or value['source'] not in {'player','curiosity','aesthetic','help','social','survival','progress','rest'}:raise ValueError('Invalid game goal state')
     if any(not isinstance(v,str) or len(v)>1000 for v in value.values()) or not value['title'].strip():raise ValueError('Invalid game goal text')
+    return value
+
+def set_goal(binding, value):
+    validate_goal(value)
     schema()
     with db.tx() as c:c.execute('INSERT INTO minecraft_goals VALUES(?,?,?) ON CONFLICT(scope) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',(scope(binding),json.dumps(value,ensure_ascii=False),db.now_iso()))
     return value
