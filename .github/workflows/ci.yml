@@ -43,7 +43,7 @@ jobs:
         run: uv run --frozen pytest -q
         working-directory: backend
       - name: Check developer resource staging and snapshot promotion
-        run: uv run --project backend --frozen python -m pytest scripts/test_promote.py scripts/test_prepare_qq_runtime.py -q
+        run: uv run --project backend --frozen python -m pytest scripts/test_promote.py scripts/test_prepare_qq_runtime.py scripts/test_prepare_minecraft_runtime.py -q
       - name: Install the locked frontend
         run: pnpm install --frozen-lockfile --ignore-workspace
         working-directory: frontend
@@ -52,3 +52,21 @@ jobs:
       - name: Check frontend types, tests and production build
         run: pnpm typecheck && pnpm test && pnpm build
         working-directory: frontend
+
+  minecraft:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Verify the pinned Minecraft dependency
+        run: python3 scripts/prepare-minecraft-runtime.py
+      - name: Compile the actual Fabric and Baritone API integration
+        run: gradle --no-daemon build
+        working-directory: plugin-host/minecraft-fabric

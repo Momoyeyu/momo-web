@@ -1,1 +1,27 @@
-{"schemaVersion":1,"id":"momo_companion","version":"0.1.0","name":"momo Companion","environment":"client","entrypoints":{"client":["dev.momo.CompanionClient"]},"depends":{"fabricloader":">=0.16.14","minecraft":"1.21.1","java":">=21","fabric-api":"*"},"mixins":["momo-companion.mixins.json"]}
+{
+  "schemaVersion": 1,
+  "id": "momo_companion",
+  "version": "0.1.0",
+  "name": "momo Companion",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.momo.CompanionClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.14",
+    "minecraft": "1.21.1",
+    "java": ">=21",
+    "fabric-api": "*",
+    "baritone": "1.11.3"
+  },
+  "mixins": [
+    "momo-companion.mixins.json"
+  ],
+  "jars": [
+    {
+      "file": "META-INF/jars/baritone-api-fabric-1.11.3.jar"
+    }
+  ]
+}

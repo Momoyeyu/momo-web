@@ -7,6 +7,8 @@ dependencies {
  mappings 'net.fabricmc:yarn:1.21.1+build.3:v2'
  modImplementation 'net.fabricmc:fabric-loader:0.16.14'
  modImplementation 'net.fabricmc.fabric-api:fabric-api:0.116.4+1.21.1'
+ modImplementation files('deps/baritone-api-fabric-1.11.3.jar')
+
 }
 java { toolchain.languageVersion = JavaLanguageVersion.of(21) }
 
@@ -16,3 +18,15 @@ tasks.register('pathSmoke', JavaExec) {
  mainClass = 'dev.momo.BoundedPathSmoke'
 }
 check.dependsOn pathSmoke
+
+// The pinned upstream is already an intermediary Fabric mod; preserve its nested jars.
+tasks.named('jar') {
+ from('deps/baritone-api-fabric-1.11.3.jar') { into 'META-INF/jars' }
+}
+
+tasks.register('navigationSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.NavigationSmoke'
+}
+check.dependsOn navigationSmoke

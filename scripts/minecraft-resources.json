@@ -1,0 +1,14 @@
+{
+  "baritone": {
+    "modId": "baritone",
+    "version": "1.11.3",
+    "minecraft": "1.21.1",
+    "file": "baritone-api-fabric-1.11.3.jar",
+    "url": "https://github.com/cabaletta/baritone/releases/download/v1.11.3/baritone-api-fabric-1.11.3.jar",
+    "sha256": "f9a9b17a41d7d7ad22c759058b14fd01e3319663282e66f99e18153237fa6767",
+    "maxBytes": 6000000,
+    "license": "LGPL-3.0",
+    "source": "https://github.com/cabaletta/baritone/tree/v1.11.3",
+    "release": "https://github.com/cabaletta/baritone/releases/tag/v1.11.3"
+  }
+}
