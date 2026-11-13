@@ -35,6 +35,15 @@ public final class TaskPlanSmoke {
   TaskRuntime stopped=new TaskRuntime();TaskPlan cancel=new TaskPlan(List.of(new TaskPlan.Node(new Work(),()->true,0,false),new TaskPlan.Node(new Work(),()->true,0,false)));
   stopped.submit("cancel","plan",cancel,0,10000);stopped.tick(1);stopped.stop("requested");
   check(((List<?>)stopped.snapshot("cancel").evidence().get("steps")).size()==1,"cancelling future work does not erase actual completed work");
+  Work gathering=new Work(){public TaskRuntime.Step tick(){return TaskRuntime.Step.running();}public Map<String,Object> partialEvidence(){return Map.of("countAfter",5);}};
+  TaskPlan currentPartial=new TaskPlan(List.of(new TaskPlan.Node(gathering,()->true,0,false)));
+  TaskRuntime interrupted=new TaskRuntime();interrupted.submit("gathering","plan",currentPartial,0,1000);interrupted.tick(1);interrupted.stop("requested");
+  check(((List<?>)interrupted.snapshot("gathering").evidence().getOrDefault("steps",List.of())).size()==1,"cancel retains current child actual gains");
+  for(String timeout:List.of("ingredients_station_or_server_ack_missing","trade_stock_or_currency_missing")){
+   Work unconfirmed=new Work(){public TaskRuntime.Step tick(){return TaskRuntime.Step.failed(timeout);}};Work next=new Work();
+   TaskPlan noSkip=new TaskPlan(List.of(new TaskPlan.Node(unconfirmed,()->true,0,true),new TaskPlan.Node(next,()->true,0,false)));
+   noSkip.start();check(noSkip.tick().state().equals("failed")&&next.starts==0,"missing final server ACK cannot advance a plan");
+  }
   System.out.println("PASS bounded local plans, result verification, conditions and retry ownership");
  }
 }

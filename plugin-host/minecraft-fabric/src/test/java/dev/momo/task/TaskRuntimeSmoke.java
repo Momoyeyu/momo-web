@@ -51,6 +51,11 @@ public final class TaskRuntimeSmoke {
   check(!broken.stopConfirmed(),"failed native stop must be visible");
   boolean refused=false;try{broken.submit("unsafe","craft",new Work(),2,1000);}catch(IllegalStateException expected){refused=true;}
   check(refused,"uncertain physical ownership blocks new tasks");
+  TaskRuntime expiry=new TaskRuntime();Work afterExpiry=new Work();
+  Work neverReleased=new Work(){public void stop(){throw new IllegalStateException("busy");}};
+  expiry.submit("expire","mine",neverReleased,0,10);expiry.tick(1);
+  expiry.submit("later","place",afterExpiry,5,1000);expiry.tick(10);
+  check(afterExpiry.starts==0,"an expiry stop failure blocks dequeue in the same tick");
   TaskRuntime ids=new TaskRuntime();
   ids.submit("same","navigate","1,2,3",new Work(),0,1000);
   boolean conflict=false;try{ids.submit("same","navigate","4,5,6",new Work(),1,1000);}catch(IllegalArgumentException expected){conflict=true;}

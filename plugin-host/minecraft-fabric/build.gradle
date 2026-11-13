@@ -84,3 +84,10 @@ tasks.register('pauseBarrierSmoke', JavaExec) {
  mainClass = 'dev.momo.task.PauseBarrierSmoke'
 }
 check.dependsOn pauseBarrierSmoke
+
+tasks.register('controlAdmissionSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.ControlAdmissionSmoke'
+}
+check.dependsOn controlAdmissionSmoke

@@ -173,6 +173,7 @@ _TOOLS: tuple[Tool, ...] = (
 TOOLS: list[dict[str, Any]] = [t.decl() for t in _TOOLS]
 
 _BY_NAME: dict[str, Tool] = {t.name: t for t in _TOOLS}
+GAME_EVENT_TOOLS=frozenset({'minecraft_action','minecraft_goal','memory_search','memory_add','common_time'})
 
 
 # ---------------- 派发 ----------------
@@ -206,7 +207,7 @@ def execute_tool(name: str, args: dict[str, Any]) -> str:
 
 
 def run_call(
-    call: dict[str, Any], ext: ExtTools | None = None
+    call: dict[str, Any], ext: ExtTools | None = None, *, origin='direct'
 ) -> ToolResultMessage:
     """执行一条 tool_calls 元素，返回 role=tool 的消息。
 
@@ -217,6 +218,11 @@ def run_call(
     """
     fn = call.get("function") or {}
     name = str(fn.get("name") or "")
+    if origin=='minecraft_event':
+        if name not in GAME_EVENT_TOOLS:
+            return {'role':'tool','tool_call_id':call.get('id') or '',
+                    'content':json.dumps({'ok':False,'code':'GAME_ORIGIN_DENIED','error':'An autonomous game event may only use granted game skills, recall or add game memories, and read time. It cannot send external messages, invoke extensions, control other apps or change owner preferences.'})}
+        ext=None  # Even an extension advertising an allowed builtin name cannot shadow it.
     raw_args = fn.get("arguments") or "{}"
     try:
         args = json.loads(raw_args) if isinstance(raw_args, str) else dict(raw_args)

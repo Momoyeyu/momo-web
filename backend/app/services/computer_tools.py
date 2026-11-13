@@ -316,6 +316,8 @@ def execute(name,args):
             recovery={
                 'MINECRAFT_TASKS_ACTIVE':'Finish or cancel the live task before replacing/completing the goal. Keep its observed progress.',
                 'MINECRAFT_PAUSED':'Gameplay is paused. A new direct player request or Resume button is required. Do not resume from an automatic game event.',
+                'MINECRAFT_SUSPENDED':'The game is unfocused or a player menu is open. Do not send more actions; wait until the player returns or explicitly resumes.',
+                'MINECRAFT_BUSY':'Another bounded action currently owns the body. Wait for its actual receipt; do not replay or cancel it just to poll.',
                 'MINECRAFT_INPUT':'Arguments were rejected before dispatch. Query the exact skill schema before changing arguments.',
                 'MINECRAFT_STALE':'Read a fresh game observation before another action; do not infer completion from this rejection.',
             }

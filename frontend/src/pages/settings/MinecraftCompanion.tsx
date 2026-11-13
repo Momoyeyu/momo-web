@@ -23,12 +23,12 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
  const game=useSyncExternalStore(subscribeMinecraft,minecraftSnapshot);
  const gameplay=preferences.minecraftPlay===true;
  const mounted=useRef(false),operation=useRef(false),request=useRef<AbortController|null>(null);
- const read=useCallback(async()=>{
+ const read=useCallback(async(force=false)=>{
   request.current?.abort();
   const controller=new AbortController();request.current=controller;
   try{
    const [status,list]=await Promise.all([
-    readMinecraftStatus(),
+    readMinecraftStatus(force),
     apiJson<{sessions:Session[]}>('/api/minecraft/sessions',{signal:controller.signal}),
    ]);
    if(!mounted.current||controller.signal.aborted)return;
@@ -45,7 +45,7 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
  },[read]);
  const run=async(fn:()=>Promise<unknown>)=>{
   if(operation.current)return;operation.current=true;setBusy(true);setError(false);request.current?.abort();
-  try{await fn();if(mounted.current)await read();}
+  try{await fn();if(mounted.current)await read(true);}
   catch{if(mounted.current)setError(true);}
   finally{operation.current=false;if(mounted.current)setBusy(false);}
  };
@@ -66,7 +66,7 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
    <FieldRow label={t('minecraft.play')}><Switch title={t('minecraft.play')} on={preferences.minecraftPlay===true} onChange={value=>updateGeneral({minecraftPlay:value})} disabled={busy||active}/></FieldRow>
    <div className="extension-detail-actions">
     <Button disabled={!enabled||busy||active||!current?.ready||meeting.state!=='active'} onClick={()=>void run(()=>apiJson('/api/minecraft/attach',jsonInit('POST',{...meetingIdentity(),sessionId:current!.id,world:current!.world,account:current!.account,permissions:['game.observe',...(gameplay?['game.chat','game.move','game.modify']:[])]})))}>{t('minecraft.start')}</Button>
-    {active&&<Button variant="ghost" disabled={busy} onClick={()=>void run(()=>apiJson('/api/minecraft/tasks',jsonInit('POST',{...meetingIdentity(),generation:game!.generation,action:game?.paused?'resume':'pause'})))}>{t(game?.paused?'minecraft.resumePlay':'minecraft.pausePlay')}</Button>}
+    {active&&game?.permissions?.includes('game.modify')&&<Button variant="ghost" disabled={busy} onClick={()=>void run(()=>apiJson('/api/minecraft/tasks',jsonInit('POST',{...meetingIdentity(),generation:game!.generation,action:game?.paused?'resume':'pause'})))}>{t(game?.paused?'minecraft.resumePlay':'minecraft.pausePlay')}</Button>}
     <Button variant="ghost" disabled={busy||!active} onClick={()=>void run(()=>apiJson('/api/minecraft/stop',jsonInit('POST',{})))}>{t('minecraft.stop')}</Button>
    </div>
   </section>

@@ -68,6 +68,7 @@ public final class TaskRuntime {
   }
   for(Job job:new ArrayList<>(queue))if(now>=job.lease||now>=job.deadline){queue.remove(job);finish(job,"failed","lease_expired",Map.of());}
   if(current!=null&&(now>=current.lease||now>=current.deadline))finish(current,"failed","lease_expired",Map.of());
+  if(uncertainStop!=null)return;
   if(paused)return;
   if(current==null&&!queue.isEmpty()){
    current=queue.remove();current.state="running";publish(current);
@@ -143,6 +144,7 @@ public final class TaskRuntime {
  }
  public boolean acceptsScreen(Object screen){return current!=null?current.work.acceptsScreen(screen):!queue.isEmpty()&&queue.peek().work.acceptsScreen(screen);}
  public boolean active(){return uncertainStop!=null||current!=null||!queue.isEmpty();}
+ public boolean releasePending(){return uncertainStop!=null;}
  public boolean controlsMining(){return current!=null&&current.state.equals("running")&&current.work.controlsMining();}
  public boolean stopConfirmed(){return uncertainStop==null&&current==null&&queue.isEmpty();}
  private void finish(Job job,String state,String reason,Map<String,Object> evidence){

@@ -17,6 +17,19 @@ def test_submit_uses_current_binding_without_waiting_for_completion():
   assert rt.host.request.call_args.args[0]=='minecraft.submit'
   assert rt.host.request.call_args.args[1]['permission']=={'world':'world','account':'player','activityEpoch':7}
 
+@pytest.mark.parametrize('failure',['minecraft.capabilities','minecraft.resume'])
+def test_failed_connect_negotiation_revokes_the_tentative_binding(failure):
+ from app.core.plugin_host import HostError
+ m,rt=setup()
+ def request(method,params=None):
+  if method==failure:raise HostError('MINECRAFT_UNKNOWN')
+  return {'taskProtocol':1,'stopVerified':True,'available':True}
+ rt.host.request.side_effect=request
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  with pytest.raises(HostError):m.connect(1234,'x'*40,'world','player',['game.observe','game.modify'],'owner','lease')
+  assert m.binding is None and not m.permissions and not m.autonomous
+  assert m.monitor_stop.is_set()
+
 def test_background_body_lease_does_not_need_a_model_run_and_cannot_outlive_owner():
  m,rt=setup();rt.host.request.return_value={'events':{'cursor':1,'gap':False,'events':[]}}
  with patch('app.services.minecraft.runtime',rt),patch.object(m,'_background_valid',return_value=True),patch.object(m,'record_tasks'):
@@ -41,6 +54,13 @@ def test_gameplay_mutation_requires_unified_play_permission():
  with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
   with pytest.raises(MinecraftError,match='denied'):m.execute('submit',{'taskId':'x'},0,'owner','lease')
   rt.host.request.assert_not_called()
+
+@pytest.mark.parametrize('reason,code',[('BODY_SUSPENDED','MINECRAFT_SUSPENDED'),('MENU_OPEN','MINECRAFT_SUSPENDED'),('SCENE_OBSERVATION_REQUIRED','MINECRAFT_STALE'),('BODY_BUSY','MINECRAFT_BUSY')])
+def test_game_thread_admission_rejection_is_known_and_does_not_revoke(reason,code):
+ m,rt=setup();rt.host.request.return_value={'accepted':False,'error':reason}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  with pytest.raises(MinecraftError) as denied:m.execute('submit',{},0,None,None)
+  assert denied.value.code==code and m.binding
 
 def test_goal_recheck_is_event_driven_with_a_30_second_idle_floor():
  m,rt=setup();m.autonomous=True;m.decision_needed=True

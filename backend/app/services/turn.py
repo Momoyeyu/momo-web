@@ -118,10 +118,12 @@ def _run_turn(
         direction = onboarding.resolve(text, gen, at, allow_new=first_meeting) if source == "meeting" and observation is None else None
         if direction:
             messages.insert(-1, {"role": "system", "content": direction})
-        with mcp.open_tools(
-            state["settings"]["extensions"] if checkpoint.audience() == "owner" and not intro.restricted() else [], [] if intro.restricted() else builtin_names()
-        ) as ext_tools:
-            for event in react(messages, ext_tools, state, gen, at, presentation, source=source, observation_only=observation is not None and observation.get("kind")!="minecraft"):
+        game_event=observation is not None and observation.get('kind')=='minecraft'
+        from contextlib import nullcontext
+        tool_scope=nullcontext(mcp.ExtTools()) if game_event else mcp.open_tools(
+            state["settings"]["extensions"] if checkpoint.audience() == "owner" and not intro.restricted() else [], [] if intro.restricted() else builtin_names())
+        with tool_scope as ext_tools:
+            for event in react(messages, ext_tools, state, gen, at, presentation, source=source, observation_only=observation is not None and observation.get("kind")!="minecraft",game_event=game_event):
                 if source == 'qq' and event['t'] == 'error' and not spoken:
                     break
                 if event['t'] == 'sentence' and event.get('text'):
@@ -307,7 +309,7 @@ def react(
     gen: int,
     at: str,
     presentation: dict | None = None,
-    *, source="meeting", observation_only=False,
+    *, source="meeting", observation_only=False,game_event=False,
 ) -> Iterator[TurnEvent]:
     """节点 R→D→E→CNT→H：流式调 LLM，正文**边到边切句落账并推句事件**。
 
@@ -325,6 +327,9 @@ def react(
     from . import computer_tools
     computer_decls = [] if intro.restricted() else computer_tools.declarations(source)
     tools = builtins + ext_tools.decls + qq_tools + computer_decls if ext_tools.decls or qq_tools or computer_decls else builtins
+    if game_event:
+        from .capability import GAME_EVENT_TOOLS
+        tools=[tool for tool in tools if tool['function']['name'] in GAME_EVENT_TOOLS]
     if observation_only:
         tools = []
     llm_cfg = state["settings"]["llm"]
@@ -477,7 +482,7 @@ def react(
                             continue
                         if checkpoint.generation()!=gen:return
                     with computer_tools.capture_scope(capture_edge):
-                        result = run_call(call, ext_tools)
+                        result = run_call(call, ext_tools,origin='minecraft_event') if game_event else run_call(call, ext_tools)
                     messages.append(result)
                     if call.get('function',{}).get('name')=='minecraft_action':
                         import json

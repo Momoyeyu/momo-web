@@ -1,7 +1,7 @@
 import {validateSkill} from './minecraft-skills.mjs';
 let bridgeEpoch = Date.now();
 const problem=(message,code='MINECRAFT_INPUT')=>Object.assign(new Error(message),{code});
-const publicCodes=new Set(['MINECRAFT_INPUT','MINECRAFT_STALE','MINECRAFT_REVOKED','MINECRAFT_UNKNOWN']);
+const publicCodes=new Set(['MINECRAFT_INPUT','MINECRAFT_STALE','MINECRAFT_REVOKED','MINECRAFT_UNKNOWN','MINECRAFT_BUSY']);
 // Preserve known pre-dispatch rejection without exposing arbitrary transport diagnostics.
 export const minecraftErrorCode=error=>publicCodes.has(error?.code)?error.code:'MINECRAFT_UNKNOWN';
 /** Bounded Fabric transport adapter. No inference, login, downloads, or code execution. */
@@ -50,7 +50,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
   async function execute(type, args, permission) {
     if (!available()) throw new Error('Managed Fabric runtime is not installed');
     const read = taskReads.has(type);
-    if (read ? readers >= 2 : busy) throw new Error('Minecraft action already in progress');
+    if (read ? readers >= 2 : busy) throw problem('Minecraft action already in progress','MINECRAFT_BUSY');
     const version = epoch;
     let dispatched=false;
     if (read) readers++; else busy = true;

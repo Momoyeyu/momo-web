@@ -5,6 +5,7 @@ import { createInterface } from 'node:readline';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { createServer } from 'node:http';
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 function child(t) {
@@ -73,4 +74,27 @@ test('Minecraft argument rejections keep their known outcome over the real pipe'
   await req('hello', {coreInstance:'minecraft-diagnostics',token});
   await assert.rejects(req('minecraft.submit', {taskId:'bad-input',skill:'plan',args:{steps:[]},permission:{world:'w',account:'a'}}), error => error.code === 'MINECRAFT_INPUT');
   await req('shutdown');
+});
+
+test('concurrent Minecraft dispatch preserves no-effect busy rejection over stdio', async t => {
+  let release,arrived;
+  const dispatched=new Promise(resolve=>{arrived=resolve;});
+  const gate=new Promise(resolve=>{release=resolve;});
+  const server=createServer(async(request,response)=>{
+    let body='';for await(const part of request)body+=part;
+    const command=JSON.parse(body);
+    if(command.type==='submit'){arrived();await gate;}
+    response.end(JSON.stringify({...command,observedAt:Date.now(),taskProtocol:1,skills:['navigate'],stopped:true,heldControls:0,accepted:true,task:{taskId:command.taskId,state:'queued'}}));
+  });
+  server.listen(0,'127.0.0.1');await once(server,'listening');
+  t.after(()=>{release();server.close();});
+  const {req,token}=child(t);
+  await req('hello',{coreInstance:'busy-game',token});await req('heartbeat',{activityEpoch:1});
+  await req('minecraft.configure',{port:server.address().port,token:'fixture-token-'.repeat(3)});
+  const permission={world:'w',account:'a',activityEpoch:1};
+  await req('minecraft.capabilities',{permission});
+  const task={permission,taskId:'one',skill:'navigate',args:{x:1,y:64,z:2}};
+  const first=req('minecraft.submit',task);await dispatched;
+  await assert.rejects(req('minecraft.submit',{...task,taskId:'two'}),error=>error.code==='MINECRAFT_BUSY');
+  release();await first;await req('shutdown');
 });

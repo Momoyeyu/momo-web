@@ -100,9 +100,15 @@ class Minecraft:
                 self.cursor, self.tasks, self.paused = 0, {}, False
                 self.suspended=False
                 permission = {**self.binding, 'activityEpoch': self.epoch}
-            capabilities = runtime.host.request('minecraft.capabilities', {'permission':permission})
-            if capabilities.get('taskProtocol')==1 and 'game.modify' in self.permissions:
-                runtime.host.request('minecraft.resume',{'permission':permission,'issuedAt':int(time.time()*1000)})
+            try:
+                capabilities = runtime.host.request('minecraft.capabilities', {'permission':permission})
+                if capabilities.get('taskProtocol')==1 and 'game.modify' in self.permissions:
+                    resumed=runtime.host.request('minecraft.resume',{'permission':permission,'issuedAt':int(time.time()*1000)})
+                    if resumed.get('error'):raise MinecraftError('Game declined the new activity')
+            except Exception:
+                # No half-attached authority may survive failed negotiation.
+                self.stop('connect_failed')
+                raise
             with self.lock:
                 self.capabilities = capabilities
                 self.autonomous = 'game.modify' in self.permissions and capabilities.get('taskProtocol') == 1
@@ -142,6 +148,13 @@ class Minecraft:
             if result.get('error') in {'BODY_PAUSED','NEW_PLAYER_INPUT_REQUIRED'}:
                 with self.lock:self.paused=True;self.autonomous=self.decision_needed=False
                 raise MinecraftError('Fresh player input is required to resume Minecraft',code='MINECRAFT_PAUSED')
+            rejection=result.get('error')
+            if rejection in {'BODY_SUSPENDED','MENU_OPEN'}:
+                with self.lock:self.suspended=True;self.decision_needed=False
+                raise MinecraftError('Return to the game or close the player menu before control',code='MINECRAFT_SUSPENDED')
+            if rejection=='SCENE_OBSERVATION_REQUIRED':raise MinecraftError('Observe the new scene before new control',code='MINECRAFT_STALE')
+            if rejection=='BODY_BUSY':raise MinecraftError('The current body action must settle first',code='MINECRAFT_BUSY')
+            if rejection in {'DEAD_REPLAN','TASK_REJECTED'}:raise MinecraftError('Inspect the current state and exact skill arguments',code='MINECRAFT_INPUT')
             if action=='observe':
                 from . import minecraft_journal as journal
                 with self.lock:

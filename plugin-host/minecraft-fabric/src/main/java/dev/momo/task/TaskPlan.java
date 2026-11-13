@@ -29,7 +29,7 @@ public final class TaskPlan implements TaskRuntime.Work {
  }
  private void failed(String reason){
   var node=steps.get(index);var partial=node.work.partialEvidence();boolean safe=node.work.retrySafe(reason);
-  boolean unknown=Set.of("server_confirmation_missing","execution_failed","stop_unconfirmed").contains(reason);
+  boolean unknown=Set.of("server_confirmation_missing","execution_failed","stop_unconfirmed","ingredients_station_or_server_ack_missing","trade_stock_or_currency_missing").contains(reason);
   release();
   if(!unknown&&safe&&attempt++<node.retries){begin();return;}
   if(!partial.isEmpty())outcomes.add(Map.of("step",index,"partial",true,"result",partial));
@@ -40,7 +40,11 @@ public final class TaskPlan implements TaskRuntime.Work {
  public void pause(){if(running)steps.get(index).work.pause();}
  public void resume(){if(running)steps.get(index).work.resume();}
  public void stop(){release();}
- public Map<String,Object> partialEvidence(){return outcomes.isEmpty()?Map.of():Map.of("steps",List.copyOf(outcomes));}
+ public Map<String,Object> partialEvidence(){
+  var facts=new ArrayList<>(outcomes);
+  if(running&&!finished&&failure==null){var partial=steps.get(index).work.partialEvidence();if(!partial.isEmpty())facts.add(Map.of("step",index,"partial",true,"result",partial));}
+  return facts.isEmpty()?Map.of():Map.of("steps",List.copyOf(facts));
+ }
  public boolean controlsMining(){return running&&!finished&&failure==null&&steps.get(index).work.controlsMining();}
  public Map<String,Object> progress(){return finished?Map.of("completedSteps",index):Map.of("step",index,"completedSteps",outcomes.size(),"action",steps.get(index).work.progress());}
  public boolean acceptsScreen(Object screen){return !finished&&failure==null&&steps.get(index).work.acceptsScreen(screen);}

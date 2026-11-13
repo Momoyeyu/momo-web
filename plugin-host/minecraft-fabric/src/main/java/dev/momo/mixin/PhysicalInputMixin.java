@@ -14,9 +14,9 @@ public abstract class PhysicalInputMixin {
  @Unique private boolean momo$tracking;
  @Unique private double momo$lastX,momo$lastY;
  @Inject(method="onMouseButton",at=@At("HEAD"))
- private void momo$button(long window,int button,int action,int mods,CallbackInfo ci){if(action==1&&MinecraftClient.getInstance().isWindowFocused()&&MinecraftClient.getInstance().currentScreen==null)CompanionClient.physicalInput();}
+ private void momo$button(long window,int button,int action,int mods,CallbackInfo ci){var c=MinecraftClient.getInstance();if(window==c.getWindow().getHandle()&&action==1&&c.isWindowFocused()&&(c.currentScreen==null||CompanionClient.ownsCurrentScreen()))CompanionClient.physicalInput();}
  @Inject(method="onMouseScroll",at=@At("HEAD"))
- private void momo$scroll(long window,double x,double y,CallbackInfo ci){if(MinecraftClient.getInstance().isWindowFocused()&&MinecraftClient.getInstance().currentScreen==null)CompanionClient.physicalInput();}
+ private void momo$scroll(long window,double x,double y,CallbackInfo ci){var c=MinecraftClient.getInstance();if(window==c.getWindow().getHandle()&&c.isWindowFocused()&&(c.currentScreen==null||CompanionClient.ownsCurrentScreen()))CompanionClient.physicalInput();}
  @Inject(method="onCursorPos",at=@At("HEAD"))
  private void momo$cursor(long window,double x,double y,CallbackInfo ci){
   var client=MinecraftClient.getInstance();boolean active=CompanionClient.controlling()&&client.isWindowFocused()&&client.mouse.isCursorLocked();
