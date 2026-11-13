@@ -181,7 +181,7 @@ public final class GameSkills {
       var destination=c.player.currentScreenHandler.slots.stream().filter(slot->slot.inventory==c.player.getInventory()&&slot.canInsert(cursor)&&slot.getStack().isEmpty()).findFirst();
       if(destination.isEmpty())destination=c.player.currentScreenHandler.slots.stream().filter(slot->slot.inventory==c.player.getInventory()&&slot.canInsert(cursor)&&net.minecraft.item.ItemStack.areItemsAndComponentsEqual(slot.getStack(),cursor)&&slot.getStack().getCount()+cursor.getCount()<=slot.getMaxItemCount(cursor)).findFirst();
       if(destination.isEmpty())return TaskRuntime.Step.failed("inventory_full");
-      c.interactionManager.clickSlot(c.player.currentScreenHandler.syncId,destination.get().id,0,SlotActionType.PICKUP,c.player);mutationTick=ticks;inventoryProof.mutated(ticks);craftPhase=3;
+      c.interactionManager.clickSlot(c.player.currentScreenHandler.syncId,destination.get().id,0,SlotActionType.PICKUP,c.player);mutationTick=ticks;inventoryProof.mutated(ticks,c.player.currentScreenHandler.getRevision());craftPhase=3;
      }
      if(ticks-mutationTick>100)return TaskRuntime.Step.failed("ingredients_station_or_server_ack_missing");break;
     case "closeScreen":if(c.currentScreen==null)return done(Map.of("screen","world"));break;
