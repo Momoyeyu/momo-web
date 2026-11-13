@@ -26,8 +26,9 @@ public final class CompanionClient implements ClientModInitializer {
  private final SurvivalController survival=new SurvivalController();
  private String taskWorld, taskAccount;
  private net.minecraft.client.world.ClientWorld taskWorldInstance;
- private boolean taskPaused,physicalTakeover;
- public static boolean controlling(){return instance!=null&&(instance.tasks.active()||instance.playing);}
+ private boolean taskPaused,physicalTakeover,guardAuthorized;
+ private long gameLeaseUntil;
+ public static boolean controlling(){return instance!=null&&(instance.tasks.active()||instance.playing||instance.guardAuthorized);}
  public static void physicalInput(){if(instance!=null&&controlling())instance.physicalTakeover=true;}
  private static CompanionClient instance;
  private boolean playing,mining,using,attacking,drivingInput;
@@ -47,7 +48,7 @@ public final class CompanionClient implements ClientModInitializer {
   final String sessionToken = token;
   try {
    server = HttpServer.create(new InetSocketAddress("127.0.0.1", Integer.getInteger("momo.bridge.port", 0)), 8);
-   executor = Executors.newSingleThreadExecutor();
+   executor = new ThreadPoolExecutor(4,4,0,TimeUnit.MILLISECONDS,new ArrayBlockingQueue<>(16));
    server.setExecutor(executor);
    server.createContext("/command", exchange -> {
     byte[] response;
@@ -111,7 +112,7 @@ public final class CompanionClient implements ClientModInitializer {
   backgroundUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(60);
  }
  private void release(MinecraftClient client) {
-  survival.stop();tasks.stop("control_released");taskPaused=false;
+  survival.stop();tasks.stop("control_released");taskPaused=false;guardAuthorized=false;gameLeaseUntil=0;
   if(mining && client.interactionManager!=null)client.interactionManager.cancelBlockBreaking();
   if(using && client.interactionManager!=null && client.player!=null && client.player.isUsingItem())client.interactionManager.stopUsingItem(client.player);
   playing = mining = using = attacking = false;
@@ -172,31 +173,32 @@ public final class CompanionClient implements ClientModInitializer {
    }
    case "submit" -> {
     String skill=command.get("skill").getAsString();
-    if(client.currentScreen!=null&&!(client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>)&&!skill.equals("respawn"))throw new IllegalStateException("Close the menu first");
-    if(playing)throw new IllegalStateException("Another action owns the body");
+    if(client.currentScreen!=null&&!(client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>)&&!skill.equals("respawn")){result.addProperty("accepted",false);result.addProperty("error","MENU_OPEN");return result;}
+    if(playing){result.addProperty("accepted",false);result.addProperty("error","BODY_BUSY");return result;}
     String id=command.get("taskId").getAsString();
     JsonObject args=command.has("args")?command.getAsJsonObject("args"):new JsonObject();
     if(skill.equals("navigate")&&!command.has("args"))for(String key:new String[]{"x","y","z"})args.add(key,command.get(key));
-    var work=GameSkills.create(skill,args);
-    boolean accepted=tasks.submit(id,skill,args.toString(),work,System.nanoTime()/1000000,command.get("leaseMs").getAsLong());
-    taskWorld=world;taskAccount=account;taskWorldInstance=client.world;backgroundControl(client);
+    boolean accepted;
+    try{var work=GameSkills.create(skill,args);accepted=tasks.submit(id,skill,args.toString(),work,System.nanoTime()/1000000,command.get("leaseMs").getAsLong());}
+    catch(IllegalArgumentException|IllegalStateException error){result.addProperty("accepted",false);result.addProperty("error","TASK_REJECTED");return result;}
+    taskWorld=world;taskAccount=account;taskWorldInstance=client.world;guardAuthorized=true;gameLeaseUntil=System.nanoTime()/1000000+command.get("leaseMs").getAsLong();backgroundControl(client);
     result.addProperty("accepted",accepted);result.add("task",gson.toJsonTree(tasks.snapshot(id)));
    }
    case "task" -> {
-    if(command.has("taskId"))result.add("task",gson.toJsonTree(tasks.snapshot(command.get("taskId").getAsString())));
+    if(command.has("taskId")){try{result.add("task",gson.toJsonTree(tasks.snapshot(command.get("taskId").getAsString())));}catch(IllegalArgumentException error){result.addProperty("error","TASK_NOT_FOUND");}}
     else result.add("tasks",gson.toJsonTree(tasks.snapshots()));
    }
    case "events" -> result.add("events",gson.toJsonTree(tasks.events(command.get("after").getAsLong())));
-   case "heartbeat" -> {tasks.heartbeat(System.nanoTime()/1000000,command.get("leaseMs").getAsLong());result.addProperty("active",tasks.active());}
+   case "heartbeat" -> {long now=System.nanoTime()/1000000,lease=command.get("leaseMs").getAsLong();tasks.heartbeat(now,lease);if(guardAuthorized)gameLeaseUntil=now+lease;result.addProperty("active",tasks.active());result.addProperty("controlPaused",taskPaused);}
    case "pause" -> {survival.stop();taskPaused=true;tasks.pause();result.addProperty("paused",true);}
-   case "resumeTask" -> {taskPaused=false;if(client.currentScreen==null)tasks.resume();result.addProperty("paused",false);}
+   case "resumeTask" -> {taskPaused=false;guardAuthorized=taskWorld!=null;gameLeaseUntil=System.nanoTime()/1000000+10000;if(client.currentScreen==null)tasks.resume();result.addProperty("paused",false);}
    case "cancel" -> {
     tasks.cancel(command.get("taskId").getAsString(),"requested");
     result.add("task",gson.toJsonTree(tasks.snapshot(command.get("taskId").getAsString())));
     if(!tasks.active()){release(client);restorePause(client);}
    }
    case "observe" -> {
-    if (!client.options.getPerspective().isFirstPerson()) throw new IllegalStateException("First person required");
+
     capture.accept(net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer()));
     GameObservation.append(client,result);
     result.addProperty("observedAt", System.currentTimeMillis());
@@ -327,9 +329,9 @@ public final class CompanionClient implements ClientModInitializer {
   var o=c.options;
   switch(key){
    case "look" -> {float yaw=cmd.get("yaw").getAsFloat(),pitch=cmd.get("pitch").getAsFloat();if(!Float.isFinite(yaw)||!Float.isFinite(pitch)||Math.abs(yaw)>180||Math.abs(pitch)>90)throw new IllegalArgumentException("Invalid look");p.changeLookDirection(yaw/0.15,pitch/0.15);return;}
-   case "hotbar" -> {int slot=cmd.get("slot").getAsInt();if(slot<0||slot>8)throw new IllegalArgumentException("Invalid hotbar slot");p.getInventory().selectedSlot=slot;return;}
+   case "hotbar" -> {int slot=cmd.get("slot").getAsInt();if(slot<0||slot>8)throw new IllegalArgumentException("Invalid hotbar slot");p.getInventory().selectedSlot=slot;p.networkHandler.sendPacket(new net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket(slot));return;}
    case "inventory" -> {c.setScreen(new net.minecraft.client.gui.screen.ingame.InventoryScreen(p));return;}
-   case "drop" -> {p.dropSelectedItem(false);return;}
+   case "drop" -> {p.networkHandler.sendPacket(new net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket(p.getInventory().selectedSlot));p.dropSelectedItem(false);return;}
    default -> {}
   }
   var binding=switch(key){
@@ -356,14 +358,19 @@ public final class CompanionClient implements ClientModInitializer {
   playing=true; boundWorld=world; boundAccount=account;deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(duration);
  }
  private void tick(MinecraftClient client) {
-  if(physicalTakeover){physicalTakeover=false;tasks.stop("manual_takeover");release(client);restorePause(client);return;}
+  dev.momo.task.PickupLedger.CURRENT.changeWorld(client.world);
+  if(physicalTakeover){physicalTakeover=false;tasks.stop("manual_takeover");tasks.notice("manual_takeover");release(client);taskPaused=true;tasks.pause();restorePause(client);return;}
+  long localNow=System.nanoTime()/1000000;
+  if(guardAuthorized&&!tasks.active()){
+   if(localNow>=gameLeaseUntil||client.player==null||client.world!=taskWorldInstance||!client.player.isAlive()||!client.player.getUuidAsString().equals(taskAccount)){tasks.notice("scene_or_life_changed");release(client);restorePause(client);return;}
+   if(!taskPaused&&client.currentScreen==null){var reflex=survival.choose();if(reflex!=SurvivalPolicy.Mode.NONE){survival.drive(reflex);return;}}
+   survival.stop();
+   // The renewable body lease owns idle survival, not the legacy 60s input timer.
+   return;
+  }
   if(tasks.active()){
    String currentWorld=client.world==null?"":worldScope(client);
    if(client.player==null||(!client.player.isAlive()&&!tasks.snapshots().stream().anyMatch(t->t.skill().equals("respawn")&&(t.state().equals("running")||t.state().equals("queued"))))||(taskWorldInstance!=client.world||!taskWorld.equals(currentWorld))||!taskAccount.equals(client.player.getUuidAsString())){tasks.stop("identity_or_life_changed");release(client);restorePause(client);return;}
-   long window=client.getWindow().getHandle();
-   boolean manual=false;
-   if(client.isWindowFocused())for(int key:new int[]{87,65,83,68,32,340,341})manual|=net.minecraft.client.util.InputUtil.isKeyPressed(window,key);
-   if(manual){tasks.stop("manual_takeover");release(client);restorePause(client);return;}
    if(client.currentScreen!=null&&!tasks.acceptsScreen(client.currentScreen)){tasks.pause();tasks.tick(System.nanoTime()/1000000);return;}
    if(!taskPaused&&client.currentScreen==null){
     var reflex=survival.choose();

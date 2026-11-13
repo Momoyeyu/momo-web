@@ -57,6 +57,9 @@ public final class TaskRuntimeSmoke {
   report.submit("progress","plan",evolving,0,5000);report.tick(1000);
   check(report.snapshot("progress").progress().get("skill").equals("craft"),"progress is separate from verified completion evidence");
   check(report.snapshot("progress").evidence().isEmpty(),"running progress is not a completed result");
+  TaskRuntime idle=new TaskRuntime();idle.notice("manual_takeover");
+  check(idle.events(0).events().get(0).task().reason().equals("manual_takeover"),"manual idle-body takeover must reach the coordinator");
+  check(idle.stopConfirmed(),"a control notice cannot create new work");
   System.out.println("PASS task queue, evidence, duplicate barrier, pause/resume, stop, heartbeat and event gap");
  }
 }

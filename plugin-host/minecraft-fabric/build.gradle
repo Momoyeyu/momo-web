@@ -49,3 +49,17 @@ tasks.register('survivalPolicySmoke', JavaExec) {
  mainClass = 'dev.momo.task.SurvivalPolicySmoke'
 }
 check.dependsOn survivalPolicySmoke
+
+tasks.register('inventoryEvidenceSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.InventoryEvidenceSmoke'
+}
+check.dependsOn inventoryEvidenceSmoke
+
+tasks.register('pickupLedgerSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.PickupLedgerSmoke'
+}
+check.dependsOn pickupLedgerSmoke

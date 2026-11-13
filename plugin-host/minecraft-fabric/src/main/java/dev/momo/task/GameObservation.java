@@ -29,11 +29,11 @@ public final class GameObservation {
  public static void append(MinecraftClient c,JsonObject result){
   var p=c.player;var handler=p.currentScreenHandler;
   result.addProperty("screenHandler",screenId(handler));result.addProperty("screenRevision",handler.getRevision());
-  result.addProperty("experience",p.experienceLevel);result.addProperty("onFire",p.isOnFire());result.addProperty("inWater",p.isTouchingWater());result.addProperty("air",p.getAir());result.addProperty("riding",p.hasVehicle());result.addProperty("sleeping",p.isSleeping());
+  result.addProperty("perspective",c.options.getPerspective().name());result.addProperty("experience",p.experienceLevel);result.addProperty("onFire",p.isOnFire());result.addProperty("inWater",p.isTouchingWater());result.addProperty("air",p.getAir());result.addProperty("riding",p.hasVehicle());result.addProperty("sleeping",p.isSleeping());
   var entities=new JsonArray();
   for(var e:c.world.getOtherEntities(p,p.getBoundingBox().expand(32),e->p.canSee(e)&&e.squaredDistanceTo(p)<=1024).stream().sorted(java.util.Comparator.comparingDouble(e->e.squaredDistanceTo(p))).limit(24).toList()){
    var row=new JsonObject();row.addProperty("entityId",e.getId());row.addProperty("type",Registries.ENTITY_TYPE.getId(e.getType()).toString());row.addProperty("name",e.getName().getString());row.addProperty("x",e.getX());row.addProperty("y",e.getY());row.addProperty("z",e.getZ());
-   if(e instanceof net.minecraft.entity.LivingEntity living)row.addProperty("health",living.getHealth());entities.add(row);
+   if(e instanceof net.minecraft.entity.LivingEntity living)row.addProperty("health",living.getHealth());if(e instanceof net.minecraft.entity.ItemEntity drop)row.add("stack",stack(drop.getStack()));entities.add(row);
   }
   result.add("visibleEntities",entities);
   result.add("knownRecipes",recipes(c,"",8));

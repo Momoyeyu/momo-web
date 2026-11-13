@@ -78,7 +78,7 @@ public final class TaskRuntime {
     if(!progress.equals(current.progress)){current.progress=progress;publish(current);}current.lastProgress=now;
    }
    else if(!step.state.equals("running"))throw new IllegalArgumentException("Invalid outcome");
-  }catch(RuntimeException error){if(current!=null)finish(current,"failed","execution_failed",Map.of());}
+  }catch(RuntimeException error){System.getLogger("momo-minecraft").log(System.Logger.Level.WARNING,"Local skill failed",error);if(current!=null)finish(current,"failed","execution_failed",Map.of());}
  }
  public void heartbeat(long now,long leaseMs){
   validateLease(leaseMs);
@@ -127,6 +127,11 @@ public final class TaskRuntime {
   if(after<0)throw new IllegalArgumentException("Invalid event cursor");
   boolean gap=after>sequence||(!journal.isEmpty()&&after<journal.getFirst().seq-1);
   return new Events(sequence,gap,journal.stream().filter(e->e.seq>after).toList());
+ }
+ public void notice(String reason){
+  if(reason==null||!reason.matches("[a-z_]{1,50}"))throw new IllegalArgumentException("Invalid control notice");
+  journal.add(new Event(++sequence,new Snapshot("control-"+sequence,"control","cancelled",reason,Map.of(),Map.of())));
+  while(journal.size()>MAX_EVENTS)journal.removeFirst();
  }
  public boolean acceptsScreen(Object screen){return current!=null?current.work.acceptsScreen(screen):!queue.isEmpty()&&queue.peek().work.acceptsScreen(screen);}
  public boolean active(){return uncertainStop!=null||current!=null||!queue.isEmpty();}
