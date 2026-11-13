@@ -7,6 +7,11 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
   let observation = null;
   let aimAvailable = false;
   let busy = false;
+  let readers = 0;
+  let capabilities = null;
+  const taskReads = new Set(['capabilities', 'task', 'events', 'heartbeat']);
+  const continuous = new Set([...taskReads, 'submit', 'pause', 'resumeTask', 'cancel']);
+  const validId = id => typeof id === 'string' && /^[A-Za-z0-9_-]{1,80}$/u.test(id);
   const controls = new Set(['aim', 'respawn', 'screenClick', 'screenScroll', 'screenText', 'screenKey', 'resume', 'forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint', 'look', 'attack', 'mine', 'use', 'eat', 'hotbar', 'inventory', 'close', 'slot', 'quickMove', 'drop', 'swapHands']);
   const movement = new Set(['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']);
   const available = () => Boolean(transport && typeof transport.request === 'function' && typeof authorize === 'function');
@@ -25,6 +30,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
     stopped = true;
     stopVerified = false;
     observation = null;
+    capabilities = null;
     aimAvailable = false;
     if (!available()) return status();
     const version = epoch;
@@ -35,19 +41,24 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
   }
   async function execute(type, args, permission) {
     if (!available()) throw new Error('Managed Fabric runtime is not installed');
-    if (busy) throw new Error('Minecraft action already in progress');
+    const read = taskReads.has(type);
+    if (read ? readers >= 2 : busy) throw new Error('Minecraft action already in progress');
     const version = epoch;
-    busy = true;
+    if (read) readers++; else busy = true;
     try {
       const grant = await authorize({ type, permission });
       if (!grant || version !== epoch) throw new Error('Minecraft authorization revoked');
       if (!permission?.world || !permission?.account) throw new Error('Minecraft world and account must be bound');
-      if (type !== 'observe' && (!observation || observation.world !== permission.world || observation.account !== permission.account || now() - observation.observedAt > (type === 'play' ? 30000 : 2000))) throw new Error('Fresh matching Minecraft observation required');
+      if (!continuous.has(type) && type !== 'observe' && (!observation || observation.world !== permission.world || observation.account !== permission.account || now() - observation.observedAt > (type === 'play' ? 30000 : 2000))) throw new Error('Fresh matching Minecraft observation required');
       stopped = false;
       stopVerified = false;
-      const result = await request({ type, ...args, epoch: version, world: permission.world, account: permission.account, leaseMs: 1500 });
+      const result = await request({ type, ...args, epoch: version, world: permission.world, account: permission.account, leaseMs: continuous.has(type) ? 10000 : 1500 });
       if (version !== epoch) throw new Error('Late Minecraft result rejected');
       if (result?.epoch !== version || result?.world !== permission.world || result?.account !== permission.account) throw new Error('Minecraft bridge identity mismatch');
+      if (type === 'capabilities') {
+        if (result.taskProtocol !== 1 || !Array.isArray(result.skills) || result.skills.some(skill => typeof skill !== 'string')) throw new Error('Unsupported Minecraft task protocol');
+        capabilities = {world: permission.world, account: permission.account, skills: [...result.skills]};
+      }
       if (type === 'observe') {
         if (!Number.isFinite(result.observedAt) || now() - result.observedAt > 2000 || result.observedAt > now()) throw new Error('Stale Minecraft observation');
         observation = { ...result, source: 'minecraft-fabric', untrusted: true };
@@ -60,10 +71,34 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
       // Stop invalidates in-flight work; do not silently restore authority on late replies.
       if (version === epoch) { try { await stop(); } catch { /* status exposes unverified stop */ } }
       throw error;
-    } finally { busy = false; }
+    } finally { if (read) readers--; else busy = false; }
   }
   return {
     status, stop,
+    capabilities: permission => execute('capabilities', {}, permission),
+    submit({ taskId, skill, args = {} }, permission) {
+      if (!capabilities || capabilities.world !== permission?.world || capabilities.account !== permission?.account || !capabilities.skills.includes(skill) || skill !== 'navigate')
+        return Promise.reject(new Error('Unsupported Minecraft skill; query capabilities first'));
+      if (!validId(taskId) || !args || Object.getPrototypeOf(args) !== Object.prototype || Object.keys(args).sort().join(',') !== 'x,y,z'
+          || !['x','y','z'].every(k => Number.isSafeInteger(args[k])) || Math.abs(args.x) > 30000000 || Math.abs(args.z) > 30000000 || args.y < -64 || args.y > 319)
+        return Promise.reject(new Error('Invalid Minecraft task'));
+      return execute('submit', {taskId, skill, ...args}, permission);
+    },
+    task(taskId, permission) {
+      if (taskId !== null && !validId(taskId)) return Promise.reject(new Error('Invalid task identifier'));
+      return execute('task', taskId === null ? {} : {taskId}, permission);
+    },
+    events(after, permission) {
+      if (!Number.isSafeInteger(after) || after < 0) return Promise.reject(new Error('Invalid event cursor'));
+      return execute('events', {after}, permission);
+    },
+    heartbeat: permission => execute('heartbeat', {}, permission),
+    pause: permission => execute('pause', {}, permission),
+    resume: permission => execute('resumeTask', {}, permission),
+    cancel(taskId, permission) {
+      if (!validId(taskId)) return Promise.reject(new Error('Invalid task identifier'));
+      return execute('cancel', {taskId}, permission);
+    },
     observe: permission => execute('observe', {}, permission),
     chat(text, permission) {
       if (typeof text !== 'string' || !text.trim() || text.length > 256 || /[\r\n\x00-\x1f]/u.test(text) || text.trimStart().startsWith('/')) return Promise.reject(new Error('Only bounded plain Minecraft chat is allowed'));

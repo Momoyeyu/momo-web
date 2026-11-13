@@ -118,6 +118,14 @@ export class PluginHost {
       }
       case 'minecraft.status': return this.minecraft.status();
       case 'minecraft.stop': return this.minecraft.stop();
+      case 'minecraft.capabilities': return this.minecraft.capabilities(params.permission);
+      case 'minecraft.submit': return this.minecraft.submit(params, params.permission);
+      case 'minecraft.task': return this.minecraft.task(params.taskId ?? null, params.permission);
+      case 'minecraft.events': return this.minecraft.events(params.after, params.permission);
+      case 'minecraft.heartbeat': return this.minecraft.heartbeat(params.permission);
+      case 'minecraft.pause': return this.minecraft.pause(params.permission);
+      case 'minecraft.resume': return this.minecraft.resume(params.permission);
+      case 'minecraft.cancel': return this.minecraft.cancel(params.taskId, params.permission);
       case 'minecraft.observe': return this.minecraft.observe(params.permission);
       case 'minecraft.chat': return this.minecraft.chat(params.text, params.permission);
       case 'minecraft.play': return this.minecraft.play(params, params.permission);
