@@ -122,8 +122,9 @@ public final class GameSkills {
    switch(skill){
     case "wait":return ticks>=args.get("ticks").getAsInt()?done(Map.of("elapsedGameTicks",ticks)):TaskRuntime.Step.running();
     case "navigate":
-     if(navigation.arrived())return done(Map.of("x",c.player.getX(),"y",c.player.getY(),"z",c.player.getZ(),"arrived",true));
-     if(navigation.failed())return TaskRuntime.Step.failed("unreachable");break;
+     boolean arrived=navigation.arrived();phase=NavigationBounds.arrivalTicks(arrived,c.player.isOnGround()||c.player.isTouchingWater()||c.player.isClimbing(),phase);
+     if(phase>=4){haltNavigation();c.player.setPitch(NavigationBounds.horizonPitch(c.player.getPitch()));return done(Map.of("x",c.player.getX(),"y",c.player.getY(),"z",c.player.getZ(),"arrived",true));}
+     if(NavigationBounds.failed(arrived,navigation.failed()))return TaskRuntime.Step.failed("unreachable");break;
     case "follow":
      if(!entity.isAlive())return TaskRuntime.Step.failed("target_lost");
      if(!c.player.canSee(entity)){if(++lostTicks>60)return TaskRuntime.Step.failed("target_lost");approach(lastSeen,20);break;}lostTicks=0;lastSeen=entity.getBlockPos();
@@ -240,7 +241,13 @@ public final class GameSkills {
    var outcome=CombatOutcome.of(entity.isRemoved(),entity.getRemovalReason()==Entity.RemovalReason.KILLED,entity instanceof LivingEntity living?living.getHealth():Float.POSITIVE_INFINITY);
    if(outcome==CombatOutcome.DEAD)return done(Map.of("entityId",entity.getId(),"targetAlive",false));
    if(outcome==CombatOutcome.LOST)return TaskRuntime.Step.failed("target_lost");
-   if(!c.player.canSee(entity)||entity.squaredDistanceTo(c.player)>1024)return TaskRuntime.Step.failed("target_lost");
+   if(!c.player.canSee(entity)){
+    if(++lostTicks>40)return TaskRuntime.Step.failed("target_lost");
+    if(c.player.squaredDistanceTo(lastSeen.toCenterPos())>4)approach(lastSeen,10);else{haltNavigation();look(lastSeen.toCenterPos());}
+    return TaskRuntime.Step.running();
+   }
+   lostTicks=0;lastSeen=entity.getBlockPos();
+   if(entity.squaredDistanceTo(c.player)>1024)return TaskRuntime.Step.failed("target_lost");
    if(c.player.getHealth()<=6){haltNavigation();look(entity.getEyePos());c.options.backKey.setPressed(true);c.options.sprintKey.setPressed(true);if(ticks%10==0&&c.player.squaredDistanceTo(entity)>144)return TaskRuntime.Step.failed("retreated_low_health");return TaskRuntime.Step.running();}
    double distance=entity.squaredDistanceTo(c.player);
    var item=c.player.getMainHandStack().getItem();
@@ -285,7 +292,11 @@ public final class GameSkills {
   }
   private static String digest(String value){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}}
   private void go(BlockPos target){navigation.start(target.getX(),target.getY(),target.getZ(),skill.equals("navigate")&&args.has("height")&&args.get("height").getAsString().equals("surface"));navigating=true;pathTarget=target;}
-  private void approach(BlockPos target,int interval){if(!navigating||(ticks%interval==1&&pathTarget.getSquaredDistance(target)>9)){haltNavigation();go(target);}if(navigation.failed())throw new IllegalStateException("unreachable");}
+  private void approach(BlockPos target,int interval){
+   boolean settled=navigating&&(navigation.arrived()||navigation.failed());
+   if(NavigationBounds.retarget(navigating,settled,navigating?pathTarget.getSquaredDistance(target):0,ticks%interval==1)){haltNavigation();go(target);}
+   else if(settled)throw new TaskRuntime.Rejected("unreachable");
+  }
   private void haltNavigation(){if(navigating){navigation.stop();navigating=false;}}
   private boolean visible(BlockPos target){var eye=c.player.getEyePos();if(eye.squaredDistanceTo(target.toCenterPos())>1024)return false;var hit=c.world.raycast(new RaycastContext(eye,target.toCenterPos(),RaycastContext.ShapeType.OUTLINE,RaycastContext.FluidHandling.NONE,c.player));return hit.getType()==HitResult.Type.BLOCK&&hit.getBlockPos().equals(target);}
   private boolean reachable(BlockPos target){return c.player.canInteractWithBlockAt(target,0)&&visible(target);}
