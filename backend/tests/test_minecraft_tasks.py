@@ -64,3 +64,32 @@ def test_model_capabilities_are_bounded_and_schemas_are_requested_per_skill():
   assert 'skillDefinitions' not in small
   selected=m.execute('capabilities',{'skill':'craft'},0,None,None)
   assert selected['skillDefinitions']=={'craft':definitions['craft']}
+
+def test_verified_stop_records_original_completed_receipt_even_after_clearing_authority():
+ from app.services import minecraft_journal as journal
+ m,rt=setup()
+ rt.host.request.return_value={'stopped':True,'stopVerified':True,'retiredTasks':[{'taskId':'owned','skill':'navigate','state':'succeeded','evidence':{'arrived':True}}]}
+ binding=dict(m.binding)
+ with patch('app.services.minecraft.runtime',rt):m.stop()
+ assert m.binding is None
+ assert journal.recent(binding)[0]['state']=='succeeded'
+
+def test_unknown_transport_revokes_binding_but_invalid_input_does_not():
+ from app.core.plugin_host import HostError
+ m,rt=setup()
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  rt.host.request.side_effect=HostError('MINECRAFT_INPUT')
+  with pytest.raises(HostError):m.execute('submit',{},0,None,None)
+  assert m.binding
+  rt.host.request.side_effect=[HostError('MINECRAFT_UNKNOWN'),{'stopped':True,'stopVerified':True}]
+  with pytest.raises(HostError):m.execute('submit',{},0,None,None)
+  assert m.binding is None
+
+def test_focus_releases_game_body_immediately_without_cancelling_the_local_conversation():
+ from app.services.coordinator import Coordinator
+ from app.services.minecraft import minecraft
+ c=Coordinator()
+ with patch.object(c,'require_meeting'),patch.object(c,'_persist_attention_policy'),patch.object(c,'_release_held'),patch.object(minecraft,'binding',{'world':'w','account':'p'}),patch.object(minecraft,'stop',return_value={'stopVerified':True}) as stop:
+  c.control('owner','lease','focus-request','focus_on')
+  stop.assert_called_once()
+  assert c.focus

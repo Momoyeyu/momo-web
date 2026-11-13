@@ -30,6 +30,7 @@ class Minecraft:
 
     def stop(self, reason='stopped', notify=True):
         with self.lock:
+            binding,generation=self.binding,self.generation
             self.monitor_stop.set()
             self.autonomous = self.decision_needed = False
             self.capabilities = {}
@@ -38,7 +39,11 @@ class Minecraft:
             self.permissions.clear()
             self.binding = None
         if notify and runtime.host:
-            return runtime.host.request('minecraft.stop')
+            result=runtime.host.request('minecraft.stop')
+            if binding and result.get('stopVerified') and result.get('retiredTasks'):
+                from . import minecraft_journal as journal
+                journal.record(binding,generation,result['retiredTasks'])
+            return result
         return {'stopped': True, 'generation': self.generation}
 
     def status(self):
@@ -112,7 +117,14 @@ class Minecraft:
                     raise MinecraftError('Minecraft action budget exhausted')
                 if action in {'observe','chat','play','follow'}:self.actions += 1
                 permission = {**self.binding, 'activityEpoch': runtime.epoch}
-            result = runtime.host.request('minecraft.' + action, {**arguments, 'permission': permission})
+            try:result = runtime.host.request('minecraft.' + action, {**arguments, 'permission': permission})
+            except Exception as error:
+                from ..core.plugin_host import HostError
+                if isinstance(error,HostError) and str(error) not in {'MINECRAFT_INPUT','MINECRAFT_STALE','MINECRAFT_BUSY'}:
+                    # Unknown transport outcomes require a fresh human binding; never replay.
+                    try:self.stop('game_result_unknown')
+                    except HostError:pass
+                raise
             if action=='capabilities' and 'skillDefinitions' in result:
                 result=dict(result)
                 definitions=result.pop('skillDefinitions')

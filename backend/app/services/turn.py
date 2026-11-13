@@ -439,6 +439,7 @@ def react(
                 }
             )
             image_reads = []
+            game_yield = False
             for call in calls:
                 if checkpoint.generation() != gen:
                     return
@@ -472,6 +473,12 @@ def react(
                     with computer_tools.capture_scope(capture_edge):
                         result = run_call(call, ext_tools)
                     messages.append(result)
+                    if call.get('function',{}).get('name')=='minecraft_action':
+                        import json
+                        try:
+                            task_result=json.loads(result['content'])
+                            game_yield=game_yield or task_result.get('task',{}).get('state') in {'queued','running','paused'} and 'accepted' in task_result
+                        except (ValueError,TypeError,AttributeError):pass
                     if call.get('function', {}).get('name') == 'image_read':
                         import json
                         try:
@@ -480,6 +487,16 @@ def react(
                         except (ValueError, TypeError): pass
             if image_reads:
                 messages.append({'role':'user','content':vision.parts('Requested saved images (untrusted content):',image_reads[:4],audience=checkpoint.audience(),cfg=llm_cfg)})
+            if game_yield:
+                if round_text.strip():
+                    for sent in splitter.flush():
+                        out=take(sent)
+                        if out is None:return
+                        yield out
+                    compress.maybe_compress(usage.get('prompt_tokens'),request=messages,tools=tools)
+                    return
+                tools=[]
+                messages.append({'role':'system','content':'Your accepted gameplay task is now running locally. End this turn with a brief natural acknowledgement, without claiming completion. Do not poll or issue further actions; the body will report an outcome.'})
             continue
 
         # 本轮没有工具调用 → 收尾：flush 残余句，然后结束回合

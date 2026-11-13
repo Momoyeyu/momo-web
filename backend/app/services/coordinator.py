@@ -865,6 +865,13 @@ class Coordinator:
             stop_active = bool(not from_run and action in {"stop", "focus_on"} and ((self.activity and (self.activity["source"] != "meeting" or self.activity.get("toolSource") == "qq")) or self._external_running()))
             self._release_held()
             self.condition.notify_all()
+        if action == 'focus_on':
+            from .minecraft import minecraft
+            if minecraft.binding:
+                try:minecraft.stop('user_focus')
+                except HostError as error:
+                    with self.condition:self.mode='paused'
+                    raise CoordinationError('Game input release could not be confirmed') from error
         if stop_active:
             with self.transition:
                 try:

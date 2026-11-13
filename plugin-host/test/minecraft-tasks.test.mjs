@@ -71,3 +71,20 @@ test('game chat cannot route raw Baritone commands around the knowledge boundary
  await assert.rejects(adapter.chat('#mine diamond_ore',permission),/plain/);
  assert.equal(commands.length,0);
 });
+test('stop preserves a task that actually completed before revocation, without importing other owners receipts',async()=>{
+ const adapter=createMinecraftAdapter({authorize:async()=>true,transport:{request:async c=>({
+  ...c,stopped:true,heldControls:0,taskProtocol:1,skills:['navigate'],accepted:true,
+  task:{taskId:c.taskId,state:'queued',evidence:{}},
+  retiredTasks:c.type==='stop'?[{taskId:'owned',state:'succeeded',evidence:{arrived:true}},{taskId:'other-owner',state:'succeeded',evidence:{arrived:true}}]:[],
+ })}});
+ await adapter.capabilities(permission);
+ await adapter.submit({taskId:'owned',skill:'navigate',args:{x:1,y:64,z:2}},permission);
+ const stopped=await adapter.stop();
+ assert.deepEqual(stopped.retiredTasks,[{taskId:'owned',state:'succeeded',evidence:{arrived:true}}]);
+ assert.equal(stopped.stopVerified,true);
+});
+test('a transport failure is marked unknown while local input errors do not revoke live work',async()=>{
+ const {adapter}=fixture();await adapter.capabilities(permission);
+ await assert.rejects(adapter.submit({taskId:'bad',skill:'navigate',args:{}},permission),e=>e.code==='MINECRAFT_INPUT');
+ assert.equal(adapter.status().stopped,false);
+});
