@@ -46,6 +46,12 @@ public final class TaskRuntimeSmoke {
   runtime.resetSession();check(runtime.snapshots().isEmpty(),"new authority scope has no old tasks");
   boolean blockedReset=false;try{broken.resetSession();}catch(IllegalStateException expected){blockedReset=true;}
   check(blockedReset,"new scope cannot hide an unconfirmed stop");
+  TaskRuntime recovering=new TaskRuntime();
+  Work intermittent=new Work(){public void stop(){stops++;if(stops==1)throw new IllegalStateException("temporarily unavailable");}};
+  recovering.submit("retry","navigate",intermittent,0,1000);recovering.tick(1);recovering.stop("world_left");
+  check(!recovering.stopConfirmed(),"first stop uncertain");
+  recovering.stop("world_left");
+  check(recovering.stopConfirmed(),"stop must retry even after world tick becomes unavailable");
   System.out.println("PASS task queue, evidence, duplicate barrier, pause/resume, stop, heartbeat and event gap");
  }
 }

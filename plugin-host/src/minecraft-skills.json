@@ -1,0 +1,469 @@
+{
+  "navigate": {
+    "description": "Reach a known local position through Baritone; no implicit digging or placing.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": -30000000,
+          "maximum": 30000000
+        },
+        "y": {
+          "type": "integer",
+          "minimum": -64,
+          "maximum": 319
+        },
+        "z": {
+          "type": "integer",
+          "minimum": -30000000,
+          "maximum": 30000000
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "follow": {
+    "description": "Approach the visible entity to within three blocks.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "entityId": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "entityId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "mine": {
+    "description": "Break this visible block with an appropriate available hotbar tool; confirms actual block change.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": -30000000,
+          "maximum": 30000000
+        },
+        "y": {
+          "type": "integer",
+          "minimum": -64,
+          "maximum": 319
+        },
+        "z": {
+          "type": "integer",
+          "minimum": -30000000,
+          "maximum": 30000000
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "place": {
+    "description": "Use hotbar slot on a visible support face. Coordinates identify the support block, not the destination.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": -30000000,
+          "maximum": 30000000
+        },
+        "y": {
+          "type": "integer",
+          "minimum": -64,
+          "maximum": 319
+        },
+        "z": {
+          "type": "integer",
+          "minimum": -30000000,
+          "maximum": 30000000
+        },
+        "face": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 1,
+          "enum": [
+            "up",
+            "down",
+            "north",
+            "south",
+            "east",
+            "west"
+          ]
+        },
+        "slot": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z",
+        "face",
+        "slot"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "interactBlock": {
+    "description": "Open/use visible block, workstations, beds, doors or vehicles. Checks actual UI/block/vehicle changes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": -30000000,
+          "maximum": 30000000
+        },
+        "y": {
+          "type": "integer",
+          "minimum": -64,
+          "maximum": 319
+        },
+        "z": {
+          "type": "integer",
+          "minimum": -30000000,
+          "maximum": 30000000
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "z"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "interactEntity": {
+    "description": "Interact with a visible entity, merchant, mount or animal; checks UI/inventory/riding changes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "entityId": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "entityId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "attack": {
+    "description": "Continuous melee or selected ranged weapon combat against a visible entity, including players. Uses cooldown, pursuit, shield and low-health retreat.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "entityId": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2147483647
+        }
+      },
+      "required": [
+        "entityId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "eat": {
+    "description": "Find hotbar food and eat until actual hunger or stack count changes.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "useItem": {
+    "description": "Use selected hotbar item for bounded ticks (20 per second). Receipt reports actual state; elapsed use is not proof of a world change.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "slot": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "ticks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1200
+        }
+      },
+      "required": [
+        "slot",
+        "ticks"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "inventory": {
+    "description": "Perform bounded slot clicks on the observed screen handler. Supports stack splitting, transfers, equip, hotbar swaps and dropping. slot/button use vanilla IDs. Requires actual inventory change.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "screen": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "button": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 8
+              },
+              "mode": {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1,
+                "enum": [
+                  "pickup",
+                  "quickMove",
+                  "swap",
+                  "throw",
+                  "button"
+                ]
+              }
+            },
+            "required": [
+              "slot",
+              "button",
+              "mode"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 32
+        }
+      },
+      "required": [
+        "screen",
+        "actions"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "craft": {
+    "description": "Craft an unlocked real recipe using player 2x2 or open workbench. count is requested minimum newly gained output. Confirms inventory increase.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "recipe": {
+          "type": "string",
+          "maxLength": 128,
+          "minLength": 1
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        }
+      },
+      "required": [
+        "recipe",
+        "count"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "workstation": {
+    "description": "Operate an observed vanilla station using slot actions and button IDs: furnace/smoker/blast furnace, brewing, enchanting, merchant, anvil, loom, stonecutter, smithing, grindstone. Observe station slots/options first. Button mode sends slot as station button ID. No arbitrary packets.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "screen": {
+          "type": "string",
+          "maxLength": 100,
+          "minLength": 1
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255
+              },
+              "button": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 8
+              },
+              "mode": {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1,
+                "enum": [
+                  "pickup",
+                  "quickMove",
+                  "swap",
+                  "throw",
+                  "button"
+                ]
+              }
+            },
+            "required": [
+              "slot",
+              "button",
+              "mode"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 32
+        }
+      },
+      "required": [
+        "screen",
+        "actions"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "closeScreen": {
+    "description": "Close current player inventory or station.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "respawn": {
+    "description": "Request normal respawn after death; never changes game mode or permissions.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  "plan": {
+    "description": "Run up to 24 bounded steps locally without model round trips. Optional when checks current inventory; retries max2; onFailure stop by default. No scripts or nested plans.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "skill": {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1,
+                "enum": [
+                  "navigate",
+                  "follow",
+                  "mine",
+                  "place",
+                  "interactBlock",
+                  "interactEntity",
+                  "attack",
+                  "eat",
+                  "useItem",
+                  "inventory",
+                  "craft",
+                  "workstation",
+                  "closeScreen",
+                  "respawn"
+                ]
+              },
+              "args": {
+                "type": "object"
+              },
+              "when": {
+                "type": "object",
+                "properties": {
+                  "item": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "minLength": 1
+                  },
+                  "count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4096
+                  },
+                  "test": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1,
+                    "enum": [
+                      "atLeast",
+                      "lessThan"
+                    ]
+                  }
+                },
+                "required": [
+                  "item",
+                  "count",
+                  "test"
+                ],
+                "additionalProperties": false
+              },
+              "retries": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2
+              },
+              "onFailure": {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1,
+                "enum": [
+                  "stop",
+                  "skip"
+                ]
+              }
+            },
+            "required": [
+              "skill",
+              "args"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1,
+          "maxItems": 24
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

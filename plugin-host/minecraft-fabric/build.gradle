@@ -32,3 +32,20 @@ tasks.register('taskRuntimeSmoke', JavaExec) {
  mainClass = 'dev.momo.task.TaskRuntimeSmoke'
 }
 check.dependsOn taskRuntimeSmoke
+
+tasks.register('taskPlanSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.TaskPlanSmoke'
+}
+check.dependsOn taskPlanSmoke
+
+tasks.named('processResources') {
+ from('../src/minecraft-skills.json') { rename { 'momo-skills.json' } }
+}
+tasks.register('skillArgumentsSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.SkillArgumentsSmoke'
+}
+check.dependsOn skillArgumentsSmoke

@@ -1,3 +1,4 @@
+import {validateSkill} from './minecraft-skills.mjs';
 let bridgeEpoch = Date.now();
 /** Bounded Fabric transport adapter. No inference, login, downloads, or code execution. */
 export function createMinecraftAdapter({ transport, authorize, now = Date.now } = {}) {
@@ -77,12 +78,11 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
     status, stop,
     capabilities: permission => execute('capabilities', {}, permission),
     submit({ taskId, skill, args = {} }, permission) {
-      if (!capabilities || capabilities.world !== permission?.world || capabilities.account !== permission?.account || !capabilities.skills.includes(skill) || skill !== 'navigate')
+      if (!capabilities || capabilities.world !== permission?.world || capabilities.account !== permission?.account || !capabilities.skills.includes(skill))
         return Promise.reject(new Error('Unsupported Minecraft skill; query capabilities first'));
-      if (!validId(taskId) || !args || Object.getPrototypeOf(args) !== Object.prototype || Object.keys(args).sort().join(',') !== 'x,y,z'
-          || !['x','y','z'].every(k => Number.isSafeInteger(args[k])) || Math.abs(args.x) > 30000000 || Math.abs(args.z) > 30000000 || args.y < -64 || args.y > 319)
-        return Promise.reject(new Error('Invalid Minecraft task'));
-      return execute('submit', {taskId, skill, ...args}, permission);
+      if (!validId(taskId)) return Promise.reject(new Error('Invalid Minecraft task'));
+      try {validateSkill(skill,args);} catch(error) {return Promise.reject(error);}
+      return execute('submit', {taskId, skill, args, ...(skill === 'navigate' ? args : {})}, permission);
     },
     task(taskId, permission) {
       if (taskId !== null && !validId(taskId)) return Promise.reject(new Error('Invalid task identifier'));

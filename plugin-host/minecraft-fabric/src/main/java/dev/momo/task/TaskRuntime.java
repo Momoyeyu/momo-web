@@ -14,6 +14,7 @@ public final class TaskRuntime {
   void pause();
   void resume();
   void stop();
+  default boolean acceptsScreen(Object screen){return false;}
  }
  public record Step(String state,String reason,Map<String,Object> evidence){
   public static Step running(){return new Step("running","",Map.of());}
@@ -101,6 +102,7 @@ public final class TaskRuntime {
   if(!job.terminal()){queue.remove(job);finish(job,"cancelled",reason,Map.of());}
  }
  public void stop(String reason){
+  if(uncertainStop!=null){try{uncertainStop.stop();uncertainStop=null;}catch(RuntimeException ignored){}}
   if(current!=null)finish(current,"cancelled",reason,Map.of());
   while(!queue.isEmpty())finish(queue.remove(),"cancelled",reason,Map.of());
   paused=false;
@@ -121,6 +123,7 @@ public final class TaskRuntime {
   boolean gap=after>sequence||(!journal.isEmpty()&&after<journal.getFirst().seq-1);
   return new Events(sequence,gap,journal.stream().filter(e->e.seq>after).toList());
  }
+ public boolean acceptsScreen(Object screen){return current!=null?current.work.acceptsScreen(screen):!queue.isEmpty()&&queue.peek().work.acceptsScreen(screen);}
  public boolean active(){return uncertainStop!=null||current!=null||!queue.isEmpty();}
  public boolean stopConfirmed(){return uncertainStop==null&&current==null&&queue.isEmpty();}
  private void finish(Job job,String state,String reason,Map<String,Object> evidence){
