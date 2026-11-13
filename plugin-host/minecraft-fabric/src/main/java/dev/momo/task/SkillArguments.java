@@ -8,6 +8,7 @@ public final class SkillArguments {
  private static final JsonObject CONTRACT=load();
  private static JsonObject load(){try(var in=SkillArguments.class.getResourceAsStream("/momo-skills.json")){if(in==null)throw new IOException("Missing skill contract");return JsonParser.parseReader(new InputStreamReader(in,StandardCharsets.UTF_8)).getAsJsonObject();}catch(IOException error){throw new IllegalStateException(error);}}
  public static JsonObject contract(){return CONTRACT.deepCopy();}
+ public static String resourceId(String value){return net.minecraft.util.Identifier.of(value).toString();}
  public static void validate(String name,JsonObject args){
   if(!CONTRACT.has(name))throw new IllegalArgumentException("Unsupported skill");
   if(args.toString().getBytes(StandardCharsets.UTF_8).length>3500)throw new IllegalArgumentException("Invalid skill size");

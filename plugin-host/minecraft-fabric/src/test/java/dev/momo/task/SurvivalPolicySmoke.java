@@ -9,6 +9,9 @@ public final class SurvivalPolicySmoke {
   check(p.choose(false,false,false,20,20,true,false,true)==SurvivalPolicy.Mode.NONE,"revoked body cannot defend/restart");
   check(p.choose(true,true,false,20,20,true,false,true)==SurvivalPolicy.Mode.NONE,"manual stop wins");
   check(p.choose(true,false,false,20,20,true,false,true)==SurvivalPolicy.Mode.DEFEND,"close hostile defense");
+  check(p.interruptOwnedScreen(SurvivalPolicy.Mode.ESCAPE,true),"danger can interrupt our station");
+  check(!p.interruptOwnedScreen(SurvivalPolicy.Mode.EAT,true),"hunger alone must not discard station work");
+  check(!p.interruptOwnedScreen(SurvivalPolicy.Mode.DEFEND,false),"player menus cannot be dismissed by a reflex");
   System.out.println("PASS survival priority, food continuity and stop barrier");
  }
 }

@@ -12,6 +12,7 @@ public final class SurvivalController {
  private SurvivalPolicy.Mode mode=SurvivalPolicy.Mode.NONE;
  private HostileEntity threat;private int savedSlot=-1,ticks;private float escapeYaw;private boolean escapeSafe;
  private MinecraftClient client(){return MinecraftClient.getInstance();}
+ public boolean interruptOwnedScreen(SurvivalPolicy.Mode desired,boolean owned){return policy.interruptOwnedScreen(desired,owned);}
  private int foodSlot(){var p=client().player;for(int i=0;i<9;i++)if(p.getInventory().getStack(i).contains(DataComponentTypes.FOOD))return i;return -1;}
  public SurvivalPolicy.Mode choose(){
   var c=client();var p=c.player;

@@ -121,6 +121,10 @@ def test_provider_usage_bounds_unchanged_prefix_and_byte_counts_only_new_suffix(
     messages.append({'role':'tool','content':'Small result','tool_call_id':'one'})
     assert estimate_request(messages, tools) == 5000 + estimate(messages[1:])
     assert estimate_request(messages, tools) < estimate(messages, tools)
-    assert estimate_request(messages, []) == estimate(messages, [])
+    # Disabling tools for the final acknowledgement only removes prompt content;
+    # the measured larger prompt remains a conservative bound.
+    assert estimate_request(messages, []) == 5000 + estimate(messages[1:])
+    added_tools = [*tools, {'type':'function','function':{'name':'new','parameters':{}}}]
+    assert estimate_request(messages, added_tools) == estimate(messages, added_tools)
     messages[0] = {'role':'system','content':'Changed prefix'}
     assert estimate_request(messages, tools) == estimate(messages, tools)

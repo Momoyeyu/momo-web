@@ -15,7 +15,7 @@ public final class GatherSkill implements TaskRuntime.Work {
  private final Map<BlockPos,Integer> blocked=new HashMap<>();
  private TaskRuntime.Work child;private BlockPos target,origin,foliage;
  private int baseline,ticks,scan,idle,clearedLeaves;private String phase="search",lastFailure="";
- public GatherSkill(JsonObject args){item=args.get("item").getAsString();requested=args.get("count").getAsInt();}
+ public GatherSkill(JsonObject args){item=SkillArguments.resourceId(args.get("item").getAsString());requested=args.get("count").getAsInt();}
  public void start(){if(c.player==null||c.world==null)throw new TaskRuntime.Rejected("world_unavailable");if(!Registries.ITEM.containsId(net.minecraft.util.Identifier.of(item)))throw new TaskRuntime.Rejected("item_unknown");if(origin==null){baseline=count();origin=c.player.getBlockPos();}scan=idle=0;lastFailure="";foliage=null;phase="search";}
  private int count(){int total=0;for(int i=0;i<c.player.getInventory().size();i++){var stack=c.player.getInventory().getStack(i);if(Registries.ITEM.getId(stack.getItem()).toString().equals(item))total+=stack.getCount();}return total;}
  public TaskRuntime.Step tick(){

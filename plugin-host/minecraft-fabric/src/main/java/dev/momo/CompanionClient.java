@@ -374,6 +374,14 @@ public final class CompanionClient implements ClientModInitializer {
    String currentWorld=client.world==null?"":worldScope(client);
    if(client.player==null||(!client.player.isAlive()&&!tasks.snapshots().stream().anyMatch(t->t.skill().equals("respawn")&&(t.state().equals("running")||t.state().equals("queued"))))||(taskWorldInstance!=client.world||!taskWorld.equals(currentWorld))||!taskAccount.equals(client.player.getUuidAsString())){tasks.stop("identity_or_life_changed");release(client);return;}
    if(!client.isWindowFocused()||(client.currentScreen!=null&&!tasks.acceptsScreen(client.currentScreen))){survival.stop();tasks.pause();tasks.tick(System.nanoTime()/1000000);return;}
+   if(!pauseBarrier.isPaused()&&client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>){
+    var reflex=survival.choose();
+    if(survival.interruptOwnedScreen(reflex,tasks.acceptsScreen(client.currentScreen))){
+     tasks.stop("danger_interrupted_station");
+     if(!tasks.stopConfirmed()){survival.stop();return;}
+     client.player.closeHandledScreen();survival.drive(reflex);return;
+    }
+   }
    if(!pauseBarrier.isPaused()&&client.currentScreen==null){
     var reflex=survival.choose();
     if(reflex!=SurvivalPolicy.Mode.NONE){tasks.pause();tasks.tick(System.nanoTime()/1000000);if(tasks.active())survival.drive(reflex);else survival.stop();return;}

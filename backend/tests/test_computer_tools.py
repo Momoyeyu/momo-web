@@ -258,6 +258,25 @@ def test_compaction_refresh_does_not_restore_retired_large_game_snapshot():
  messages.refresh()
  assert len(messages[0]['content'])<1000 and 'superseded' in messages[0]['content']
 
+def test_retiring_known_read_keeps_a_conservative_measured_prefix_bound():
+ import copy
+ from app.services.turn import ContextMessages
+ from app.services.context_policy import estimate_request,estimate
+ event={'role':'system','content':tools.GAME_EVENT_PREFIX+json.dumps({'observedAt':1,'x':2,'visibleEntities':['x'*12000]})}
+ messages=ContextMessages([{'role':'system','content':'unchanged'*5000},event])
+ definitions=[{'type':'function','function':{'name':'minecraft_action'}}]
+ messages.usage_anchor=(copy.deepcopy(list(messages)),definitions,5000)
+ tools.retire_game_observations(messages)
+ assert messages.usage_anchor[0]==messages
+ assert messages.usage_anchor[2]>5000, 'replacement text is charged; removed text is not discounted'
+ assert estimate_request(messages,definitions)<estimate(messages,definitions)
+ charged=messages.usage_anchor[2]
+ tools.retire_game_observations(messages)
+ assert messages.usage_anchor[2]==charged, 'idempotent retirement must not charge twice'
+ messages[0]['content']='unmeasured change'
+ tools.retire_game_observations(messages)
+ assert estimate_request(messages,definitions)==estimate(messages,definitions)
+
 def test_game_model_projection_keeps_slot_addresses_and_requests_recipes_on_demand():
  from app.services.minecraft import Minecraft
  raw={'observedAt':1,'x':2,'slots':[{'id':0,'item':'minecraft:air','count':0,'components':{}},

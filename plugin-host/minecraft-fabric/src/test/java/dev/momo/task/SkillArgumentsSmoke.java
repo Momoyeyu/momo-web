@@ -5,6 +5,8 @@ public final class SkillArgumentsSmoke {
  static void reject(String skill,String json){try{validate(skill,json);throw new AssertionError("Accepted invalid task: "+skill);}catch(IllegalArgumentException expected){}}
  public static void main(String[] args){
   validate("navigate","{\"x\":1,\"y\":64,\"z\":2}");
+  if(!SkillArguments.resourceId("oak_log").equals("minecraft:oak_log"))throw new AssertionError("vanilla identifiers need their default namespace");
+  if(!SkillArguments.resourceId("example:oak_log").equals("example:oak_log"))throw new AssertionError("mod namespaces must be preserved");
   validate("navigate","{\"x\":1,\"y\":64,\"z\":2,\"height\":\"surface\"}");
   reject("navigate","{\"x\":1,\"y\":64,\"z\":2,\"height\":\"teleport\"}");
   validate("gather","{\"item\":\"minecraft:oak_log\",\"count\":4}");

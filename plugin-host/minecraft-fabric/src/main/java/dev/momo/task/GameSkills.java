@@ -30,7 +30,8 @@ public final class GameSkills {
     work.add(new TaskPlan.Node(create(step.get("skill").getAsString(),step.getAsJsonObject("args")),()->{
      if(condition==null)return true;var client=MinecraftClient.getInstance();int count=0;
      if(client.player==null)return false;
-     for(int i=0;i<client.player.getInventory().size();i++){var stack=client.player.getInventory().getStack(i);if(Registries.ITEM.getId(stack.getItem()).toString().equals(condition.get("item").getAsString()))count+=stack.getCount();}
+     String expected=SkillArguments.resourceId(condition.get("item").getAsString());
+     for(int i=0;i<client.player.getInventory().size();i++){var stack=client.player.getInventory().getStack(i);if(Registries.ITEM.getId(stack.getItem()).toString().equals(expected))count+=stack.getCount();}
      return condition.get("test").getAsString().equals("atLeast")?count>=condition.get("count").getAsInt():count<condition.get("count").getAsInt();
     },step.has("retries")?step.get("retries").getAsInt():0,step.has("onFailure")&&step.get("onFailure").getAsString().equals("skip")));
    }
@@ -90,6 +91,7 @@ public final class GameSkills {
     if(skill.equals("inventory")&&c.currentScreen==null)c.setScreen(new InventoryScreen(c.player));
     ownedScreen=c.currentScreen;
     if(!screenName().equals(args.get("screen").getAsString()))throw new TaskRuntime.Rejected("screen_changed");
+    inventoryProof=new InventoryEvidence(0,c.player.currentScreenHandler.getRevision());
    }
    if(skill.equals("craft")){
     if(c.currentScreen==null)c.setScreen(new InventoryScreen(c.player));ownedScreen=c.currentScreen;
@@ -182,8 +184,13 @@ public final class GameSkills {
       var a=args.getAsJsonArray("actions").get(actionIndex++).getAsJsonObject();int slot=a.get("slot").getAsInt(),button=a.get("button").getAsInt();String mode=a.get("mode").getAsString();
       if(mode.equals("button"))c.interactionManager.clickButton(c.player.currentScreenHandler.syncId,slot);
       else {if(slot>=c.player.currentScreenHandler.slots.size())return TaskRuntime.Step.failed("slot_missing");c.interactionManager.clickSlot(c.player.currentScreenHandler.syncId,slot,button,switch(mode){case "quickMove"->SlotActionType.QUICK_MOVE;case "swap"->SlotActionType.SWAP;case "throw"->SlotActionType.THROW;default->SlotActionType.PICKUP;},c.player);}
+      mutationTick=ticks;inventoryProof.mutated(ticks,c.player.currentScreenHandler.getRevision());
      }
-     if(ticks>args.getAsJsonArray("actions").size()*4+4){String after=inventoryState();return after.equals(inventoryBefore)?TaskRuntime.Step.failed("no_inventory_change"):done(inventoryReceipt(after));}break;
+     if(actionIndex>=args.getAsJsonArray("actions").size()){
+      String after=inventoryState();boolean changed=!after.equals(inventoryBefore);
+      if(inventoryProof.settledMutation(ticks,changed,c.player.currentScreenHandler.getRevision()))return done(inventoryReceipt(after));
+      if(ticks-mutationTick>100)return TaskRuntime.Step.failed(changed?"server_confirmation_missing":"no_inventory_change");
+     }break;
     case "craft":
      int gained=count(outputItem)-beforeCount;
      if(craftPhase==3&&inventoryProof.settled(ticks,count(outputItem),c.player.currentScreenHandler.getCursorStack().isEmpty(),c.player.currentScreenHandler.getRevision())){
@@ -239,7 +246,7 @@ public final class GameSkills {
   }
   private TaskRuntime.Step done(Map<String,Object> evidence){return TaskRuntime.Step.done(evidence);}
   private boolean expectedStack(ItemStack stack){
-   if(!Registries.ITEM.getId(stack.getItem()).toString().equals(args.get("item").getAsString()))return false;
+   if(!Registries.ITEM.getId(stack.getItem()).equals(identifier(args,"item")))return false;
    if(!args.has("potion"))return true;
    var contents=stack.get(net.minecraft.component.DataComponentTypes.POTION_CONTENTS);
    return contents!=null&&contents.potion().filter(potion->potion.matchesId(Identifier.of(args.get("potion").getAsString()))).isPresent();

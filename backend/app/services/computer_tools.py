@@ -25,6 +25,9 @@ def retire_game_observations(messages):
     Pixels already have a one-use lifetime. Repeated inventory/world snapshots
     must not accumulate either. This never edits durable dialogue or task facts.
     """
+    anchor=getattr(messages,'usage_anchor',None)
+    measured=bool(anchor and messages[:len(anchor[0])]==anchor[0])
+    replacement_cost=0
     reads=set()
     for message in messages:
         if message.get('role')!='assistant':continue
@@ -34,7 +37,7 @@ def retire_game_observations(messages):
             try:args=json.loads(function.get('arguments','{}'))
             except (ValueError,TypeError):continue
             if isinstance(args,dict) and args.get('action')=='observe':reads.add(call.get('id'))
-    for message in messages:
+    for index,message in enumerate(messages):
         content=message.get('content')
         if not isinstance(content,str):continue
         event=message.get('role')=='system' and content.startswith(GAME_EVENT_PREFIX)
@@ -45,6 +48,15 @@ def retire_game_observations(messages):
         brief={k:old[k] for k in ('observedAt','world','account','dimension','x','y','z','health','hunger','screen','screenHandler') if k in old}
         brief.update(superseded=True,notice='Past read-only snapshot; do not treat this as the current world. New observations replace its inventory, terrain and entities. Action outcomes remain separate task facts.')
         message['content']=(GAME_EVENT_PREFIX if event else '')+json.dumps(brief,ensure_ascii=False)
+        if measured and index<len(anchor[0]) and message['content']!=content:
+            from .context_policy import estimate
+            replacement_cost+=estimate([message])
+    if replacement_cost:
+        import copy
+        # The old full prompt is already measured. Removing a read cannot add
+        # tokens; charge the entire replacement without discounting old content.
+        # No other prefix edit is allowed to retain this bound.
+        messages.usage_anchor=(copy.deepcopy(messages[:len(anchor[0])]),anchor[1],anchor[2]+replacement_cost)
     if hasattr(messages,'refresh'):messages.game_observation_retired=True
 
 
