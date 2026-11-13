@@ -24,6 +24,7 @@ class Minecraft:
         self.cursor = 0
         self.tasks = {}
         self.paused = False
+        self.suspended = False
         self.autonomous = False
         self.last_decision = 0
         self.decision_needed = False
@@ -33,7 +34,7 @@ class Minecraft:
         with self.lock:
             binding,activity_id=self.binding,self.activity_id
             self.monitor_stop.set()
-            self.autonomous = self.decision_needed = False
+            self.autonomous = self.decision_needed = self.suspended = False
             self.capabilities = {}
             self.owner = None
             self.generation += 1
@@ -56,8 +57,8 @@ class Minecraft:
         with self.lock:
             return {**result, 'active': self.binding is not None, 'generation': self.generation,
                     'permissions': sorted(self.permissions), 'managedProvisioningAvailable': False,
-                    'tasks': list(self.tasks.values())[-5:], 'paused': self.paused,
-                    'autonomous': self.autonomous, 'decisionNeeded': self.autonomous and not self.paused and (self.decision_needed or time.monotonic()-self.last_decision>=30),
+                    'tasks': list(self.tasks.values())[-5:], 'paused': self.paused or self.suspended,
+                    'autonomous': self.autonomous, 'decisionNeeded': self.autonomous and not self.paused and not self.suspended and (self.decision_needed or time.monotonic()-self.last_decision>=30),
                     'goal': self.current_goal() if self.binding else None}
 
     def gate(self, client, lease, *, allow_active=False):
@@ -95,8 +96,11 @@ class Minecraft:
                 self.epoch, self.fingerprint = runtime.epoch, fingerprint
                 self.owner = (client, lease)
                 self.cursor, self.tasks, self.paused = 0, {}, False
+                self.suspended=False
                 permission = {**self.binding, 'activityEpoch': self.epoch}
             capabilities = runtime.host.request('minecraft.capabilities', {'permission':permission})
+            if capabilities.get('taskProtocol')==1 and 'game.modify' in self.permissions:
+                runtime.host.request('minecraft.resume',{'permission':permission})
             with self.lock:
                 self.capabilities = capabilities
                 self.autonomous = 'game.modify' in self.permissions and capabilities.get('taskProtocol') == 1
@@ -116,7 +120,7 @@ class Minecraft:
                 if (generation != self.generation or self.epoch != runtime.epoch or not self.binding
                         or fingerprint != self.fingerprint or capability not in self.permissions or 'game.observe' not in self.permissions):
                     raise MinecraftError('Minecraft grant revoked or capability denied')
-                if self.paused and action in {'submit','play','follow','chat'}:raise MinecraftError('Minecraft gameplay paused')
+                if (self.paused or self.suspended) and action in {'submit','play','follow','chat'}:raise MinecraftError('Minecraft gameplay paused')
                 if action in {'observe','chat','play','follow'} and time.monotonic() - self.budget_window >= 60:
                     self.actions = 0
                     self.budget_window = time.monotonic()
@@ -213,7 +217,7 @@ class Minecraft:
         from . import intro
         with self.lock:
             now=time.monotonic()
-            if (generation!=self.generation or not self.binding or not self.autonomous or self.paused
+            if (generation!=self.generation or not self.binding or not self.autonomous or self.paused or self.suspended
                     or runtime.active or runtime.presentation or runtime.queue or runtime.interrupt_hold or intro.restricted()
                     or now-self.last_decision<2 or (not self.decision_needed and now-self.last_decision<30)):
                 return None
@@ -255,7 +259,7 @@ class Minecraft:
         from . import minecraft_journal as journal
         with self.lock:
             if not self.binding:return ''
-            data={'goal':journal.goal(self.binding),'tasks':list(self.tasks.values())[-4:],'paused':self.paused,
+            data={'goal':journal.goal(self.binding),'tasks':list(self.tasks.values())[-4:],'paused':self.paused or self.suspended,
                   'exploredPlaces':journal.explored(self.binding)}
         return ('You are the same momo, currently sharing the player’s Minecraft character. Preserve your personality and agreements. '
             'Choose meaningful goals from curiosity, companionship, beauty, helping, survival or game progress; no fixed technology tree. '
@@ -292,6 +296,7 @@ class Minecraft:
                 return
             with self.lock:permission={**self.binding,'activityEpoch':self.epoch};cursor=self.cursor
             body=runtime.host.request('minecraft.heartbeat', {'permission':permission})
+            with self.lock:self.suspended=body.get('suspended',False)
             if body.get('controlPaused'):
                 with self.lock:self.paused=True;self.autonomous=False;self.decision_needed=False
             packet=runtime.host.request('minecraft.events', {'after':cursor,'permission':permission})['events']

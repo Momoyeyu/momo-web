@@ -11,14 +11,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(MinecraftClient.class)
 public abstract class GameplayInputMixin {
 
- @Inject(method="openGameMenu",at=@At("HEAD"),cancellable=true)
- private void keepAuthorizedBackgroundPlay(boolean pauseOnly,CallbackInfo callback) {
-  if(CompanionClient.suppressAutoPause())callback.cancel();
- }
-
  @Inject(method="handleBlockBreaking",at=@At("HEAD"),cancellable=true)
  private void keepControlledMining(boolean breaking,CallbackInfo callback) {
-  // The unfocused vanilla input pass otherwise cancels progress every tick.
+  // Vanilla's idle input pass must not cancel an authorized held mining action.
   if(CompanionClient.suppressVanillaBreaking())callback.cancel();
  }
 }

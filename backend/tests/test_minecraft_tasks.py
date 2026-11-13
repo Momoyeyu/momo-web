@@ -117,3 +117,14 @@ def test_goal_activation_never_undoes_manual_takeover_pause():
   m.update_goal(value)
   assert m.paused and not m.autonomous
   rt.host.request.assert_not_called()
+
+def test_unfocused_game_suspends_decisions_without_revoking_or_mistaking_it_for_a_failure():
+ m,rt=setup();m.autonomous=True;m.decision_needed=True
+ rt.active=rt.presentation=None;rt.queue=[];rt.interrupt_hold=False
+ rt.host.request.side_effect=[{'suspended':True},{'events':{'cursor':0,'gap':False,'events':[]}}]
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'),patch.object(m,'_background_valid',return_value=True),patch('app.services.intro.restricted',return_value=False):
+  m.poll_tasks(0)
+  assert m.binding and m.suspended and m.claim_decision(0,'owner','lease') is None
+  rt.host.request.side_effect=[{'suspended':False},{'events':{'cursor':0,'gap':False,'events':[]}}]
+  m.poll_tasks(0)
+  assert not m.suspended and m.claim_decision(0,'owner','lease')

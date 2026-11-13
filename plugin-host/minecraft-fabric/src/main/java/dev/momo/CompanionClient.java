@@ -27,15 +27,13 @@ public final class CompanionClient implements ClientModInitializer {
  private String taskWorld, taskAccount;
  private net.minecraft.client.world.ClientWorld taskWorldInstance;
  private boolean taskPaused,physicalTakeover,guardAuthorized;
- private long gameLeaseUntil;
+ private long gameLeaseUntil,focusResumeDeadline;
  public static boolean controlling(){return instance!=null&&(instance.tasks.active()||instance.playing||instance.guardAuthorized);}
  public static void physicalInput(){if(instance!=null&&controlling())instance.physicalTakeover=true;}
  private static CompanionClient instance;
  private boolean playing,mining,using,attacking,drivingInput;
  private int useTicks;
  public static boolean suppressVanillaBreaking(){return instance!=null && instance.playing && instance.mining && !instance.drivingInput;}
- private long backgroundUntil;
- public static boolean suppressAutoPause(){return instance!=null && System.nanoTime()<instance.backgroundUntil && !MinecraftClient.getInstance().isWindowFocused();}
  private java.nio.file.Path rendezvous;
  private HttpServer server;
  private ExecutorService executor;
@@ -99,20 +97,11 @@ public final class CompanionClient implements ClientModInitializer {
    java.nio.file.Files.createFile(rendezvous,java.nio.file.attribute.PosixFilePermissions.asFileAttribute(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
    java.nio.file.Files.writeString(rendezvous,gson.toJson(discovery));
    ClientTickEvents.END_CLIENT_TICK.register(this::tick);
-   ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { release(client); restorePause(client); server.stop(0); executor.shutdownNow(); try { java.nio.file.Files.deleteIfExists(rendezvous); } catch (Exception ignored) {} });
+   ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { release(client); server.stop(0); executor.shutdownNow(); try { java.nio.file.Files.deleteIfExists(rendezvous); } catch (Exception ignored) {} });
   } catch (Exception error) { if (server != null) server.stop(0); if (executor != null) executor.shutdownNow(); }
  }
- private void restorePause(MinecraftClient client) {
-  boolean controlled=backgroundUntil!=0;
-  backgroundUntil=0;
-  if(controlled && client.player!=null && client.currentScreen==null && client.options.pauseOnLostFocus && !client.isWindowFocused())client.openGameMenu(false);
- }
- private void backgroundControl(MinecraftClient client) {
-  // Suppress only automatic unfocused pause; never mutate or serialize preferences.
-  backgroundUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(60);
- }
  private void release(MinecraftClient client) {
-  survival.stop();tasks.stop("control_released");taskPaused=false;guardAuthorized=false;gameLeaseUntil=0;
+  survival.stop();tasks.stop("control_released");taskPaused=false;guardAuthorized=false;gameLeaseUntil=focusResumeDeadline=0;
   if(mining && client.interactionManager!=null)client.interactionManager.cancelBlockBreaking();
   if(using && client.interactionManager!=null && client.player!=null && client.player.isUsingItem())client.interactionManager.stopUsingItem(client.player);
   playing = mining = using = attacking = false;
@@ -141,25 +130,24 @@ public final class CompanionClient implements ClientModInitializer {
   if ("ping".equals(type)) { JsonObject ready = new JsonObject(); ready.addProperty("ready", true); ready.addProperty("protocol", 1);
    if (client.player!=null && client.world!=null) {
     String scope=worldScope(client);
-    ready.addProperty("world",scope);ready.addProperty("dimension",client.world.getRegistryKey().getValue().toString());ready.addProperty("worldName",client.getServer()!=null?client.getServer().getSaveProperties().getLevelName():serverName(client));ready.addProperty("account",client.player.getUuidAsString());ready.addProperty("playerName",client.player.getName().getString());
+    ready.addProperty("focused",client.isWindowFocused());ready.addProperty("world",scope);ready.addProperty("dimension",client.world.getRegistryKey().getValue().toString());ready.addProperty("worldName",client.getServer()!=null?client.getServer().getSaveProperties().getLevelName():serverName(client));ready.addProperty("account",client.player.getUuidAsString());ready.addProperty("playerName",client.player.getName().getString());
    }
    return ready; }
   long version = command.get("epoch").getAsLong();
   if (version < epoch) throw new IllegalArgumentException("Revoked");
   JsonElement retiredTasks=null;
   if (version > epoch) {
-   release(client);restorePause(client);
+   release(client);
    retiredTasks=gson.toJsonTree(tasks.recentSnapshots());
    tasks.resetSession();epoch=version;
   }
   JsonObject result = new JsonObject(); result.addProperty("epoch", epoch);
   if(retiredTasks!=null)result.add("retiredTasks",retiredTasks);
-  if ("stop".equals(type)) { release(client); restorePause(client); result.addProperty("stopped", tasks.stopConfirmed()); result.addProperty("heldControls", tasks.stopConfirmed()?0:-1); return result; }
+  if ("stop".equals(type)) { release(client); result.addProperty("stopped", tasks.stopConfirmed()); result.addProperty("heldControls", tasks.stopConfirmed()?0:-1); return result; }
   if (client.player == null || client.world == null) throw new IllegalStateException("Join an authorized world first");
   String world = worldScope(client);
   String account = client.player.getUuidAsString();
-  if (!world.equals(command.get("world").getAsString()) || !account.equals(command.get("account").getAsString())) { release(client); restorePause(client); throw new IllegalArgumentException("Identity mismatch"); }
-  if(backgroundUntil!=0) backgroundControl(client);
+  if (!world.equals(command.get("world").getAsString()) || !account.equals(command.get("account").getAsString())) { release(client); throw new IllegalArgumentException("Identity mismatch"); }
   result.addProperty("world", world);result.addProperty("dimension",client.world.getRegistryKey().getValue().toString()); result.addProperty("account", account);
   switch (type) {
    case "capabilities" -> {
@@ -181,7 +169,7 @@ public final class CompanionClient implements ClientModInitializer {
     boolean accepted;
     try{var work=GameSkills.create(skill,args);accepted=tasks.submit(id,skill,args.toString(),work,System.nanoTime()/1000000,command.get("leaseMs").getAsLong());}
     catch(IllegalArgumentException|IllegalStateException error){result.addProperty("accepted",false);result.addProperty("error","TASK_REJECTED");return result;}
-    taskWorld=world;taskAccount=account;taskWorldInstance=client.world;guardAuthorized=true;gameLeaseUntil=System.nanoTime()/1000000+command.get("leaseMs").getAsLong();backgroundControl(client);
+    taskWorld=world;taskAccount=account;taskWorldInstance=client.world;guardAuthorized=true;gameLeaseUntil=System.nanoTime()/1000000+command.get("leaseMs").getAsLong();
     result.addProperty("accepted",accepted);result.add("task",gson.toJsonTree(tasks.snapshot(id)));
    }
    case "task" -> {
@@ -189,13 +177,13 @@ public final class CompanionClient implements ClientModInitializer {
     else result.add("tasks",gson.toJsonTree(tasks.snapshots()));
    }
    case "events" -> result.add("events",gson.toJsonTree(tasks.events(command.get("after").getAsLong())));
-   case "heartbeat" -> {long now=System.nanoTime()/1000000,lease=command.get("leaseMs").getAsLong();tasks.heartbeat(now,lease);if(guardAuthorized)gameLeaseUntil=now+lease;result.addProperty("active",tasks.active());result.addProperty("controlPaused",taskPaused);}
+   case "heartbeat" -> {long now=System.nanoTime()/1000000,lease=command.get("leaseMs").getAsLong();tasks.heartbeat(now,lease);if(guardAuthorized)gameLeaseUntil=now+lease;result.addProperty("active",tasks.active());result.addProperty("controlPaused",taskPaused);result.addProperty("suspended",!client.isWindowFocused()||(client.currentScreen!=null&&!tasks.acceptsScreen(client.currentScreen)));}
    case "pause" -> {survival.stop();taskPaused=true;tasks.pause();result.addProperty("paused",true);}
-   case "resumeTask" -> {taskPaused=false;guardAuthorized=taskWorld!=null;gameLeaseUntil=System.nanoTime()/1000000+10000;if(client.currentScreen==null)tasks.resume();result.addProperty("paused",false);}
+   case "resumeTask" -> {org.lwjgl.glfw.GLFW.glfwFocusWindow(client.getWindow().getHandle());focusResumeDeadline=System.nanoTime()/1000000+1500;taskPaused=false;guardAuthorized=taskWorld!=null;gameLeaseUntil=System.nanoTime()/1000000+10000;if(client.currentScreen==null)tasks.resume();result.addProperty("paused",false);}
    case "cancel" -> {
     tasks.cancel(command.get("taskId").getAsString(),"requested");
     result.add("task",gson.toJsonTree(tasks.snapshot(command.get("taskId").getAsString())));
-    if(!tasks.active()){release(client);restorePause(client);}
+    if(!tasks.active()){release(client);}
    }
    case "observe" -> {
 
@@ -276,7 +264,7 @@ public final class CompanionClient implements ClientModInitializer {
     var player=client.world.getPlayers().stream().filter(p->p!=client.player&&p.getName().getString().equals(name)&&client.player.canSee(p)).findFirst().orElseThrow(()->new IllegalArgumentException("Player is not visible"));
     var args=new JsonObject();args.addProperty("entityId",player.getId());String id="follow-"+java.util.UUID.randomUUID();
     tasks.submit(id,"follow",args.toString(),GameSkills.create("follow",args),System.nanoTime()/1000000,10000);
-    taskWorld=world;taskAccount=account;taskWorldInstance=client.world;backgroundControl(client);
+    taskWorld=world;taskAccount=account;taskWorldInstance=client.world;
     result.addProperty("accepted",true);result.add("task",gson.toJsonTree(tasks.snapshot(id)));
    }
    default -> throw new IllegalArgumentException("Unsupported command");
@@ -288,7 +276,6 @@ public final class CompanionClient implements ClientModInitializer {
   String key=cmd.get("control").getAsString();
   int duration=cmd.get("durationMs").getAsInt();
   if(duration<1 || duration>10000 || c.interactionManager==null) throw new IllegalArgumentException("Invalid input");
-  backgroundControl(c);
   release(c);
   var p=c.player;
   if(key.equals("respawn") && !p.isAlive()) {p.requestRespawn();return;}
@@ -359,19 +346,22 @@ public final class CompanionClient implements ClientModInitializer {
  }
  private void tick(MinecraftClient client) {
   dev.momo.task.PickupLedger.CURRENT.changeWorld(client.world);
-  if(physicalTakeover){physicalTakeover=false;tasks.stop("manual_takeover");tasks.notice("manual_takeover");release(client);taskPaused=true;tasks.pause();restorePause(client);return;}
+  if(physicalTakeover){physicalTakeover=false;tasks.stop("manual_takeover");tasks.notice("manual_takeover");release(client);taskPaused=true;tasks.pause();return;}
   long localNow=System.nanoTime()/1000000;
+  // GLFW focus is delivered on a later event pump. Resume only after real focus,
+  // otherwise vanilla immediately reopens the unfocused pause menu.
+  if(focusResumeDeadline!=0){if(localNow>=focusResumeDeadline)focusResumeDeadline=0;else if(client.isWindowFocused()){focusResumeDeadline=0;if(client.currentScreen instanceof net.minecraft.client.gui.screen.GameMenuScreen)client.setScreen(null);}}
   if(guardAuthorized&&!tasks.active()){
-   if(localNow>=gameLeaseUntil||client.player==null||client.world!=taskWorldInstance||!client.player.isAlive()||!client.player.getUuidAsString().equals(taskAccount)){tasks.notice("scene_or_life_changed");release(client);restorePause(client);return;}
-   if(!taskPaused&&client.currentScreen==null){var reflex=survival.choose();if(reflex!=SurvivalPolicy.Mode.NONE){survival.drive(reflex);return;}}
+   if(localNow>=gameLeaseUntil||client.player==null||client.world!=taskWorldInstance||!client.player.isAlive()||!client.player.getUuidAsString().equals(taskAccount)){tasks.notice("scene_or_life_changed");release(client);return;}
+   if(!taskPaused&&client.isWindowFocused()&&client.currentScreen==null){var reflex=survival.choose();if(reflex!=SurvivalPolicy.Mode.NONE){survival.drive(reflex);return;}}
    survival.stop();
-   // The renewable body lease owns idle survival, not the legacy 60s input timer.
+   // Idle survival remains bounded by the renewable body lease.
    return;
   }
   if(tasks.active()){
    String currentWorld=client.world==null?"":worldScope(client);
-   if(client.player==null||(!client.player.isAlive()&&!tasks.snapshots().stream().anyMatch(t->t.skill().equals("respawn")&&(t.state().equals("running")||t.state().equals("queued"))))||(taskWorldInstance!=client.world||!taskWorld.equals(currentWorld))||!taskAccount.equals(client.player.getUuidAsString())){tasks.stop("identity_or_life_changed");release(client);restorePause(client);return;}
-   if(client.currentScreen!=null&&!tasks.acceptsScreen(client.currentScreen)){tasks.pause();tasks.tick(System.nanoTime()/1000000);return;}
+   if(client.player==null||(!client.player.isAlive()&&!tasks.snapshots().stream().anyMatch(t->t.skill().equals("respawn")&&(t.state().equals("running")||t.state().equals("queued"))))||(taskWorldInstance!=client.world||!taskWorld.equals(currentWorld))||!taskAccount.equals(client.player.getUuidAsString())){tasks.stop("identity_or_life_changed");release(client);return;}
+   if(!client.isWindowFocused()||(client.currentScreen!=null&&!tasks.acceptsScreen(client.currentScreen))){survival.stop();tasks.pause();tasks.tick(System.nanoTime()/1000000);return;}
    if(!taskPaused&&client.currentScreen==null){
     var reflex=survival.choose();
     if(reflex!=SurvivalPolicy.Mode.NONE){tasks.pause();tasks.tick(System.nanoTime()/1000000);if(tasks.active())survival.drive(reflex);else survival.stop();return;}
@@ -381,9 +371,8 @@ public final class CompanionClient implements ClientModInitializer {
    tasks.tick(System.nanoTime()/1000000);
    return;
   }
-  if(backgroundUntil!=0 && (System.nanoTime()>=backgroundUntil || client.player==null || client.world==null)) {release(client);restorePause(client);}
   if(playing){
-   if(System.nanoTime()>=deadline||client.player==null||!client.player.isAlive()||client.world==null||client.currentScreen!=null||
+   if(System.nanoTime()>=deadline||!client.isWindowFocused()||client.player==null||!client.player.isAlive()||client.world==null||client.currentScreen!=null||
       !client.player.getUuidAsString().equals(boundAccount)||!worldScope(client).equals(boundWorld)) {release(client);return;}
    var input=(GameplayInputAccess)client;
    drivingInput=true;
