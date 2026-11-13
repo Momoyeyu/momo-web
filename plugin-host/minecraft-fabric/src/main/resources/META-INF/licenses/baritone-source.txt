@@ -1,0 +1,6 @@
+Baritone 1.11.3, unmodified official Fabric API release.
+Source: https://github.com/cabaletta/baritone/tree/v1.11.3
+Release: https://github.com/cabaletta/baritone/releases/tag/v1.11.3
+SHA-256: f9a9b17a41d7d7ad22c759058b14fd01e3319663282e66f99e18153237fa6767
+Bundled as an independently replaceable nested Fabric mod; includes upstream nether-pathfinder 1.6.
+See upstream repository and jar for additional notices.

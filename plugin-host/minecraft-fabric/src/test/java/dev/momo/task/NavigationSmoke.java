@@ -24,6 +24,11 @@ public final class NavigationSmoke {
   check(t.state().equals("failed")&&t.reason().equals("lease_expired"),"lost heartbeat releases control");
   t.start("fourth",1,2,3,1500,1000);d.failed=true;t.tick(1510);
   check(t.state().equals("failed")&&t.reason().equals("unreachable"),"do not spin on failed path");
+  d.failed=false;t.start("menu",1,2,3,2000,1000);t.pause();
+  check(t.state().equals("paused"),"menu pauses rather than cancels");
+  int count=d.starts;t.tick(2010);check(d.starts==count,"no path runs behind menu");
+  t.resume(2020);check(t.state().equals("running")&&d.starts==count+1,"resume recomputes current path");
+  t.pause();t.tick(3000);t.resume(3010);check(t.state().equals("failed"),"expired pause cannot resume");
   System.out.println("PASS navigation lifecycle: continuous, evidenced arrival, idempotency, cancel, lease, unreachable");
  }
 }

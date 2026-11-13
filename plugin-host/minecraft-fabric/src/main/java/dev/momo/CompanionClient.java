@@ -2,6 +2,8 @@ package dev.momo;
 
 import com.google.gson.*;
 import dev.momo.mixin.GameplayInputAccess;
+import dev.momo.task.NavigationTask;
+import dev.momo.task.BaritoneNavigator;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +20,8 @@ public final class CompanionClient implements ClientModInitializer {
  private String target, boundWorld, boundAccount;
  private java.util.List<BoundedPath.Cell> path = java.util.List.of();
  private long nextPlan;
+ private final NavigationTask navigation=new NavigationTask(new BaritoneNavigator());
+ private String navigationWorld, navigationAccount;
  private static CompanionClient instance;
  private boolean playing,mining,using,attacking,drivingInput;
  private int useTicks;
@@ -82,6 +86,7 @@ public final class CompanionClient implements ClientModInitializer {
   backgroundUntil=System.nanoTime()+TimeUnit.SECONDS.toNanos(60);
  }
  private void release(MinecraftClient client) {
+  navigation.cancel("control_released");
   if(mining && client.interactionManager!=null)client.interactionManager.cancelBlockBreaking();
   if(using && client.interactionManager!=null && client.player!=null && client.player.isUsingItem())client.interactionManager.stopUsingItem(client.player);
   playing = mining = using = attacking = false;
@@ -113,6 +118,30 @@ public final class CompanionClient implements ClientModInitializer {
   if(backgroundUntil!=0) backgroundControl(client);
   result.addProperty("world", world); result.addProperty("account", account);
   switch (type) {
+   case "capabilities" -> {
+    result.addProperty("protocol",2);result.addProperty("navigation",BaritoneNavigator.available());
+    result.addProperty("navigationBackend","baritone-1.11.3");
+   }
+   case "submit" -> {
+    if(!"navigate".equals(command.get("skill").getAsString()))throw new IllegalArgumentException("Unsupported skill");
+    if(client.currentScreen!=null)throw new IllegalStateException("Close the menu first");
+    int x=command.get("x").getAsInt(),y=command.get("y").getAsInt(),z=command.get("z").getAsInt();
+    var destination=new net.minecraft.util.math.BlockPos(x,y,z);
+    if(!client.world.isChunkLoaded(destination)||client.player.squaredDistanceTo(x+.5,y,z+.5)>4096)throw new IllegalArgumentException("Destination outside local known terrain");
+    if(playing||target!=null)throw new IllegalStateException("Another action owns the body");
+    boolean accepted=navigation.start(command.get("taskId").getAsString(),x,y,z,System.nanoTime()/1000000,Math.min(30000,command.get("leaseMs").getAsLong()));
+    navigationWorld=world;navigationAccount=account;backgroundControl(client);
+    result.addProperty("accepted",accepted);navigationSnapshot(result);
+   }
+   case "task" -> navigationSnapshot(result);
+   case "heartbeat" -> {
+    if(!navigation.id().equals(command.get("taskId").getAsString()))throw new IllegalArgumentException("Task identity mismatch");
+    navigation.renew(System.nanoTime()/1000000,command.get("leaseMs").getAsLong());navigationSnapshot(result);
+   }
+   case "cancel" -> {
+    if(!navigation.id().equals(command.get("taskId").getAsString()))throw new IllegalArgumentException("Task identity mismatch");
+    navigation.cancel("requested");release(client);restorePause(client);navigationSnapshot(result);
+   }
    case "observe" -> {
     if (!client.options.getPerspective().isFirstPerson()) throw new IllegalStateException("First person required");
     try (var raw = net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer())) {
@@ -194,6 +223,7 @@ public final class CompanionClient implements ClientModInitializer {
     client.player.networkHandler.sendChatMessage(text);
    }
    case "follow" -> {
+    if(navigation.active())throw new IllegalStateException("Navigation owns the body");
     String player = command.get("player").getAsString(); int duration = command.get("durationMs").getAsInt();
     if (!player.matches("[A-Za-z0-9_]{1,16}") || duration < 1 || duration > 1000) throw new IllegalArgumentException("Invalid follow");
     backgroundControl(client);
@@ -204,6 +234,7 @@ public final class CompanionClient implements ClientModInitializer {
   return result;
  }
  private void play(MinecraftClient c,JsonObject cmd,String world,String account) {
+  if(navigation.active())throw new IllegalStateException("Navigation owns the body");
   String key=cmd.get("control").getAsString();
   int duration=cmd.get("durationMs").getAsInt();
   if(duration<1 || duration>10000 || c.interactionManager==null) throw new IllegalArgumentException("Invalid input");
@@ -276,7 +307,24 @@ public final class CompanionClient implements ClientModInitializer {
   mining=key.equals("mine")||key.equals("attack");attacking=key.equals("attack");using=key.equals("use")||key.equals("eat");useTicks=0;
   playing=true; boundWorld=world; boundAccount=account;deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(duration);
  }
+ private void navigationSnapshot(JsonObject result){
+  result.addProperty("taskId",navigation.id());result.addProperty("state",navigation.state());result.addProperty("reason",navigation.reason());
+  var player=MinecraftClient.getInstance().player;
+  if(player!=null){result.addProperty("x",player.getX());result.addProperty("y",player.getY());result.addProperty("z",player.getZ());}
+ }
  private void tick(MinecraftClient client) {
+  if(navigation.active()){
+   String currentWorld=client.world==null?"":((client.getCurrentServerEntry()!=null?client.getCurrentServerEntry().address:"local")+"/"+client.world.getRegistryKey().getValue());
+   if(client.player==null||!client.player.isAlive()||!navigationWorld.equals(currentWorld)||!navigationAccount.equals(client.player.getUuidAsString())){navigation.cancel("identity_or_life_changed");release(client);restorePause(client);return;}
+   long window=client.getWindow().getHandle();
+   boolean manual=false;
+   if(client.isWindowFocused())for(int key:new int[]{87,65,83,68,32,340,341})manual|=net.minecraft.client.util.InputUtil.isKeyPressed(window,key);
+   if(manual){navigation.cancel("manual_takeover");release(client);restorePause(client);return;}
+   if(client.currentScreen!=null){navigation.pause();navigation.tick(System.nanoTime()/1000000);return;}
+   navigation.resume(System.nanoTime()/1000000);
+   navigation.tick(System.nanoTime()/1000000);
+   return;
+  }
   if(backgroundUntil!=0 && (System.nanoTime()>=backgroundUntil || client.player==null || client.world==null)) {release(client);restorePause(client);}
   if(playing){
    if(System.nanoTime()>=deadline||client.player==null||!client.player.isAlive()||client.world==null||client.currentScreen!=null||

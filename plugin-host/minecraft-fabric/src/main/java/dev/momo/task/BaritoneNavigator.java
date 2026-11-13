@@ -2,6 +2,9 @@ package dev.momo.task;
 
 import baritone.api.BaritoneAPI;
 import baritone.api.IBaritone;
+import baritone.api.Settings;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import baritone.api.pathing.goals.GoalNear;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.BlockPos;
@@ -11,16 +14,25 @@ public final class BaritoneNavigator implements NavigationTask.Driver {
  private IBaritone baritone;
  private GoalNear goal;
  private int warmup;
+ private final Map<Settings.Setting<Boolean>,Boolean> settings=new LinkedHashMap<>();
+ private void override(Settings.Setting<Boolean> setting,boolean value){settings.putIfAbsent(setting,setting.value);setting.value=value;}
  public void start(int x,int y,int z){
   baritone=BaritoneAPI.getProvider().getPrimaryBaritone();
-  if(baritone.getPathingBehavior().isPathing())throw new IllegalStateException("Another navigator owns control");
+  if(baritone.getPathingBehavior().isPathing()||baritone.getPathingBehavior().getInProgress().isPresent()||baritone.getCustomGoalProcess().isActive())throw new IllegalStateException("Another navigator owns control");
+  var config=BaritoneAPI.getSettings();
+  override(config.allowBreak,false);override(config.allowPlace,false);
+  override(config.allowParkourPlace,false);override(config.allowWaterBucketFall,false);
+  override(config.chatControl,false);override(config.chatControlAnyway,false);override(config.prefixControl,false);
+  override(config.freeLook,false);override(config.renderPath,false);override(config.renderGoal,false);
+  override(config.chunkCaching,false);
   goal=new GoalNear(new BlockPos(x,y,z),1);
   warmup=4;
   baritone.getCustomGoalProcess().setGoalAndPath(goal);
  }
  public void stop(){
-  if(baritone!=null&&goal!=null)baritone.getPathingBehavior().cancelEverything();
+  if(baritone!=null&&goal!=null){baritone.getPathingBehavior().cancelEverything();baritone.getInputOverrideHandler().clearAllKeys();}
   goal=null;
+  settings.forEach((key,value)->key.value=value);settings.clear();
  }
  public boolean arrived(){
   var client=MinecraftClient.getInstance();
