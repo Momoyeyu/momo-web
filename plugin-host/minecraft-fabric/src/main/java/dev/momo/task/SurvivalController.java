@@ -11,27 +11,36 @@ public final class SurvivalController {
  private final SurvivalPolicy policy=new SurvivalPolicy();
  private SurvivalPolicy.Mode mode=SurvivalPolicy.Mode.NONE;
  private HostileEntity threat;private int savedSlot=-1,ticks;private float escapeYaw;private boolean escapeSafe;
+ private TaskRuntime.Work foodWork;private long foodRetryUntil;
  private MinecraftClient client(){return MinecraftClient.getInstance();}
  public boolean interruptOwnedScreen(SurvivalPolicy.Mode desired,boolean owned){return policy.interruptOwnedScreen(desired,owned);}
- private int foodSlot(){return FoodInventory.find(client(),9);}
+ public boolean acceptsScreen(Object screen){return screen!=null&&foodWork!=null&&foodWork.acceptsScreen(screen);}
+ public boolean canDrive(boolean paused,boolean focused,Object screen){return policy.canDrive(paused,focused,screen!=null,acceptsScreen(screen));}
+ private int foodSlot(){return FoodInventory.find(client(),36);}
  public SurvivalPolicy.Mode choose(){
-  return choose(false);
+  return choose(false,false);
  }
- public SurvivalPolicy.Mode choose(boolean combatOwned){
+ public SurvivalPolicy.Mode choose(boolean combatOwned,boolean mealOwned){
   var c=client();var p=c.player;
   if(p==null||c.world==null||!p.isAlive())return SurvivalPolicy.Mode.NONE;
   threat=c.world.getEntitiesByClass(HostileEntity.class,p.getBoundingBox().expand(4),e->e.isAlive()&&p.canSee(e)&&p.squaredDistanceTo(e)<16).stream().min(java.util.Comparator.comparingDouble(e->e.squaredDistanceTo(p))).orElse(null);
-  boolean eating=p.isUsingItem()&&p.getActiveItem().contains(DataComponentTypes.FOOD);
-  boolean critical=p.isInLava()||p.getAir()<35||(p.isOnFire()&&p.getHealth()<8);
-  var desired=policy.choose(true,false,critical,p.getHealth(),p.getHungerManager().getFoodLevel(),foodSlot()>=0,eating,threat!=null);
-  return policy.forBody(desired,mode==SurvivalPolicy.Mode.NONE&&eating,combatOwned);
+  boolean eating=foodWork!=null||(p.isUsingItem()&&p.getActiveItem().contains(DataComponentTypes.FOOD));
+  boolean critical=p.isInLava()||policy.airCritical(p.getAir(),mode==SurvivalPolicy.Mode.ESCAPE)||(p.isOnFire()&&p.getHealth()<8);
+  var desired=policy.choose(true,false,critical,p.getHealth(),p.getHungerManager().getFoodLevel(),foodWork!=null||(System.nanoTime()>=foodRetryUntil&&foodSlot()>=0),eating,threat!=null);
+  return policy.forBody(desired,mealOwned||(mode==SurvivalPolicy.Mode.NONE&&eating),combatOwned);
  }
  public void drive(SurvivalPolicy.Mode desired){
   var c=client();var p=c.player;
   if(desired!=mode){var selectedThreat=threat;stop();threat=selectedThreat;mode=desired;savedSlot=p.getInventory().selectedSlot;ticks=0;escapeYaw=p.getYaw();}
   ticks++;
   switch(mode){
-   case EAT -> {int slot=foodSlot();if(slot>=0){p.getInventory().selectedSlot=slot;c.options.useKey.setPressed(true);if(!p.isUsingItem()&&ticks%4==1)c.interactionManager.interactItem(p,Hand.MAIN_HAND);}}
+   case EAT -> {
+    try{
+     if(foodWork==null){foodWork=GameSkills.create("eat",new com.google.gson.JsonObject());foodWork.start();}
+     var result=foodWork.tick();
+     if(!result.state().equals("running")){if(!result.state().equals("succeeded"))foodRetryUntil=System.nanoTime()+5_000_000_000L;stop();}
+    }catch(RuntimeException error){foodRetryUntil=System.nanoTime()+5_000_000_000L;stop();}
+   }
    case DEFEND -> {
     if(threat==null)return;
     if(ticks==1)for(int i=0;i<9;i++)if(p.getInventory().getStack(i).getItem() instanceof SwordItem){p.getInventory().selectedSlot=i;break;}
@@ -43,6 +52,7 @@ public final class SurvivalController {
     else if(p.getOffHandStack().isOf(Items.SHIELD)){c.options.useKey.setPressed(true);if(!p.isUsingItem())c.interactionManager.interactItem(p,Hand.OFF_HAND);}
    }
    case ESCAPE -> {
+    p.setPitch(policy.escapePitch(p.isTouchingWater()&&p.getAir()<250,p.getPitch()));
     // Evaluate a few nearby collision cells, never hidden resources or global terrain.
     if(ticks==1||ticks%20==0){double best=-Double.MAX_VALUE;escapeSafe=false;for(int i=0;i<8;i++){
      float yaw=p.getYaw()+i*45;double angle=Math.toRadians(yaw);var pos=BlockPos.ofFloored(p.getX()-Math.sin(angle)*2,p.getY(),p.getZ()+Math.cos(angle)*2);
@@ -57,9 +67,13 @@ public final class SurvivalController {
   }
  }
  private void look(Vec3d target){var p=client().player;var d=target.subtract(p.getEyePos());float yaw=(float)Math.toDegrees(Math.atan2(-d.x,d.z));p.setYaw(p.getYaw()+MathHelper.clamp(MathHelper.wrapDegrees(yaw-p.getYaw()),-20,20));p.setPitch((float)-Math.toDegrees(Math.atan2(d.y,Math.sqrt(d.x*d.x+d.z*d.z))));}
- public void stop(){
+ public void stop(){stop(false);}
+ public void stop(boolean preserveScreen){
+  var c=client();boolean mealScreen=acceptsScreen(c.currentScreen);
+  if(foodWork!=null){foodWork.stop();foodWork=null;}
+  if(!preserveScreen&&mealScreen&&c.player!=null&&c.player.currentScreenHandler.getCursorStack().isEmpty())c.player.closeHandledScreen();
   if(mode==SurvivalPolicy.Mode.NONE){threat=null;return;}
-  var c=client();if(c.player!=null){if(c.player.isUsingItem()&&c.interactionManager!=null)c.interactionManager.stopUsingItem(c.player);if(savedSlot>=0)c.player.getInventory().selectedSlot=savedSlot;}
+  if(c.player!=null){if(c.player.isUsingItem()&&c.interactionManager!=null)c.interactionManager.stopUsingItem(c.player);if(savedSlot>=0)c.player.getInventory().selectedSlot=savedSlot;}
   c.options.forwardKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.useKey.setPressed(false);
   savedSlot=-1;mode=SurvivalPolicy.Mode.NONE;threat=null;
  }

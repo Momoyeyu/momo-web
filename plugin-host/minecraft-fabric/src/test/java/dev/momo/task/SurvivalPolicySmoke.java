@@ -4,6 +4,15 @@ public final class SurvivalPolicySmoke {
  public static void main(String[] args){
   FoodChoiceSmoke.main(args);
   SurvivalPolicy p=new SurvivalPolicy();
+  check(p.airCritical(99,false),"air escape starts before the last breath");
+  check(p.airCritical(180,true),"do not immediately dive again with a partially recovered breath");
+  check(!p.airCritical(250,true),"air escape finishes after sufficient recovery");
+  check(p.escapePitch(true,80)<0,"escape from water must look upward even after chasing a target below");
+  check(p.escapePitch(false,20)==20,"ordinary land retreat retains its aim");
+  check(p.canDrive(false,true,true,true),"our food preparation screen must not suspend the same survival owner");
+  check(!p.canDrive(false,true,true,false),"a player menu is never an owned food screen");
+  check(!p.canDrive(true,true,false,true),"pause prevents every survival action");
+  check(!p.canDrive(false,false,false,true),"focus loss prevents every survival action");
   check(p.choose(true,false,false,16,10,true,false,false)==SurvivalPolicy.Mode.EAT,"eat from local hunger");
   check(p.choose(true,false,false,15,12,true,true,true)==SurvivalPolicy.Mode.EAT,"minor threat cannot keep interrupting food");
   check(p.choose(true,false,true,4,12,true,true,true)==SurvivalPolicy.Mode.ESCAPE,"critical danger wins over food");

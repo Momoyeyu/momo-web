@@ -13,6 +13,14 @@ public final class TaskRuntimeSmoke {
  }
  static void check(boolean ok,String why){if(!ok)throw new AssertionError(why);}
  public static void main(String[] args){
+  TaskRuntime mealRuntime=new TaskRuntime();
+  Work meal=new Work(){public boolean handlesEating(){return true;}};
+  mealRuntime.submit("meal","eat",meal,0,10000);
+  check(mealRuntime.handlesEating(),"queued explicit eating must not be preempted by a duplicate food reflex");
+  mealRuntime.tick(1);mealRuntime.pause();
+  check(mealRuntime.handlesEating(),"paused meal retains ownership until resume or cancellation");
+  mealRuntime.stop("revoke");mealRuntime.tick(2);
+  check(!mealRuntime.handlesEating(),"revocation removes meal ownership without restarting it");
   TaskRuntime digging=new TaskRuntime();
   Work dig=new Work(){public boolean controlsMining(){return true;}};
   digging.submit("dig","mine",dig,0,10000);check(!digging.controlsMining(),"queued work does not own vanilla mining input");

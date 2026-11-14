@@ -133,8 +133,8 @@ public final class GameSkills {
     case "follow":
      if(!entity.isAlive())return TaskRuntime.Step.failed("target_lost");
      if(!c.player.canSee(entity)){if(++lostTicks>60)return TaskRuntime.Step.failed("target_lost");approach(lastSeen,20);break;}lostTicks=0;lastSeen=entity.getBlockPos();
-     if(entity.squaredDistanceTo(c.player)<9){haltNavigation();return done(Map.of("entityId",entity.getId(),"distance",Math.sqrt(entity.squaredDistanceTo(c.player))));}
-     approach(entity.getBlockPos(),20);break;
+     if(entity.squaredDistanceTo(c.player)<9){stopSwimming();haltNavigation();return done(Map.of("entityId",entity.getId(),"distance",Math.sqrt(entity.squaredDistanceTo(c.player))));}
+     if(!swimToward(entity,entity.getEyePos()))approach(entity.getBlockPos(),20);break;
     case "mine":
      var mined=BlockReceipts.CURRENT.after(c.world,pos.getX(),pos.getY(),pos.getZ(),blockBoundary);
      if(mined!=null&&!mined.block().equals(beforeBlock))return done(Map.of("block",beforeState,"x",pos.getX(),"y",pos.getY(),"z",pos.getZ(),"after",mined.state(),"serverBlockSeq",mined.seq()));
@@ -164,7 +164,7 @@ public final class GameSkills {
      if(ticks>4&&(c.currentScreen!=ownedScreen||!c.world.getBlockState(pos).toString().equals(beforeState)||!inventoryState().equals(inventoryBefore)||c.player.hasVehicle()||c.player.isSleeping()))return done(Map.of("screen",screenName(),"block",c.world.getBlockState(pos).toString(),"riding",c.player.hasVehicle(),"sleeping",c.player.isSleeping()));
      if(phase>80)return TaskRuntime.Step.failed("no_interaction_result");break;
     case "interactEntity":
-     if(entity.squaredDistanceTo(c.player)>9){approach(entity.getBlockPos(),20);break;}haltNavigation();
+     if(entity.squaredDistanceTo(c.player)>9){if(!swimToward(entity,entity.getEyePos()))approach(entity.getBlockPos(),20);break;}stopSwimming();haltNavigation();
      if(phase++==0){look(entity.getEyePos());c.interactionManager.interactEntity(c.player,entity,Hand.MAIN_HAND);}
      if(ticks>4&&(c.currentScreen!=ownedScreen||c.player.hasVehicle()||!inventoryState().equals(inventoryBefore)))return done(Map.of("entityId",entity.getId(),"screen",screenName(),"riding",c.player.hasVehicle(),"inventoryChanged",!inventoryState().equals(inventoryBefore)));
      if(phase>80)return TaskRuntime.Step.failed("no_interaction_result");break;
@@ -172,15 +172,7 @@ public final class GameSkills {
      var receipt=PickupLedger.CURRENT.since(c.world,args.get("entityId").getAsInt(),c.player.getId(),pickupBoundary);
      if(receipt!=null)return done(Map.of("entityId",receipt.entityId(),"pickedCount",receipt.amount(),"serverPickupSeq",receipt.seq()));
      if(entity==null||entity.isRemoved())return TaskRuntime.Step.failed("drop_gone_without_own_pickup");
-     var offset=entity.getPos().subtract(c.player.getPos());
-     var swim=PickupMotion.swim(c.player.isTouchingWater(),entity.isTouchingWater(),c.player.canSee(entity),offset.x,offset.y,offset.z);
-     if(swim.steer()){
-      haltNavigation();swimming=true;look(entity.getPos());
-      c.options.forwardKey.setPressed(swim.forward());c.options.jumpKey.setPressed(swim.up());c.options.sneakKey.setPressed(swim.down());
-      if(++lostTicks>200)return TaskRuntime.Step.failed("unreachable");
-      break;
-     }
-     if(swimming){c.options.forwardKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sneakKey.setPressed(false);swimming=false;}
+     if(swimToward(entity,entity.getPos())){if(++lostTicks>200)return TaskRuntime.Step.failed("unreachable");break;}
      if(navigating&&navigation.arrived()&&pathTarget.equals(entity.getBlockPos())){haltNavigation();phase=1;}
      if(phase>0){
       look(entity.getPos());c.options.forwardKey.setPressed(false);c.options.jumpKey.setPressed(false);
@@ -274,8 +266,8 @@ public final class GameSkills {
    var item=c.player.getMainHandStack().getItem();
    boolean ranged=item instanceof BowItem||item instanceof CrossbowItem||item instanceof TridentItem;
    c.options.useKey.setPressed(false);
-   if(distance>(ranged?225:8)){approach(entity.getBlockPos(),10);return TaskRuntime.Step.running();}
-   haltNavigation();look(entity.getEyePos());
+   if(distance>(ranged?225:8)){if(!swimToward(entity,entity.getEyePos()))approach(entity.getBlockPos(),10);return TaskRuntime.Step.running();}
+   stopSwimming();haltNavigation();look(entity.getEyePos());
    if(ranged){
     var stack=c.player.getMainHandStack();
     if(item instanceof CrossbowItem&&CrossbowItem.isCharged(stack)){c.interactionManager.interactItem(c.player,Hand.MAIN_HAND);startedUse=false;}
@@ -312,9 +304,21 @@ public final class GameSkills {
    return Map.of("beforeDigest",digest(inventoryBefore),"afterDigest",digest(after),"screen",screenName(),"slots",slots,"cursor",GameObservation.stack(c.player.currentScreenHandler.getCursorStack()),"completedActions",verifiedActions,"serverConfirmationSeq",InventoryReceipts.CURRENT.cursor());
   }
   private static String digest(String value){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}}
+  private boolean swimToward(Entity target,Vec3d lookAt){
+   var delta=target.getPos().subtract(c.player.getPos());
+   var motion=WaterApproach.swim(c.player.isTouchingWater(),target.isTouchingWater(),c.player.canSee(target),delta.x,delta.y,delta.z);
+   if(!motion.steer()){stopSwimming();return false;}
+   haltNavigation();swimming=true;look(lookAt);
+   c.options.forwardKey.setPressed(motion.forward());c.options.jumpKey.setPressed(motion.up());c.options.sneakKey.setPressed(motion.down());
+   return true;
+  }
+  private void stopSwimming(){if(swimming){c.options.forwardKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sneakKey.setPressed(false);swimming=false;}}
   private void go(BlockPos target){
    boolean navigate=skill.equals("navigate");
    boolean surface=navigate&&args.has("height")&&args.get("height").getAsString().equals("surface");
+   // Long water approaches use the collision-aware surface route; the short
+   // visible approach handles vertical swimming once the target is nearby.
+   if(!navigate&&entity!=null&&WaterApproach.surfaceRoute(c.player.isTouchingWater(),entity.isTouchingWater()))surface=true;
    boolean adapt=navigate&&args.has("terrain")&&args.get("terrain").getAsString().equals("adapt");
    // Exact navigation names the feet block. Interaction approaches may stop
    // nearby, but must not make a different floor count as an exact arrival.

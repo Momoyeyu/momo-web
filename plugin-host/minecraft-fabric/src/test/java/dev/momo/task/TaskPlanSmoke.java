@@ -10,6 +10,13 @@ public final class TaskPlanSmoke {
   public boolean retrySafe(String reason){return true;}
  }
  public static void main(String[] args){
+  Work meal=new Work(){public boolean handlesEating(){return true;}public TaskRuntime.Step tick(){return TaskRuntime.Step.running();}};
+  Work restore=new Work();
+  TaskPlan eating=new TaskPlan(List.of(new TaskPlan.Node(meal,()->true,0,false),new TaskPlan.Node(restore,()->true,0,false)));
+  TaskRuntime revokedMeal=new TaskRuntime();revokedMeal.submit("food","plan",eating,0,1000);
+  revokedMeal.tick(1);check(revokedMeal.handlesEating(),"nested eating retains the same body ownership");
+  revokedMeal.stop("user_takeover");revokedMeal.tick(2);
+  check(restore.starts==0,"equipment restoration may not click slots after control is revoked");
   Work a=new Work(),b=new Work();
   TaskPlan p=new TaskPlan(List.of(new TaskPlan.Node(a,()->true,0,false),new TaskPlan.Node(b,()->true,0,false)));
   p.start();check(p.tick().state().equals("running")&&b.starts==1,"chain locally without inference");

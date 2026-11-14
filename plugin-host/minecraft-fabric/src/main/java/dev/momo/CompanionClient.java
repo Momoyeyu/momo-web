@@ -34,7 +34,7 @@ public final class CompanionClient implements ClientModInitializer {
  public static boolean controlling(){return instance!=null&&(instance.tasks.active()||instance.playing||instance.guardAuthorized);}
  public static void physicalInput(){if(instance!=null&&controlling()){instance.physicalAt=System.currentTimeMillis();instance.physicalTakeover=true;}}
  public static boolean ownsCurrentScreen(){return instance!=null&&instance.ownsScreen(MinecraftClient.getInstance());}
- private boolean ownsScreen(MinecraftClient c){return c.currentScreen!=null&&(c.currentScreen==ownedScreen||tasks.active()&&tasks.acceptsScreen(c.currentScreen));}
+ private boolean ownsScreen(MinecraftClient c){return c.currentScreen!=null&&(c.currentScreen==ownedScreen||survival.acceptsScreen(c.currentScreen)||tasks.active()&&tasks.acceptsScreen(c.currentScreen));}
  private boolean deathScreen(MinecraftClient c){return c.player!=null&&!c.player.isAlive()&&c.currentScreen instanceof net.minecraft.client.gui.screen.DeathScreen;}
  private boolean suspended(MinecraftClient c){return !c.isWindowFocused()||(c.currentScreen!=null&&!ownsScreen(c)&&!deathScreen(c));}
  private void rememberScreen(MinecraftClient c){if(c.currentScreen==null)ownedScreen=null;else if(c.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?> && ownsScreen(c))ownedScreen=c.currentScreen;}
@@ -115,9 +115,9 @@ public final class CompanionClient implements ClientModInitializer {
  }
  private void release(MinecraftClient client,boolean preserveScreen) {
   boolean owned=ownsScreen(client);
-  survival.stop();tasks.stop("control_released");guardAuthorized=false;gameLeaseUntil=focusResumeDeadline=0;
+  survival.stop(preserveScreen);tasks.stop("control_released");guardAuthorized=false;gameLeaseUntil=focusResumeDeadline=0;
   releaseLegacy(client);
-  if(dev.momo.task.ControlAdmission.closeOnRelease(preserveScreen,owned,tasks.stopConfirmed(),client.player!=null&&client.player.currentScreenHandler.getCursorStack().isEmpty()))client.player.closeHandledScreen();
+  if(client.currentScreen!=null&&dev.momo.task.ControlAdmission.closeOnRelease(preserveScreen,owned,tasks.stopConfirmed(),client.player!=null&&client.player.currentScreenHandler.getCursorStack().isEmpty()))client.player.closeHandledScreen();
   if(!preserveScreen&&tasks.stopConfirmed())ownedScreen=null;
  }
  private void releaseLegacy(MinecraftClient client){
@@ -394,7 +394,7 @@ public final class CompanionClient implements ClientModInitializer {
   if(focusResumeDeadline!=0){if(localNow>=focusResumeDeadline)focusResumeDeadline=0;else if(client.isWindowFocused()){focusResumeDeadline=0;if(client.currentScreen instanceof net.minecraft.client.gui.screen.GameMenuScreen)client.setScreen(null);}}
   if(guardAuthorized&&!tasks.active()){
    if(localNow>=gameLeaseUntil||client.player==null||client.world!=taskWorldInstance||!client.player.isAlive()||!client.player.getUuidAsString().equals(taskAccount)){tasks.notice("scene_or_life_changed");release(client);return;}
-   if(!pauseBarrier.isPaused()&&client.isWindowFocused()&&client.currentScreen==null){var reflex=survival.choose();if(reflex!=SurvivalPolicy.Mode.NONE){survival.drive(reflex);return;}}
+   if(survival.canDrive(pauseBarrier.isPaused(),client.isWindowFocused(),client.currentScreen)){var reflex=survival.choose();if(reflex!=SurvivalPolicy.Mode.NONE){survival.drive(reflex);return;}}
    survival.stop();
    // Idle survival remains bounded by the renewable body lease.
    return;
@@ -403,8 +403,14 @@ public final class CompanionClient implements ClientModInitializer {
    String currentWorld=client.world==null?"":worldScope(client);
    if(client.player==null||(!client.player.isAlive()&&!tasks.snapshots().stream().anyMatch(t->t.skill().equals("respawn")&&(t.state().equals("running")||t.state().equals("queued"))))||(taskWorldInstance!=client.world||!taskWorld.equals(currentWorld))||!taskAccount.equals(client.player.getUuidAsString())){tasks.stop("identity_or_life_changed");release(client);return;}
    if(suspended(client)){survival.stop();tasks.pause();tasks.tick(System.nanoTime()/1000000);return;}
+   if(!pauseBarrier.isPaused()&&survival.acceptsScreen(client.currentScreen)){
+    var reflex=survival.choose(tasks.handlesCombat(),tasks.handlesEating());
+    tasks.pause();tasks.tick(localNow);
+    if(tasks.active())survival.drive(reflex);else survival.stop();
+    return;
+   }
    if(!pauseBarrier.isPaused()&&client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>){
-    var reflex=survival.choose();
+    var reflex=survival.choose(tasks.handlesCombat(),tasks.handlesEating());
     if(survival.interruptOwnedScreen(reflex,tasks.acceptsScreen(client.currentScreen))){
      tasks.stop("danger_interrupted_station");
      if(!tasks.stopConfirmed()){survival.stop();return;}
@@ -412,7 +418,7 @@ public final class CompanionClient implements ClientModInitializer {
     }
    }
    if(!pauseBarrier.isPaused()&&client.currentScreen==null){
-    var reflex=survival.choose(tasks.handlesCombat());
+    var reflex=survival.choose(tasks.handlesCombat(),tasks.handlesEating());
     if(reflex!=SurvivalPolicy.Mode.NONE){tasks.pause();tasks.tick(System.nanoTime()/1000000);if(tasks.active())survival.drive(reflex);else survival.stop();return;}
    }
    survival.stop();

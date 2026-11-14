@@ -47,6 +47,7 @@ public final class TaskPlan implements TaskRuntime.Work {
  }
  public boolean controlsMining(){return running&&!finished&&failure==null&&steps.get(index).work.controlsMining();}
  public boolean handlesCombat(){return running&&!finished&&failure==null&&steps.get(index).work.handlesCombat();}
+ public boolean handlesEating(){return !finished&&failure==null&&steps.get(index).work.handlesEating();}
  public Map<String,Object> progress(){return finished?Map.of("completedSteps",index):Map.of("step",index,"completedSteps",outcomes.size(),"action",steps.get(index).work.progress());}
  public boolean acceptsScreen(Object screen){return !finished&&failure==null&&steps.get(index).work.acceptsScreen(screen);}
 }

@@ -24,6 +24,7 @@ public final class TaskRuntime {
   default Map<String,Object> partialEvidence(){return Map.of();}
   default boolean controlsMining(){return false;}
   default boolean handlesCombat(){return false;}
+  default boolean handlesEating(){return false;}
   default boolean retrySafe(String reason){return false;}
  }
  public record Step(String state,String reason,Map<String,Object> evidence){
@@ -148,6 +149,7 @@ public final class TaskRuntime {
  public boolean releasePending(){return uncertainStop!=null;}
  public boolean controlsMining(){return current!=null&&current.state.equals("running")&&current.work.controlsMining();}
  public boolean handlesCombat(){return current!=null&&current.work!=null&&current.work.handlesCombat();}
+ public boolean handlesEating(){return current!=null?current.work!=null&&current.work.handlesEating():!queue.isEmpty()&&queue.peek().work.handlesEating();}
  public boolean stopConfirmed(){return uncertainStop==null&&current==null&&queue.isEmpty();}
  private void finish(Job job,String state,String reason,Map<String,Object> evidence){
   if(job==null||job.terminal())return;
