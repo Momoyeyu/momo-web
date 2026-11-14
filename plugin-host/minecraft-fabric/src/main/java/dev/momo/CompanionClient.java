@@ -315,6 +315,7 @@ public final class CompanionClient implements ClientModInitializer {
   var p=c.player;
   if(key.equals("respawn") && !p.isAlive()) {p.requestRespawn();return;}
   if(key.equals("screenClick") || key.equals("screenScroll") || key.equals("screenText") || key.equals("screenKey")) {
+   if(key.equals("screenKey")&&cmd.get("key").getAsString().equals("escape")&&c.currentScreen==null){c.openGameMenu(false);return;}
    if(c.currentScreen==null)throw new IllegalStateException("No open game screen");
    double x=cmd.get("x").getAsDouble(), y=cmd.get("y").getAsDouble();
    if(!Double.isFinite(x)||!Double.isFinite(y)||x<0||x>1||y<0||y>1)throw new IllegalArgumentException("Invalid screen coordinate");
@@ -329,7 +330,7 @@ public final class CompanionClient implements ClientModInitializer {
     }
     case "screenKey" -> {
      int code=switch(cmd.get("key").getAsString()) {
-      case "enter" -> 257; case "backspace" -> 259;case "tab" -> 258;
+      case "escape" -> 256;case "enter" -> 257; case "backspace" -> 259;case "tab" -> 258;
       case "left" -> 263;case "right" -> 262;case "up" -> 265;case "down" -> 264;
       default -> throw new IllegalArgumentException("Invalid screen key");
      };

@@ -53,6 +53,19 @@ test('gameplay supports combined movement and rejects invalid input before dispa
   assert.equal(commands.length, count);
 });
 
+test('escape is a normal game key with the same observation and permission checks',async()=>{
+ const {adapter,commands}=fixture();
+ await assert.rejects(adapter.play({control:'screenKey',key:'escape',durationMs:1},permission),/observation/);
+ assert.equal(commands.length,0);
+ await adapter.observe(permission);
+ await adapter.play({control:'screenKey',key:'escape',durationMs:1},permission);
+ assert.equal(commands.at(-1).control,'screenKey');
+ assert.equal(commands.at(-1).key,'escape');
+ const count=commands.length;
+ await assert.rejects(adapter.play({control:'screenKey',key:'command'},permission),/Invalid gameplay/);
+ assert.equal(commands.length,count);
+});
+
 test('aim uses only the latest observed visible block and bounds pitch', async () => {
   const commands=[];
   const adapter=createMinecraftAdapter({now:()=>1000,authorize:async()=>true,transport:{request:async command=>{

@@ -139,7 +139,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
           || !Number.isFinite(x) || x < 0 || x > 1 || !Number.isFinite(y) || y < 0 || y > 1
           || !Number.isFinite(scroll) || Math.abs(scroll) > 10
           || typeof text !== 'string' || text.length > 256 || /[\r\n\x00-\x1f]/u.test(text) || /^[/#]/u.test(text.trimStart())
-          || !['enter', 'backspace', 'tab', 'left', 'right', 'up', 'down'].includes(key)) return Promise.reject(problem('Invalid gameplay input'));
+          || !['enter', 'backspace', 'tab', 'left', 'right', 'up', 'down', 'escape'].includes(key)) return Promise.reject(problem('Invalid gameplay input'));
       return execute('play', { control, held, durationMs, yaw, pitch, slot, button, x, y, scroll, text, key }, permission);
     },
     follow(player, durationMs, permission) {
