@@ -158,6 +158,19 @@ def test_reaction_downsampling_preserves_original_deadline_and_authorization(mon
         tools._pending.pop('reaction-budget',None);current_run.reset(token)
 
 
+def test_discard_observation_does_not_remove_another_runs_frame():
+    token=current_run.set('discard-this')
+    own,other=object(),object()
+    try:
+        tools._pending['discard-this']=own
+        tools._pending['keep-other']=other
+        tools.discard_observation()
+        assert 'discard-this' not in tools._pending
+        assert tools._pending['keep-other'] is other
+    finally:
+        tools._pending.pop('discard-this',None);tools._pending.pop('keep-other',None);current_run.reset(token)
+
+
 def test_screen_sense_is_available_without_started_observation_or_app_grant():
     from app.services.computer import computer
     with patch.object(tools,'require_local',return_value='r'),patch.object(tools.runtime,'focus',False),patch('app.services.activities.snapshot',return_value={'enabled':{'computer':True}}),patch.object(computer,'desktop_allowed',True),patch.object(computer,'observing',False):

@@ -266,7 +266,36 @@ def build_messages(
     projection = ContextMessages(messages)
     projection.base_count = len(messages)
     projection.rebuild = lambda: build_messages(state, text, presentation, source=source, plugin_context=plugin_context, image_ids=image_ids, image_note=image_note, observation=observation)
+    if observation is not None and observation.get('kind')=='minecraft':
+        def refresh_observation():
+            from .minecraft import minecraft
+            from .computer_tools import retire_game_observations
+            retire_game_observations(projection)
+            fresh=minecraft.stage_decision(observation['generation'])
+            observation.clear()
+            observation.update(fresh)
+            projection.game_observation_retired=False
+            projection.refresh()
+        projection.refresh_observation=refresh_observation
     return projection
+
+
+def _fit_pending_observation(messages,cfg,tools,*,game_event,cancelled):
+    from . import computer_tools
+    try:
+        computer_tools.fit_observation(messages,cfg,tools)
+    except vision.VisionError as error:
+        refresh=getattr(messages,'refresh_observation',None)
+        if str(error)!='computer.budget' or not game_event or refresh is None:raise
+        # Maintenance may outlive a frame's authority/TTL. Discard it first,
+        # reserve only dimensions, then capture a new authorized world snapshot.
+        computer_tools.discard_observation()
+        reservation=computer_tools._observation_message('momo-observation:pending',512,512)
+        compress.guard_request(cfg,messages,tools,cancelled=cancelled,extra_messages=[reservation])
+        if cancelled():raise llm.LlmError('Context preparation cancelled')
+        refresh()
+        computer_tools.fit_observation(messages,cfg,tools)
+    return computer_tools.observation_budget()
 
 
 def _merge_assistant(msgs: list[StoredMessage]) -> list[ChatMessage]:
@@ -389,8 +418,7 @@ def react(
                 # pre-capture metadata reservation. Fit the actual frame again
                 # after receiving them, for both reactions and active play.
                 if observation_budget:
-                    computer_tools.fit_observation(messages,llm_cfg,tools)
-                    observation_budget=computer_tools.observation_budget()
+                    observation_budget=_fit_pending_observation(messages,llm_cfg,tools,game_event=game_event,cancelled=lambda:checkpoint.generation()!=gen)
                     if not observation_budget:raise vision.VisionError("computer.observationExpired")
                 from .context_policy import Budget, estimate_request
                 if observation_budget and estimate_request(messages,tools,extra_messages=observation_budget)>Budget.from_config(llm_cfg).safe:

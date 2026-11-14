@@ -2,6 +2,8 @@ import json
 from contextlib import contextmanager
 from app.services import capability,turn
 from app.core import llm
+from app.services import computer_tools,vision
+import pytest
 
 
 def test_game_event_cannot_dispatch_unadvertised_owner_or_extension_tools():
@@ -46,3 +48,39 @@ def test_game_event_stops_its_turn_after_releasing_its_binding(monkeypatch):
  events=list(turn.run_turn('',observation={'kind':'minecraft','source':'Minecraft','observedAt':1,'state':{}}))
  assert calls==['stop']
  assert not [event for event in events if event['t']=='error']
+
+
+def test_game_frame_capacity_discards_then_maintains_then_recaptures(monkeypatch):
+ order=[]
+ class Messages(list):
+  def refresh_observation(self):order.append('fresh')
+ def fit(*args):
+  if not order:raise vision.VisionError('computer.budget')
+  assert order[-1]=='fresh';order.append('fit')
+ def maintain(*args,**kwargs):
+  assert order==['discard']
+  assert kwargs['extra_messages'][0]['content'][1]['image_url']['url']=='momo-observation:pending'
+  order.append('maintain')
+ monkeypatch.setattr(computer_tools,'fit_observation',fit)
+ monkeypatch.setattr(computer_tools,'discard_observation',lambda:order.append('discard'),raising=False)
+ monkeypatch.setattr(computer_tools,'observation_budget',lambda:['new-reservation'])
+ monkeypatch.setattr(turn.compress,'guard_request',maintain)
+ result=turn._fit_pending_observation(Messages(),{},[],game_event=True,cancelled=lambda:False)
+ assert result==['new-reservation'] and order==['discard','maintain','fresh','fit']
+
+
+def test_owner_screen_reaction_does_not_wait_with_old_pixels(monkeypatch):
+ monkeypatch.setattr(computer_tools,'fit_observation',lambda *a:(_ for _ in ()).throw(vision.VisionError('computer.budget')))
+ monkeypatch.setattr(turn.compress,'guard_request',lambda *a,**k:pytest.fail('old screen frame entered maintenance'))
+ with pytest.raises(vision.VisionError,match='computer.budget'):
+  turn._fit_pending_observation([],{},[],game_event=False,cancelled=lambda:False)
+
+
+def test_game_frame_revocation_during_maintenance_prevents_recapture(monkeypatch):
+ class Messages(list):
+  def refresh_observation(self):pytest.fail('revoked run recaptured game pixels')
+ monkeypatch.setattr(computer_tools,'fit_observation',lambda *a:(_ for _ in ()).throw(vision.VisionError('computer.budget')))
+ monkeypatch.setattr(computer_tools,'discard_observation',lambda:None)
+ monkeypatch.setattr(turn.compress,'guard_request',lambda *a,**k:None)
+ with pytest.raises(llm.LlmError,match='cancelled'):
+  turn._fit_pending_observation(Messages(),{},[],game_event=True,cancelled=lambda:True)

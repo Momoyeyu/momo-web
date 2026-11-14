@@ -126,6 +126,12 @@ def observation_budget():
     return [_observation_message('momo-observation:pending',w,h)]
 
 
+def discard_observation():
+    """Retire only this run's captured pixels; recapture requires a new grant check."""
+    with _lock:
+        _pending.pop(current_run.get(),None)
+
+
 def fit_observation(messages,cfg,tools=None):
     """Fit an already-captured read-only reaction without renewing its deadline."""
     try:rid=require_local()
