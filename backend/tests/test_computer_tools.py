@@ -306,3 +306,35 @@ def test_game_goal_conflict_reports_recovery_instead_of_an_ambiguous_permission_
  with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'update_goal',side_effect=MinecraftError('Live task must settle',code='MINECRAFT_TASKS_ACTIVE')):
   result=json.loads(tools.execute('minecraft_goal',{}))
  assert result['code']=='MINECRAFT_TASKS_ACTIVE' and 'cancel' in result['error'].lower()
+
+@pytest.mark.parametrize('arguments',[
+ {'action':'submit','taskId':'work','args':{'steps':[{'skill':'wait','args':{'ticks':20}}]}},
+ {'action':'wait','args':{'ticks':20}},
+ {'action':'play','control':'forward','durationMs':0},
+])
+def test_game_parameter_errors_are_known_before_dispatch(arguments):
+ from app.services.minecraft import minecraft
+ with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'execute') as dispatch:
+  reply=json.loads(tools.execute('minecraft_action',arguments))
+ assert reply['code']=='MINECRAFT_INPUT'
+ assert 'skill' in reply['error']
+ dispatch.assert_not_called()
+
+def test_declared_game_escape_key_passes_the_shared_action_schema():
+ from app.services.minecraft import minecraft
+ with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'execute',return_value={'sent':True}) as dispatch:
+  reply=json.loads(tools.execute('minecraft_action',{'action':'play','control':'screenKey','key':'escape','durationMs':1}))
+ assert reply=={'sent':True}
+ assert dispatch.call_args.args[1]['key']=='escape'
+
+def test_game_observation_omits_default_slot_metadata_but_preserves_durability_and_food():
+ import copy
+ from app.services.minecraft import Minecraft
+ raw={'slots':[{'id':9,'item':'minecraft:oak_log','count':3,'damage':0,'maxDamage':0,'components':{}},
+               {'id':41,'item':'minecraft:wooden_sword','count':1,'damage':7,'maxDamage':59,'components':{'minecraft:enchantments':'sharpness level 1'}},
+               {'id':36,'item':'minecraft:rotten_flesh','count':3,'damage':0,'maxDamage':0,'components':{'minecraft:food':'nutrition=4, hunger effect'}}]}
+ old=copy.deepcopy(raw);projected=Minecraft.model_observation(raw)
+ assert projected['slots'][0]=={'id':9,'item':'minecraft:oak_log','count':3}
+ assert projected['slots'][1]==raw['slots'][1]
+ assert projected['slots'][2]['components']==raw['slots'][2]['components']
+ assert raw==old

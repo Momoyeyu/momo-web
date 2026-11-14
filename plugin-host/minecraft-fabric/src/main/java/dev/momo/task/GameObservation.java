@@ -9,7 +9,8 @@ public final class GameObservation {
  public static JsonObject stack(ItemStack stack){var o=new JsonObject();o.addProperty("item",Registries.ITEM.getId(stack.getItem()).toString());o.addProperty("count",stack.getCount());o.addProperty("name",stack.getName().getString());o.addProperty("damage",stack.getDamage());o.addProperty("maxDamage",stack.getMaxDamage());
   var components=new JsonObject();
   for(var type:java.util.List.of(net.minecraft.component.DataComponentTypes.ENCHANTMENTS,net.minecraft.component.DataComponentTypes.STORED_ENCHANTMENTS,net.minecraft.component.DataComponentTypes.POTION_CONTENTS,net.minecraft.component.DataComponentTypes.FOOD)){
-   var value=stack.get(type);if(value!=null){String text=value.toString();components.addProperty(net.minecraft.registry.Registries.DATA_COMPONENT_TYPE.getId(type).toString(),text.substring(0,Math.min(1000,text.length())));}
+   var value=stack.get(type);if(value instanceof net.minecraft.component.type.ItemEnchantmentsComponent enchantments&&enchantments.isEmpty())continue;
+   if(value!=null){String text=value.toString();components.addProperty(net.minecraft.registry.Registries.DATA_COMPONENT_TYPE.getId(type).toString(),text.substring(0,Math.min(1000,text.length())));}
   }
   o.add("components",components);return o;}
  public static String screenId(net.minecraft.screen.ScreenHandler handler){

@@ -105,13 +105,15 @@ public final class GameSkills {
    }
    if(skill.equals("waitFor")&&args.get("area").getAsString().equals("screen")&&StationOutputs.indices(screenName()).isEmpty())throw new TaskRuntime.Rejected("station_required");
    if(skill.equals("craft")){
-    if(c.currentScreen==null)c.setScreen(new InventoryScreen(c.player));ownedScreen=c.currentScreen;
     var recipe=c.world.getRecipeManager().get(identifier(args,"recipe")).orElseThrow(()->new IllegalArgumentException("Unknown recipe"));
     if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.CraftingScreenHandler||c.player.currentScreenHandler instanceof net.minecraft.screen.PlayerScreenHandler))throw new TaskRuntime.Rejected("station_required");
     if(!c.player.getRecipeBook().contains(recipe))throw new TaskRuntime.Rejected("recipe_unknown");
+    var grid=(net.minecraft.screen.AbstractRecipeScreenHandler<?,?>)c.player.currentScreenHandler;
+    if(!(recipe.value() instanceof net.minecraft.recipe.CraftingRecipe)||!recipe.value().fits(grid.getCraftingWidth(),grid.getCraftingHeight()))throw new TaskRuntime.Rejected("station_required");
     var output=recipe.value().getResult(c.world.getRegistryManager());outputItem=Registries.ITEM.getId(output.getItem()).toString();beforeCount=count(outputItem);
     if(!c.player.currentScreenHandler.getCursorStack().isEmpty())throw new TaskRuntime.Rejected("cursor_not_empty");
     inventoryProof=new InventoryEvidence(beforeCount,c.player.currentScreenHandler.getRevision());
+    if(c.currentScreen==null)c.setScreen(new InventoryScreen(c.player));ownedScreen=c.currentScreen;
    }
    if(skill.equals("closeScreen"))c.player.closeHandledScreen();
    if(skill.equals("respawn")){if(c.player.isAlive())throw new TaskRuntime.Rejected("already_alive");c.player.requestRespawn();}

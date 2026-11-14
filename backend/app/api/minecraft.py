@@ -28,7 +28,7 @@ class Action(Owner):
     x: float = Field(default=0.5,ge=0,le=1)
     y: float = Field(default=0.5,ge=0,le=1)
     scroll: float = Field(default=0,ge=-10,le=10)
-    key: Literal['enter','backspace','tab','left','right','up','down'] = 'enter'
+    key: Literal['enter','backspace','tab','left','right','up','down','escape'] = 'enter'
     control: Literal['aim','respawn','screenClick','screenScroll','screenText','screenKey','resume','forward','back','left','right','jump','sneak','sprint','look','attack','mine','use','eat','hotbar','inventory','close','slot','quickMove','drop','swapHands'] | None = None
     blockIndex: int = Field(default=0,ge=0,le=7)
     yaw: float = Field(default=0,ge=-180,le=180)

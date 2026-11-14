@@ -2381,7 +2381,8 @@
               "left",
               "right",
               "up",
-              "down"
+              "down",
+              "escape"
             ],
             "title": "Key",
             "type": "string"
