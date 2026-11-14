@@ -1,6 +1,6 @@
 {
   "navigate": {
-    "description": "Reach a loaded local position within 64 blocks through Baritone. Use height=surface for outdoor exploration (y is ignored); exact is the default for a known floor. terrain=preserve (default) only walks. terrain=adapt can clear a passage or place existing throwaway blocks using normal player actions; use it when the intention allows terrain edits and an ordinary route is blocked. It does not discover resources or supply materials.",
+    "description": "Reach a loaded local position within 64 blocks through Baritone. Use height=surface for outdoor exploration (y is ignored); exact is the default and requires the specified standable feet block, not a neighboring floor. terrain=preserve (default) only walks. terrain=adapt can clear a passage or place existing throwaway blocks using normal player actions; use it when the intention allows terrain edits and an ordinary route is blocked. It does not discover resources or supply materials.",
     "parameters": {
       "type": "object",
       "properties": {
