@@ -27,10 +27,13 @@ public final class BaritoneNavigator {
   start(x,y,z,surface,false);
  }
  public void start(int x,int y,int z,boolean surface,boolean precise){
+  start(x,y,z,surface,precise,false);
+ }
+ public void start(int x,int y,int z,boolean surface,boolean precise,boolean adaptTerrain){
   baritone=BaritoneAPI.getProvider().getPrimaryBaritone();
   if(baritone.getPathingBehavior().isPathing()||baritone.getCustomGoalProcess().isActive()||(baritone.getPathingBehavior().getInProgress().isPresent()&&baritone!=releasedByUs))throw new IllegalStateException("Another navigator owns control");
   var config=BaritoneAPI.getSettings();
-  override(config.allowBreak,false);override(config.allowPlace,false);
+  override(config.allowBreak,adaptTerrain);override(config.allowPlace,adaptTerrain);
   override(config.allowParkourPlace,false);override(config.allowWaterBucketFall,false);
   override(config.chatControl,false);override(config.chatControlAnyway,false);override(config.prefixControl,false);
   override(config.freeLook,false);override(config.renderPath,false);override(config.renderGoal,false);

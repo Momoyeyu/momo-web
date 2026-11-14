@@ -10,6 +10,13 @@ test('strict typed contract covers vanilla interaction and finite local composit
  validateSkill('mine',{x:1,y:64,z:2});
  validateSkill('plan',{steps:[{skill:'eat',args:{},when:{item:'minecraft:apple',count:1,test:'atLeast'},retries:2},{skill:'inventory',args:{screen:'PlayerScreenHandler',actions:[{slot:9,button:0,mode:'quickMove'}]}}]});
 });
+test('terrain adaptation is an explicit bounded navigation option, never an executable program',()=>{
+ validateSkill('navigate',{x:1,y:64,z:2,terrain:'preserve'});
+ validateSkill('navigate',{x:1,y:64,z:2,height:'surface',terrain:'adapt'});
+ validateSkill('plan',{steps:[{skill:'navigate',args:{x:1,y:64,z:2,terrain:'adapt'}}]});
+ for(const terrain of ['teleport','script',''])assert.throws(()=>validateSkill('navigate',{x:1,y:64,z:2,terrain}),/Invalid/);
+ assert.throws(()=>validateSkill('navigate',{x:1,y:64,z:2,terrain:'adapt',script:'anything'}),/Invalid/);
+});
 test('unknown fields, nested programs, overlong plans and nonfinite values fail before transport',()=>{
  for(const [skill,args] of [['mine',{x:NaN,y:64,z:1}],['eat',{script:'run'}],['plan',{steps:[{skill:'plan',args:{steps:[]}}]}],['plan',{steps:Array(25).fill({skill:'eat',args:{}})}],['workstation',{screen:'MerchantScreenHandler',actions:[{slot:1,button:9,mode:'button'}]}]])assert.throws(()=>validateSkill(skill,args),/Invalid|Unsupported/);
  assert.throws(()=>validateSkill('bash',{command:'x'}),/Unsupported/);

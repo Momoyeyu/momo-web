@@ -9,6 +9,9 @@ public final class SkillArgumentsSmoke {
   if(!GatherSight.belowFeet(-1,63,0,-.1,.2,.5,.8,64))throw new AssertionError("Protect the full footprint across block boundaries");
   if(!GatherSight.belowFeet(0,63,0,.2,.2,.8,.8,63.5))throw new AssertionError("A half slab's support is inside the feet block, not below its floored Y");
   validate("navigate","{\"x\":1,\"y\":64,\"z\":2}");
+  validate("navigate","{\"x\":1,\"y\":64,\"z\":2,\"terrain\":\"adapt\"}");
+  validate("navigate","{\"x\":1,\"y\":64,\"z\":2,\"terrain\":\"preserve\"}");
+  reject("navigate","{\"x\":1,\"y\":64,\"z\":2,\"terrain\":\"teleport\"}");
   if(!SkillArguments.resourceId("oak_log").equals("minecraft:oak_log"))throw new AssertionError("vanilla identifiers need their default namespace");
   if(!SkillArguments.resourceId("example:oak_log").equals("example:oak_log"))throw new AssertionError("mod namespaces must be preserved");
   validate("navigate","{\"x\":1,\"y\":64,\"z\":2,\"height\":\"surface\"}");

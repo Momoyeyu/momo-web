@@ -299,7 +299,7 @@ public final class GameSkills {
    return Map.of("beforeDigest",digest(inventoryBefore),"afterDigest",digest(after),"screen",screenName(),"slots",slots,"cursor",GameObservation.stack(c.player.currentScreenHandler.getCursorStack()),"completedActions",verifiedActions,"serverConfirmationSeq",InventoryReceipts.CURRENT.cursor());
   }
   private static String digest(String value){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}}
-  private void go(BlockPos target){navigation.start(target.getX(),target.getY(),target.getZ(),skill.equals("navigate")&&args.has("height")&&args.get("height").getAsString().equals("surface"),skill.equals("pickup"));navigating=true;pathTarget=target;}
+  private void go(BlockPos target){navigation.start(target.getX(),target.getY(),target.getZ(),skill.equals("navigate")&&args.has("height")&&args.get("height").getAsString().equals("surface"),skill.equals("pickup"),skill.equals("navigate")&&args.has("terrain")&&args.get("terrain").getAsString().equals("adapt"));navigating=true;pathTarget=target;}
   private void approach(BlockPos target,int interval){
    boolean settled=navigating&&(navigation.arrived()||navigation.failed());
    if(NavigationBounds.retarget(navigating,settled,navigating?pathTarget.getSquaredDistance(target):0,ticks%interval==1)){haltNavigation();go(target);}
