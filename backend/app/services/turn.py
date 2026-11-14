@@ -177,6 +177,8 @@ def _remote_fallback(state, gen, at):
 class ContextMessages(list):
     """Request-local projection; refresh only persisted prefix, keep tool rounds."""
     def refresh(self):
+        anchor = getattr(self, "usage_anchor", None)
+        measured = bool(anchor and self[:len(anchor[0])] == anchor[0])
         suffix = self[self.base_count:]
         fresh = self.rebuild()
         self[:] = fresh + suffix
@@ -184,6 +186,20 @@ class ContextMessages(list):
         if getattr(self,'game_observation_retired',False):
             from .computer_tools import retire_game_observations
             retire_game_observations(self)
+        if measured:
+            import copy
+            import json
+            from difflib import SequenceMatcher
+            from .context_policy import estimate
+            # Rebuilding is an owned transformation. Keep the WHOLE measured
+            # prompt's cost and charge every new/replaced message in full bytes,
+            # including previously unmeasured action receipts. No credit for
+            # deleted history. Ordered matching counts duplicate additions too.
+            key = lambda row: json.dumps(row, ensure_ascii=False, sort_keys=True)
+            matching = SequenceMatcher(None, list(map(key, anchor[0])), list(map(key, self)), autojunk=False)
+            retained = {index for block in matching.get_matching_blocks() for index in range(block.b, block.b + block.size)}
+            added = [row for index, row in enumerate(self) if index not in retained]
+            self.usage_anchor = (copy.deepcopy(list(self)), anchor[1], anchor[2] + (estimate(added) if added else 0))
         if hasattr(self, "fit_images"): self.fit_images()
 
 

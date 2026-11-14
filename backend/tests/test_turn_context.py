@@ -128,3 +128,44 @@ def test_provider_usage_bounds_unchanged_prefix_and_byte_counts_only_new_suffix(
     assert estimate_request(messages, added_tools) == estimate(messages, added_tools)
     messages[0] = {'role':'system','content':'Changed prefix'}
     assert estimate_request(messages, tools) == estimate(messages, tools)
+
+
+def test_owned_refresh_charges_new_prefix_and_unmeasured_effects_without_forgetting_usage():
+    from app.services.turn import ContextMessages
+    from app.services.context_policy import estimate_request, estimate
+    common={'role':'system','content':'unchanged instructions '*2500}
+    old=[common,{'role':'user','content':'old dialogue'},{'role':'assistant','content':'old answer'}]
+    tools=[{'type':'function','function':{'name':'minecraft_action'}}]
+    messages=ContextMessages(copy.deepcopy(old));messages.base_count=len(old)
+    messages.usage_anchor=(copy.deepcopy(old),copy.deepcopy(tools),5000)
+    effect=[{'role':'assistant','tool_calls':[{'id':'effect','function':{'name':'minecraft_action','arguments':'{"action":"submit"}'}}]},
+            {'role':'tool','tool_call_id':'effect','content':'Verified actual action receipt; keep this unchanged'}]
+    messages.extend(copy.deepcopy(effect))
+    summary={'role':'system','content':'New summary replaces the dialogue; fresh trusted facts.'}
+    messages.rebuild=lambda:[copy.deepcopy(common),copy.deepcopy(summary)]
+    messages.refresh()
+    assert messages[-2:]==effect
+    assert messages.usage_anchor[0]==messages
+    assert messages.usage_anchor[2]==5000+estimate([summary,*effect])
+    expected=messages.usage_anchor[2]+estimate([])  # Request framing remains conservatively charged.
+    assert estimate_request(messages,tools)==expected
+    assert expected<estimate(messages,tools), 'Unchanged large instructions were already counted by the provider'
+    messages.refresh()
+    assert estimate_request(messages,tools)==expected, 'An identical rebuild must not charge again'
+    assert estimate_request(messages,[{'type':'function','function':{'name':'different'}}])==estimate(messages,[{'type':'function','function':{'name':'different'}}])
+
+
+def test_refresh_usage_bound_counts_duplicate_additions_and_rejects_untracked_prefix_changes():
+    from app.services.turn import ContextMessages
+    from app.services.context_policy import estimate_request,estimate
+    common={'role':'system','content':'unchanged '*5000};repeated={'role':'system','content':'Fresh repeated fact'}
+    old=[common,repeated];messages=ContextMessages(copy.deepcopy(old));messages.base_count=2
+    messages.usage_anchor=(copy.deepcopy(old),[],5000)
+    messages.rebuild=lambda:[copy.deepcopy(common),*([copy.deepcopy(repeated)]*3)]
+    messages.refresh()
+    assert messages.usage_anchor[2]==5000+estimate([repeated,repeated]), 'Each extra occurrence costs tokens'
+    assert estimate_request(messages,[])==messages.usage_anchor[2]+estimate([])
+    messages[0]={'role':'system','content':'untracked caller edit'}
+    messages.rebuild=lambda:[{'role':'system','content':'different rebuilt context'}]
+    messages.refresh()
+    assert estimate_request(messages,[])==estimate(messages,[]), 'A stale anchor cannot authorize unrelated prefix edits'
