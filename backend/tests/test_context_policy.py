@@ -91,6 +91,36 @@ def test_output_allowance_is_not_silently_lowered():
     assert Budget.from_config({'contextWindow':32000,'maxOutputTokens':12000}).output==12000
 
 
+def test_hard_guard_rebuilds_a_prefix_already_compacted_before_entry(monkeypatch):
+    from app.services import compress,turn
+    from app.core import llm
+    common={'role':'system','content':'Shared instructions'}
+    messages=turn.ContextMessages([common,{'role':'system','content':'old summary '*1400}]);messages.base_count=2
+    receipt={'role':'tool','tool_call_id':'actual-effect','content':'Verified action; keep it'}
+    messages.append(receipt)
+    messages.rebuild=lambda:[common,{'role':'system','content':'New summary already published'}]
+    # No further publication occurs during this guard. Waiting for a version
+    # change can never discover the stale prefix that the caller already holds.
+    monkeypatch.setattr(compress,'maybe_compress',lambda *a,**k:False)
+    cfg={'contextWindow':12000,'maxOutputTokens':1000}
+    compress.guard_request(cfg,messages,[],cancelled=lambda:False)
+    assert messages[-1]==receipt
+    assert 'New summary already published' in str(messages)
+    assert estimate(messages,[])<=Budget.from_config(cfg).safe
+
+
+def test_cancelled_hard_guard_does_not_rebuild_another_generation(monkeypatch):
+    from app.services import compress,turn
+    from app.core import llm
+    rebuilt=[]
+    messages=turn.ContextMessages([{'role':'system','content':'old '*4000}]);messages.base_count=1
+    messages.rebuild=lambda:rebuilt.append(True) or []
+    monkeypatch.setattr(compress,'maybe_compress',lambda *a,**k:False)
+    with pytest.raises(llm.LlmError,match='cancelled'):
+        compress.guard_request({'contextWindow':12000,'maxOutputTokens':1000},messages,[],cancelled=lambda:True)
+    assert rebuilt==[]
+
+
 def test_screenshot_reservation_triggers_real_guard_refresh_without_summarizing_pixels(monkeypatch):
     import math
     from app.services import compress, turn

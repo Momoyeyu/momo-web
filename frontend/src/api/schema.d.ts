@@ -2657,7 +2657,7 @@ export interface components {
              * @default enter
              * @enum {string}
              */
-            key: "enter" | "backspace" | "tab" | "left" | "right" | "up" | "down";
+            key: "enter" | "backspace" | "tab" | "left" | "right" | "up" | "down" | "escape";
             /** Leaseid */
             leaseId: string;
             /**

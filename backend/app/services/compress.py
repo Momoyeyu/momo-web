@@ -75,6 +75,14 @@ def guard_request(cfg, messages, tools, *, cancelled, extra_messages=()):
     budget = Budget.from_config(cfg)
     from .context_policy import estimate_request
     size = estimate_request(messages, tools, extra_messages=extra_messages)
+    if size > budget.safe and hasattr(messages, 'refresh'):
+        # A soft worker may have published BEFORE this guard took its first
+        # version snapshot. Synchronize once now; waiting only for a subsequent
+        # publication would keep budgeting the caller's stale oversized prefix.
+        if cancelled():raise llm.LlmError('Context preparation cancelled')
+        messages.refresh()
+        if cancelled():raise llm.LlmError('Context preparation cancelled')
+        size = estimate_request(messages, tools, extra_messages=extra_messages)
     from . import checkpoint
     policy = Policy(cfg, checkpoint.audience(), tools)
     policy.record_request(size)

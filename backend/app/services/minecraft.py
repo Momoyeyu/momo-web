@@ -60,8 +60,15 @@ class Minecraft:
             return {**result, 'active': self.binding is not None, 'generation': self.generation,
                     'permissions': sorted(self.permissions), 'managedProvisioningAvailable': False,
                     'tasks': list(self.tasks.values())[-5:], 'paused': self.paused or self.suspended,
-                    'autonomous': self.autonomous, 'decisionNeeded': self.autonomous and not self.paused and not self.suspended and (self.decision_needed or time.monotonic()-self.last_decision>=30),
+                    'autonomous': self.autonomous, 'decisionNeeded': self._decision_due(time.monotonic()),
                     'goal': self.current_goal() if self.binding else None}
+
+    def _decision_due(self, now):
+        if not self.binding or not self.autonomous or self.paused or self.suspended:return False
+        if self.decision_needed:return True
+        # A healthy body already has purposeful work. Time alone must not wake
+        # the model to poll it or enqueue duplicate waiting/navigation tasks.
+        return now-self.last_decision>=30 and not any(task.get('state') in {'queued','running','paused'} for task in self.tasks.values())
 
     def gate(self, client, lease, *, allow_active=False):
         from .activities import require_enabled
@@ -246,9 +253,9 @@ class Minecraft:
         from . import intro
         with self.lock:
             now=time.monotonic()
-            if (generation!=self.generation or not self.binding or not self.autonomous or self.paused or self.suspended
+            if (generation!=self.generation or not self._decision_due(now)
                     or runtime.active or runtime.presentation or runtime.queue or runtime.interrupt_hold or intro.restricted()
-                    or now-self.last_decision<2 or (not self.decision_needed and now-self.last_decision<30)):
+                    or now-self.last_decision<2):
                 return None
             self.last_decision=now
             self.decision_needed=False

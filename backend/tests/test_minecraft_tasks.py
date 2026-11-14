@@ -75,6 +75,18 @@ def test_goal_recheck_is_event_driven_with_a_30_second_idle_floor():
   rt.active='player-conversation'
   with patch('app.services.minecraft.time.monotonic',return_value=170):assert m.claim_decision(0,'owner','lease') is None
 
+@pytest.mark.parametrize('task_state',['queued','running','paused'])
+def test_body_in_progress_does_not_trigger_idle_model_polls_but_important_events_still_wake(task_state):
+ m,rt=setup();m.autonomous=True;m.decision_needed=False;m.last_decision=100
+ m.tasks={'wait':{'taskId':'wait','skill':'wait','state':task_state}}
+ rt.active=rt.presentation=None;rt.queue=[];rt.interrupt_hold=False
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'),patch('app.services.intro.restricted',return_value=False),patch('app.services.minecraft.time.monotonic',return_value=200):
+  assert m.status()['decisionNeeded'] is False
+  assert m.claim_decision(0,'owner','lease') is None
+  m.decision_needed=True
+  assert m.status()['decisionNeeded'] is True
+  assert m.claim_decision(0,'owner','lease')['kind']=='minecraft'
+
 def test_equivalent_failed_searches_expose_replanning_evidence_without_a_fixed_goal():
  from app.services.minecraft import Minecraft
  def failed(item,x,dimension='minecraft:overworld'):
