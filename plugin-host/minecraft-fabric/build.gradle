@@ -105,3 +105,10 @@ tasks.register('navigationBoundsSmoke', JavaExec) {
  mainClass = 'dev.momo.task.NavigationBoundsSmoke'
 }
 check.dependsOn navigationBoundsSmoke
+
+tasks.register('sightLandmarksSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.SightLandmarksSmoke'
+}
+check.dependsOn sightLandmarksSmoke
