@@ -298,9 +298,10 @@ public final class GameSkills {
    else if(settled)throw new TaskRuntime.Rejected("unreachable");
   }
   private void haltNavigation(){if(navigating){navigation.stop();navigating=false;}}
-  private boolean visible(BlockPos target){var eye=c.player.getEyePos();if(eye.squaredDistanceTo(target.toCenterPos())>1024)return false;var hit=c.world.raycast(new RaycastContext(eye,target.toCenterPos(),RaycastContext.ShapeType.OUTLINE,RaycastContext.FluidHandling.NONE,c.player));return hit.getType()==HitResult.Type.BLOCK&&hit.getBlockPos().equals(target);}
+  private RaycastContext.ShapeType sightShape(BlockPos target){return c.world.getBlockState(target).getCollisionShape(c.world,target).isEmpty()?RaycastContext.ShapeType.OUTLINE:RaycastContext.ShapeType.COLLIDER;}
+  private boolean visible(BlockPos target){var eye=c.player.getEyePos();if(eye.squaredDistanceTo(target.toCenterPos())>1024)return false;var hit=c.world.raycast(new RaycastContext(eye,target.toCenterPos(),sightShape(target),RaycastContext.FluidHandling.NONE,c.player));return hit.getType()==HitResult.Type.BLOCK&&hit.getBlockPos().equals(target);}
   private boolean reachable(BlockPos target){return c.player.canInteractWithBlockAt(target,0)&&visible(target);}
-  private Direction face(BlockPos target){var ray=c.world.raycast(new RaycastContext(c.player.getEyePos(),target.toCenterPos(),RaycastContext.ShapeType.OUTLINE,RaycastContext.FluidHandling.NONE,c.player));return ray.getSide();}
+  private Direction face(BlockPos target){var ray=c.world.raycast(new RaycastContext(c.player.getEyePos(),target.toCenterPos(),sightShape(target),RaycastContext.FluidHandling.NONE,c.player));return ray.getSide();}
   private void look(Vec3d target){var delta=target.subtract(c.player.getEyePos());float yaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z)),pitch=(float)-Math.toDegrees(Math.atan2(delta.y,Math.sqrt(delta.x*delta.x+delta.z*delta.z)));c.player.setYaw(c.player.getYaw()+MathHelper.clamp(MathHelper.wrapDegrees(yaw-c.player.getYaw()),-18,18));c.player.setPitch(c.player.getPitch()+MathHelper.clamp(pitch-c.player.getPitch(),-14,14));}
   private void selectTool(){float best=1;int slot=c.player.getInventory().selectedSlot;for(int i=0;i<9;i++){var stack=c.player.getInventory().getStack(i);float speed=stack.getMiningSpeedMultiplier(c.world.getBlockState(pos));if(speed>best){best=speed;slot=i;}}c.player.getInventory().selectedSlot=slot;}
   private int foodSlot(){for(int i=0;i<9;i++)if(c.player.getInventory().getStack(i).contains(net.minecraft.component.DataComponentTypes.FOOD))return i;return -1;}

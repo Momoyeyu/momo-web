@@ -37,14 +37,16 @@ public final class GameObservation {
   }
   result.add("visibleEntities",entities);
   var eye=p.getEyePos();
-  var landmarks=SightLandmarks.collect(eye.x,eye.y,eye.z,(dx,dy,dz)->{
-   var hit=c.world.raycast(new net.minecraft.world.RaycastContext(eye,eye.add(dx,dy,dz),net.minecraft.world.RaycastContext.ShapeType.OUTLINE,net.minecraft.world.RaycastContext.FluidHandling.NONE,p));
+  var landmarks=SightLandmarks.collect(eye.x,eye.y,eye.z,p.getYaw(),p.getPitch(),(dx,dy,dz)->{
+   var hit=c.world.raycast(new net.minecraft.world.RaycastContext(eye,eye.add(dx,dy,dz),net.minecraft.world.RaycastContext.ShapeType.COLLIDER,net.minecraft.world.RaycastContext.FluidHandling.NONE,p));
    if(hit.getType()!=net.minecraft.util.hit.HitResult.Type.BLOCK||!c.world.isChunkLoaded(hit.getBlockPos()))return null;
    var pos=hit.getBlockPos();var state=c.world.getBlockState(pos);
    int priority=state.isIn(net.minecraft.registry.tag.BlockTags.LOGS)?0:state.isIn(net.minecraft.registry.tag.BlockTags.LEAVES)?1:state.hasBlockEntity()?2:3;
    return new SightLandmarks.Hit(pos.getX(),pos.getY(),pos.getZ(),Registries.BLOCK.getId(state.getBlock()).toString(),priority);
   });
   result.add("visibleLandmarks",new Gson().toJsonTree(landmarks));
+  result.addProperty("biome",c.world.getBiome(p.getBlockPos()).getKey().map(key->key.getValue().toString()).orElse("unknown"));
+  result.addProperty("difficulty",c.world.getDifficulty().getName());
   result.add("knownRecipes",recipes(c,"",8));
   result.addProperty("recipeQueryAvailable",true);
   var station=new JsonObject();

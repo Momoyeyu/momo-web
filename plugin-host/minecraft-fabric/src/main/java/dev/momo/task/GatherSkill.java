@@ -42,7 +42,11 @@ public final class GatherSkill implements TaskRuntime.Work {
   for(int n=0;n<16&&scan<512;n++,scan++){
    totalRays++;
    double[] direction=GatherSight.direction(scan);var eye=c.player.getEyePos();var end=eye.add(direction[0]*16,direction[1]*16,direction[2]*16);
-   var hit=c.world.raycast(new RaycastContext(eye,end,RaycastContext.ShapeType.OUTLINE,RaycastContext.FluidHandling.NONE,c.player));
+   var wanted=Registries.ITEM.get(net.minecraft.util.Identifier.of(item));
+   boolean plantTarget=wanted instanceof net.minecraft.item.BlockItem block&&block.getBlock().getDefaultState().getCollisionShape(c.world,c.player.getBlockPos()).isEmpty();
+   // Decorative grass does not hide solid wood/ore from normal vision. A plant
+   // being gathered still uses its own outline rather than disappearing from sight.
+   var hit=c.world.raycast(new RaycastContext(eye,end,plantTarget?RaycastContext.ShapeType.OUTLINE:RaycastContext.ShapeType.COLLIDER,RaycastContext.FluidHandling.NONE,c.player));
    if(hit.getType()!=HitResult.Type.BLOCK)continue;
    var pos=hit.getBlockPos();if(!c.world.isChunkLoaded(pos)||blocked.getOrDefault(pos,0)>ticks)continue;
    var state=c.world.getBlockState(pos);String block=Registries.BLOCK.getId(state.getBlock()).toString();
