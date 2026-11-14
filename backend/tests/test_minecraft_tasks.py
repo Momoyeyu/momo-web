@@ -81,6 +81,8 @@ def test_equivalent_failed_searches_expose_replanning_evidence_without_a_fixed_g
   return {'state':'failed','evidence':{'item':item,'dimension':dimension,'searchResult':'source_not_visible','searchOrigin':{'x':x,'y':64,'z':0},'lastObservedPosition':{'x':x,'y':64,'z':0},'countBefore':0,'countAfter':0}}
  repeated=Minecraft.repeated_searches([failed('minecraft:oak_log',0),failed('minecraft:oak_log',1),failed('minecraft:oak_log',1,'minecraft:the_nether'),failed('minecraft:iron_ore',0)])
  assert len(repeated)==1 and repeated[0]['item']=='minecraft:oak_log' and repeated[0]['attempts']==2
+ successful=failed('minecraft:oak_log',1);successful['state']='succeeded'
+ assert Minecraft.repeated_searches([failed('minecraft:oak_log',0),successful])==[], 'Recovered successful searches must not count as repeated failures'
 
 def test_model_capabilities_are_bounded_and_schemas_are_requested_per_skill():
  m,rt=setup()

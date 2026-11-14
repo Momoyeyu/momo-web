@@ -20,6 +20,7 @@ import net.minecraft.world.RaycastContext;
 public final class GameSkills {
  public static final List<String> NAMES=List.copyOf(SkillArguments.contract().keySet());
  private GameSkills(){}
+ static TaskRuntime.Work gatherMine(JsonObject args){SkillArguments.validate("mine",args);var work=new Skill("mine",args.deepCopy());work.protectSupport=true;return work;}
  public static TaskRuntime.Work create(String skill,JsonObject args){
   SkillArguments.validate(skill,args);
   if(skill.equals("gather"))return new GatherSkill(args);
@@ -53,7 +54,7 @@ public final class GameSkills {
   final BaritoneNavigator navigation=new BaritoneNavigator();
   BlockPos pos,placed,pathTarget,lastSeen;Entity entity;Screen ownedScreen;boolean navigating,startedUse;int ticks,actionIndex,phase,startFood,beforeCount,lostTicks;String beforeState,inventoryBefore,outputItem;InventoryEvidence inventoryProof;int mutationTick,craftPhase;final long pickupBoundary=PickupLedger.CURRENT.cursor();float startHealth;int targetSlot;
   long blockBoundary;String beforeBlock;int predictedChangeTick;
-  boolean placeSent,inventoryPending,buttonPending;String placedItem;int verifiedActions;
+  boolean placeSent,inventoryPending,buttonPending,protectSupport;String placedItem;int verifiedActions;
   net.minecraft.client.world.ClientWorld proofWorld;int proofHandler;long slotBoundary;SlotProof slotProof;
   Map<String,Object> verifiedGain=Map.of(),verifiedSlots=Map.of();
   Skill(String skill,JsonObject args){this.skill=skill;this.args=args;ownedScreen=c.currentScreen;}
@@ -139,7 +140,10 @@ public final class GameSkills {
       break;
      }
      if(predictedChangeTick!=0&&mined!=null)return TaskRuntime.Step.failed("block_change_rejected");
-     if(!reachable(pos)){approach(pos,20);break;}haltNavigation();look(pos.toCenterPos());
+     if(protectSupport&&belowFeet(pos))return TaskRuntime.Step.failed("unreachable");
+     if(!reachable(pos)){approach(pos,20);break;}haltNavigation();
+     if(protectSupport&&belowFeet(pos))return TaskRuntime.Step.failed("unreachable");
+     look(pos.toCenterPos());
      c.interactionManager.updateBlockBreakingProgress(pos,face(pos));c.player.swingHand(Hand.MAIN_HAND);break;
     case "place":
      var built=BlockReceipts.CURRENT.after(c.world,placed.getX(),placed.getY(),placed.getZ(),blockBoundary);
@@ -164,8 +168,12 @@ public final class GameSkills {
      var receipt=PickupLedger.CURRENT.since(c.world,args.get("entityId").getAsInt(),c.player.getId(),pickupBoundary);
      if(receipt!=null)return done(Map.of("entityId",receipt.entityId(),"pickedCount",receipt.amount(),"serverPickupSeq",receipt.seq()));
      if(entity==null||entity.isRemoved())return TaskRuntime.Step.failed("drop_gone_without_own_pickup");
-     if(navigating&&navigation.arrived()){haltNavigation();look(entity.getPos());c.options.forwardKey.setPressed(true);c.options.jumpKey.setPressed(c.player.horizontalCollision);}
-     else if(!c.options.forwardKey.isPressed())approach(entity.getBlockPos(),20);
+     if(navigating&&navigation.arrived()&&pathTarget.equals(entity.getBlockPos())){haltNavigation();phase=1;}
+     if(phase>0){
+      look(entity.getPos());c.options.forwardKey.setPressed(false);c.options.jumpKey.setPressed(false);
+      if(!pathTarget.equals(entity.getBlockPos())){phase=0;approach(entity.getBlockPos(),20);}
+      else if(++phase>40)return TaskRuntime.Step.failed("unreachable");
+     }else approach(entity.getBlockPos(),20);
      break;
     case "waitFor":
      int present=0;
@@ -291,7 +299,7 @@ public final class GameSkills {
    return Map.of("beforeDigest",digest(inventoryBefore),"afterDigest",digest(after),"screen",screenName(),"slots",slots,"cursor",GameObservation.stack(c.player.currentScreenHandler.getCursorStack()),"completedActions",verifiedActions,"serverConfirmationSeq",InventoryReceipts.CURRENT.cursor());
   }
   private static String digest(String value){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}}
-  private void go(BlockPos target){navigation.start(target.getX(),target.getY(),target.getZ(),skill.equals("navigate")&&args.has("height")&&args.get("height").getAsString().equals("surface"));navigating=true;pathTarget=target;}
+  private void go(BlockPos target){navigation.start(target.getX(),target.getY(),target.getZ(),skill.equals("navigate")&&args.has("height")&&args.get("height").getAsString().equals("surface"),skill.equals("pickup"));navigating=true;pathTarget=target;}
   private void approach(BlockPos target,int interval){
    boolean settled=navigating&&(navigation.arrived()||navigation.failed());
    if(NavigationBounds.retarget(navigating,settled,navigating?pathTarget.getSquaredDistance(target):0,ticks%interval==1)){haltNavigation();go(target);}
@@ -309,7 +317,8 @@ public final class GameSkills {
   private String inventoryState(){StringBuilder value=new StringBuilder();for(var slot:c.player.currentScreenHandler.slots){var stack=slot.getStack();if(!stack.isEmpty())value.append(slot.id).append(':').append(Registries.ITEM.getId(stack.getItem())).append('*').append(stack.getCount()).append('@').append(stack.getComponents().hashCode()).append(';');}return value.append("cursor:").append(c.player.currentScreenHandler.getCursorStack()).toString();}
   private String screenName(){return GameObservation.screenId(c.player.currentScreenHandler);}
   public void pause(){haltNavigation();release();}
-  public boolean controlsMining(){return skill.equals("mine")&&!navigating;}
+  private boolean belowFeet(BlockPos target){if(c.player==null||target==null)return true;var box=c.player.getBoundingBox();return GatherSight.belowFeet(target.getX(),target.getY(),target.getZ(),box.minX,box.minZ,box.maxX,box.maxZ,c.player.getY());}
+  public boolean controlsMining(){return skill.equals("mine")&&!navigating&&(!protectSupport||!belowFeet(pos));}
   public boolean handlesCombat(){return skill.equals("attack");}
   public boolean retrySafe(String reason){return Set.of("navigate","follow","wait","waitFor").contains(skill)||Set.of("target_not_visible","outside_known_terrain","block_change_rejected").contains(reason);}
   public Map<String,Object> partialEvidence(){

@@ -13,6 +13,7 @@ public final class GatherSkill implements TaskRuntime.Work {
  private final MinecraftClient c=MinecraftClient.getInstance();
  private final String item;private final int requested;
  private final Map<BlockPos,Integer> blocked=new HashMap<>();
+ private final Map<Integer,Integer> blockedDrops=new HashMap<>();private int dropTarget=-1;
  private TaskRuntime.Work child;private BlockPos target,origin,foliage;
  private int baseline,observedCount,totalRays,ticks,scan,idle,clearedLeaves;private String phase="search",lastFailure="",dimension="";
  private BlockPos lastPosition;private net.minecraft.client.world.ClientWorld searchWorld;
@@ -23,7 +24,7 @@ public final class GatherSkill implements TaskRuntime.Work {
   if(++ticks>2400)return fail("gather_timeout");
   if(c.player==null||c.world==null||c.world!=searchWorld||!c.player.isAlive())return fail("world_unavailable");
   observedCount=count();lastPosition=c.player.getBlockPos();
-  if(count()-baseline>=requested)return TaskRuntime.Step.done(Map.of("item",item,"countBefore",baseline,"countAfter",count()));
+  if(count()-baseline>=requested){lastFailure="completed";phase="completed";return TaskRuntime.Step.done(Map.of("item",item,"countBefore",baseline,"countAfter",count()));}
   if(c.player.getBlockPos().getSquaredDistance(origin)>1024)return fail("outside_known_terrain");
   if(child!=null){
    TaskRuntime.Step outcome;
@@ -31,12 +32,13 @@ public final class GatherSkill implements TaskRuntime.Work {
    if(outcome.state().equals("running"))return outcome;
    child.stop();child=null;
    if(Set.of("server_confirmation_missing","execution_failed","stop_unconfirmed").contains(outcome.reason()))return fail(outcome.reason());
-   if(outcome.state().equals("failed")){lastFailure=outcome.reason();if(target!=null)blocked.put(target,ticks+200);}
+   if(outcome.state().equals("failed")){lastFailure=outcome.reason();if(target!=null)blocked.put(target,ticks+200);if(dropTarget>=0)blockedDrops.put(dropTarget,ticks+200);}
+   dropTarget=-1;
    target=null;foliage=null;phase="search";idle=0;scan=0;return TaskRuntime.Step.running();
   }
   // Pickup entities are already visible normal-player facts, not remote loot scans.
-  var drop=c.world.getOtherEntities(c.player,c.player.getBoundingBox().expand(16),e->e instanceof net.minecraft.entity.ItemEntity d&&Registries.ITEM.getId(d.getStack().getItem()).toString().equals(item)&&c.player.canSee(e)).stream().min(Comparator.comparingDouble(e->e.squaredDistanceTo(c.player)));
-  if(drop.isPresent()){var args=new JsonObject();args.addProperty("entityId",drop.get().getId());begin("pickup",args);return TaskRuntime.Step.running();}
+  var drop=c.world.getOtherEntities(c.player,c.player.getBoundingBox().expand(16),e->blockedDrops.getOrDefault(e.getId(),0)<=ticks&&e instanceof net.minecraft.entity.ItemEntity d&&Registries.ITEM.getId(d.getStack().getItem()).toString().equals(item)&&c.player.canSee(e)).stream().min(Comparator.comparingDouble(e->e.squaredDistanceTo(c.player)));
+  if(drop.isPresent()){dropTarget=drop.get().getId();var args=new JsonObject();args.addProperty("entityId",dropTarget);begin("pickup",args);return TaskRuntime.Step.running();}
   if(++idle<12)return TaskRuntime.Step.running(); // Allow normal drops/server inventory updates to arrive.
   // At most sixteen sight rays per tick; read only the first visible hit of each.
   for(int n=0;n<16&&scan<512;n++,scan++){
@@ -49,6 +51,7 @@ public final class GatherSkill implements TaskRuntime.Work {
    var hit=c.world.raycast(new RaycastContext(eye,end,plantTarget?RaycastContext.ShapeType.OUTLINE:RaycastContext.ShapeType.COLLIDER,RaycastContext.FluidHandling.NONE,c.player));
    if(hit.getType()!=HitResult.Type.BLOCK)continue;
    var pos=hit.getBlockPos();if(!c.world.isChunkLoaded(pos)||blocked.getOrDefault(pos,0)>ticks)continue;
+   var box=c.player.getBoundingBox();if(GatherSight.belowFeet(pos.getX(),pos.getY(),pos.getZ(),box.minX,box.minZ,box.maxX,box.maxZ,c.player.getY()))continue;
    var state=c.world.getBlockState(pos);String block=Registries.BLOCK.getId(state.getBlock()).toString();
    if(!Registries.ITEM.getId(state.getBlock().asItem()).toString().equals(item)&&!GatherSight.normalDrop(block,item)){
     // A visible canopy is a normal cue for wood, not knowledge of a hidden log.
@@ -66,7 +69,7 @@ public final class GatherSkill implements TaskRuntime.Work {
   return TaskRuntime.Step.running();
  }
  private void begin(String skill,JsonObject args){
-  child=GameSkills.create(skill,args);phase=skill;
+  child=skill.equals("mine")?GameSkills.gatherMine(args):GameSkills.create(skill,args);phase=skill;
   try{child.start();}catch(RuntimeException error){child.stop();child=null;lastFailure=TaskRuntime.reason(error,"start_failed");if(target!=null)blocked.put(target,ticks+200);target=null;phase="search";}
  }
  public void pause(){if(child!=null)child.pause();}

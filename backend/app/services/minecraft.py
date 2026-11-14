@@ -304,6 +304,7 @@ class Minecraft:
     def repeated_searches(tasks):
         groups={}
         for task in tasks:
+            if task.get('state') not in {'failed','cancelled'}:continue
             evidence=task.get('evidence',{})
             values=[evidence,*[row.get('result',{}) for row in evidence.get('steps',[]) if isinstance(row,dict)]]
             seen=set()

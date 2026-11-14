@@ -2,6 +2,7 @@ package dev.momo.task;
 /** Sampling normal sight, never enumerating hidden terrain or querying loot tables. */
 public final class GatherSight {
  private GatherSight(){}
+ public static boolean belowFeet(int x,int y,int z,double minX,double minZ,double maxX,double maxZ,double feetY){return y<feetY&&x+1>minX&&x<maxX&&z+1>minZ&&z<maxZ;}
  private static final double[] HEIGHT={0,.15,-.15,.35,-.35,.65,-.65,.9,-.9};
  public static double[] direction(int index){double y=HEIGHT[index%HEIGHT.length],angle=(index/HEIGHT.length)*2.399963229728653,r=Math.sqrt(1-y*y);return new double[]{Math.sin(angle)*r,y,Math.cos(angle)*r};}
  public static boolean normalDrop(String block,String item){

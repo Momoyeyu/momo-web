@@ -24,6 +24,9 @@ public final class BaritoneNavigator {
   start(x,y,z,false);
  }
  public void start(int x,int y,int z,boolean surface){
+  start(x,y,z,surface,false);
+ }
+ public void start(int x,int y,int z,boolean surface,boolean precise){
   baritone=BaritoneAPI.getProvider().getPrimaryBaritone();
   if(baritone.getPathingBehavior().isPathing()||baritone.getCustomGoalProcess().isActive()||(baritone.getPathingBehavior().getInProgress().isPresent()&&baritone!=releasedByUs))throw new IllegalStateException("Another navigator owns control");
   var config=BaritoneAPI.getSettings();
@@ -36,7 +39,7 @@ public final class BaritoneNavigator {
   override(config.failureTimeoutMS,Math.min(3000L,Math.max(1L,config.failureTimeoutMS.value)));
   override(config.planAheadPrimaryTimeoutMS,Math.min(500L,Math.max(1L,config.planAheadPrimaryTimeoutMS.value)));
   override(config.planAheadFailureTimeoutMS,Math.min(1500L,Math.max(1L,config.planAheadFailureTimeoutMS.value)));
-  goal=surface?new GoalXZ(x,z):new GoalNear(new BlockPos(x,y,z),1);
+  goal=surface?new GoalXZ(x,z):new GoalNear(new BlockPos(x,y,z),precise?0:1);
   warmup=4;
   pendingTicks=0;started=false;pending=baritone.getPathingBehavior().getInProgress().isPresent();
   if(!pending)begin();
