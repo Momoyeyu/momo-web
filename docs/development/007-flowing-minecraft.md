@@ -6,6 +6,20 @@ Approved replacement specification, 2026-11-13. Status: implementation in progre
 
 007 尚未完成。已实测导航、视线内采集、精确合成、方块破坏／放置、背包交换、工作台转移、普通熔炉、追击近战、死亡后重生和暂停释放；这些是分项证据。完整战斗、其他原版加工／交易／交通／维度等能力组、连续自主游玩、接管／恢复以及最终安装版仍需集中验证。不能因为工具已声明或单项 smoke 通过就标记 done。
 
+| 验收范围 | 已有真实证据 | 仍需验证 |
+|---|---|---|
+| 感知与探索 | 近处操作方块、约 67 格外可见树冠、探索后接近采集 | 完整异常与未知机制反馈 |
+| 移动与导航 | 地表路线、跳跃、游泳、稳定抵达、可选清理通路 | 跟随、攀爬及搭路分支的集中覆盖 |
+| 采集与建造 | 连续采石 8 块、连续采木 3 根、正常破坏与放置回执 | 更复杂组合和满背包恢复 |
+| 背包与容器 | 交换、拆分、箱子存入、关闭重开核对、完整取回 | 护甲、副手、耐久管理的集中覆盖 |
+| 制作与加工 | 分批木板、工具、梯子、石剑、箱子、船、普通熔炉 | 其他加工界面 |
+| 战斗与生存 | 移动目标追击近战、死亡后重生 | 敌对生物、远程、盾牌、进食、撤退、PvP |
+| 世界交互 | 工作台、箱子、种植、放船／上下船／驾船分项 | 门、床、其他交通、维度和其他实体交互 |
+| 原版特殊机制 | 已有对应槽位／按钮操作路径 | 附魔、酿造、交易、铁砧等实际成果 |
+| 人格与连续生活 | 同一模型自行组织路线、受阻后修改目标、容量维护后重新取景续接 | 交谈、改目标和 compact 的完整连续生活场景 |
+| 停止与生命周期 | 暂停屏障、旧继续拒绝、取消及停止释放 | 手动接管、断线、世界切换和撤权的最终集中覆盖 |
+| 交付 | 稳定源码分批推送，GitHub CI 通过 | 同步桌面、固定签名打包安装、安装版全链路 smoke |
+
 ## Product contract
 
 Control the player's existing Fabric Java 1.21.1 client, account and world. No extra client/account, Docker, Bash, arbitrary generated script, cheats or second reasoning personality. Vanilla common gameplay is supported; modded mechanics are best effort with explicit unsupported feedback. Use normal player knowledge, visible discoveries and exploration memory; collision navigation is allowed, underground resource scanning is not. Unified gameplay permission includes PvP. Target continuous normal-player combat rather than competitive win rates.
@@ -227,3 +241,5 @@ Fabric 增加严格声明的语义技能与最多 24 步的本地顺序计划，
 此前所有导航都禁止地形修改，树冠、窄路等情况需要模型逐块下指令。增加可选 `navigate(...,terrain=adapt)`：通过同一 Baritone 执行器正常挖除通路障碍或用现有可用材料搭路，不查询地下资源、不创造材料。默认 `preserve` 及跟随、拾取、采集中的接近行为保持保留地形；整理模式仍使用统一游戏操作许可，模型须遵循玩家的地形保护约定。借用设置在完成、取消和停止时恢复。
 
 同一真实障碍目标对照：`preserve` 明确返回不可达且位置不变，`adapt` 正常破坏障碍并上升到目标，实际背包从空增至 1 根原木，停止后持有按键为零。契约新增项经历拒绝到通过的回归；Fabric 20 项构建任务通过，Node 317 项通过、1 项平台跳过，后端定向 56 项通过。放置搭路分支、其他能力组和最终安装版仍需继续实测。
+
+之后实际连续采木从 1 根增至 4 根，分四批制作 16 块木板，再正常制作箱子与船。箱子验证包括放置、拆分存入 1 块木板、关闭重开确认内容、取回后背包恢复 3 块。船验证包括实际放置、上船、连续行驶约 10.1 米、下船并游回岸上，生命值全程 20，最后停止释放按键。使用有界短时输入驾驶船，不将其描述成自主船舶寻路；上述为直接执行器的分组实测，仍非最终安装版验收。
