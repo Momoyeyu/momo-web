@@ -13,7 +13,7 @@ public final class SurvivalController {
  private HostileEntity threat;private int savedSlot=-1,ticks;private float escapeYaw;private boolean escapeSafe;
  private MinecraftClient client(){return MinecraftClient.getInstance();}
  public boolean interruptOwnedScreen(SurvivalPolicy.Mode desired,boolean owned){return policy.interruptOwnedScreen(desired,owned);}
- private int foodSlot(){var p=client().player;for(int i=0;i<9;i++)if(p.getInventory().getStack(i).contains(DataComponentTypes.FOOD))return i;return -1;}
+ private int foodSlot(){return FoodInventory.find(client(),9);}
  public SurvivalPolicy.Mode choose(){
   return choose(false);
  }

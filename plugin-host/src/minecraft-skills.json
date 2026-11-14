@@ -189,7 +189,7 @@
     }
   },
   "eat": {
-    "description": "Find hotbar food and eat until actual hunger or stack count changes.",
+    "description": "Eat safe food from the inventory, preparing a hotbar slot automatically with verified swaps. Poisonous food is excluded; hunger food is a last resort. Close stations before eating.",
     "parameters": {
       "type": "object",
       "properties": {},

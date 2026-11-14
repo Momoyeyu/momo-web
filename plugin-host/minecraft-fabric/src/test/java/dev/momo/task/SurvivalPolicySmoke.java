@@ -2,6 +2,7 @@ package dev.momo.task;
 public final class SurvivalPolicySmoke {
  static void check(boolean b,String s){if(!b)throw new AssertionError(s);}
  public static void main(String[] args){
+  FoodChoiceSmoke.main(args);
   SurvivalPolicy p=new SurvivalPolicy();
   check(p.choose(true,false,false,16,10,true,false,false)==SurvivalPolicy.Mode.EAT,"eat from local hunger");
   check(p.choose(true,false,false,15,12,true,true,true)==SurvivalPolicy.Mode.EAT,"minor threat cannot keep interrupting food");

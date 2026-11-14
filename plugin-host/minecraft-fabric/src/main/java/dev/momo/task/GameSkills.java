@@ -20,10 +20,12 @@ import net.minecraft.world.RaycastContext;
 public final class GameSkills {
  public static final List<String> NAMES=List.copyOf(SkillArguments.contract().keySet());
  private GameSkills(){}
+ static TaskRuntime.Work consumeFood(){return new Skill("eat",new JsonObject());}
  static TaskRuntime.Work gatherMine(JsonObject args){SkillArguments.validate("mine",args);var work=new Skill("mine",args.deepCopy());work.protectSupport=true;return work;}
  public static TaskRuntime.Work create(String skill,JsonObject args){
   SkillArguments.validate(skill,args);
   if(skill.equals("gather"))return new GatherSkill(args);
+  if(skill.equals("eat"))return new EatSkill();
   if(skill.equals("plan")){
    var work=new ArrayList<TaskPlan.Node>();
    for(var value:args.getAsJsonArray("steps")){
@@ -54,7 +56,7 @@ public final class GameSkills {
   final BaritoneNavigator navigation=new BaritoneNavigator();
   BlockPos pos,placed,pathTarget,lastSeen;Entity entity;Screen ownedScreen;boolean navigating,startedUse;int ticks,actionIndex,phase,startFood,beforeCount,lostTicks;String beforeState,inventoryBefore,outputItem;InventoryEvidence inventoryProof;int mutationTick,craftPhase;final long pickupBoundary=PickupLedger.CURRENT.cursor();float startHealth;int targetSlot;
   long blockBoundary;String beforeBlock;int predictedChangeTick;
-  boolean placeSent,inventoryPending,buttonPending,protectSupport;String placedItem;int verifiedActions;
+  boolean placeSent,inventoryPending,buttonPending,protectSupport,swimming;String placedItem;int verifiedActions;
   net.minecraft.client.world.ClientWorld proofWorld;int proofHandler;long slotBoundary;SlotProof slotProof;
   Map<String,Object> verifiedGain=Map.of(),verifiedSlots=Map.of();
   Skill(String skill,JsonObject args){this.skill=skill;this.args=args;ownedScreen=c.currentScreen;}
@@ -170,6 +172,15 @@ public final class GameSkills {
      var receipt=PickupLedger.CURRENT.since(c.world,args.get("entityId").getAsInt(),c.player.getId(),pickupBoundary);
      if(receipt!=null)return done(Map.of("entityId",receipt.entityId(),"pickedCount",receipt.amount(),"serverPickupSeq",receipt.seq()));
      if(entity==null||entity.isRemoved())return TaskRuntime.Step.failed("drop_gone_without_own_pickup");
+     var offset=entity.getPos().subtract(c.player.getPos());
+     var swim=PickupMotion.swim(c.player.isTouchingWater(),entity.isTouchingWater(),c.player.canSee(entity),offset.x,offset.y,offset.z);
+     if(swim.steer()){
+      haltNavigation();swimming=true;look(entity.getPos());
+      c.options.forwardKey.setPressed(swim.forward());c.options.jumpKey.setPressed(swim.up());c.options.sneakKey.setPressed(swim.down());
+      if(++lostTicks>200)return TaskRuntime.Step.failed("unreachable");
+      break;
+     }
+     if(swimming){c.options.forwardKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sneakKey.setPressed(false);swimming=false;}
      if(navigating&&navigation.arrived()&&pathTarget.equals(entity.getBlockPos())){haltNavigation();phase=1;}
      if(phase>0){
       look(entity.getPos());c.options.forwardKey.setPressed(false);c.options.jumpKey.setPressed(false);
@@ -322,7 +333,7 @@ public final class GameSkills {
   private Direction face(BlockPos target){var ray=c.world.raycast(new RaycastContext(c.player.getEyePos(),target.toCenterPos(),sightShape(target),RaycastContext.FluidHandling.NONE,c.player));return ray.getSide();}
   private void look(Vec3d target){var delta=target.subtract(c.player.getEyePos());float yaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z)),pitch=(float)-Math.toDegrees(Math.atan2(delta.y,Math.sqrt(delta.x*delta.x+delta.z*delta.z)));c.player.setYaw(c.player.getYaw()+MathHelper.clamp(MathHelper.wrapDegrees(yaw-c.player.getYaw()),-18,18));c.player.setPitch(c.player.getPitch()+MathHelper.clamp(pitch-c.player.getPitch(),-14,14));}
   private void selectTool(){float best=1;int slot=c.player.getInventory().selectedSlot;for(int i=0;i<9;i++){var stack=c.player.getInventory().getStack(i);float speed=stack.getMiningSpeedMultiplier(c.world.getBlockState(pos));if(speed>best){best=speed;slot=i;}}c.player.getInventory().selectedSlot=slot;}
-  private int foodSlot(){for(int i=0;i<9;i++)if(c.player.getInventory().getStack(i).contains(net.minecraft.component.DataComponentTypes.FOOD))return i;return -1;}
+  private int foodSlot(){return FoodInventory.find(c,9);}
   private int count(String item){int n=0;for(int i=0;i<c.player.getInventory().size();i++){var stack=c.player.getInventory().getStack(i);if(Registries.ITEM.getId(stack.getItem()).toString().equals(item))n+=stack.getCount();}return n;}
   private String inventoryState(){StringBuilder value=new StringBuilder();for(var slot:c.player.currentScreenHandler.slots){var stack=slot.getStack();if(!stack.isEmpty())value.append(slot.id).append(':').append(Registries.ITEM.getId(stack.getItem())).append('*').append(stack.getCount()).append('@').append(stack.getComponents().hashCode()).append(';');}return value.append("cursor:").append(c.player.currentScreenHandler.getCursorStack()).toString();}
   private String screenName(){return GameObservation.screenId(c.player.currentScreenHandler);}
@@ -337,7 +348,7 @@ public final class GameSkills {
   }
   public void resume(){if(Set.of("inventory","workstation","craft","trade","waitFor").contains(skill)&&c.currentScreen!=ownedScreen)throw new IllegalStateException("station_screen_changed");if(skill.equals("navigate"))go(pos);}
   public void stop(){haltNavigation();release();}
-  private void release(){if(c.interactionManager!=null){c.interactionManager.cancelBlockBreaking();if(c.player!=null&&c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);}c.options.forwardKey.setPressed(false);c.options.backKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.attackKey.setPressed(false);c.options.useKey.setPressed(false);}
+  private void release(){if(c.interactionManager!=null){c.interactionManager.cancelBlockBreaking();if(c.player!=null&&c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);}c.options.forwardKey.setPressed(false);c.options.backKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sneakKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.attackKey.setPressed(false);c.options.useKey.setPressed(false);}
   public Map<String,Object> progress(){return Map.of("skill",skill,"ticks",ticks,"phase",craftPhase);}
   public boolean acceptsScreen(Object screen){return screen==ownedScreen||((skill.equals("interactBlock")||skill.equals("interactEntity"))&&phase>0&&screen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>);}
  }
