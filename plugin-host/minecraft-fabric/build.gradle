@@ -112,3 +112,35 @@ tasks.register('sightLandmarksSmoke', JavaExec) {
  mainClass = 'dev.momo.task.SightLandmarksSmoke'
 }
 check.dependsOn sightLandmarksSmoke
+
+// Opt-in development setup. These classes/resources never enter the companion
+// jar or the exact artifact staged by scripts/build-minecraft-component.py.
+sourceSets {
+ fixture { compileClasspath += sourceSets.main.compileClasspath }
+ fixtureTest {
+  compileClasspath += sourceSets.fixture.output + sourceSets.main.compileClasspath
+  runtimeClasspath += sourceSets.fixture.output + sourceSets.main.compileClasspath
+ }
+}
+def fixtureDestination = layout.projectDirectory.dir('../../.workbuddy/007/fixture-build')
+tasks.register('fixtureJar', Jar) {
+ dependsOn fixtureClasses
+ from sourceSets.fixture.output
+ archiveBaseName = 'momo-acceptance-fixtures'
+ archiveClassifier = 'named'
+ destinationDirectory = fixtureDestination
+}
+tasks.register('remapFixtureJar', net.fabricmc.loom.task.RemapJarTask) {
+ dependsOn fixtureJar
+ inputFile = tasks.named('fixtureJar').flatMap { it.archiveFile }
+ archiveBaseName = 'momo-acceptance-fixtures'
+ archiveClassifier = ''
+ destinationDirectory = fixtureDestination
+ addNestedDependencies = false
+}
+tasks.register('fixtureGuardSmoke', JavaExec) {
+ dependsOn fixtureTestClasses
+ classpath = sourceSets.fixtureTest.runtimeClasspath
+ mainClass = 'dev.momo.fixture.FixtureGuardSmoke'
+}
+check.dependsOn fixtureGuardSmoke

@@ -43,7 +43,7 @@ jobs:
         run: uv run --frozen pytest -q
         working-directory: backend
       - name: Check developer resource staging and snapshot promotion
-        run: uv run --project backend --frozen python -m pytest scripts/test_promote.py scripts/test_prepare_qq_runtime.py scripts/test_prepare_minecraft_runtime.py -q
+        run: uv run --project backend --frozen python -m pytest scripts/test_promote.py scripts/test_prepare_qq_runtime.py scripts/test_prepare_minecraft_runtime.py scripts/test_build_minecraft_component.py scripts/test_minecraft_fixture_world.py -q
       - name: Install the locked frontend
         run: pnpm install --frozen-lockfile --ignore-workspace
         working-directory: frontend

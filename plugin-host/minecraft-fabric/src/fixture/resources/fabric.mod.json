@@ -1,0 +1,9 @@
+{
+ "schemaVersion":1,
+ "id":"momo_acceptance_setup",
+ "version":"0.0.0-dev",
+ "name":"momo acceptance setup (development only)",
+ "environment":"*",
+ "entrypoints":{"main":["dev.momo.fixture.AcceptanceFixtures"]},
+ "depends":{"fabricloader":">=0.16.14","minecraft":"1.21.1","java":">=21","fabric-api":"*"}
+}
