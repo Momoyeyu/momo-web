@@ -104,10 +104,16 @@ def test_gameplay_wait_releases_dispatch_lock_and_revocation_interrupts():
         assert not worker.is_alive()
         assert result == ['Minecraft input interrupted']
 
-def test_gameplay_budget_recovers_after_interval():
+@pytest.mark.parametrize('elapsed', [59.999, 60, 60.001])
+def test_gameplay_budget_recovers_after_interval(elapsed):
     m, runtime = active()
     m.actions = 120
     m.budget_window = 0
-    with patch('app.services.minecraft.runtime', runtime), patch.object(m, 'gate', return_value='verified'):
-        assert m.execute('observe', {}, 0, 'owner', 'lease') == {'ok':True}
-        assert m.actions == 1
+    with patch('app.services.minecraft.runtime', runtime), patch.object(m, 'gate', return_value='verified'), patch('app.services.minecraft.time.monotonic', return_value=elapsed):
+        if elapsed < 60:
+            with pytest.raises(MinecraftError, match='budget'):
+                m.execute('observe', {}, 0, 'owner', 'lease')
+            assert m.actions == 120
+        else:
+            assert m.execute('observe', {}, 0, 'owner', 'lease') == {'ok':True}
+            assert m.actions == 1
