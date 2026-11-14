@@ -389,6 +389,7 @@ def react(
         seq += 1
         return ev
 
+    game_ack_only = False
     round_limit = MAX_ROUNDS
     if source == "meeting" and not observation_only:
         from .minecraft import minecraft
@@ -461,6 +462,16 @@ def react(
             return
 
         if checkpoint.generation() != gen:
+            return
+        if game_ack_only:
+            # Tools=[] is a provider hint, not an execution barrier. A provider
+            # may still emit old tool syntax or no text. This one acknowledgement
+            # must never dispatch a poll/stop or start another inference round.
+            for sent in splitter.flush():
+                out = take(sent)
+                if out is None:return
+                yield out
+            compress.maybe_compress(usage.get("prompt_tokens"),request=messages,tools=tools)
             return
         if observation_only and calls:
             yield _error("Observation reactions cannot execute actions")
@@ -540,6 +551,7 @@ def react(
                     compress.maybe_compress(usage.get('prompt_tokens'),request=messages,tools=tools)
                     return
                 tools=[]
+                game_ack_only=True
                 messages.append({'role':'system','content':'Your accepted gameplay task is now running locally. End this turn with a brief natural acknowledgement, without claiming completion. Do not poll or issue further actions; the body will report an outcome.'})
             continue
 
