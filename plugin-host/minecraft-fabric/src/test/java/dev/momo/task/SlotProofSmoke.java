@@ -3,6 +3,7 @@ import java.util.*;
 public final class SlotProofSmoke {
  static void check(boolean value,String reason){if(!value)throw new AssertionError(reason);}
  public static void main(String[] args){
+  StationOptionsSmoke.main(args);
   Object world=new Object();InventoryReceipts ledger=new InventoryReceipts();
   SlotProof proof=new SlotProof(List.of("dirt:2","air","iron:1"),"air");
   proof.mutated(1,ledger.cursor(),List.of("air","dirt:2","iron:1"),"air");

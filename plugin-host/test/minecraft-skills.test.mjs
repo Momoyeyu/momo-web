@@ -29,3 +29,9 @@ test('pickup, wait for processing, and a bounded merchant trade have typed paths
  validateSkill('waitFor',{item:'minecraft:iron_ingot',count:1,area:'screen',ticks:1200});
  validateSkill('trade',{index:0,count:1});
 });
+test('anvil naming uses bounded text and the same finite plan interface',()=>{
+ validateSkill('rename',{name:'momo の剣'});
+ validateSkill('rename',{name:''});
+ validateSkill('plan',{steps:[{skill:'rename',args:{name:'小小的冒险'}}]});
+ for(const args of [{name:'x'.repeat(51)},{name:'line\nbreak'},{name:'momo',command:'anything'}])assert.throws(()=>validateSkill('rename',args),/Invalid/);
+});

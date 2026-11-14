@@ -16,6 +16,9 @@ public final class SkillArgumentsSmoke {
   if(!SkillArguments.resourceId("example:oak_log").equals("example:oak_log"))throw new AssertionError("mod namespaces must be preserved");
   validate("navigate","{\"x\":1,\"y\":64,\"z\":2,\"height\":\"surface\"}");
   reject("navigate","{\"x\":1,\"y\":64,\"z\":2,\"height\":\"teleport\"}");
+  validate("rename","{\"name\":\"momo の剣\"}");
+  validate("rename","{\"name\":\"\"}");
+  reject("rename","{\"name\":\"line\\nbreak\"}");
   validate("gather","{\"item\":\"minecraft:oak_log\",\"count\":4}");
   validate("plan","{\"steps\":[{\"skill\":\"eat\",\"args\":{},\"retries\":2,\"when\":{\"item\":\"minecraft:apple\",\"count\":1,\"test\":\"atLeast\"}}]}");
   reject("mine","{\"x\":1.5,\"y\":64,\"z\":2}");reject("eat","{\"script\":\"run\"}");

@@ -4,8 +4,24 @@
     "parameters": {
       "type": "object",
       "properties": {
-        "height": {"type":"string","minLength":5,"maxLength":7,"enum":["exact","surface"]},
-        "terrain": {"type":"string","minLength":5,"maxLength":8,"enum":["preserve","adapt"]},
+        "height": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 7,
+          "enum": [
+            "exact",
+            "surface"
+          ]
+        },
+        "terrain": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 8,
+          "enum": [
+            "preserve",
+            "adapt"
+          ]
+        },
         "x": {
           "type": "integer",
           "minimum": -30000000,
@@ -490,7 +506,8 @@
                   "waitFor",
                   "trade",
                   "gather",
-                  "wait"
+                  "wait",
+                  "rename"
                 ]
               },
               "args": {
@@ -593,6 +610,23 @@
       },
       "required": [
         "ticks"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "rename": {
+    "description": "Rename the single input stack in an open anvil and return it to the inventory using normal anvil XP costs. Put the item in slot 0 with slot 1 empty first. Empty name removes its custom name. Verifies server output and final inventory; already matching names cost no XP.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 50
+        }
+      },
+      "required": [
+        "name"
       ],
       "additionalProperties": false
     }

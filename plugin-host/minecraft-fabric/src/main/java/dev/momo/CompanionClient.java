@@ -181,6 +181,7 @@ public final class CompanionClient implements ClientModInitializer {
    }
    case "recipes" -> {
     String query=command.get("query").getAsString();if(query.length()>64||query.chars().anyMatch(c->c<32))throw new IllegalArgumentException("Invalid query");
+    result.addProperty("screenHandler",GameObservation.screenId(client.player.currentScreenHandler));
     result.add("recipes",GameObservation.recipes(client,query,16));
    }
    case "submit" -> {

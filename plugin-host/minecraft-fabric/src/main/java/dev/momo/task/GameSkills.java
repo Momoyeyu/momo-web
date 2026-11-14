@@ -55,6 +55,7 @@ public final class GameSkills {
   final String skill;final JsonObject args;final MinecraftClient c=MinecraftClient.getInstance();
   final BaritoneNavigator navigation=new BaritoneNavigator();
   BlockPos pos,placed,pathTarget,lastSeen;Entity entity;Screen ownedScreen;boolean navigating,startedUse;int ticks,actionIndex,phase,startFood,beforeCount,lostTicks;String beforeState,inventoryBefore,outputItem;InventoryEvidence inventoryProof;int mutationTick,craftPhase;final long pickupBoundary=PickupLedger.CURRENT.cursor();float startHealth;int targetSlot;
+  long renameBoundary;String renameName;boolean renameUnchanged;int startExperience;
   long blockBoundary;String beforeBlock;int predictedChangeTick;
   boolean placeSent,inventoryPending,buttonPending,protectSupport,swimming;String placedItem;int verifiedActions;
   net.minecraft.client.world.ClientWorld proofWorld;int proofHandler;long slotBoundary;SlotProof slotProof;
@@ -96,6 +97,24 @@ public final class GameSkills {
     var offer=merchant.getRecipes().get(index);outputItem=Registries.ITEM.getId(offer.getSellItem().getItem()).toString();beforeCount=count(outputItem);targetSlot=offer.getSellItem().getCount()*args.get("count").getAsInt();
     if(!c.player.currentScreenHandler.getCursorStack().isEmpty())throw new TaskRuntime.Rejected("cursor_not_empty");inventoryProof=new InventoryEvidence(beforeCount,c.player.currentScreenHandler.getRevision());craftPhase=1;
     merchant.setRecipeIndex(index);merchant.switchTo(index);c.player.networkHandler.sendPacket(new net.minecraft.network.packet.c2s.play.SelectMerchantTradeC2SPacket(index));
+   }
+   if(skill.equals("rename")){
+    if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.AnvilScreenHandler anvil))throw new TaskRuntime.Rejected("station_required");
+    var input=anvil.getSlot(0).getStack();if(input.isEmpty())throw new TaskRuntime.Rejected("input_missing");
+    if(!anvil.getSlot(1).getStack().isEmpty())throw new TaskRuntime.Rejected("rename_requires_single_input");
+    if(!anvil.getCursorStack().isEmpty())throw new TaskRuntime.Rejected("cursor_not_empty");
+    renameName=args.get("name").getAsString();
+    if(!renameName.equals(net.minecraft.util.StringHelper.stripInvalidChars(renameName)))throw new TaskRuntime.Rejected("name_characters_unsupported");
+    if(net.minecraft.util.StringHelper.isBlank(renameName))renameName="";
+    var custom=input.get(net.minecraft.component.DataComponentTypes.CUSTOM_NAME);
+    renameUnchanged=renameName.isEmpty()?custom==null:input.getName().getString().equals(renameName);
+    targetSlot=renameUnchanged?0:2;outputItem=Registries.ITEM.getId(input.getItem()).toString();beforeCount=count(outputItem);startExperience=c.player.experienceLevel;
+    inventoryProof=new InventoryEvidence(beforeCount,anvil.getRevision());
+    if(renameUnchanged){craftPhase=1;mutationTick=0;}
+    else{
+     renameBoundary=InventoryReceipts.CURRENT.cursor();anvil.setNewItemName(renameName);
+     c.player.networkHandler.sendPacket(new net.minecraft.network.packet.c2s.play.RenameItemC2SPacket(renameName));
+    }
    }
    if(skill.equals("eat")){targetSlot=foodSlot();if(targetSlot<0)throw new TaskRuntime.Rejected("food_missing");c.player.getInventory().selectedSlot=targetSlot;beforeCount=c.player.getMainHandStack().getCount();if(!c.player.canConsume(c.player.getMainHandStack().get(net.minecraft.component.DataComponentTypes.FOOD).canAlwaysEat()))throw new TaskRuntime.Rejected("not_hungry");}
    if(skill.equals("useItem")){c.player.getInventory().selectedSlot=args.get("slot").getAsInt();beforeCount=c.player.getMainHandStack().getCount();}
@@ -195,6 +214,25 @@ public final class GameSkills {
      }
      takeOneOutput(2);
      if(ticks-mutationTick>100)return TaskRuntime.Step.failed("trade_stock_or_currency_missing");break;
+    case "rename":
+     if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.AnvilScreenHandler anvil))return TaskRuntime.Step.failed("station_screen_changed");
+     if(craftPhase==0){
+      var output=anvil.getSlot(2).getStack();var custom=output.get(net.minecraft.component.DataComponentTypes.CUSTOM_NAME);
+      var changes=InventoryReceipts.CURRENT.changes(proofWorld,proofHandler,renameBoundary);
+      if(!output.isEmpty()&&RenameProof.matches(renameName,custom==null?"":custom.getString(),SlotConfirmation.fingerprint(output),changes)){
+       if(!c.player.getAbilities().creativeMode&&anvil.getLevelCost()>c.player.experienceLevel)return TaskRuntime.Step.failed("levels_required");
+       craftPhase=1;mutationTick=ticks;
+      }else if(ticks>100)return TaskRuntime.Step.failed(changes.containsKey(2)?"rename_unavailable":"server_confirmation_missing");
+     }
+     if(craftPhase>=1){
+      if(gainSettled()){
+       var evidence=new LinkedHashMap<String,Object>(gainReceipt());evidence.put("name",renameName);evidence.put("unchanged",renameUnchanged);evidence.put("experienceBefore",startExperience);evidence.put("experienceAfter",c.player.experienceLevel);return done(evidence);
+      }
+      if(craftPhase==1&&!roomFor(anvil.getSlot(targetSlot).getStack()))return TaskRuntime.Step.failed("inventory_full");
+      takeOneOutput(targetSlot);
+      if(ticks-mutationTick>100)return TaskRuntime.Step.failed("server_confirmation_missing");
+     }
+     break;
     case "attack": return combat();
     case "eat":
      if(c.player.getHungerManager().getFoodLevel()>startFood||c.player.getMainHandStack().getCount()<beforeCount)return done(Map.of("foodBefore",startFood,"foodAfter",c.player.getHungerManager().getFoodLevel(),"remaining",c.player.getMainHandStack().getCount()));
@@ -238,6 +276,7 @@ public final class GameSkills {
    }
    return TaskRuntime.Step.running();
   }
+  private boolean roomFor(ItemStack output){return !output.isEmpty()&&c.player.currentScreenHandler.slots.stream().anyMatch(slot->slot.inventory==c.player.getInventory()&&slot.canInsert(output)&&(slot.getStack().isEmpty()||(ItemStack.areItemsAndComponentsEqual(slot.getStack(),output)&&slot.getStack().getCount()+output.getCount()<=slot.getMaxItemCount(output))));}
   private void takeOneOutput(int outputSlot){
    if(craftPhase==1&&ticks-mutationTick>=4&&!c.player.currentScreenHandler.getSlot(outputSlot).getStack().isEmpty()){
       // Pickup exactly one recipe output, rather than shift-crafting every available ingredient.
@@ -350,7 +389,7 @@ public final class GameSkills {
    if(c.player!=null&&inventoryProof!=null&&outputItem!=null&&gainSettled())return gainReceipt();
    return !verifiedSlots.isEmpty()?verifiedSlots:verifiedGain;
   }
-  public void resume(){if(Set.of("inventory","workstation","craft","trade","waitFor").contains(skill)&&c.currentScreen!=ownedScreen)throw new IllegalStateException("station_screen_changed");if(skill.equals("navigate"))go(pos);}
+  public void resume(){if(Set.of("inventory","workstation","craft","trade","waitFor","rename").contains(skill)&&c.currentScreen!=ownedScreen)throw new IllegalStateException("station_screen_changed");if(skill.equals("navigate"))go(pos);}
   public void stop(){haltNavigation();release();}
   private void release(){if(c.interactionManager!=null){c.interactionManager.cancelBlockBreaking();if(c.player!=null&&c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);}c.options.forwardKey.setPressed(false);c.options.backKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sneakKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.attackKey.setPressed(false);c.options.useKey.setPressed(false);}
   public Map<String,Object> progress(){return Map.of("skill",skill,"ticks",ticks,"phase",craftPhase);}
