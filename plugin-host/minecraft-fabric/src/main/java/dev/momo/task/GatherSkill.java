@@ -25,6 +25,7 @@ public final class GatherSkill implements TaskRuntime.Work {
   if(c.player==null||c.world==null||c.world!=searchWorld||!c.player.isAlive())return fail("world_unavailable");
   observedCount=count();lastPosition=c.player.getBlockPos();
   if(count()-baseline>=requested){lastFailure="completed";phase="completed";return TaskRuntime.Step.done(Map.of("item",item,"countBefore",baseline,"countAfter",count()));}
+  if(PickupCapacity.room(c.player.getInventory(),new net.minecraft.item.ItemStack(Registries.ITEM.get(net.minecraft.util.Identifier.of(item))))<=0)return fail("inventory_full");
   if(c.player.getBlockPos().getSquaredDistance(origin)>1024)return fail("outside_known_terrain");
   if(child!=null){
    TaskRuntime.Step outcome;
@@ -32,6 +33,7 @@ public final class GatherSkill implements TaskRuntime.Work {
    if(outcome.state().equals("running"))return outcome;
    child.stop();child=null;
    if(Set.of("server_confirmation_missing","execution_failed","stop_unconfirmed").contains(outcome.reason()))return fail(outcome.reason());
+   if(outcome.reason().equals("inventory_full"))return fail("inventory_full");
    if(outcome.state().equals("failed")){lastFailure=outcome.reason();if(target!=null)blocked.put(target,ticks+200);if(dropTarget>=0)blockedDrops.put(dropTarget,ticks+200);}
    dropTarget=-1;
    target=null;foliage=null;phase="search";idle=0;scan=0;return TaskRuntime.Step.running();

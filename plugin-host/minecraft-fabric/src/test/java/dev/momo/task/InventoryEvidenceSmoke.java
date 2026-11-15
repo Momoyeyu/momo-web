@@ -1,6 +1,7 @@
 package dev.momo.task;
 public final class InventoryEvidenceSmoke {
  public static void main(String[] args){
+  PickupCapacitySmoke.main(args);
   InventoryEvidence proof=new InventoryEvidence(0,7);proof.mutated(10,8);
   if(proof.settled(11,4,true,8))throw new AssertionError("client prediction is not server proof");
   if(proof.settled(20,4,true,8))throw new AssertionError("elapsed time alone is not acknowledgement");

@@ -212,6 +212,7 @@ public final class GameSkills {
      if(receipt!=null)return done(Map.of("entityId",receipt.entityId(),"pickedCount",receipt.amount(),"serverPickupSeq",receipt.seq()));
      if(entity==null||entity.isRemoved())return TaskRuntime.Step.failed("drop_gone_without_own_pickup");
      if(!visibleApproach())break;
+     PickupCapacity.require(PickupCapacity.room(c.player.getInventory(),((net.minecraft.entity.ItemEntity)entity).getStack()));
      if(swimToward(entity,entity.getPos())){if(++lostTicks>200)return TaskRuntime.Step.failed("unreachable");break;}
      if(navigating&&navigation.arrived()&&pathTarget.equals(entity.getBlockPos())){haltNavigation();phase=1;}
      if(phase>0){
