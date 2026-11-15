@@ -96,7 +96,7 @@ def test_follow_requires_unified_gameplay_permission_because_its_body_can_defend
 def test_game_thread_admission_rejection_is_known_and_does_not_revoke(reason,code):
  m,rt=setup();rt.host.request.return_value={'accepted':False,'error':reason}
  with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
-  with pytest.raises(MinecraftError) as denied:m.execute('submit',{},0,None,None)
+  with pytest.raises(MinecraftError) as denied:m.execute('submit',{'taskId':'rejection-test','skill':'wait','args':{'ticks':20}},0,None,None)
   assert denied.value.code==code and m.binding
 
 def test_goal_recheck_is_event_driven_with_a_30_second_idle_floor():
@@ -232,10 +232,10 @@ def test_unknown_transport_revokes_binding_but_invalid_input_does_not():
  m,rt=setup()
  with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
   rt.host.request.side_effect=HostError('MINECRAFT_INPUT')
-  with pytest.raises(HostError):m.execute('submit',{},0,None,None)
+  with pytest.raises(HostError):m.execute('submit',{'taskId':'rejection-test','skill':'wait','args':{'ticks':20}},0,None,None)
   assert m.binding
   rt.host.request.side_effect=[HostError('MINECRAFT_UNKNOWN'),{'stopped':True,'stopVerified':True}]
-  with pytest.raises(HostError):m.execute('submit',{},0,None,None)
+  with pytest.raises(HostError):m.execute('submit',{'taskId':'rejection-test','skill':'wait','args':{'ticks':20}},0,None,None)
   assert m.binding is None
 
 def test_focus_releases_game_body_immediately_without_cancelling_the_local_conversation():

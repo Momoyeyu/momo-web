@@ -2490,6 +2490,8 @@ export interface components {
              * @enum {string}
              */
             action: "capabilities" | "recipes" | "submit" | "task" | "events" | "pause" | "resume" | "cancel";
+            /** Activityid */
+            activityId?: string | null;
             /**
              * After
              * @default 0

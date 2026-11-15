@@ -163,17 +163,40 @@ class Minecraft:
                 if action in {'observe','chat','play','follow'}:self.actions += 1
                 permission = {**self.binding, 'activityEpoch': runtime.epoch}
                 task_binding,task_activity=dict(self.binding),self.activity_id
-            if action=='submit' and isinstance(arguments.get('taskId'),str) and 0<len(arguments['taskId'])<=80:
-                from . import minecraft_journal as journal
-                journal.bind_task(task_binding,task_activity,arguments['taskId'])
+            from . import minecraft_journal as journal
+            if action=='task' and arguments.get('activityId'):
+                rows=journal.history(task_binding,activity=arguments['activityId'],task_id=arguments.get('taskId'))
+                return {'task':rows[-1]} if arguments.get('taskId') and rows else {'tasks':rows}
+            if action=='submit':
+                try:
+                    if not journal.prepare_dispatch(task_binding,task_activity,arguments):
+                        return {'accepted':False,'duplicate':True,'task':journal.history(task_binding,activity=task_activity,task_id=arguments['taskId'])[-1]}
+                except journal.DispatchConflict as error:raise MinecraftError(str(error),code='MINECRAFT_RESULT_UNKNOWN') from error
+                except ValueError as error:raise MinecraftError(str(error),code='MINECRAFT_INPUT') from error
             try:result = runtime.host.request('minecraft.' + action, {**arguments, 'permission': permission})
             except Exception as error:
                 from ..core.plugin_host import HostError
+                if action=='submit':journal.dispatch_failed(task_binding,task_activity,arguments['taskId'],rejected=isinstance(error,HostError) and str(error) in {'MINECRAFT_INPUT','MINECRAFT_STALE','MINECRAFT_BUSY'},reason='submission_rejected' if str(error) in {'MINECRAFT_INPUT','MINECRAFT_STALE','MINECRAFT_BUSY'} else 'dispatch_unconfirmed')
                 if isinstance(error,HostError) and str(error) not in {'MINECRAFT_INPUT','MINECRAFT_STALE','MINECRAFT_BUSY'}:
                     # Unknown transport outcomes require a fresh human binding; never replay.
                     try:self.stop('game_result_unknown')
                     except HostError:pass
                 raise
+            if action=='submit':
+                if result.get('task'):
+                    # Facts belong to the original command even after its grant
+                    # has ended. They cannot acquire the replacement activity.
+                    with self.lock:
+                        if generation==self.generation and self.activity_id==task_activity:self.record_tasks([result['task']],generation)
+                        else:
+                            journal.record(task_binding,task_activity,[result['task']])
+                            journal.reconcile(task_binding,activity=task_activity)
+                else:
+                    journal.dispatch_failed(task_binding,task_activity,arguments['taskId'],rejected=bool(result.get('error')),reason='submission_rejected' if result.get('error') else 'dispatch_unconfirmed')
+                    if not result.get('error'):
+                        try:self.stop('game_result_unknown')
+                        except Exception:pass
+                        raise MinecraftError('Missing task receipt; inspect original activity without replay',code='MINECRAFT_RESULT_UNKNOWN')
             if result.get('error') in {'BODY_PAUSED','NEW_PLAYER_INPUT_REQUIRED'}:
                 with self.lock:self._eligibility(paused=True,autonomous=False);self.decision_needed=False
                 raise MinecraftError('Fresh player input is required to resume Minecraft',code='MINECRAFT_PAUSED')
@@ -201,8 +224,9 @@ class Minecraft:
                     if skill not in definitions:raise MinecraftError('Unsupported Minecraft skill')
                     result['skillDefinitions']={skill:definitions[skill]}
                 else:result['help']='Query capabilities with skill=<name> for that exact argument schema. Use recipes with query=<item or recipe name> for unlocked recipes.'
-            if action in {'submit','task','cancel'}:
+            if action in {'task','cancel'}:
                 self.record_tasks(([result['task']] if result.get('task') else result.get('tasks',[])), generation)
+                if action=='task':result={**result,'history':[{key:row[key] for key in ('activityId','taskId','skill','state','reason','dispatch') if key in row} for row in journal.history(task_binding,task_id=arguments.get('taskId'))]}
             if action in {'pause','resume'}:
                 with self.lock:
                     self._eligibility(paused=action=='pause')
@@ -411,12 +435,14 @@ class Minecraft:
             if not self.binding:return ''
             recent=list(self.tasks.values())[-4:]
             data={'goal':journal.goal(self.binding),'goalEvidence':self.goal_evidence(),'tasks':[self._task_context(task,index>=len(recent)-2) for index,task in enumerate(recent)],'paused':self.paused or self.suspended,
+                  'unconfirmedTasks':[{k:row[k] for k in ('activityId','taskId','skill','state','reason') if k in row} for row in journal.history(self.binding) if row['state']=='unknown'],
                   'exploredPlaces':journal.explored(self.binding),'repeatedSearches':self.repeated_searches(list(self.tasks.values())[-16:])}
         return ('You are the same momo, currently sharing the player’s Minecraft character. Preserve your personality and agreements. '
             'Choose meaningful goals from curiosity, companionship, beauty, helping, survival or game progress; no fixed technology tree. '
             'Keep an active goal until a player instruction, significant event, blocked path or completion justifies changing it. '
             'Record your intention with minecraft_goal and submit bounded semantic tasks/plans; local skills continue while we talk. '
             'Accepted/queued is not completed. Use actual task evidence, and observe after events before new effects. '
+            'unconfirmedTasks are original dispatches whose effects may already have happened. Query task with its original activityId for durable facts; never replay them or silently treat missing receipts as no effect. '
             'goalEvidence contains verified historical gains and world changes for THIS goal, not current stock or instructions. Prefer these facts over a stale progress description. '
             'visibleLandmarks are bounded first-hit sight coordinates: use visible foliage/log landmarks to approach trees instead of inventing coordinates. For landmarks farther than 64 blocks, use intermediate surface waypoints within 64 blocks. Near a source, gather continues mining and pickup locally. '
             'Repeated equivalent failed searches require a changed approach: explore another area, obtain needed equipment, or choose a different meaningful goal. Do not keep retrying an unchanged source or location. '

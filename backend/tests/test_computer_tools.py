@@ -363,7 +363,7 @@ def test_live_game_projection_bounds_metadata_without_losing_vanilla_inventory_a
 
 def test_game_declaration_keeps_semantic_tasks_small_and_manual_controls_on_demand():
  declaration=tools._minecraft_declaration(['observe','submit','capabilities','play'])['function']
- assert set(declaration['parameters']['properties'])=={'action','query','taskId','skill','args','after'}
+ assert set(declaration['parameters']['properties'])=={'action','query','taskId','activityId','skill','args','after'}
  assert 'controls' in declaration['description'] and 'args' in declaration['description']
 
 def test_full_game_catalog_leaves_context_for_goal_and_current_pixels():

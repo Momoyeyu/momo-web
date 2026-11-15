@@ -71,6 +71,7 @@ class TaskCommand(Owner):
     generation: int
     action: Literal['capabilities','recipes','submit','task','events','pause','resume','cancel']
     taskId: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{1,80}$')
+    activityId: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{1,80}$')
     skill: str | None = Field(default=None,max_length=32)
     query: str = Field(default='',max_length=64)
     args: dict = Field(default_factory=dict)
@@ -78,6 +79,7 @@ class TaskCommand(Owner):
 
 @router.post('/tasks')
 def tasks(body: TaskCommand):
+    if body.activityId and body.action!='task':raise HTTPException(422,'Historical activities are read-only')
     arguments={}
     if body.action=='submit':
         if not body.taskId or not body.skill:raise HTTPException(422,'Task ID and skill required')
@@ -85,6 +87,9 @@ def tasks(body: TaskCommand):
     elif body.action in {'task','cancel'}:
         if body.action=='cancel' and not body.taskId:raise HTTPException(422,'Task ID required')
         if body.taskId:arguments={'taskId':body.taskId}
+        if body.activityId:
+            if body.action!='task':raise HTTPException(422,'Historical activities are read-only')
+            arguments['activityId']=body.activityId
     elif body.action=='events':arguments={'after':body.after}
     elif body.action=='capabilities' and body.skill:arguments={'skill':body.skill}
     elif body.action=='recipes':arguments={'query':body.query}

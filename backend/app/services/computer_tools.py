@@ -204,6 +204,7 @@ def _minecraft_declaration(actions):
             'action':{'type':'string','enum':actions},
             'query':{'type':'string','maxLength':64,'description':'recipes: item/pattern; observe: inventory, terrain, entities, station, chat, slot:<id>, or details'},
             'taskId':{'type':'string','pattern':'^[A-Za-z0-9_-]{1,80}$','description':'REQUIRED for every submit. Caller-chosen stable ID; query task with this ID to reconcile unknown outcomes, never replay with a new ID'},
+            'activityId':{'type':'string','pattern':'^[A-Za-z0-9_-]{1,80}$','description':'task only: inspect the original activity from returned history. Read-only, including unknown dispatches after a fresh human binding; never resumes or replays.'},
             'skill':{'type':'string','description':'For submit, the semantic skill; for capabilities, the skill name or controls for manual fallback help'},
             'args':{'type':'object','description':'Arguments for the named skill; plan uses steps. For legacy play/chat/follow, their validated control/text/player arguments. No code.'},
             'after':{'type':'integer','minimum':0}},'required':['action'],'additionalProperties':False}}}
@@ -313,6 +314,9 @@ def execute(name,args):
             if parsed.action=='play' and not parsed.control:raise MinecraftError('Control required',code='MINECRAFT_INPUT')
             if isinstance(parsed,TaskCommand):
                 command=({'query':parsed.query} if parsed.action=='recipes' else {'skill':parsed.skill} if parsed.action=='capabilities' and parsed.skill else {'taskId':parsed.taskId,'skill':parsed.skill,'args':parsed.args} if parsed.action=='submit' else {'after':parsed.after} if parsed.action=='events' else {'taskId':parsed.taskId} if parsed.taskId else {})
+                if parsed.activityId:
+                    if parsed.action!='task':raise MinecraftError('Historical activities are read-only',code='MINECRAFT_INPUT')
+                    command['activityId']=parsed.activityId
                 if parsed.action=='submit' and (not parsed.taskId or not parsed.skill):raise MinecraftError('Task ID and skill required',code='MINECRAFT_INPUT')
             else:command=parsed.model_dump(exclude={'clientId','leaseId','generation','action'})
             result=dict(minecraft.execute(parsed.action,command,parsed.generation,None,None))
@@ -342,6 +346,8 @@ def execute(name,args):
                 'MINECRAFT_PAUSED':'Gameplay is paused. A new direct player request or Resume button is required. Do not resume from an automatic game event.',
                 'MINECRAFT_SUSPENDED':'The game is unfocused or a player menu is open. Do not send more actions; wait until the player returns or explicitly resumes.',
                 'MINECRAFT_BUSY':'Another bounded action currently owns the body. Wait for its actual receipt; do not replay or cancel it just to poll.',
+                'MINECRAFT_RESULT_UNKNOWN':'This task ID already has a durable dispatch intent or conflicts with it. Inspect task history and its original activityId. Its effects may already have happened; never replay or claim nothing ran.',
+                'MINECRAFT_UNKNOWN':'The transport outcome is unknown. Effects may already have happened. After the player explicitly reconnects, inspect task history and its original activityId; never replay the command.',
                 'MINECRAFT_INPUT':'Arguments were rejected before dispatch; nothing ran. submit requires action="submit", taskId, skill, args. For a plan use skill="plan", args={"steps":[{"skill":"wait","args":{"ticks":20}}]}. Query capabilities with skill for its exact schema.',
                 'MINECRAFT_STALE':'Read a fresh game observation before another action; do not infer completion from this rejection.',
             }

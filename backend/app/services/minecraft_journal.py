@@ -10,6 +10,7 @@ import uuid
 from ..core import db
 
 STATUSES={'active','paused','completed','abandoned','blocked'}
+class DispatchConflict(ValueError):pass
 def scope(binding):
     return hashlib.sha256(json.dumps(binding,sort_keys=True).encode()).hexdigest()
 def schema():
@@ -24,6 +25,48 @@ def schema():
         c.execute('CREATE TABLE IF NOT EXISTS minecraft_goal_instances(scope TEXT PRIMARY KEY,goal_id TEXT NOT NULL)')
         c.execute('CREATE TABLE IF NOT EXISTS minecraft_task_goals(scope TEXT NOT NULL,activity TEXT NOT NULL,task_id TEXT NOT NULL,goal_id TEXT NOT NULL,progress TEXT,updated_at TEXT NOT NULL,PRIMARY KEY(scope,activity,task_id))')
         c.execute('CREATE INDEX IF NOT EXISTS minecraft_goal_progress ON minecraft_task_goals(scope,goal_id,updated_at DESC)')
+        c.execute('CREATE TABLE IF NOT EXISTS minecraft_dispatches(scope TEXT NOT NULL,activity TEXT NOT NULL,task_id TEXT NOT NULL,request TEXT NOT NULL,disposition TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(scope,activity,task_id))')
+
+def prepare_dispatch(binding, activity, command):
+    """Write before transport. A pending/unknown command must never be resent."""
+    task_id=command.get('taskId')
+    if not isinstance(task_id,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,80}',task_id):raise ValueError('Invalid task ID')
+    request=json.dumps({'skill':command.get('skill'),'args':command.get('args',{})},sort_keys=True,ensure_ascii=False)
+    if len(request)>64000:raise ValueError('Task request too large')
+    schema();key=scope(binding)
+    with db.tx() as c:
+        old=c.execute('SELECT request,disposition FROM minecraft_dispatches WHERE scope=? AND activity=? AND task_id=?',(key,activity,task_id)).fetchone()
+        if old:
+            if old['request']!=request:raise DispatchConflict('Task identity conflict')
+            if old['disposition']=='observed':return False
+            if old['disposition']!='rejected':raise DispatchConflict('Task already dispatched; inspect its original receipt without replay')
+        now=db.now_iso()
+        c.execute('INSERT INTO minecraft_dispatches VALUES(?,?,?,?,?,?) ON CONFLICT(scope,activity,task_id) DO UPDATE SET disposition=excluded.disposition,updated_at=excluded.updated_at',(key,activity,task_id,request,'pending',now))
+        task={'taskId':task_id,'skill':command.get('skill'),'state':'unknown','reason':'dispatch_unconfirmed','evidence':{}}
+        c.execute('INSERT INTO minecraft_tasks VALUES(?,?,?,?,?) ON CONFLICT(scope,activity,task_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',(key,activity,task_id,json.dumps(task),now))
+    if not old:bind_task(binding,activity,task_id)
+    return True
+
+def dispatch_failed(binding, activity, task_id, *, rejected=False, reason='dispatch_unconfirmed'):
+    schema();key=scope(binding)
+    with db.tx() as c:
+        # A real receipt may already have arrived through events or stop.
+        row=c.execute('SELECT disposition FROM minecraft_dispatches WHERE scope=? AND activity=? AND task_id=?',(key,activity,task_id)).fetchone()
+        if row is None or row['disposition']=='observed':return
+        disposition='rejected' if rejected else 'unknown'
+        c.execute('UPDATE minecraft_dispatches SET disposition=?,updated_at=? WHERE scope=? AND activity=? AND task_id=?',(disposition,db.now_iso(),key,activity,task_id))
+        row=c.execute('SELECT data FROM minecraft_tasks WHERE scope=? AND activity=? AND task_id=?',(key,activity,task_id)).fetchone()
+        task=json.loads(row['data'])
+        task.update(state='failed' if rejected else 'unknown',reason=reason)
+        c.execute('UPDATE minecraft_tasks SET data=?,updated_at=? WHERE scope=? AND activity=? AND task_id=?',(json.dumps(task),db.now_iso(),key,activity,task_id))
+
+def history(binding, *, activity=None, task_id=None, limit=12):
+    """Read original facts only; never contact a body, restore a grant or replay."""
+    schema();where='t.scope=?';params=[scope(binding)]
+    if activity is not None:where+=' AND t.activity=?';params.append(activity)
+    if task_id is not None:where+=' AND t.task_id=?';params.append(task_id)
+    rows=db.query('SELECT t.activity,t.data,d.request,d.disposition FROM minecraft_tasks t LEFT JOIN minecraft_dispatches d ON d.scope=t.scope AND d.activity=t.activity AND d.task_id=t.task_id WHERE '+where+' ORDER BY t.updated_at DESC,t.rowid DESC LIMIT ?',(*params,min(64,max(1,limit))))
+    return [{**json.loads(row['data']),'activityId':row['activity'],**({'dispatch':row['disposition'],'request':json.loads(row['request'])} if row['request'] else {})} for row in reversed(rows)]
 def goal(binding):
     schema()
     rows=db.query('SELECT data FROM minecraft_goals WHERE scope=?',(scope(binding),))
@@ -113,8 +156,10 @@ def record(binding,activity,tasks):
             data=json.dumps(task,sort_keys=True,ensure_ascii=False)
             if len(data)>64000:raise ValueError('Task evidence too large')
             old=c.execute('SELECT data FROM minecraft_tasks WHERE scope=? AND activity=? AND task_id=?',(scope(binding),activity,task['taskId'])).fetchone()
+            if old and json.loads(old['data']).get('state') in {'succeeded','failed','cancelled'} and task['state'] in {'queued','running','paused'}:continue
             if old and old['data']==data:continue
             c.execute('INSERT INTO minecraft_tasks VALUES(?,?,?,?,?) ON CONFLICT(scope,activity,task_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',(scope(binding),activity,task['taskId'],data,db.now_iso()))
+            c.execute("UPDATE minecraft_dispatches SET disposition='observed',updated_at=? WHERE scope=? AND activity=? AND task_id=?",(db.now_iso(),scope(binding),activity,task['taskId']))
             milestone=_progress(task)
             if milestone is not None:c.execute('UPDATE minecraft_task_goals SET progress=?,updated_at=? WHERE scope=? AND activity=? AND task_id=?',(json.dumps(milestone,ensure_ascii=False),db.now_iso(),scope(binding),activity,task['taskId']))
             changed.append(task)
@@ -128,6 +173,7 @@ def reconcile(binding, *, activity=None):
     """
     schema()
     with db.tx() as c:
+        c.execute("UPDATE minecraft_dispatches SET disposition='unknown',updated_at=? WHERE scope=? AND disposition='pending'"+(' AND activity=?' if activity is not None else ''),(db.now_iso(),scope(binding),*([activity] if activity is not None else [])))
         for row in c.execute('SELECT activity,task_id,data FROM minecraft_tasks WHERE scope=?',(scope(binding),)).fetchall():
             if activity is not None and row['activity'] != activity:continue
             task=json.loads(row['data'])

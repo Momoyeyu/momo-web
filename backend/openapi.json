@@ -1978,6 +1978,18 @@
             "title": "Action",
             "type": "string"
           },
+          "activityId": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9_-]{1,80}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activityid"
+          },
           "after": {
             "default": 0,
             "minimum": 0.0,
