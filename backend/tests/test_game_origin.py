@@ -49,6 +49,24 @@ def test_game_event_stops_its_turn_after_releasing_its_binding(monkeypatch):
  assert calls==['stop']
  assert not [event for event in events if event['t']=='error']
 
+def test_automatic_game_decision_can_be_silent_without_twelve_empty_model_calls(monkeypatch):
+ calls=[]
+ def chat(*args,**kwargs):
+  calls.append(1)
+  yield from ()
+ monkeypatch.setattr(llm,'chat_stream',chat)
+ events=list(turn.run_turn('',observation={'kind':'minecraft','source':'Minecraft','observedAt':1,'state':{}}))
+ assert len(calls)==1 and not [event for event in events if event['t']=='error']
+
+def test_capacity_yields_only_automatic_game_decisions_without_hiding_provider_errors(monkeypatch):
+ def full(*args,**kwargs):raise llm.LlmError('Context capacity reached; please retry after maintenance')
+ monkeypatch.setattr(turn.compress,'guard_request',full)
+ event={'kind':'minecraft','source':'Minecraft','observedAt':1,'state':{}}
+ assert not [e for e in turn.run_turn('',observation=event) if e['t']=='error']
+ def bad_provider(*args,**kwargs):raise llm.LlmError('Provider authentication failed')
+ monkeypatch.setattr(turn.compress,'guard_request',bad_provider)
+ assert [e for e in turn.run_turn('',observation=event) if e['t']=='error']
+
 
 def test_game_frame_capacity_discards_then_maintains_then_recaptures(monkeypatch):
  order=[]

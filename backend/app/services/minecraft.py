@@ -5,6 +5,7 @@ import uuid
 from ..core import state
 from .coordinator import runtime
 from . import vision
+MODEL_OBSERVATION_BYTES = 6000
 
 class MinecraftError(ValueError):
     def __init__(self,message,*,code='MINECRAFT_STATE'):
@@ -170,7 +171,12 @@ class Minecraft:
                 result=dict(result)
                 definitions=result.pop('skillDefinitions')
                 skill=arguments.get('skill')
-                if skill:
+                if skill=='controls':
+                    from ..api.minecraft import Action
+                    properties=Action.model_json_schema()['properties']
+                    result['controls']={'type':'object','properties':{k:v for k,v in properties.items() if k not in {'clientId','leaseId','generation','action'}},'required':['control'],'additionalProperties':False}
+                    result['help']='Manual fallback only: action=play with args matching controls; ordinary gameplay uses submit. This does not grant permissions.'
+                elif skill:
                     if skill not in definitions:raise MinecraftError('Unsupported Minecraft skill')
                     result['skillDefinitions']={skill:definitions[skill]}
                 else:result['help']='Query capabilities with skill=<name> for that exact argument schema. Use recipes with query=<item or recipe name> for unlocked recipes.'
@@ -277,10 +283,10 @@ class Minecraft:
             prefix='data:image/png;base64,'
             if not frame.startswith(prefix) or len(frame)>5400000:raise MinecraftError('Invalid game frame')
             stage(base64.b64decode(frame[len(prefix):],validate=True),lambda:self.validate_decision(generation))
-        return {'kind':'minecraft','source':'Minecraft','observedAt':result.get('observedAt',time.time()*1000),'generation':generation,'state':self.model_observation(result)}
+        return {'kind':'minecraft','source':'Minecraft','observedAt':result.get('observedAt',time.time()*1000),'generation':generation,'state':self.model_observation(result,compact=True)}
 
     @staticmethod
-    def model_observation(value):
+    def model_observation(value, *, compact=False, query=''):
         # Keep real slot addresses and facts, not a repeated catalogue of recipes
         # and verbose empty stacks. Full unlocked recipes remain queryable.
         result={k:v for k,v in value.items() if k!='knownRecipes'}
@@ -296,7 +302,56 @@ class Minecraft:
                     projected.pop('damage',None);projected.pop('maxDamage',None)
                 if not projected.get('components'):projected.pop('components',None)
                 result['slots'].append(projected)
-        return result
+        return Minecraft._compact_observation(result,query) if compact and query!='details' else result
+
+    @staticmethod
+    def _compact_observation(value, query):
+        """Request-local view only. Full facts stay in the host; focus queries are reads."""
+        import copy,json,re
+        frame=value.get('frame')
+        data=copy.deepcopy({k:v for k,v in value.items() if k!='frame'})
+        core={'world','account','epoch','observedAt','dimension','gameTick','x','y','z','yaw','pitch','health','food','air','onFire','inWater','screen','screenHandler','screenRevision','selectedHotbar','cursor','experience','gameMode','difficulty','biome','riding','sleeping','perspective','survival','recipeQueryAvailable','shieldBlockCount'}
+        groups={'inventory':{'slots','emptySlots'},'terrain':{'visibleBlocks','visibleLandmarks','targetBlock'},'entities':{'visibleEntities','visiblePlayers','nearbyDrops'},'station':{'station'}}
+        slot=re.fullmatch(r'slot:(\d{1,3})',query)
+        fields=groups.get(query,set().union(*groups.values()))
+        if slot:fields=groups['inventory']
+        data={k:v for k,v in data.items() if k in core|fields}
+        if slot:
+            index=int(slot[1]);data['slots']=[s for s in data.get('slots',[]) if s.get('id')==index]
+            data['emptySlots']=[s for s in data.get('emptySlots',[]) if s==index]
+        data['detailsAvailable']=True
+        for field in ('x','y','z','yaw','pitch'):
+            if isinstance(data.get(field),float):data[field]=round(data[field],2)
+        for field in ('visibleEntities','visibleLandmarks','nearbyDrops','visiblePlayers'):
+            if isinstance(data.get(field),list):data[field]=data[field][:8]
+        for field in ('visibleEntities','visibleLandmarks','nearbyDrops','visibleBlocks'):
+            for row in data.get(field,[]):
+                if isinstance(row,dict):
+                    for key in ('x','y','z','distance','lookYaw','lookPitch'):
+                        if isinstance(row.get(key),float):row[key]=round(row[key],2)
+        # Leave room inside the capture reservation for the tool envelope and
+        # the pixelsFollow flag added after this read-only projection.
+        size=lambda:len(json.dumps(data,ensure_ascii=False,separators=(',',':')).encode())+256
+        if size()>MODEL_OBSERVATION_BYTES:
+            for row in data.get('slots',[]):
+                if row.pop('components',None):row['componentsAvailable']=True
+                row.pop('name',None)
+        if size()>MODEL_OBSERVATION_BYTES:
+            for field in ('visibleEntities','visibleLandmarks','nearbyDrops','visiblePlayers'):
+                if field in data:data[field]=data[field][:4]
+            if isinstance(data.get('station'),dict) and 'options' in data['station']:data['station'].pop('options')
+        # Unusually verbose modded inventories remain readable one real slot at
+        # a time. Never truncate an item ID or invent that an omitted slot is empty.
+        while size()>MODEL_OBSERVATION_BYTES and len(data.get('slots',[]))>1:
+            rows=data['slots'];selected=36+int(data.get('selectedHotbar',0))
+            index=next((i for i in range(len(rows)-1,-1,-1) if rows[i]['id'] not in {selected,45}),len(rows)-1)
+            data.setdefault('omittedSlotIds',[]).append(rows.pop(index)['id'])
+        if size()>MODEL_OBSERVATION_BYTES:
+            for field in ('visibleEntities','visibleLandmarks','nearbyDrops','visiblePlayers','station'):
+                data.pop(field,None)
+        if size()>MODEL_OBSERVATION_BYTES:raise MinecraftError('Observation details exceed the bounded view; query one slot')
+        if frame is not None:data['frame']=frame
+        return data
 
     def goal_context(self):
         import json

@@ -338,3 +338,33 @@ def test_game_observation_omits_default_slot_metadata_but_preserves_durability_a
  assert projected['slots'][1]==raw['slots'][1]
  assert projected['slots'][2]['components']==raw['slots'][2]['components']
  assert raw==old
+
+def test_live_game_projection_bounds_metadata_without_losing_vanilla_inventory_addresses():
+ import copy
+ from app.services.minecraft import Minecraft
+ raw={'world':'w','account':'a','observedAt':123456789,'epoch':77,'x':1.123456789,'y':64,'z':2.987654321,'health':17,'food':15,'screen':'world','selectedHotbar':0,
+      'slots':[{'id':i,'item':'minecraft:oak_planks','count':i+1,'name':'橡木木板','components':{'minecraft:enchantments':'long evidence '*70}} for i in range(9,46)],
+      'visibleLandmarks':[{'x':i,'y':65,'z':3,'block':'minecraft:oak_log','distance':i+.123456789} for i in range(24)]}
+ before=copy.deepcopy(raw);projected=Minecraft.model_observation(raw,compact=True)
+ assert len(json.dumps(projected,ensure_ascii=False,separators=(',',':')).encode())<=6000
+ assert [(s['id'],s['item'],s['count']) for s in projected['slots']]==[(s['id'],s['item'],s['count']) for s in raw['slots']]
+ assert projected['observedAt']==raw['observedAt'] and projected['epoch']==77 and projected['health']==17
+ assert projected['detailsAvailable'] and raw==before
+ detail=Minecraft.model_observation(raw,compact=True,query='slot:12')
+ assert detail['slots']==[raw['slots'][3]] and detail['world']=='w'
+ assert Minecraft.model_observation(raw,compact=True,query='details')['slots']==raw['slots']
+
+def test_game_declaration_keeps_semantic_tasks_small_and_manual_controls_on_demand():
+ declaration=tools._minecraft_declaration(['observe','submit','capabilities','play'])['function']
+ assert set(declaration['parameters']['properties'])=={'action','query','taskId','skill','args','after'}
+ assert 'controls' in declaration['description'] and 'args' in declaration['description']
+
+def test_nested_manual_fallback_uses_the_same_validated_input_and_authority():
+ from app.services.minecraft import minecraft
+ with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'execute',return_value={'sent':True}) as dispatch:
+  reply=json.loads(tools.execute('minecraft_action',{'action':'play','args':{'control':'screenKey','key':'escape','durationMs':1}}))
+ assert reply=={'sent':True} and dispatch.call_args.args[1]['control']=='screenKey' and dispatch.call_args.args[1]['key']=='escape'
+ with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'execute') as dispatch:
+  for args in [{'control':'look','generation':99},{'control':'look','leaseId':'fake'},{'control':'forward','durationMs':0}]:
+   assert json.loads(tools.execute('minecraft_action',{'action':'play','args':args}))['code']=='MINECRAFT_INPUT'
+ dispatch.assert_not_called()

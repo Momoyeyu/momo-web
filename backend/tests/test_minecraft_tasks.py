@@ -17,6 +17,14 @@ def test_submit_uses_current_binding_without_waiting_for_completion():
   assert rt.host.request.call_args.args[0]=='minecraft.submit'
   assert rt.host.request.call_args.args[1]['permission']=={'world':'world','account':'player','activityEpoch':7}
 
+def test_manual_control_help_is_read_only_and_never_exposes_authority_fields():
+ m,rt=setup();rt.host.request.return_value={'skills':['navigate'],'skillDefinitions':{'navigate':{}}}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  result=m.execute('capabilities',{'skill':'controls'},0,None,None)
+ assert 'control' in result['controls']['properties']
+ assert not set(result['controls']['properties'])&{'clientId','leaseId','generation','action'}
+ assert m.permissions=={'game.observe','game.modify'} and rt.host.request.call_args.args[0]=='minecraft.capabilities'
+
 @pytest.mark.parametrize('failure',['minecraft.capabilities','minecraft.resume'])
 def test_failed_connect_negotiation_revokes_the_tentative_binding(failure):
  from app.core.plugin_host import HostError
