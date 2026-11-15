@@ -57,6 +57,12 @@ public final class AcceptanceFixtures implements ModInitializer {
   chest(world,-3,-2,"oak_log*64","cobblestone*64","iron_ingot*64","diamond*16","stick*64","oak_planks*64","coal*64","apple*64","iron_sword","shield","bow","arrow*64","crossbow","trident","iron_helmet","iron_chestplate","iron_leggings","iron_boots","lapis_lazuli*64","book*16","experience_bottle*64","glass_bottle*16");
   chest(world,-5,-2,"brewing_stand","blaze_powder*64","nether_wart*64","sugar*64","redstone*64","glowstone_dust*64","fermented_spider_eye*64","magma_cream*64","golden_carrot*64","pufferfish*16","emerald*64","wheat*64","carrot*64","potato*64","beetroot*64","leather*64","white_wool*64","white_banner*16","red_dye*64","netherite_upgrade_smithing_template","netherite_ingot*8","gold_ingot*64","sand*64","raw_iron*64","raw_gold*64","salmon*64");
   chest(world,-7,-5,"oak_boat","minecart","chest_minecart","saddle","flint_and_steel","ender_eye*16","oak_door*16","wheat_seeds*64","bone_meal*64","water_bucket","iron_hoe","diamond_sword","diamond_pickaxe","copper_ingot*64");
+  // Review regressions: setup-only materials and visible geometry, never runtime cheats.
+  chest(world,-10,-6,"golden_pickaxe","iron_pickaxe","writable_book","oak_sign*16","bucket","stone*64","dirt*64");
+  block(world,-15,64,-9,Blocks.DIAMOND_ORE);block(world,-15,64,-6,Blocks.STONE);
+  for(int x=-13;x<=-11;x++)for(int y=64;y<=66;y++)block(world,x,y,-14,Blocks.STONE);
+  var hiddenDrop=new net.minecraft.entity.ItemEntity(world,-11.5,64.2,-15.5,new ItemStack(net.minecraft.item.Items.DIAMOND));
+  hiddenDrop.setNeverDespawn();hiddenDrop.setPickupDelay(32767);world.spawnEntity(hiddenDrop);
   // Full set of ordinary station UIs within a short walk from the spawn.
   Block[] stations={Blocks.CRAFTING_TABLE,Blocks.FURNACE,Blocks.SMOKER,Blocks.BLAST_FURNACE,Blocks.ANVIL,Blocks.GRINDSTONE,Blocks.SMITHING_TABLE,Blocks.LOOM,Blocks.STONECUTTER,Blocks.BREWING_STAND};
   for(int i=0;i<stations.length;i++)block(world,-8+i*2,64,6,stations[i]);
@@ -94,7 +100,9 @@ public final class AcceptanceFixtures implements ModInitializer {
   skeleton.initialize(world,world.getLocalDifficulty(skeleton.getBlockPos()),SpawnReason.STRUCTURE,null);skeleton.setPersistent();world.spawnEntity(skeleton);
   var neutral=new net.minecraft.entity.mob.ZombifiedPiglinEntity(EntityType.ZOMBIFIED_PIGLIN,world);neutral.setPosition(32.5,64,-24.5);neutral.setPersistent();world.spawnEntity(neutral);
   var companion=new net.minecraft.entity.passive.CowEntity(EntityType.COW,world);companion.setPosition(-4.5,64,10.5);companion.setPersistent();world.spawnEntity(companion);
-  Map<String,Object> report=new LinkedHashMap<>(Map.of("version",3,"setupOnly",true,"spawn",List.of(0,64,0),"stationsRow",List.of(-8,64,6),"supplies",List.of(List.of(-3,64,-2),List.of(-5,64,-2),List.of(-7,64,-5)),"villager",List.of(10,64,2),"water",List.of(-10,61,0),"netherFrame",List.of(-13,65,12),"endFrame",List.of(0,64,12)));
+  var horse=new net.minecraft.entity.passive.HorseEntity(EntityType.HORSE,world);horse.setPosition(-4.5,64,12.5);horse.setTame(true);horse.setPersistent();world.spawnEntity(horse);
+  Map<String,Object> report=new LinkedHashMap<>(Map.of("version",4,"setupOnly",true,"spawn",List.of(0,64,0),"stationsRow",List.of(-8,64,6),"supplies",List.of(List.of(-3,64,-2),List.of(-5,64,-2),List.of(-7,64,-5)),"villager",List.of(10,64,2),"water",List.of(-10,61,0),"netherFrame",List.of(-13,65,12),"endFrame",List.of(0,64,12)));
+  report.put("reviewSupplies",List.of(-10,64,-6));report.put("ore",List.of(-15,64,-9));report.put("hiddenDropWall",List.of(-12,65,-14));report.put("horse",List.of(-4,64,12));
   report.put("followTarget",List.of(-4,64,10));report.put("bed",List.of(4,64,-3));report.put("nightWithDaylightCycle",true);
   report.put("combatTargets",List.of(List.of(-32,64,18),List.of(-32,64,28),List.of(-32,64,38),List.of(44,64,0)));report.put("neutral",List.of(32,64,-25));
   Files.writeString(save.resolve(".momo-fixture-prepared"),new Gson().toJson(report),StandardOpenOption.CREATE_NEW);
