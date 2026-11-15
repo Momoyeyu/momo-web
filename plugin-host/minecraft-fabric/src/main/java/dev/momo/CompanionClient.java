@@ -235,6 +235,7 @@ public final class CompanionClient implements ClientModInitializer {
     capture.accept(net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer()));
     GameObservation.append(client,result);
     result.add("survival",new Gson().toJsonTree(survival.progress()));result.addProperty("gameTick",client.world.getTime());
+    result.addProperty("clientFps",client.getCurrentFps());
     result.addProperty("observedAt", System.currentTimeMillis());
     result.addProperty("x",client.player.getX()); result.addProperty("y",client.player.getY()); result.addProperty("z",client.player.getZ());
     result.addProperty("yaw",client.player.getYaw()); result.addProperty("pitch",client.player.getPitch());
