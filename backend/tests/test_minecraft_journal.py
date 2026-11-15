@@ -65,3 +65,54 @@ def test_stop_snapshot_does_not_drop_newest_facts_after_256_tasks():
  tasks=[{'taskId':f't{i}','state':'succeeded','evidence':{'x':i}} for i in range(257)]
  journal.record(b,'game-one',tasks)
  assert journal.recent(b)[-1]['taskId']=='t256'
+
+def intent(title='歇脚点',**extra):
+ return {'title':title,'reason':'喜欢安静','source':'aesthetic','expected':title+'可以使用','status':'active',**extra}
+
+def gain(task_id='wood',state='succeeded',before=0,after=4):
+ return {'taskId':task_id,'skill':'gather','state':state,'evidence':{'item':'minecraft:oak_log','countBefore':before,'countAfter':after}}
+
+def test_goal_progress_survives_compact_restart_and_duplicate_receipts_without_authority():
+ b={'world':'home','account':'p'};goal=intent();journal.set_goal(b,goal)
+ journal.bind_task(b,'activity','wood')
+ journal.record(b,'activity',[{**gain(),'state':'queued'}]);assert journal.progress(b)==[]
+ journal.record(b,'activity',[gain()]);journal.record(b,'activity',[gain()])
+ first=journal.progress(b);assert len(first)==1 and first[0]['gains']==[{'item':'minecraft:oak_log','count':4}]
+ journal.set_goal(b,{**goal,'progress':'已有木材'})
+ with db.tx() as c:c.execute("UPDATE sessions SET summary=?,generation=generation+1 WHERE id='live'",('compacted',))
+ assert journal.progress(b)==first and journal.goal(b)['progress']=='已有木材'
+ from app.services.minecraft import Minecraft
+ restarted=Minecraft();restarted.binding=b
+ assert restarted.goal_evidence()==first and restarted.permissions==set() and not restarted.autonomous
+ assert journal.progress({**b,'world':'other'})==[] and journal.progress({**b,'account':'other'})==[]
+
+def test_late_old_goal_receipt_stays_a_fact_but_cannot_become_new_goal_progress():
+ b={'world':'home','account':'p'};journal.set_goal(b,intent('花园'))
+ old=journal.bind_task(b,'activity','same')
+ journal.set_goal(b,intent('小屋'))
+ assert journal.bind_task(b,'activity','same')==old,'Reconciliation must never reassign an already dispatched ID'
+ journal.record(b,'activity',[gain('same')]);assert journal.progress(b)==[]
+ assert journal.recent(b)[-1]['state']=='succeeded'
+ assert journal.bind_task(b,'new-activity','same')!=old
+ journal.record(b,'new-activity',[gain('same')]);assert len(journal.progress(b))==1
+
+def test_restarting_completed_intention_does_not_reuse_old_achievement_or_adopt_legacy_receipts():
+ b={'world':'home','account':'p'};goal=intent()
+ journal.set_goal(b,goal);journal.bind_task(b,'a','wood');journal.record(b,'a',[gain()])
+ journal.set_goal(b,{**goal,'status':'completed'});assert journal.progress(b)
+ journal.set_goal(b,goal);assert journal.progress(b)==[]
+ journal.record(b,'unmapped',[gain('legacy')]);assert journal.progress(b)==[]
+
+def test_partial_goal_progress_requires_real_changes_and_preserves_original_proof():
+ b={'world':'home','account':'p'};journal.set_goal(b,intent())
+ for name in ['partial','zero','pending','building']:journal.bind_task(b,'a',name)
+ journal.record(b,'a',[gain('partial','failed',2,5),gain('zero','failed',2,2),gain('pending','queued',0,8)])
+ raw={'taskId':'building','skill':'build','state':'failed','reason':'build_blocked','evidence':{
+  'confirmedCells':[{'x':1,'y':64,'z':2,'block':'Block{minecraft:oak_planks}','serverBlockSeq':9},
+                    {'x':2,'y':64,'z':2,'block':'Block{minecraft:oak_planks}','observedExisting':True}],
+  'remainingCells':[{'x':3,'y':64,'z':2,'block':'minecraft:oak_planks'}]}}
+ journal.record(b,'a',[raw]);facts=journal.progress(b)
+ assert {f['taskId'] for f in facts}=={'partial','building'}
+ assert next(f for f in facts if f['taskId']=='partial')['gains'][0]['count']==3
+ built=next(f for f in facts if f['taskId']=='building');assert built['placed']==[{'block':'minecraft:oak_planks','count':1}] and built['partial'] is True
+ assert next(t for t in journal.recent(b) if t['taskId']=='building')==raw

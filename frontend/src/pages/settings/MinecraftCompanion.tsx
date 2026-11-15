@@ -50,6 +50,10 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
   finally{operation.current=false;if(mounted.current)setBusy(false);}
  };
  const current=sessions.find(s=>s.id===selected);
+ const evidence=game?.goalEvidence?.at(-1);
+ const evidenceSkill=evidence?.placed?.length?'build':evidence?.gains?.length?(evidence.skill==='craft'?'craft':'gather'):evidence?.mined?.length?'mine':'attack';
+ const evidenceRows=evidence?.placed?.length?evidence.placed:evidence?.gains?.length?evidence.gains:evidence?.mined||[];
+ const evidenceCount=evidenceRows.reduce((total,item)=>total+item.count,0)||(evidence?.defeated||0);
  const body=<div className="extension-detail">
   <header className="extension-detail-header">
    <div><h3>{t('minecraft.title')}</h3><span className="extension-detail-status">{t(active?'minecraft.running':'minecraft.stopped')}</span></div>
@@ -72,6 +76,7 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
   </section>
   {active&&game&&<section className="extension-detail-section game-progress" aria-live="polite">
    {game.goal&&<div className="game-goal"><span>{t('minecraft.currentGoal')}</span><strong>{game.goal.title}</strong></div>}
+   {evidence&&evidenceCount>0&&Number.isFinite(evidenceCount)&&<div className="game-task"><span>{t('minecraft.actualProgress')}</span><span>{t(`minecraft.skill.${evidenceSkill}`)} · {evidenceCount}</span></div>}
    {game.tasks.filter(task=>['running','queued','paused','failed'].includes(task.state)).slice(-3).map(task=><div className="game-task" key={task.taskId}><span>{t(`minecraft.skill.${task.progress?.action?.skill||task.progress?.skill||task.skill}`)}</span><span>{t(`minecraft.taskState.${task.state}`)}</span>{task.state==='failed'&&<Hint text={t(minecraftFailureKey(task.reason))}/>}</div>)}
   </section>}
   {mode==='settings'&&<details className="extension-detail-section extension-detail-advanced"><summary>{t('minecraft.install')}</summary><FieldRow label={t('minecraft.instancePath')} hint={t('minecraft.installHint')}><input type="text" value={path} onChange={e=>setPath(e.target.value)} disabled={busy}/></FieldRow><div className="extension-detail-actions"><Button disabled={busy||!path.trim()} onClick={()=>void run(()=>apiJson('/api/minecraft/install',jsonInit('POST',{instancePath:path.trim()})))}>{t('minecraft.install')}</Button></div></details>}

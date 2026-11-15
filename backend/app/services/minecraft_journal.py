@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+import uuid
 from ..core import db
 
 STATUSES={'active','paused','completed','abandoned','blocked'}
@@ -20,6 +21,9 @@ def schema():
         if 'generation' in {row['name'] for row in c.execute('PRAGMA table_info(minecraft_tasks)')}:
             c.execute('ALTER TABLE minecraft_tasks RENAME COLUMN generation TO activity')
         c.execute('CREATE TABLE IF NOT EXISTS minecraft_places(scope TEXT NOT NULL,dimension TEXT NOT NULL,chunk_x INTEGER NOT NULL,chunk_z INTEGER NOT NULL,data TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(scope,dimension,chunk_x,chunk_z))')
+        c.execute('CREATE TABLE IF NOT EXISTS minecraft_goal_instances(scope TEXT PRIMARY KEY,goal_id TEXT NOT NULL)')
+        c.execute('CREATE TABLE IF NOT EXISTS minecraft_task_goals(scope TEXT NOT NULL,activity TEXT NOT NULL,task_id TEXT NOT NULL,goal_id TEXT NOT NULL,progress TEXT,updated_at TEXT NOT NULL,PRIMARY KEY(scope,activity,task_id))')
+        c.execute('CREATE INDEX IF NOT EXISTS minecraft_goal_progress ON minecraft_task_goals(scope,goal_id,updated_at DESC)')
 def goal(binding):
     schema()
     rows=db.query('SELECT data FROM minecraft_goals WHERE scope=?',(scope(binding),))
@@ -35,8 +39,66 @@ def validate_goal(value):
 def set_goal(binding, value):
     validate_goal(value)
     schema()
-    with db.tx() as c:c.execute('INSERT INTO minecraft_goals VALUES(?,?,?) ON CONFLICT(scope) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',(scope(binding),json.dumps(value,ensure_ascii=False),db.now_iso()))
+    key=scope(binding)
+    with db.tx() as c:
+        row=c.execute('SELECT data FROM minecraft_goals WHERE scope=?',(key,)).fetchone()
+        previous=json.loads(row['data']) if row else None
+        instance=c.execute('SELECT goal_id FROM minecraft_goal_instances WHERE scope=?',(key,)).fetchone()
+        replacing=previous and (any(previous.get(k)!=value.get(k) for k in ('title','expected')) or previous['status'] in {'completed','abandoned'} and value['status'] in {'active','blocked'})
+        if instance is None or replacing:c.execute('INSERT INTO minecraft_goal_instances VALUES(?,?) ON CONFLICT(scope) DO UPDATE SET goal_id=excluded.goal_id',(key,uuid.uuid4().hex))
+        c.execute('INSERT INTO minecraft_goals VALUES(?,?,?) ON CONFLICT(scope) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',(key,json.dumps(value,ensure_ascii=False),db.now_iso()))
     return value
+
+def bind_task(binding, activity, task_id):
+    """Capture intent before dispatch. Reconciliation must not reassign an ID."""
+    schema();key=scope(binding)
+    with db.tx() as c:
+        previous=c.execute('SELECT goal_id FROM minecraft_task_goals WHERE scope=? AND activity=? AND task_id=?',(key,activity,task_id)).fetchone()
+        if previous:return previous['goal_id']
+        row=c.execute('SELECT data FROM minecraft_goals WHERE scope=?',(key,)).fetchone()
+        if not row or json.loads(row['data'])['status'] not in {'active','blocked'}:return None
+        instance=c.execute('SELECT goal_id FROM minecraft_goal_instances WHERE scope=?',(key,)).fetchone()
+        if instance is None:
+            identity=uuid.uuid4().hex;c.execute('INSERT INTO minecraft_goal_instances VALUES(?,?)',(key,identity))
+        else:identity=instance['goal_id']
+        c.execute('INSERT INTO minecraft_task_goals VALUES(?,?,?,?,NULL,?)',(key,activity,task_id,identity,db.now_iso()))
+        return identity
+
+def _progress(task):
+    if task.get('state') not in {'succeeded','failed','cancelled'}:return None
+    gains={};placed={};mined={};positions=[];defeated=set();seen=set();pending=[(task.get('evidence',{}),0)];visited=0
+    def resource(value):
+        if not isinstance(value,str) or len(value)>1200:return None
+        match=re.fullmatch(r'(?:Block\{)?([a-z0-9_.-]+:[a-z0-9_./-]+)(?:\}.*)?',value)
+        return match[1] if match and len(match[1])<=128 else None
+    while pending and visited<512:
+        row,depth=pending.pop();visited+=1
+        if depth>8:continue
+        if isinstance(row,list):pending.extend((r,depth+1) for r in row);continue
+        if not isinstance(row,dict):continue
+        item=resource(row.get('item'));before,after=row.get('countBefore'),row.get('countAfter')
+        if item and type(before) is int and type(after) is int and 0<=before<after:gains[item]=gains.get(item,0)+after-before
+        block=resource(row.get('block'));sequence=row.get('serverBlockSeq')
+        if block and type(sequence) is int and sequence>0 and all(type(row.get(axis)) is int for axis in ('x','y','z')):
+            identity=(sequence,*(row[axis] for axis in ('x','y','z')))
+            if identity not in seen:
+                seen.add(identity);counts=mined if 'after' in row else placed;counts[block]=counts.get(block,0)+1
+                if 'after' not in row:positions.append({'block':block,**{axis:row[axis] for axis in ('x','y','z')}})
+        if row.get('targetAlive') is False and type(row.get('entityId')) is int:defeated.add(row['entityId'])
+        pending.extend((value,depth+1) for value in row.values() if isinstance(value,(list,dict)))
+    if not (gains or placed or mined or defeated):return None
+    result={'taskId':task['taskId'],'skill':task.get('skill','plan'),'partial':task['state']!='succeeded'}
+    if gains:result['gains']=[{'item':item,'count':count} for item,count in sorted(gains.items())]
+    if placed:result['placed']=[{'block':block,'count':count} for block,count in sorted(placed.items())]
+    if mined:result['mined']=[{'block':block,'count':count} for block,count in sorted(mined.items())]
+    if positions:result['positions']=positions[-4:]
+    if defeated:result['defeated']=len(defeated)
+    return result
+
+def progress(binding, limit=8):
+    schema();key=scope(binding)
+    rows=db.query('SELECT t.progress FROM minecraft_task_goals t JOIN minecraft_goal_instances g ON g.scope=t.scope AND g.goal_id=t.goal_id WHERE t.scope=? AND t.progress IS NOT NULL ORDER BY t.updated_at DESC,t.rowid DESC LIMIT ?',(key,min(8,max(1,limit))))
+    return [json.loads(row['progress']) for row in reversed(rows)]
 
 def record(binding,activity,tasks):
     if len(tasks)>4096:raise ValueError('Too many task receipts')
@@ -51,6 +113,8 @@ def record(binding,activity,tasks):
             old=c.execute('SELECT data FROM minecraft_tasks WHERE scope=? AND activity=? AND task_id=?',(scope(binding),activity,task['taskId'])).fetchone()
             if old and old['data']==data:continue
             c.execute('INSERT INTO minecraft_tasks VALUES(?,?,?,?,?) ON CONFLICT(scope,activity,task_id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',(scope(binding),activity,task['taskId'],data,db.now_iso()))
+            milestone=_progress(task)
+            if milestone is not None:c.execute('UPDATE minecraft_task_goals SET progress=?,updated_at=? WHERE scope=? AND activity=? AND task_id=?',(json.dumps(milestone,ensure_ascii=False),db.now_iso(),scope(binding),activity,task['taskId']))
             changed.append(task)
     return changed
 

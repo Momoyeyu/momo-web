@@ -17,6 +17,17 @@ def test_submit_uses_current_binding_without_waiting_for_completion():
   assert rt.host.request.call_args.args[0]=='minecraft.submit'
   assert rt.host.request.call_args.args[1]['permission']=={'world':'world','account':'player','activityEpoch':7}
 
+def test_task_is_bound_to_its_goal_before_dispatch_not_when_result_arrives():
+ from app.services import minecraft_journal as journal
+ from app.core import db
+ m,rt=setup();journal.set_goal(m.binding,{'title':'小屋','reason':'休息','source':'rest','expected':'可以歇脚','status':'active'})
+ def dispatch(method,params):
+  assert db.query('SELECT goal_id FROM minecraft_task_goals WHERE task_id=?',('t1',))
+  return {'task':{'taskId':'t1','state':'queued','evidence':{}}}
+ rt.host.request.side_effect=dispatch
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  m.execute('submit',{'taskId':'t1','skill':'gather','args':{'item':'minecraft:oak_log','count':4}},0,'owner','lease')
+
 def test_manual_control_help_is_read_only_and_never_exposes_authority_fields():
  m,rt=setup();rt.host.request.return_value={'skills':['navigate'],'skillDefinitions':{'navigate':{}}}
  with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):

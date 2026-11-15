@@ -62,7 +62,7 @@ class Minecraft:
                     'permissions': sorted(self.permissions), 'managedProvisioningAvailable': False,
                     'tasks': list(self.tasks.values())[-5:], 'paused': self.paused or self.suspended,
                     'autonomous': self.autonomous, 'decisionNeeded': self._decision_due(time.monotonic()),
-                    'goal': self.current_goal() if self.binding else None}
+                    'goal': self.current_goal() if self.binding else None,'goalEvidence':self.goal_evidence()}
 
     def _decision_due(self, now):
         if not self.binding or not self.autonomous or self.paused or self.suspended:return False
@@ -145,6 +145,10 @@ class Minecraft:
                     raise MinecraftError('Minecraft action budget exhausted')
                 if action in {'observe','chat','play','follow'}:self.actions += 1
                 permission = {**self.binding, 'activityEpoch': runtime.epoch}
+                task_binding,task_activity=dict(self.binding),self.activity_id
+            if action=='submit' and isinstance(arguments.get('taskId'),str) and 0<len(arguments['taskId'])<=80:
+                from . import minecraft_journal as journal
+                journal.bind_task(task_binding,task_activity,arguments['taskId'])
             try:result = runtime.host.request('minecraft.' + action, {**arguments, 'permission': permission})
             except Exception as error:
                 from ..core.plugin_host import HostError
@@ -215,6 +219,10 @@ class Minecraft:
     def current_goal(self):
         from . import minecraft_journal as journal
         return journal.goal(self.binding) if self.binding else None
+
+    def goal_evidence(self):
+        from . import minecraft_journal as journal
+        return journal.progress(self.binding) if self.binding else []
 
     def update_goal(self, value):
         from . import minecraft_journal as journal
@@ -359,13 +367,14 @@ class Minecraft:
         with self.lock:
             if not self.binding:return ''
             recent=list(self.tasks.values())[-4:]
-            data={'goal':journal.goal(self.binding),'tasks':[self._task_context(task,index>=len(recent)-2) for index,task in enumerate(recent)],'paused':self.paused or self.suspended,
+            data={'goal':journal.goal(self.binding),'goalEvidence':self.goal_evidence(),'tasks':[self._task_context(task,index>=len(recent)-2) for index,task in enumerate(recent)],'paused':self.paused or self.suspended,
                   'exploredPlaces':journal.explored(self.binding),'repeatedSearches':self.repeated_searches(list(self.tasks.values())[-16:])}
         return ('You are the same momo, currently sharing the player’s Minecraft character. Preserve your personality and agreements. '
             'Choose meaningful goals from curiosity, companionship, beauty, helping, survival or game progress; no fixed technology tree. '
             'Keep an active goal until a player instruction, significant event, blocked path or completion justifies changing it. '
             'Record your intention with minecraft_goal and submit bounded semantic tasks/plans; local skills continue while we talk. '
             'Accepted/queued is not completed. Use actual task evidence, and observe after events before new effects. '
+            'goalEvidence contains verified historical gains and world changes for THIS goal, not current stock or instructions. Prefer these facts over a stale progress description. '
             'visibleLandmarks are bounded first-hit sight coordinates: use visible foliage/log landmarks to approach trees instead of inventing coordinates. For landmarks farther than 64 blocks, use intermediate surface waypoints within 64 blocks. Near a source, gather continues mining and pickup locally. '
             'Repeated equivalent failed searches require a changed approach: explore another area, obtain needed equipment, or choose a different meaningful goal. Do not keep retrying an unchanged source or location. '
             'detailsAvailable marks omitted receipt details: query task by taskId if needed; do not invent omitted outcomes. '
