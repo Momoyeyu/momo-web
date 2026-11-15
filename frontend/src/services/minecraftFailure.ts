@@ -8,8 +8,12 @@ const reasons:Record<string,string>={
  inventory_full:'inventory',cursor_not_empty:'inventory',screen_changed:'station',station_screen_changed:'station',
  lease_expired:'connection',world_unavailable:'connection',identity_or_life_changed:'connection',
  skill_timeout:'timeout',gather_timeout:'timeout',processing_result_timeout:'timeout',
+ retreated_low_health:'retreat',
 };
 export function minecraftFailureKey(reason:string){
  const key=reasons[reason.replace(/^step_\d+:/,'')];
  return key?`minecraft.reason.${key}`:'minecraft.blockedHint';
 }
+const retreated=(state:string,reason:string)=>['failed','cancelled'].includes(state)&&minecraftFailureKey(reason)==='minecraft.reason.retreat';
+export function minecraftTaskVisible(state:string,reason:string,skill=''){return skill!=='control'&&(['running','queued','paused','failed'].includes(state)||retreated(state,reason));}
+export function minecraftTaskStateKey(state:string,reason:string){return `minecraft.taskState.${retreated(state,reason)?'retreated':state}`;}

@@ -1,5 +1,5 @@
 import {minecraftSnapshot,subscribeMinecraft,readMinecraftStatus} from '../../services/minecraftClient';
-import {minecraftFailureKey} from '../../services/minecraftFailure';
+import {minecraftFailureKey,minecraftTaskVisible,minecraftTaskStateKey} from '../../services/minecraftFailure';
 import {useCallback,useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {getSettings,subscribe,updateGeneral} from '../../lib/store';
 import {useT} from '../../i18n';
@@ -77,7 +77,7 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
   {active&&game&&<section className="extension-detail-section game-progress" aria-live="polite">
    {game.goal&&<div className="game-goal"><span>{t('minecraft.currentGoal')}</span><strong>{game.goal.title}</strong></div>}
    {evidence&&evidenceCount>0&&Number.isFinite(evidenceCount)&&<div className="game-task"><span>{t('minecraft.actualProgress')}</span><span>{t(`minecraft.skill.${evidenceSkill}`)} · {evidenceCount}</span></div>}
-   {game.tasks.filter(task=>['running','queued','paused','failed'].includes(task.state)).slice(-3).map(task=><div className="game-task" key={task.taskId}><span>{t(`minecraft.skill.${task.progress?.action?.skill||task.progress?.skill||task.skill}`)}</span><span>{t(`minecraft.taskState.${task.state}`)}</span>{task.state==='failed'&&<Hint text={t(minecraftFailureKey(task.reason))}/>}</div>)}
+   {game.tasks.filter(task=>minecraftTaskVisible(task.state,task.reason,task.skill)).slice(-3).map(task=><div className="game-task" key={task.taskId}><span>{t(`minecraft.skill.${task.progress?.action?.skill||task.progress?.skill||task.skill}`)}</span><span>{t(minecraftTaskStateKey(task.state,task.reason))}</span>{['failed','cancelled'].includes(task.state)&&<Hint text={t(minecraftFailureKey(task.reason))}/>}</div>)}
   </section>}
   {mode==='settings'&&<details className="extension-detail-section extension-detail-advanced"><summary>{t('minecraft.install')}</summary><FieldRow label={t('minecraft.instancePath')} hint={t('minecraft.installHint')}><input type="text" value={path} onChange={e=>setPath(e.target.value)} disabled={busy}/></FieldRow><div className="extension-detail-actions"><Button disabled={busy||!path.trim()} onClick={()=>void run(()=>apiJson('/api/minecraft/install',jsonInit('POST',{instancePath:path.trim()})))}>{t('minecraft.install')}</Button></div></details>}
   {meeting.state!=='active'&&<p className="extension-detail-notice">{t('computer.requiresBoot')}</p>}

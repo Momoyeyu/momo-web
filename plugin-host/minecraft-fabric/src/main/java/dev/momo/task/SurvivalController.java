@@ -12,6 +12,7 @@ public final class SurvivalController {
  private SurvivalPolicy.Mode mode=SurvivalPolicy.Mode.NONE;
  private LivingEntity threat;private int savedSlot=-1,ticks;private float escapeYaw;private boolean escapeSafe,combatRetreat;
  private TaskRuntime.Work foodWork,combatWork;private long foodRetryUntil,combatRetryUntil;private String replanReason="";
+ private CombatWithdrawal withdrawal=new CombatWithdrawal();
  private MinecraftClient client(){return MinecraftClient.getInstance();}
  public boolean interruptOwnedScreen(SurvivalPolicy.Mode desired,boolean owned){return policy.interruptOwnedScreen(desired,owned);}
  public boolean acceptsScreen(Object screen){return screen!=null&&foodWork!=null&&foodWork.acceptsScreen(screen);}
@@ -25,10 +26,11 @@ public final class SurvivalController {
   if(p==null||c.world==null||!p.isAlive())return SurvivalPolicy.Mode.NONE;
   // Preserve one borrowed combat owner while it pursues/briefly reacquires its
   // visible target; do not swap enemies every tick or attack calm neutrals.
-  if(combatWork==null||threat==null||!threat.isAlive()||p.squaredDistanceTo(threat)>1024){
+  if(combatWork==null&&!combatRetreat||threat==null||!threat.isAlive()||p.squaredDistanceTo(threat)>1024){
    threat=c.world.getEntitiesByClass(LivingEntity.class,p.getBoundingBox().expand(32),e->{
     if(e==p||!e.isAlive())return false;
-    boolean recent=p.getAttacker()==e&&p.age-p.getLastAttackedTime()<=120;
+    var damage=p.getRecentDamageSource();
+    boolean recent=ThreatPolicy.recent(p.getAttacker()==e,p.age-p.getLastAttackedTime(),damage!=null&&damage.getAttacker()==e);
     boolean neutral=e instanceof EndermanEntity||e instanceof PiglinEntity||e instanceof ZombifiedPiglinEntity||e instanceof SpiderEntity&&c.world.isDay();
     boolean aggressive=e instanceof MobEntity mob&&(mob.isAttacking()||mob.getTarget()==p)||e instanceof EndermanEntity enderman&&enderman.isAngry();
     boolean ranged=e instanceof net.minecraft.entity.ai.RangedAttackMob||e instanceof GhastEntity||e instanceof BlazeEntity||e instanceof GuardianEntity;
@@ -40,7 +42,11 @@ public final class SurvivalController {
   var desired=policy.choose(true,false,critical,p.getHealth(),p.getHungerManager().getFoodLevel(),foodWork!=null||(System.nanoTime()>=foodRetryUntil&&foodSlot()>=0),eating,threat!=null);
   desired=policy.forBody(desired,mealOwned||(mode==SurvivalPolicy.Mode.NONE&&eating),combatOwned);
   if(desired==SurvivalPolicy.Mode.DEFEND&&System.nanoTime()<combatRetryUntil)desired=SurvivalPolicy.Mode.NONE;
-  if(policy.endsRetreat(mode,desired,combatRetreat))replanReason="retreated_low_health";
+  if(mode==SurvivalPolicy.Mode.ESCAPE&&combatRetreat&&!critical){
+   String retreat=threat==null||!threat.isAlive()?"retreated_low_health":withdrawal.update(p.getHealth(),p.squaredDistanceTo(threat),ticks);
+   if(retreat.equals("retreating"))desired=SurvivalPolicy.Mode.ESCAPE;
+   else{replanReason=retreat;desired=SurvivalPolicy.Mode.NONE;}
+  }
   return desired;
  }
  public String replanReason(){return replanReason;}
@@ -52,7 +58,7 @@ public final class SurvivalController {
  }
  public void drive(SurvivalPolicy.Mode desired){
   var c=client();var p=c.player;
-  if(desired!=mode){var selectedThreat=threat;stop();threat=selectedThreat;mode=desired;savedSlot=p.getInventory().selectedSlot;ticks=0;escapeYaw=p.getYaw();combatRetreat=desired==SurvivalPolicy.Mode.ESCAPE&&p.getHealth()<=6&&threat!=null;}
+  if(desired!=mode){var selectedThreat=threat;stop();threat=selectedThreat;mode=desired;savedSlot=p.getInventory().selectedSlot;ticks=0;escapeYaw=p.getYaw();combatRetreat=desired==SurvivalPolicy.Mode.ESCAPE&&p.getHealth()<=6&&threat!=null;if(combatRetreat)withdrawal.update(p.getHealth(),p.squaredDistanceTo(threat),ticks);}
   ticks++;
   switch(mode){
    case EAT -> {
@@ -94,7 +100,7 @@ public final class SurvivalController {
   if(foodWork!=null){foodWork.stop();foodWork=null;}
   if(combatWork!=null){combatWork.stop();combatWork=null;}
   if(!preserveScreen&&mealScreen&&c.player!=null&&c.player.currentScreenHandler.getCursorStack().isEmpty())c.player.closeHandledScreen();
-  combatRetreat=false;replanReason="";
+  combatRetreat=false;withdrawal=new CombatWithdrawal();replanReason="";
   if(mode==SurvivalPolicy.Mode.NONE){threat=null;return;}
   if(c.player!=null){if(c.player.isUsingItem()&&c.interactionManager!=null)c.interactionManager.stopUsingItem(c.player);if(savedSlot>=0)c.player.getInventory().selectedSlot=savedSlot;}
   c.options.forwardKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.useKey.setPressed(false);

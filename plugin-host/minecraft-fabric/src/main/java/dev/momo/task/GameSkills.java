@@ -59,6 +59,7 @@ public final class GameSkills {
  private static final class Skill implements TaskRuntime.Work {
   final String skill;final JsonObject args;final MinecraftClient c=MinecraftClient.getInstance();
   final BaritoneNavigator navigation=new BaritoneNavigator();
+  final CombatWithdrawal withdrawal=new CombatWithdrawal();
   BlockPos pos,placed,pathTarget,lastSeen;Entity entity;Screen ownedScreen;boolean navigating,startedUse;int ticks,actionIndex,phase,startFood,beforeCount,lostTicks;String beforeState,inventoryBefore,outputItem;InventoryEvidence inventoryProof;int mutationTick,craftPhase;final long pickupBoundary=PickupLedger.CURRENT.cursor();float startHealth;int targetSlot;
   long renameBoundary;String renameName;boolean renameUnchanged;int startExperience;
   long blockBoundary;String beforeBlock;int predictedChangeTick;
@@ -308,7 +309,12 @@ public final class GameSkills {
    }
    lostTicks=0;lastSeen=entity.getBlockPos();
    if(entity.squaredDistanceTo(c.player)>1024)return TaskRuntime.Step.failed("target_lost");
-   if(c.player.getHealth()<=6){haltNavigation();look(entity.getEyePos());c.options.backKey.setPressed(true);c.options.sprintKey.setPressed(true);if(ticks%10==0&&c.player.squaredDistanceTo(entity)>144)return TaskRuntime.Step.failed("retreated_low_health");return TaskRuntime.Step.running();}
+   String retreat=withdrawal.update(c.player.getHealth(),entity.squaredDistanceTo(c.player),ticks);
+   if(!retreat.isEmpty()){
+    haltNavigation();look(entity.getEyePos());
+    if(!retreat.equals("retreating"))return TaskRuntime.Step.failed(retreat);
+    c.options.backKey.setPressed(true);c.options.sprintKey.setPressed(true);return TaskRuntime.Step.running();
+   }
    double distance=entity.squaredDistanceTo(c.player);
    var item=c.player.getMainHandStack().getItem();
    boolean ranged=item instanceof BowItem||item instanceof CrossbowItem||item instanceof TridentItem;

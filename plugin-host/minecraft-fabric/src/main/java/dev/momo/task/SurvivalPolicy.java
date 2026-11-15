@@ -4,7 +4,6 @@ public final class SurvivalPolicy {
  public enum Mode {NONE,EAT,DEFEND,ESCAPE}
  public boolean airCritical(int air,boolean escaping){return air<100||(escaping&&air<250);}
  public float escapePitch(boolean recoveringAir,float previous){return recoveringAir?-60:previous;}
- public boolean endsRetreat(Mode previous,Mode next,boolean combatRetreat){return combatRetreat&&previous==Mode.ESCAPE&&next!=Mode.ESCAPE;}
  public boolean canDrive(boolean paused,boolean focused,boolean screenOpen,boolean mealScreen){return !paused&&focused&&(!screenOpen||mealScreen);}
  public Mode forBody(Mode desired,boolean skillEating,boolean combatOwned){
   if(desired==Mode.ESCAPE)return desired;
