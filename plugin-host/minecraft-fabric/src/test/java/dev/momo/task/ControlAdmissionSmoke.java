@@ -6,6 +6,8 @@ public final class ControlAdmissionSmoke {
  public static void main(String[] args){
   ControlLifetimeSmoke.main(args);
   PhysicalInputStateSmoke.main(args);
+  InteractionOutcomeSmoke.main(args);
+  WindowReceiptsSmoke.main(args);
   if(!InteractionScreens.accepts(true,true,false,false)||!InteractionScreens.accepts(true,false,true,true))throw new AssertionError("Owned interactions include station screens and the actual bed outcome");
   if(InteractionScreens.accepts(false,true,false,false)||InteractionScreens.accepts(true,false,true,false)||InteractionScreens.accepts(true,false,false,true))throw new AssertionError("Unrelated menus and unrequested bed screens must remain manual");
   var runtime=new TaskRuntime();var body=new TaskRuntimeSmoke.Work();runtime.submit("body","wait",body,0,1000);

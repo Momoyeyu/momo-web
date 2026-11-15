@@ -4,12 +4,18 @@ import java.util.*;
 public final class InventoryReceipts {
  public static final InventoryReceipts CURRENT=new InventoryReceipts();
  public record Receipt(long sequence,int revision,List<String> slots,String cursor){}
+ public record WindowReceipt(long sequence,String target,int handler){}
+ private Object openedWindow;private WindowReceipt opened;
  private Object world;private long sequence;private final LinkedHashMap<Integer,Receipt> recent=new LinkedHashMap<>();
  private record Address(int handler,int slot){}
  private record Delta(long sequence,String value){}
  private final LinkedHashMap<Address,Delta> deltas=new LinkedHashMap<>();
  public long cursor(){return sequence;}
- public void changeWorld(Object value){if(world!=value){world=value;recent.clear();deltas.clear();}}
+ public void changeWorld(Object value){if(world!=value){world=value;recent.clear();deltas.clear();openedWindow=null;opened=null;}}
+ public void recordWindow(Object value,Object screen,String target,int handler){
+  if(value==null||screen==null)return;changeWorld(value);openedWindow=screen;opened=new WindowReceipt(++sequence,target,handler);
+ }
+ public WindowReceipt windowAfter(Object value,Object screen,long boundary){return world==value&&openedWindow==screen&&opened!=null&&opened.sequence()>boundary?opened:null;}
  public void record(Object value,int handler,int revision,List<String> slots,String cursor){
   if(value==null)return;changeWorld(value);recent.remove(handler);recent.put(handler,new Receipt(++sequence,revision,List.copyOf(slots),cursor));
   for(int i=0;i<slots.size();i++)remember(handler,i,slots.get(i));

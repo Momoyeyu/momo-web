@@ -41,7 +41,7 @@ public final class CompanionClient implements ClientModInitializer {
  private boolean ownsScreen(MinecraftClient c){return c.currentScreen!=null&&(c.currentScreen==ownedScreen||survival.acceptsScreen(c.currentScreen)||tasks.active()&&tasks.acceptsScreen(c.currentScreen));}
  private boolean deathScreen(MinecraftClient c){return c.player!=null&&!c.player.isAlive()&&c.currentScreen instanceof net.minecraft.client.gui.screen.DeathScreen;}
  private boolean suspended(MinecraftClient c){return !c.isWindowFocused()||(c.currentScreen!=null&&!ownsScreen(c)&&!deathScreen(c));}
- private void rememberScreen(MinecraftClient c){if(c.currentScreen==null)ownedScreen=null;else if((c.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>||c.currentScreen instanceof net.minecraft.client.gui.screen.SleepingChatScreen)&&ownsScreen(c))ownedScreen=c.currentScreen;}
+ private void rememberScreen(MinecraftClient c){if(c.currentScreen==null)ownedScreen=null;else if(ownsScreen(c))ownedScreen=c.currentScreen;}
  private void takeover(MinecraftClient c){physicalTakeover=false;tasks.stop("manual_takeover");tasks.notice("manual_takeover");release(c,true);ownedScreen=null;pauseBarrier.pause(physicalAt);tasks.pause();restorePhysicalKeys(c);}
  private void restorePhysicalKeys(MinecraftClient c){
   for(var binding:c.options.allKeys){
@@ -439,6 +439,10 @@ public final class CompanionClient implements ClientModInitializer {
   if(focusResumeDeadline!=0){if(localNow>=focusResumeDeadline)focusResumeDeadline=0;else if(client.isWindowFocused()){focusResumeDeadline=0;if(client.currentScreen instanceof net.minecraft.client.gui.screen.GameMenuScreen)client.setScreen(null);}}
   if(controlLease.idleGuard()&&!tasks.active()){
    if(controlLease.leaseExpired(localNow)||client.player==null||client.world!=taskWorldInstance||!client.player.isAlive()||!client.player.getUuidAsString().equals(taskAccount)){tasks.notice("scene_or_life_changed");release(client);return;}
+   if(client.currentScreen!=null&&ownsScreen(client)&&!survival.acceptsScreen(client.currentScreen)&&!pauseBarrier.isPaused()){
+    var danger=chooseReflex(false,false);
+    if(survival.interruptOwnedScreen(danger,true)){client.player.closeHandledScreen();survival.drive(danger);return;}
+   }
    if(survival.canDrive(pauseBarrier.isPaused(),client.isWindowFocused(),client.currentScreen)){var reflex=chooseReflex(false,false);if(reflex!=SurvivalPolicy.Mode.NONE){survival.drive(reflex);return;}}
    survival.stop();
    // Idle survival remains bounded by the renewable body lease.
@@ -454,7 +458,7 @@ public final class CompanionClient implements ClientModInitializer {
     if(tasks.active())survival.drive(reflex);else survival.stop();
     return;
    }
-   if(!pauseBarrier.isPaused()&&client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>){
+   if(!pauseBarrier.isPaused()&&client.currentScreen!=null&&ownsScreen(client)){
     var reflex=chooseReflex(tasks.handlesCombat(),tasks.handlesEating());
     if(survival.interruptOwnedScreen(reflex,tasks.acceptsScreen(client.currentScreen))){
      tasks.stop("danger_interrupted_station");

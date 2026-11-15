@@ -16,6 +16,7 @@ public final class GameObservation {
   o.add("components",components);return o;}
  public static String screenId(net.minecraft.screen.ScreenHandler handler){
   if(handler instanceof net.minecraft.screen.PlayerScreenHandler)return "minecraft:inventory";
+  if(handler instanceof net.minecraft.screen.HorseScreenHandler)return "minecraft:horse";
   return Registries.SCREEN_HANDLER.getId(handler.getType()).toString();
  }
  public static JsonArray stationOptions(MinecraftClient c,String query,int limit){
