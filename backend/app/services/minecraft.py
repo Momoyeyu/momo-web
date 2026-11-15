@@ -91,12 +91,12 @@ class Minecraft:
         vision.require_enabled(cfg)
         return vision.fingerprint(cfg)
 
-    def connect(self, port, token, world, account, permissions, client, lease):
+    def connect(self, port, token, world, account, permissions, client, lease, pid=None):
         # Explicit user binding only. Credentials are passed privately, never saved or returned.
         with runtime.host.control:
             fingerprint = self.gate(client, lease)
             self.stop()
-            runtime.host.request('minecraft.configure', {'port': port, 'token': token})
+            runtime.host.request('minecraft.configure', {'port': port, 'token': token, 'pid': pid})
             with self.lock:
                 self.binding = {'world': world, 'account': account}
                 self.activity_id = 'game-' + uuid.uuid4().hex

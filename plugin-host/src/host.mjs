@@ -111,7 +111,7 @@ export class PluginHost {
       case 'minecraft.configure': {
         await this.minecraft.stop();
         this.minecraft = createMinecraftAdapter({ now: this.now,
-          transport: createMinecraftTransport({ port: params.port, token: params.token }),
+          transport: createMinecraftTransport({ port: params.port, token: params.token, pid: params.pid ?? null }),
           authorize: ({ permission }) => !this.paused && !this.closed && permission?.activityEpoch === this.epoch,
         });
         return this.minecraft.status();

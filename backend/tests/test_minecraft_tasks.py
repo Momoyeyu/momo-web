@@ -49,6 +49,13 @@ def test_failed_connect_negotiation_revokes_the_tentative_binding(failure):
   assert m.binding is None and not m.permissions and not m.autonomous
   assert m.monitor_stop.is_set()
 
+def test_explicit_attach_passes_selected_process_identity_to_local_transport():
+ m,rt=setup();rt.host.request.return_value={'available':True,'stopped':True,'stopVerified':True}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  m.connect(1234,'x'*40,'world','player',['game.observe'],'owner','lease',42)
+ configure=next(c.args[1] for c in rt.host.request.call_args_list if c.args[0]=='minecraft.configure')
+ assert configure=={'port':1234,'token':'x'*40,'pid':42}
+
 def test_background_body_lease_does_not_need_a_model_run_and_cannot_outlive_owner():
  m,rt=setup();rt.host.request.return_value={'events':{'cursor':1,'gap':False,'events':[]}}
  with patch('app.services.minecraft.runtime',rt),patch.object(m,'_background_valid',return_value=True),patch.object(m,'record_tasks'):

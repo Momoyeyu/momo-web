@@ -14,10 +14,11 @@ def test_private_discovery_and_invalid_paths(tmp_path,monkeypatch):
 
 def test_attach_rechecks_identity(monkeypatch):
  monkeypatch.setattr(bridge.minecraft,'gate',lambda *a:None)
- monkeypatch.setattr(bridge,'inspect',lambda *a:({'port':1234,'token':'x'*40},{'world':'local/overworld','account':'a'}))
+ monkeypatch.setattr(bridge,'inspect',lambda *a:({'pid':42,'port':1234,'token':'x'*40},{'world':'local/overworld','account':'a'}))
  with pytest.raises(MinecraftError):bridge.attach('1','other','a',['game.observe'],'c','l')
  monkeypatch.setattr(bridge.minecraft,'connect',lambda *a:a)
- assert bridge.attach('1','local/overworld','a',['game.observe'],'c','l')[0]==1234
+ args=bridge.attach('1','local/overworld','a',['game.observe'],'c','l')
+ assert args[0]==1234 and args[-1]==42
 
 def test_install_never_overwrites(tmp_path,monkeypatch):
  mod=tmp_path/'momo.jar';mod.write_bytes(b'jar')

@@ -51,7 +51,7 @@ def attach(session,world,account,permissions,client,lease):
     minecraft.gate(client,lease)
     value,data=inspect(session)
     if not world or not account or data.get('world')!=world or data.get('account')!=account or 'game.observe' not in permissions: raise MinecraftError('Selected game identity changed')
-    return minecraft.connect(value['port'],value['token'],world,account,permissions,client,lease)
+    return minecraft.connect(value['port'],value['token'],world,account,permissions,client,lease,value['pid'])
 
 def install(instance_path):
     root=Path(instance_path).expanduser()

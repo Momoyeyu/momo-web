@@ -9,6 +9,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
   let epoch = ++bridgeEpoch;
   let stopped = true;
   let stopVerified = false;
+  let stopEvidence = null;
   let observation = null;
   let aimAvailable = false;
   let busy = false;
@@ -22,7 +23,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
   const controls = new Set(['aim', 'respawn', 'screenClick', 'screenScroll', 'screenText', 'screenKey', 'resume', 'forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint', 'look', 'attack', 'mine', 'use', 'eat', 'hotbar', 'inventory', 'close', 'slot', 'quickMove', 'drop', 'swapHands']);
   const movement = new Set(['forward', 'back', 'left', 'right', 'jump', 'sneak', 'sprint']);
   const available = () => Boolean(transport && typeof transport.request === 'function' && typeof authorize === 'function');
-  const status = () => ({ available: available(), stopped, stopVerified, epoch, runtime: 'fabric', liveValidated: false });
+  const status = () => ({ available: available(), stopped, stopVerified, stopEvidence, epoch, runtime: 'fabric', liveValidated: false });
   async function request(command) {
     let timeout;
     try {
@@ -36,14 +37,28 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
     epoch = bridgeEpoch = Math.max(bridgeEpoch, epoch) + 1;
     stopped = true;
     stopVerified = false;
+    stopEvidence = null;
     observation = null;
     capabilities = null;
     aimAvailable = false;
     if (!available()) return status();
     const version = epoch;
-    const result = await request({ type: 'stop', epoch: version });
-    stopVerified = epoch === version && result?.epoch === version && result?.stopped === true && result?.heldControls === 0;
-    if (!stopVerified) throw problem('Minecraft stop was not acknowledged','MINECRAFT_UNKNOWN');
+    // An exited selected JVM cannot retain inputs. A missing bridge alone is
+    // insufficient: a live/unidentified process still needs its actual ACK.
+    const exitedBefore = transport.processExited?.() === true;
+    let result, requestError;
+    if (!exitedBefore) {
+      try { result = await request({ type: 'stop', epoch: version }); }
+      catch (error) { requestError = error; }
+    }
+    if (epoch !== version) throw problem('Late Minecraft stop discarded','MINECRAFT_REVOKED');
+    if (result?.epoch === version && result?.stopped === true && result?.heldControls === 0) {
+      stopVerified = true; stopEvidence = 'bridge_ack';
+    } else if (exitedBefore || transport.processExited?.() === true) {
+      stopVerified = true; stopEvidence = 'process_exited';
+    } else {
+      throw requestError ?? problem('Minecraft stop was not acknowledged','MINECRAFT_UNKNOWN');
+    }
     collectRetired(result);
     return {...status(),retiredTasks:[...retiredTasks.values()]};
   }
@@ -61,6 +76,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
       if (!continuous.has(type) && type !== 'observe' && (!observation || observation.world !== permission.world || observation.account !== permission.account || now() - observation.observedAt > (type === 'play' ? 30000 : 2000))) throw problem('Fresh matching Minecraft observation required','MINECRAFT_STALE');
       stopped = false;
       stopVerified = false;
+      stopEvidence = null;
       if(type==='submit')ownedTasks.add(args.taskId);
       dispatched=true;
       const result = await request({ type, ...args, epoch: version, world: permission.world, account: permission.account, leaseMs: continuous.has(type) ? 10000 : 1500 });
@@ -150,9 +166,13 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
 }
 
 /** Credentials belong to the managed instance and must not be exposed in settings responses. */
-export function createMinecraftTransport({ port = 17643, token, fetchImpl = fetch }) {
-  if (!Number.isInteger(port) || port < 1024 || port > 65535 || typeof token !== 'string' || token.length < 32) throw new Error('Invalid Minecraft bridge configuration');
-  return { async request(command) {
+export function createMinecraftTransport({ port = 17643, token, pid = null, fetchImpl = fetch, processProbe = process.kill }) {
+  if (!Number.isInteger(port) || port < 1024 || port > 65535 || typeof token !== 'string' || token.length < 32 || (pid !== null && (!Number.isSafeInteger(pid) || pid <= 0))) throw new Error('Invalid Minecraft bridge configuration');
+  return { processExited() {
+    if (pid === null) return false;
+    try { processProbe(pid, 0); return false; }
+    catch (error) { return error?.code === 'ESRCH'; }
+  }, async request(command) {
     const response = await fetchImpl(`http://127.0.0.1:${port}/command`, {
       method: 'POST', redirect: 'error', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(command), signal: AbortSignal.timeout(2800),
