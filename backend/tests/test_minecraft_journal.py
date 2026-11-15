@@ -116,3 +116,16 @@ def test_partial_goal_progress_requires_real_changes_and_preserves_original_proo
  assert next(f for f in facts if f['taskId']=='partial')['gains'][0]['count']==3
  built=next(f for f in facts if f['taskId']=='building');assert built['placed']==[{'block':'minecraft:oak_planks','count':1}] and built['partial'] is True
  assert next(t for t in journal.recent(b) if t['taskId']=='building')==raw
+
+
+def test_verified_progress_keeps_original_task_dimension_and_never_invents_one_for_legacy_facts():
+ b={'world':'home','account':'p'};journal.set_goal(b,intent())
+ journal.bind_task(b,'a','old-scene');journal.bind_task(b,'a','legacy')
+ old={**gain('old-scene'),'dimension':'minecraft:the_nether'}
+ journal.record(b,'a',[old,gain('legacy')])
+ facts={row['taskId']:row for row in journal.progress(b)}
+ assert facts['old-scene']['dimension']=='minecraft:the_nether'
+ from app.services.minecraft import Minecraft
+ assert Minecraft._task_context(old)['dimension']=='minecraft:the_nether'
+ assert 'dimension' not in facts['legacy']
+ assert journal.recent(b)[0]['dimension']=='minecraft:the_nether'

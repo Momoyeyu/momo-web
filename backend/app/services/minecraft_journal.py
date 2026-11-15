@@ -88,6 +88,8 @@ def _progress(task):
         pending.extend((value,depth+1) for value in row.values() if isinstance(value,(list,dict)))
     if not (gains or placed or mined or defeated):return None
     result={'taskId':task['taskId'],'skill':task.get('skill','plan'),'partial':task['state']!='succeeded'}
+    dimension=task.get('dimension')
+    if isinstance(dimension,str) and len(dimension)<=128 and re.fullmatch(r'[a-z0-9_.-]+:[a-z0-9_./-]+',dimension):result['dimension']=dimension
     if gains:result['gains']=[{'item':item,'count':count} for item,count in sorted(gains.items())]
     if placed:result['placed']=[{'block':block,'count':count} for block,count in sorted(placed.items())]
     if mined:result['mined']=[{'block':block,'count':count} for block,count in sorted(mined.items())]

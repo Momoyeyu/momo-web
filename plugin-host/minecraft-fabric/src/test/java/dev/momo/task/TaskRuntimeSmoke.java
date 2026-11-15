@@ -13,6 +13,11 @@ public final class TaskRuntimeSmoke {
  }
  static void check(boolean ok,String why){if(!ok)throw new AssertionError(why);}
  public static void main(String[] args){
+  TaskRuntime scenes=new TaskRuntime();Work oldScene=new Work();
+  scenes.submit("origin","build","cells","minecraft:overworld",oldScene,0,10000);scenes.tick(1);scenes.stop("scene_changed");
+  check(scenes.snapshot("origin").dimension().equals("minecraft:overworld"),"Retired tasks keep the dimension where their effects actually occurred");
+  try{scenes.submit("origin","build","cells","minecraft:the_nether",new Work(),2,10000);throw new AssertionError("A task ID cannot be rebound to a new dimension");}catch(IllegalArgumentException expected){}
+  check(!scenes.submit("origin","build","cells","minecraft:overworld",new Work(),2,10000),"Same-scene reconciliation remains idempotent");
   TaskRuntime danger=new TaskRuntime();Work unsafe=new Work(),later=new Work();
   danger.submit("unsafe","navigate",unsafe,0,10000);danger.submit("later","mine",later,0,10000);danger.tick(1);danger.pause();
   danger.interrupt("retreated_low_health");danger.resume();danger.tick(2);

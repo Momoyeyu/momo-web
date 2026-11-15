@@ -401,7 +401,7 @@ class Minecraft:
         slot confirmation payloads here consumes the space for the next image.
         Preserve outcomes/counts and task IDs; full receipts stay queryable.
         """
-        value={key:task[key] for key in ('taskId','skill','state','reason') if key in task}
+        value={key:task[key] for key in ('taskId','skill','state','reason','dimension') if key in task}
         if task.get('progress'):value['progress']=task['progress']
         evidence=task.get('evidence',{})
         def outcome(proof):

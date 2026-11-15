@@ -201,7 +201,7 @@ public final class CompanionClient implements ClientModInitializer {
     JsonObject args=command.has("args")?command.getAsJsonObject("args"):new JsonObject();
     if(skill.equals("navigate")&&!command.has("args"))for(String key:new String[]{"x","y","z"})args.add(key,command.get(key));
     boolean accepted;
-    try{var work=GameSkills.create(skill,args);accepted=tasks.submit(id,skill,args.toString(),work,System.nanoTime()/1000000,command.get("leaseMs").getAsLong());}
+    try{var work=GameSkills.create(skill,args);accepted=tasks.submit(id,skill,args.toString(),client.world.getRegistryKey().getValue().toString(),work,System.nanoTime()/1000000,command.get("leaseMs").getAsLong());}
     catch(IllegalArgumentException|IllegalStateException error){result.addProperty("accepted",false);result.addProperty("error","TASK_REJECTED");return result;}
     taskWorld=world;taskAccount=account;taskWorldInstance=client.world;guardAuthorized=true;gameLeaseUntil=System.nanoTime()/1000000+command.get("leaseMs").getAsLong();
     result.addProperty("accepted",accepted);result.add("task",gson.toJsonTree(tasks.snapshot(id)));
@@ -312,7 +312,7 @@ public final class CompanionClient implements ClientModInitializer {
     if(!name.matches("[A-Za-z0-9_]{1,16}"))throw new IllegalArgumentException("Invalid player");
     var player=client.world.getPlayers().stream().filter(p->p!=client.player&&p.getName().getString().equals(name)&&client.player.canSee(p)).findFirst().orElseThrow(()->new IllegalArgumentException("Player is not visible"));
     var args=new JsonObject();args.addProperty("entityId",player.getId());String id="follow-"+java.util.UUID.randomUUID();
-    tasks.submit(id,"follow",args.toString(),GameSkills.create("follow",args),System.nanoTime()/1000000,10000);
+    tasks.submit(id,"follow",args.toString(),client.world.getRegistryKey().getValue().toString(),GameSkills.create("follow",args),System.nanoTime()/1000000,10000);
     taskWorld=world;taskAccount=account;taskWorldInstance=client.world;
     result.addProperty("accepted",true);result.add("task",gson.toJsonTree(tasks.snapshot(id)));
    }

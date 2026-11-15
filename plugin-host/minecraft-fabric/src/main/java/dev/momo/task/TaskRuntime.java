@@ -32,17 +32,17 @@ public final class TaskRuntime {
   public static Step done(Map<String,Object> evidence){return new Step("succeeded","",Map.copyOf(evidence));}
   public static Step failed(String reason){return new Step("failed",reason,Map.of());}
  }
- public record Snapshot(String taskId,String skill,String state,String reason,Map<String,Object> evidence,Map<String,Object> progress){}
+ public record Snapshot(String taskId,String skill,String state,String reason,Map<String,Object> evidence,Map<String,Object> progress,String dimension){}
  public record Event(long seq,Snapshot task){}
  public record Events(long cursor,boolean gap,List<Event> events){}
  private static final int MAX_PENDING=5,MAX_HISTORY=4096,MAX_EVENTS=256;
  private static final long MAX_LIFETIME=600000;
  private static final class Job {
-  final String id,skill,key;Work work;final long deadline;
+  final String id,skill,key,dimension;Work work;final long deadline;
   long lease;String state="queued",reason="";Map<String,Object> evidence=Map.of(),progress=Map.of();long lastProgress;
-  Job(String id,String skill,String key,Work work,long now,long duration){this.id=id;this.skill=skill;this.key=key;this.work=work;lease=now+duration;deadline=now+MAX_LIFETIME;}
+  Job(String id,String skill,String key,String dimension,Work work,long now,long duration){this.id=id;this.skill=skill;this.key=key;this.dimension=dimension;this.work=work;lease=now+duration;deadline=now+MAX_LIFETIME;}
   boolean terminal(){return state.equals("succeeded")||state.equals("failed")||state.equals("cancelled");}
-  Snapshot snapshot(){return new Snapshot(id,skill,state,reason,evidence,progress);}
+  Snapshot snapshot(){return new Snapshot(id,skill,state,reason,evidence,progress,dimension);}
  }
  private final Map<String,Job> history=new LinkedHashMap<>();
  private final ArrayDeque<Job> queue=new ArrayDeque<>();
@@ -53,16 +53,20 @@ public final class TaskRuntime {
  private boolean paused;
  public boolean submit(String id,String skill,Work work,long now,long leaseMs){return submit(id,skill,skill,work,now,leaseMs);}
  public boolean submit(String id,String skill,String key,Work work,long now,long leaseMs){
+  return submit(id,skill,key,"",work,now,leaseMs);
+ }
+ public boolean submit(String id,String skill,String key,String dimension,Work work,long now,long leaseMs){
   if(id==null||!id.matches("[A-Za-z0-9_-]{1,80}")||skill==null||key==null||key.length()>3500||work==null)throw new IllegalArgumentException("Invalid task");
+  if(dimension==null||dimension.length()>128||!dimension.isEmpty()&&!dimension.matches("[a-z0-9_.-]+:[a-z0-9_./-]+"))throw new IllegalArgumentException("Invalid task dimension");
   validateLease(leaseMs);
   if(uncertainStop!=null)throw new IllegalStateException("Previous stop unconfirmed");
   if(history.containsKey(id)){
-   if(!history.get(id).skill.equals(skill)||!history.get(id).key.equals(key))throw new IllegalArgumentException("Task identity conflict");
+   if(!history.get(id).skill.equals(skill)||!history.get(id).key.equals(key)||!history.get(id).dimension.equals(dimension))throw new IllegalArgumentException("Task identity conflict");
    return false;
   }
   if(queue.size()+(current==null?0:1)>=MAX_PENDING)throw new IllegalStateException("Task queue full");
   if(history.size()>=MAX_HISTORY)throw new IllegalStateException("Task history exhausted; new activity required");
-  Job job=new Job(id,skill,key,work,now,leaseMs);history.put(id,job);queue.add(job);publish(job);return true;
+  Job job=new Job(id,skill,key,dimension,work,now,leaseMs);history.put(id,job);queue.add(job);publish(job);return true;
  }
  public void tick(long now){
   if(uncertainStop!=null){
@@ -149,7 +153,7 @@ public final class TaskRuntime {
  }
  public void notice(String reason){
   if(reason==null||!reason.matches("[a-z_]{1,50}"))throw new IllegalArgumentException("Invalid control notice");
-  journal.add(new Event(++sequence,new Snapshot("control-"+sequence,"control","cancelled",reason,Map.of(),Map.of())));
+  journal.add(new Event(++sequence,new Snapshot("control-"+sequence,"control","cancelled",reason,Map.of(),Map.of(),"")));
   while(journal.size()>MAX_EVENTS)journal.removeFirst();
  }
  public boolean acceptsScreen(Object screen){return current!=null?current.work.acceptsScreen(screen):!queue.isEmpty()&&queue.peek().work.acceptsScreen(screen);}
