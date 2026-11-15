@@ -533,7 +533,8 @@
                   "wait",
                   "rename",
                   "selectItem",
-                  "placeNearby"
+                  "placeNearby",
+                  "build"
                 ]
               },
               "args": {
@@ -692,6 +693,55 @@
       },
       "required": [
         "item"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "build": {
+    "description": "Build up to 32 desired world cells through the local Baritone builder, with existing materials and normal player actions. Cells are TARGET block coordinates, not clicked supports. Bounding box at most 16 per axis, every cell initially visible within 32 blocks; only empty cells or the already requested block type. No terrain clearing, schematics/files/scripts, resource creation, repeated build or substitutions. Confirms actual server changes. Specifies block types; use precise place for special orientation/property control.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "integer",
+                "minimum": -30000000,
+                "maximum": 30000000
+              },
+              "y": {
+                "type": "integer",
+                "minimum": -64,
+                "maximum": 319
+              },
+              "z": {
+                "type": "integer",
+                "minimum": -30000000,
+                "maximum": 30000000
+              },
+              "block": {
+                "type": "string",
+                "minLength": 3,
+                "maxLength": 128
+              }
+            },
+            "required": [
+              "x",
+              "y",
+              "z",
+              "block"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "cells"
       ],
       "additionalProperties": false
     }

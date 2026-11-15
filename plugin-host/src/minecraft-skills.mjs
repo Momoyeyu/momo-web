@@ -19,6 +19,10 @@ function validate(schema,value){
 export function validateSkill(name,args){
  if(!Object.hasOwn(skills,name))throw new Error('Unsupported Minecraft skill');
  validate(skills[name].parameters,args);
+ if(name==='build'){
+  if(new Set(args.cells.map(c=>`${c.x},${c.y},${c.z}`)).size!==args.cells.length)throw new Error('Invalid duplicate build cell');
+  for(const axis of ['x','y','z'])if(Math.max(...args.cells.map(c=>c[axis]))-Math.min(...args.cells.map(c=>c[axis]))>=16)throw new Error('Invalid build extent');
+ }
  if(name==='plan')for(const step of args.steps)validateSkill(step.skill,step.args);
  if(Buffer.byteLength(JSON.stringify(args),'utf8')>3500)throw new Error('Invalid skill size');
  return args;

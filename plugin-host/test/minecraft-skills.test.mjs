@@ -48,3 +48,10 @@ test('ordinary item preparation and nearby placement do not require inventory sl
  validateSkill('plan',{steps:[{skill:'selectItem',args:{item:'minecraft:torch'}},{skill:'placeNearby',args:{item:'minecraft:torch'}}]});
  for(const [name,args] of [['selectItem',{item:'minecraft:stone',hotbar:9}],['placeNearby',{item:'minecraft:stone',script:'x'}],['selectItem',{item:''}]])assert.throws(()=>validateSkill(name,args),/Invalid/);
 });
+test('a bounded declarative build is cells, not scripts or repeated support-face inputs',()=>{
+ const cell={x:1,y:64,z:2,block:'minecraft:oak_planks'};
+ validateSkill('build',{cells:[cell,{...cell,x:2}]});
+ validateSkill('plan',{steps:[{skill:'build',args:{cells:[cell]}}]});
+ for(const cells of [[],Array(33).fill(cell),[cell,cell],[cell,{...cell,x:18}]])assert.throws(()=>validateSkill('build',{cells}),/Invalid/);
+ assert.throws(()=>validateSkill('build',{cells:[cell],script:'anything'}),/Invalid/);
+});

@@ -27,6 +27,9 @@ public final class SkillArgumentsSmoke {
   reject("selectItem","{\"item\":\"minecraft:stone\",\"hotbar\":9}");
   ItemSelectionSmoke.main(args);
   MiningToolChoiceSmoke.main(args);
+  validate("build","{\"cells\":[{\"x\":1,\"y\":64,\"z\":2,\"block\":\"minecraft:oak_planks\"}]}");
+  reject("build","{\"cells\":[]}");
+  SparseBuildSmoke.main(args);
   validate("rename","{\"name\":\"\"}");
   reject("rename","{\"name\":\"line\\nbreak\"}");
   validate("gather","{\"item\":\"minecraft:oak_log\",\"count\":4}");

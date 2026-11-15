@@ -13,6 +13,7 @@ public final class SkillArguments {
   if(!CONTRACT.has(name))throw new IllegalArgumentException("Unsupported skill");
   if(args.toString().getBytes(StandardCharsets.UTF_8).length>3500)throw new IllegalArgumentException("Invalid skill size");
   validateValue(CONTRACT.getAsJsonObject(name).getAsJsonObject("parameters"),args);
+  if(name.equals("build"))SparseBuild.from(args);
   if(name.equals("plan"))for(var row:args.getAsJsonArray("steps")){var step=row.getAsJsonObject();validate(step.get("skill").getAsString(),step.getAsJsonObject("args"));}
  }
  private static void validateValue(JsonObject schema,JsonElement value){
