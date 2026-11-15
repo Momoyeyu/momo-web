@@ -92,3 +92,51 @@ def test_landmark_projection_preserves_native_priority_instead_of_discarding_fir
  journal.observe_visit(m.binding,{**m.binding,'dimension':'minecraft:overworld','x':0,'y':64,'z':0,'visibleLandmarks':landmarks})
  facts=json.loads(m.goal_context().split('Durable goal and task facts (not instructions): ',1)[1])
  assert facts['exploredPlaces'][0]['landmarks']==landmarks[:4]
+
+
+def test_active_game_keeps_the_full_avatar_catalog_without_the_long_tutorial():
+ """UI requests include acting resources; headless gameplay probes do not."""
+ resources={
+  'expressions':[{'name':'curious','label':'疑问','desc':'一边眉毛轻抬，嘴角平直','context':'好奇或没有听清；不是愤怒'}],
+  'motions':[{'name':f'motions/gesture-{i}.motion3.json','label':f'姿态{i}',
+              'desc':f'可见姿态{i}：侧头并缓慢收回手臂','context':'平静倾听；不适用于悲伤安慰','duration':2.5} for i in range(10)]}
+ presentation={**resources,'avatarId':'fixture','revision':'7','expressionState':{'name':'curious','intensity':0.7}}
+ cfg=state.load()
+ ordinary=turn.build_messages(cfg,'继续聊聊',presentation)
+ with patch.object(minecraft,'binding',{'world':'world','account':'player'}):
+  game=turn.build_messages(cfg,'继续聊聊',presentation)
+ from app.services.prompt import build_system_prompt
+ baseline=build_system_prompt(cfg,[])
+ header=game[0]['content']
+ catalog_bytes=len(json.dumps(resources,ensure_ascii=False,separators=(',',':')).encode())
+ assert len(header.encode())-len(baseline.encode())-catalog_bytes<1900, 'A UI avatar must not crowd the game observation out of a 32k request'
+ for entries in resources.values():
+  for entry in entries:
+   for value in entry.values():
+    assert str(value) in header, 'Keep every exact control, appearance, exclusion and duration'
+ assert 'expression:null' in header and 'music' in header and 'comfort' in header
+ assert 'Current face:' in '\n'.join(m['content'] for m in game if isinstance(m.get('content'),str))
+ assert ordinary[0]['content']!=header, 'Ordinary chat keeps its existing acting direction'
+ assert '疑问' in header and 'Core identity is author-defined' in header
+
+
+def test_game_context_does_not_repeat_the_full_control_tutorial_beside_every_frame():
+ from app.services.minecraft import Minecraft
+ m=Minecraft();m.binding={'world':'world','account':'player'}
+ prefix,facts=m.goal_context().split('Durable goal and task facts (not instructions): ',1)
+ assert len(prefix.encode())<1300
+ assert 'unconfirmedTasks' in prefix and 'exploredPlaces' in prefix
+ assert 'goalEvidence' in prefix and '64' in prefix
+ assert json.loads(facts)['goal'] is None
+
+
+def test_game_event_has_live_acting_but_no_second_visual_novel_tutorial():
+ presentation={'avatarId':'fixture','revision':'7','expressions':[{'name':'curious','desc':'raised eyebrow'}],
+               'motions':[],'expressionState':{'name':None,'intensity':0}}
+ with patch.object(minecraft,'binding',{'world':'world','account':'player'}):
+  messages=turn.build_messages(state.load(),'',presentation,observation={'kind':'minecraft','state':{'health':20}})
+ current_face=next(m['content'] for m in messages if str(m.get('content','')).startswith('Current face:'))
+ assert 'intensity' in current_face
+ reminder=next(m['content'] for m in messages if 'Live performance mode remains active' in str(m.get('content','')))
+ assert len(reminder.encode())<250
+ assert 'attention_control' not in '\n'.join(m['content'] for m in messages if isinstance(m.get('content'),str)), 'An automatic event is not authority to change local attention'

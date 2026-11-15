@@ -147,11 +147,12 @@ def compress_once(request=None, tools=None, *, hard=False) -> bool:
     without_summary = [m for m in (request or []) if not (m.get('role') == 'system' and isinstance(m.get('content'), str) and m['content'].startswith(turn.SUMMARY_PREFIX))]
     overhead = max(estimate(header, tools), estimate(without_summary, tools)-estimate(history) if request else 0)
     selected = policy.select(history, Budget.from_config(llm_cfg), overhead, hard=hard, previous_summary_size=len(old_summary.encode('utf-8')))
-    if selected is None:
-        return False
-    fold_n = choose_latest(history, selected)
+    fold_n = choose_latest(history, selected) if selected is not None else 0
     if fold_n < 2:
-        return False
+        # A newly attached visual activity can enlarge fixed context after the
+        # last publication. Keeping two recent exchanges must not make the old
+        # summary permanently impossible to shorten.
+        return _recompress_summary(llm_cfg, request, tools, snapshot, policy) if hard else False
     seg = history[:fold_n]
     messages = _summary_messages(state, seg, request, snapshot)
     messages.append({'role': 'user', 'content': _PROMPT})
@@ -177,15 +178,49 @@ def compress_once(request=None, tools=None, *, hard=False) -> bool:
         Policy(llm_cfg, checkpoint.audience(), tools).finish(published=published, duration=monotonic()-started, usage=usage)
 
 
-def _generate_and_publish(llm_cfg, messages, usage, seg, snapshot, gen_n, tools):
+def _recompress_summary(llm_cfg, request, tools, snapshot, policy):
+    from . import turn, checkpoint
+    old = str(snapshot['summary'] or '').strip()
+    if not request or not old:
+        return False
+    budget = Budget.from_config(llm_cfg)
+    if estimate(request, tools) <= budget.safe:
+        return False
+    fixed = [m for m in request if not (m.get('role') == 'system'
+             and isinstance(m.get('content'), str) and m['content'].startswith(turn.SUMMARY_PREFIX))]
+    target = min(int(len(old.encode()) * .6), budget.safe - estimate(fixed, tools)
+                 - len(turn.SUMMARY_PREFIX.encode()) - 128)
+    if target < 256:
+        return False  # The immutable context itself needs attention; do not drop facts.
+    # Only the previous summary is a source here. Current pixels, goal receipts,
+    # retained messages and avatar instructions are neither folded nor executed.
+    # Models follow character guidance more reliably than UTF-8 byte counts.
+    # Four bytes per code point leaves room for multilingual text; enforce the
+    # actual byte ceiling independently before publishing.
+    messages = [{'role':'system','content':_PROMPT + f' Rewrite only the previous summary below in at most {target // 4} characters ({target} UTF-8 bytes maximum).'},
+                {'role':'user','content':old}]
+    if estimate(messages, []) > budget.safe:
+        return False
+    policy.start(uuid.uuid4().hex)
+    started, usage, published = monotonic(), {}, False
+    try:
+        published = _generate_and_publish(llm_cfg, messages, usage, [], snapshot,
+                                         snapshot['generation'], [], max_summary_bytes=target)
+        return published
+    finally:
+        Policy(llm_cfg, checkpoint.audience(), tools).finish(published=published, duration=monotonic()-started, usage=usage)
+
+
+def _generate_and_publish(llm_cfg, messages, usage, seg, snapshot, gen_n, tools, *, max_summary_bytes=None):
     from . import checkpoint
     msg = llm.chat_completion(llm_cfg, messages, tools=tools, usage_out=usage, tool_choice="none")
     new_summary = str(msg.get('content') or '').strip()
     old_size = len(str(snapshot['summary']).encode()) + sum(len(r['text'].encode()) for r in seg)
     if (msg.get('tool_calls') or not new_summary or len(new_summary) > 6000
+        or (max_summary_bytes is not None and len(new_summary.encode()) > max_summary_bytes)
         or len(new_summary.encode()) >= old_size * .9):
         return False
-    max_seq = seg[-1]["seq"]
+    max_seq = seg[-1]["seq"] if seg else snapshot['cursor']
     if fingerprint(load_state()['settings']['llm']) != fingerprint(llm_cfg):
         return False
     with db.tx() as c:

@@ -247,3 +247,87 @@ def test_hard_capture_budget_replaces_old_summary_instead_of_counting_both(monke
     assert requests and checkpoint.live_summary()!=old
     assert messages[-1:]==pair
     assert estimate([*messages,*reservation])<=Budget.from_config(cfg['settings']['llm']).safe
+
+
+@pytest.mark.parametrize('recent_count',[1,8])
+def test_hard_capture_can_shorten_an_old_summary_without_folding_recent_messages(monkeypatch,recent_count):
+    from app.core import state, db, llm
+    from app.services import compress, turn, checkpoint
+    from conftest import add_turn
+    from tests.test_checkpoint import _InlineThread
+    cfg=state.load();cfg['settings']['llm'].update(contextWindow=16000,maxOutputTokens=2000)
+    old='Shared past experiences and unfinished agreement. '*150
+    for index in range(recent_count):
+        add_turn('Only recent player request '+str(index),'The current response',at='recent'+str(index))
+    with db.tx() as c:c.execute('UPDATE sessions SET summary=?,summary_cursor=-1 WHERE id=?',(old,db.LIVE_ID))
+    before=checkpoint.summary_state();original=checkpoint.live_messages()
+    monkeypatch.setattr(compress,'load_state',lambda:cfg)
+    monkeypatch.setattr(turn,'build_system_prompt',lambda *a,**k:'H'*6500)
+    messages=turn.build_messages(cfg,'Continue the authorized game.')
+    reservation=[{'role':'user','content':[{'type':'image_url','image_url':{'url':'momo-observation:pending'},'vision_tokens':1024}]}]
+    assert estimate([*messages,*reservation])>Budget.from_config(cfg['settings']['llm']).safe
+    requests=[]
+    def summarize(config,prompt,**kwargs):
+        requests.append(prompt)
+        assert old.strip() in str(prompt) and 'momo-observation:' not in str(prompt)
+        assert 'Only recent player request' not in str(prompt), 'Do not silently fold the retained recent conversation'
+        assert kwargs.get('tools')==[] and kwargs.get('tool_choice')=='none'
+        add_turn('Arrived during maintenance','Preserve this too',at='concurrent')
+        return {'content':'The shared experience and unfinished agreement remain.'}
+    monkeypatch.setattr(llm,'chat_completion',summarize)
+    monkeypatch.setattr(compress,'Thread',_InlineThread)
+    compress.guard_request(cfg['settings']['llm'],messages,[],cancelled=lambda:False,extra_messages=reservation)
+    after=checkpoint.summary_state()
+    assert requests and after['cursor']==before['cursor'] and after['version']==before['version']+1
+    assert checkpoint.live_messages()[:len(original)]==original
+    assert checkpoint.context_rows(limit=None)[-1]['text']=='Preserve this too'
+    assert estimate([*messages,*reservation])<=Budget.from_config(cfg['settings']['llm']).safe
+
+
+@pytest.mark.parametrize('invalid',['generation','summary_version','config','tool_call','oversize'])
+def test_summary_only_recompression_discards_invalid_candidates(monkeypatch,invalid):
+    from app.core import state, db, llm
+    from app.services import compress, checkpoint, turn
+    cfg=state.load();cfg['settings']['llm'].update(contextWindow=16000,maxOutputTokens=2000)
+    old='Previous shared experiences. '*230
+    with db.tx() as c:c.execute('UPDATE sessions SET summary=? WHERE id=?',(old,db.LIVE_ID))
+    monkeypatch.setattr(compress,'load_state',lambda:cfg)
+    monkeypatch.setattr(turn,'build_system_prompt',lambda *a,**k:'H'*6500)
+    messages=turn.build_messages(cfg,'Keep the current agreement.')
+    calls=[]
+    def summarize(*args,**kwargs):
+        calls.append(True)
+        if invalid in {'generation','summary_version'}:
+            with db.tx() as c:c.execute('UPDATE sessions SET '+invalid+'='+invalid+'+1 WHERE id=?',(db.LIVE_ID,))
+        if invalid=='config':
+            import copy
+            changed=copy.deepcopy(cfg);changed['settings']['llm']['model']='changed'
+            monkeypatch.setattr(compress,'load_state',lambda:changed)
+        if invalid=='tool_call':return {'content':'Shorter','tool_calls':[{'id':'must-not-run'}]}
+        return {'content':old[:5500] if invalid=='oversize' else 'Shorter shared experiences.'}
+    monkeypatch.setattr(llm,'chat_completion',summarize)
+    assert not compress.compress_once(request=messages,tools=[],hard=True)
+    assert calls and checkpoint.live_summary()==old
+
+
+def test_summary_only_recompression_keeps_the_contact_audience_separate(monkeypatch):
+    from app.core import state, db, llm
+    from app.services import compress, checkpoint, turn
+    cfg=state.load();cfg['settings']['llm'].update(contextWindow=16000,maxOutputTokens=2000)
+    with db.tx() as c:c.execute('UPDATE sessions SET summary=? WHERE id=?',('PRIVATE OWNER HISTORY',db.LIVE_ID))
+    monkeypatch.setattr(compress,'load_state',lambda:cfg)
+    monkeypatch.setattr(turn,'build_system_prompt',lambda *a,**k:'H'*6500)
+    with checkpoint.audience_scope('qq:separate-contact'):
+        checkpoint.summary_state()
+        with db.tx() as c:c.execute('INSERT INTO audience_summaries(audience,summary,cursor,version) VALUES(?,?,?,?)',
+                                   ('qq:separate-contact','Contact shared experiences. '*250,-1,0))
+        messages=turn.build_messages(cfg,'Continue.',source='qq')
+        def summarize(*args,**kwargs):
+            assert 'PRIVATE OWNER HISTORY' not in str(args[1])
+            assert 'Contact shared experiences.' in str(args[1])
+            return {'content':'Contact shared experiences retained.'}
+        monkeypatch.setattr(llm,'chat_completion',summarize)
+        assert compress.compress_once(request=messages,tools=[],hard=True)
+        assert checkpoint.summary_state()['cursor']==-1
+        assert checkpoint.live_summary()=='Contact shared experiences retained.'
+    assert checkpoint.live_summary()=='PRIVATE OWNER HISTORY'
