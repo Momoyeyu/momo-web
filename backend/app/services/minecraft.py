@@ -248,7 +248,11 @@ class Minecraft:
                 if generation!=self.generation or not self.binding:raise MinecraftError('Minecraft goal revoked')
                 result=journal.set_goal(self.binding,value)
                 self.autonomous=value['status'] in {'active','blocked'} and not self.paused
-                self.decision_needed=self.autonomous
+                # A model-authored progress note is not a new world event.
+                # Preserve pending receipts, but do not make an active wait or
+                # navigation wake the model merely because it wrote its journal.
+                new_intent=not previous or replacing or previous.get('status') not in {'active','blocked'}
+                self.decision_needed=self.autonomous and (self.decision_needed or new_intent)
                 return result
 
     def record_tasks(self, tasks, generation):

@@ -359,6 +359,17 @@ def test_game_declaration_keeps_semantic_tasks_small_and_manual_controls_on_dema
  assert set(declaration['parameters']['properties'])=={'action','query','taskId','skill','args','after'}
  assert 'controls' in declaration['description'] and 'args' in declaration['description']
 
+def test_full_game_catalog_leaves_context_for_goal_and_current_pixels():
+ from pathlib import Path
+ from app.services.minecraft import minecraft
+ definitions=json.loads((Path(__file__).parents[2]/'plugin-host/src/minecraft-skills.json').read_text())
+ with patch.object(minecraft,'capabilities',{'skillDefinitions':definitions}):
+  declaration=tools._minecraft_declaration(['observe','submit','capabilities','play'])
+ assert len(json.dumps(declaration,ensure_ascii=False).encode())<=3000
+ description=declaration['function']['description']
+ assert all(name+'(' in description for name in definitions), 'Keep every actual skill discoverable'
+ assert 'taskId' in description and 'same' in description.lower()
+
 def test_nested_manual_fallback_uses_the_same_validated_input_and_authority():
  from app.services.minecraft import minecraft
  with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'execute',return_value={'sent':True}) as dispatch:

@@ -178,6 +178,20 @@ def test_goal_activation_never_undoes_manual_takeover_pause():
   assert m.paused and not m.autonomous
   rt.host.request.assert_not_called()
 
+@pytest.mark.parametrize('status',['active','blocked'])
+@pytest.mark.parametrize('pending_event',[False,True])
+def test_progress_note_does_not_wake_itself_while_local_work_continues(status,pending_event):
+ m,rt=setup();m.autonomous=True
+ goal={'title':'等天亮再搭小窝','reason':'休息','source':'rest','expected':'安全过夜','status':'active'}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  m.update_goal(goal)
+  m.tasks={'rest':{'taskId':'rest','skill':'wait','state':'running'}}
+  m.decision_needed=pending_event
+  m.update_goal({**goal,'status':status,'progress':'已经封住坑口，继续等天亮'})
+  assert m.decision_needed is pending_event
+  assert m.autonomous and m.tasks['rest']['state']=='running'
+  rt.host.request.assert_not_called()
+
 def test_unfocused_game_suspends_decisions_without_revoking_or_mistaking_it_for_a_failure():
  m,rt=setup();m.autonomous=True;m.decision_needed=True
  rt.active=rt.presentation=None;rt.queue=[];rt.interrupt_hold=False
