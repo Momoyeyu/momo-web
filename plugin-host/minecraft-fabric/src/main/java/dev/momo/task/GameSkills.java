@@ -67,7 +67,9 @@ public final class GameSkills {
    ownedScreen=c.currentScreen;
    proofWorld=c.world;proofHandler=c.player.currentScreenHandler.syncId;placeSent=inventoryPending=buttonPending=false;verifiedActions=0;
    if(Set.of("navigate","mine","place","interactBlock").contains(skill)){
-    pos=position(args);boolean surface=skill.equals("navigate")&&args.has("height")&&args.get("height").getAsString().equals("surface");if(!c.world.isChunkLoaded(pos)||!NavigationBounds.within(c.player.getX(),c.player.getY(),c.player.getZ(),pos.getX(),pos.getY(),pos.getZ(),surface))throw new TaskRuntime.Rejected("outside_known_terrain");
+    boolean surface=skill.equals("navigate")&&args.has("height")&&args.get("height").getAsString().equals("surface");
+    pos=surface&&!args.has("y")?new BlockPos(integer(args,"x",-30000000,30000000),c.player.getBlockY(),integer(args,"z",-30000000,30000000)):position(args);
+    if(!c.world.isChunkLoaded(pos)||!NavigationBounds.within(c.player.getX(),c.player.getY(),c.player.getZ(),pos.getX(),pos.getY(),pos.getZ(),surface))throw new TaskRuntime.Rejected("outside_known_terrain");
     if(!skill.equals("navigate")&&!visible(pos))throw new TaskRuntime.Rejected("target_not_visible");
     if(!skill.equals("navigate")){beforeState=c.world.getBlockState(pos).toString();beforeBlock=Registries.BLOCK.getId(c.world.getBlockState(pos).getBlock()).toString();blockBoundary=BlockReceipts.CURRENT.cursor();}
    }

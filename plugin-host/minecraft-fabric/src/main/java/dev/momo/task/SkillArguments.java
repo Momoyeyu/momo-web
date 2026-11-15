@@ -35,5 +35,10 @@ public final class SkillArguments {
    }
    default -> throw new IllegalArgumentException("Unsupported schema");
   }
+  if(schema.has("anyOf")){
+   boolean matched=false;
+   for(var branch:schema.getAsJsonArray("anyOf"))try{validateValue(branch.getAsJsonObject(),value);matched=true;break;}catch(IllegalArgumentException ignored){}
+   if(!matched)throw new IllegalArgumentException("Invalid conditional skill fields");
+  }
  }
 }

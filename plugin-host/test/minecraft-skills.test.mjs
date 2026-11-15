@@ -35,3 +35,9 @@ test('anvil naming uses bounded text and the same finite plan interface',()=>{
  validateSkill('plan',{steps:[{skill:'rename',args:{name:'小小的冒险'}}]});
  for(const args of [{name:'x'.repeat(51)},{name:'line\nbreak'},{name:'momo',command:'anything'}])assert.throws(()=>validateSkill('rename',args),/Invalid/);
 });
+test('surface navigation does not invent an unused elevation; exact navigation still requires it',()=>{
+ validateSkill('navigate',{x:1,z:2,height:'surface'});
+ validateSkill('navigate',{x:1,y:64,z:2,height:'surface'});
+ validateSkill('plan',{steps:[{skill:'navigate',args:{x:1,z:2,height:'surface',terrain:'adapt'}}]});
+ for(const args of [{x:1,z:2},{x:1,z:2,height:'exact'},{x:1,z:2,height:'surface',y:NaN},{x:1,z:2,height:'surface',y:'64'}])assert.throws(()=>validateSkill('navigate',args),/Invalid/);
+});

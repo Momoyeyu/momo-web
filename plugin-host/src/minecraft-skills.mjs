@@ -14,6 +14,7 @@ function validate(schema,value){
  }else if(schema.type==='string'){
   if(typeof value!=='string'||value.length<schema.minLength||value.length>schema.maxLength||/[\x00-\x1f]/u.test(value)||schema.enum&&!schema.enum.includes(value))throw new Error('Invalid skill string');
  }else throw new Error('Unsupported skill schema');
+ if(schema.anyOf&&!schema.anyOf.some(branch=>{try{validate(branch,value);return true;}catch{return false;}}))throw new Error('Invalid conditional skill fields');
 }
 export function validateSkill(name,args){
  if(!Object.hasOwn(skills,name))throw new Error('Unsupported Minecraft skill');

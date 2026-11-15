@@ -15,6 +15,11 @@ public final class SkillArgumentsSmoke {
   if(!SkillArguments.resourceId("oak_log").equals("minecraft:oak_log"))throw new AssertionError("vanilla identifiers need their default namespace");
   if(!SkillArguments.resourceId("example:oak_log").equals("example:oak_log"))throw new AssertionError("mod namespaces must be preserved");
   validate("navigate","{\"x\":1,\"y\":64,\"z\":2,\"height\":\"surface\"}");
+  validate("navigate","{\"x\":1,\"z\":2,\"height\":\"surface\"}");
+  validate("plan","{\"steps\":[{\"skill\":\"navigate\",\"args\":{\"x\":1,\"z\":2,\"height\":\"surface\"}}]}");
+  reject("navigate","{\"x\":1,\"z\":2}");
+  reject("navigate","{\"x\":1,\"z\":2,\"height\":\"exact\"}");
+  reject("navigate","{\"x\":1,\"y\":\"64\",\"z\":2,\"height\":\"surface\"}");
   reject("navigate","{\"x\":1,\"y\":64,\"z\":2,\"height\":\"teleport\"}");
   validate("rename","{\"name\":\"momo の剣\"}");
   validate("rename","{\"name\":\"\"}");
