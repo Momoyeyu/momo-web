@@ -119,3 +119,15 @@ def test_parent_symlink_cannot_redirect_writes_outside_target(pair, tmp_path):
     with pytest.raises(ValueError, match="symlink"):
         module.promote(source, target, "HEAD", bootstrap=True, apply=True)
     assert not list(outside.iterdir())
+
+
+def test_minecraft_build_inputs_are_owned_shared_snapshot_files(pair):
+    source,target=pair
+    names=('prepare-minecraft-runtime.py','minecraft-resources.json','build-minecraft-component.py')
+    (source/'scripts').mkdir()
+    for name in names:(source/'scripts'/name).write_text('pinned '+name)
+    commit(source)
+    report=module.promote(source,target,'HEAD',bootstrap=True,apply=True)
+    for name in names:
+        assert 'app/scripts/'+name in report['changed']
+        assert (target/'app/scripts'/name).read_text()=='pinned '+name

@@ -35,6 +35,7 @@ check.dependsOn taskPlanSmoke
 
 tasks.named('processResources') {
  from('../src/minecraft-skills.json') { rename { 'momo-skills.json' } }
+ from('../../scripts/minecraft-resources.json') { into 'META-INF/momo' }
 }
 tasks.register('skillArgumentsSmoke', JavaExec) {
  dependsOn testClasses

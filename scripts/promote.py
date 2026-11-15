@@ -18,7 +18,8 @@ PREFIXES = {
 }
 FILES = {
     f"scripts/{name}": f"app/scripts/{name}"
-    for name in ("prepare-core.py", "prepare-models.py", "offline-resources.json")
+    for name in ("prepare-core.py", "prepare-models.py", "offline-resources.json",
+                 "prepare-minecraft-runtime.py", "minecraft-resources.json", "build-minecraft-component.py")
 }
 FILES.update(
     {
