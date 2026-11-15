@@ -512,3 +512,11 @@ A single high-level request continued the original shelter goal through the same
 The last task window contained 47 repeated idle `retreated_low_health` notices and eight `defense_blocked` notices. Source tracing showed that completing a retreat cleared its local state while the same separated ranged threat remained visible; the next idle arbitration immediately began another retreat, interrupting normal work and waking the model again. This is an actual acceptance failure, not a second source review or cosmetic issue.
 
 The body now remembers at most sixteen escaped threats during the current activity. Routine reflex cleanup and instant input preserve that separation; explicit stop/new activity clears it. A threat approaching within nine blocks, actual health loss, a fresh damage source or recovery out of low health rearms normal arbitration. Critical blast/air/fire reactions retain priority. This fixes the repeated transition rather than merely hiding its notices. New state/policy regressions failed before the contract existed and then passed; the complete Fabric build passed all 24 tasks in four seconds and the actual production JAR passed integrity/isolation validation. The new body change still requires loaded-game verification before another long model run. No app reinstallation has occurred.
+
+### 2026-11-16：撤退接续与骑乘背包回归
+
+低血量 5.9 HP、食物 16 的真实角色面对同一可见骷髅，保持至少 12 格分离；79 次取样中连续 133 个游戏 tick 仍处于该威胁的 24 格反应范围。仅产生一次撤退回执，后续等待任务实际完成 300 个游戏 tick，生命不变，停止后持有按键为 0。这是特定反复撤退问题的回归证据，不代替完整自主游玩或性能结论。初次对手箭击用例同时存在另一骷髅，因此不同威胁引发的第二次撤退不能算同一威胁的重复故障。
+
+随后真实发现骑马后背包仍打开人物界面的缺口（修复前失败）。现按原版输入分支请求骑乘背包，并使用服务端窗口回执匹配世界、坐骑、窗口、handler 与请求序号；过期、停止或换世界不能取得窗口控制权。回执测试先因缺少请求关联而失败，修复后 Java 全构建 24 项任务通过，交付隔离检查 8 项通过。真实客户端正常打开 `minecraft:horse` 且未被误判为玩家菜单，箱子取鞍、骑乘、背包装鞍和关闭均成功；装鞍后普通前进使同一角色移动约 9.94 格，停止释放为 0。移动探针最初误用了未声明的 `move` 技能，明确拒绝后改用已支持的原版前进控制，不算产品失败或技能支持。
+
+上述使用明确标记的开发场景与现有客户端／账号，无 OP、物品命令、运行时生成实体或额外推理人格。安装版和完整自主目标仍未验收。

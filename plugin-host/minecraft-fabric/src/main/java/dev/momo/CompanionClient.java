@@ -31,6 +31,7 @@ public final class CompanionClient implements ClientModInitializer {
  private boolean physicalTakeover,sceneObservationRequired;
  private long physicalAt;
  private net.minecraft.client.gui.screen.Screen ownedScreen;
+ private dev.momo.task.InventoryReceipts.WindowRequest inventoryRequest;
  private final dev.momo.task.PauseBarrier pauseBarrier=new dev.momo.task.PauseBarrier();
  private long focusResumeDeadline;
  public static boolean controlling(){return instance!=null&&instance.controlLease.controlling(instance.tasks.active());}
@@ -38,10 +39,14 @@ public final class CompanionClient implements ClientModInitializer {
  public static void physicalButton(int button,boolean down){if(instance!=null)instance.physicalKeys.button(button,down);}
  public static void physicalInput(){if(instance!=null&&controlling()){instance.physicalAt=System.currentTimeMillis();instance.physicalTakeover=true;}}
  public static boolean ownsCurrentScreen(){return instance!=null&&instance.ownsScreen(MinecraftClient.getInstance());}
- private boolean ownsScreen(MinecraftClient c){return c.currentScreen!=null&&(c.currentScreen==ownedScreen||survival.acceptsScreen(c.currentScreen)||tasks.active()&&tasks.acceptsScreen(c.currentScreen));}
+ private boolean ownsScreen(MinecraftClient c){return c.currentScreen!=null&&(c.currentScreen==ownedScreen||requestedInventoryScreen(c)||survival.acceptsScreen(c.currentScreen)||tasks.active()&&tasks.acceptsScreen(c.currentScreen));}
+ private boolean requestedInventoryScreen(MinecraftClient c){
+  if(inventoryRequest==null||c.player==null||c.player.getVehicle()==null||!inventoryRequest.target().equals("entity:"+c.player.getVehicle().getId()))return false;
+  return dev.momo.task.InventoryReceipts.CURRENT.confirmedWindow(inventoryRequest,c.world,c.currentScreen,c.player.currentScreenHandler.syncId,System.nanoTime()/1000000);
+ }
  private boolean deathScreen(MinecraftClient c){return c.player!=null&&!c.player.isAlive()&&c.currentScreen instanceof net.minecraft.client.gui.screen.DeathScreen;}
  private boolean suspended(MinecraftClient c){return !c.isWindowFocused()||(c.currentScreen!=null&&!ownsScreen(c)&&!deathScreen(c));}
- private void rememberScreen(MinecraftClient c){if(c.currentScreen==null)ownedScreen=null;else if(ownsScreen(c))ownedScreen=c.currentScreen;}
+ private void rememberScreen(MinecraftClient c){if(c.currentScreen==null)ownedScreen=null;else if(ownsScreen(c)){ownedScreen=c.currentScreen;inventoryRequest=null;}if(inventoryRequest!=null&&System.nanoTime()/1000000>inventoryRequest.deadline())inventoryRequest=null;}
  private void takeover(MinecraftClient c){physicalTakeover=false;tasks.stop("manual_takeover");tasks.notice("manual_takeover");release(c,true);ownedScreen=null;pauseBarrier.pause(physicalAt);tasks.pause();restorePhysicalKeys(c);}
  private void restorePhysicalKeys(MinecraftClient c){
   for(var binding:c.options.allKeys){
@@ -136,7 +141,7 @@ public final class CompanionClient implements ClientModInitializer {
   release(client,false);
  }
  private void release(MinecraftClient client,boolean preserveScreen) {
-  boolean owned=ownsScreen(client);
+  boolean owned=ownsScreen(client);inventoryRequest=null;
   survival.stop(preserveScreen);tasks.stop("control_released");controlLease.revoke();focusResumeDeadline=0;
   releaseLegacy(client);
   if(client.currentScreen!=null&&dev.momo.task.ControlAdmission.closeOnRelease(preserveScreen,owned,tasks.stopConfirmed(),client.player!=null&&client.player.currentScreenHandler.getCursorStack().isEmpty()))client.player.closeHandledScreen();
@@ -233,7 +238,7 @@ public final class CompanionClient implements ClientModInitializer {
     events.add("chat",gson.toJsonTree(dev.momo.task.GameChat.CURRENT.notification(client.world)));result.add("events",events);
    }
    case "heartbeat" -> {long now=System.nanoTime()/1000000,lease=command.get("leaseMs").getAsLong();tasks.heartbeat(now,lease);controlLease.renew(now,lease);result.addProperty("active",tasks.active());result.addProperty("controlPaused",pauseBarrier.isPaused());result.addProperty("suspended",suspended(client));}
-   case "pause" -> {survival.stop();releaseLegacy(client);focusResumeDeadline=0;pauseBarrier.pause(System.currentTimeMillis());tasks.pause();result.addProperty("paused",true);}
+   case "pause" -> {inventoryRequest=null;survival.stop();releaseLegacy(client);focusResumeDeadline=0;pauseBarrier.pause(System.currentTimeMillis());tasks.pause();result.addProperty("paused",true);}
    case "resumeTask" -> {
     if(sceneObservationRequired){result.addProperty("accepted",false);result.addProperty("error","SCENE_OBSERVATION_REQUIRED");return result;}
     long issuedAt=command.has("issuedAt")?command.get("issuedAt").getAsLong():0;
@@ -346,7 +351,7 @@ public final class CompanionClient implements ClientModInitializer {
   String key=cmd.get("control").getAsString();
   int duration=cmd.get("durationMs").getAsInt();
   if(duration<1 || duration>10000 || c.interactionManager==null) throw new IllegalArgumentException("Invalid input");
-  survival.settle(true);releaseLegacy(c);
+  inventoryRequest=null;survival.settle(true);releaseLegacy(c);
   if(!controlLease.armed()||controlLease.leaseExpired(System.nanoTime()/1000000))throw new IllegalStateException("Control activity expired");
   var p=c.player;
   if(key.equals("respawn") && !p.isAlive()) {p.requestRespawn();return;}
@@ -389,7 +394,12 @@ public final class CompanionClient implements ClientModInitializer {
   switch(key){
    case "look" -> {float yaw=cmd.get("yaw").getAsFloat(),pitch=cmd.get("pitch").getAsFloat();if(!Float.isFinite(yaw)||!Float.isFinite(pitch)||Math.abs(yaw)>180||Math.abs(pitch)>90)throw new IllegalArgumentException("Invalid look");p.changeLookDirection(yaw/0.15,pitch/0.15);return;}
    case "hotbar" -> {int slot=cmd.get("slot").getAsInt();if(slot<0||slot>8)throw new IllegalArgumentException("Invalid hotbar slot");p.getInventory().selectedSlot=slot;p.networkHandler.sendPacket(new net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket(slot));return;}
-   case "inventory" -> {c.setScreen(new net.minecraft.client.gui.screen.ingame.InventoryScreen(p));return;}
+   case "inventory" -> {
+    if(c.interactionManager.hasRidingInventory()&&p.getVehicle()!=null){
+     inventoryRequest=dev.momo.task.InventoryReceipts.CURRENT.requestWindow(c.world,"entity:"+p.getVehicle().getId(),System.nanoTime()/1000000);p.openRidingInventory();
+    }else c.setScreen(new net.minecraft.client.gui.screen.ingame.InventoryScreen(p));
+    return;
+   }
    case "drop" -> {p.networkHandler.sendPacket(new net.minecraft.network.packet.c2s.play.UpdateSelectedSlotC2SPacket(p.getInventory().selectedSlot));p.dropSelectedItem(false);return;}
    default -> {}
   }

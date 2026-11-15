@@ -5,6 +5,7 @@ public final class InventoryReceipts {
  public static final InventoryReceipts CURRENT=new InventoryReceipts();
  public record Receipt(long sequence,int revision,List<String> slots,String cursor){}
  public record WindowReceipt(long sequence,String target,int handler){}
+ public record WindowRequest(Object world,String target,long boundary,long deadline){}
  private Object openedWindow;private WindowReceipt opened;
  private Object world;private long sequence;private final LinkedHashMap<Integer,Receipt> recent=new LinkedHashMap<>();
  private record Address(int handler,int slot){}
@@ -12,6 +13,15 @@ public final class InventoryReceipts {
  private final LinkedHashMap<Address,Delta> deltas=new LinkedHashMap<>();
  public long cursor(){return sequence;}
  public void changeWorld(Object value){if(world!=value){world=value;recent.clear();deltas.clear();openedWindow=null;opened=null;}}
+ public WindowRequest requestWindow(Object value,String target,long now){
+  if(value==null||target==null||target.isBlank())throw new IllegalArgumentException("Missing requested window target");
+  changeWorld(value);return new WindowRequest(value,target,sequence,now+3000);
+ }
+ public boolean confirmedWindow(WindowRequest request,Object value,Object screen,int handler,long now){
+  if(request==null||request.world()!=value||now>request.deadline())return false;
+  var receipt=windowAfter(value,screen,request.boundary());
+  return receipt!=null&&receipt.handler()==handler&&receipt.target().equals(request.target());
+ }
  public void recordWindow(Object value,Object screen,String target,int handler){
   if(value==null||screen==null)return;changeWorld(value);openedWindow=screen;opened=new WindowReceipt(++sequence,target,handler);
  }
