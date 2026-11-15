@@ -107,6 +107,13 @@ public final class CompanionClient implements ClientModInitializer {
    java.nio.file.Files.createFile(rendezvous,java.nio.file.attribute.PosixFilePermissions.asFileAttribute(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
    java.nio.file.Files.writeString(rendezvous,gson.toJson(discovery));
    ClientTickEvents.END_CLIENT_TICK.register(this::tick);
+   net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.CHAT.register((message,signed,sender,params,received)->{
+    var c=MinecraftClient.getInstance();
+    dev.momo.task.GameChat.CURRENT.receive(c.world,"player",message.getString(),sender==null?"":sender.getName(),sender!=null&&c.player!=null&&sender.getId().equals(c.player.getUuid()),received.toEpochMilli());
+   });
+   net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.GAME.register((message,overlay)->{
+    var c=MinecraftClient.getInstance();dev.momo.task.GameChat.CURRENT.receive(c.world,overlay?"overlay":"system",message.getString(),"",false,System.currentTimeMillis());
+   });
    ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { release(client); server.stop(0); executor.shutdownNow(); try { java.nio.file.Files.deleteIfExists(rendezvous); } catch (Exception ignored) {} });
   } catch (Exception error) { if (server != null) server.stop(0); if (executor != null) executor.shutdownNow(); }
  }
@@ -203,7 +210,10 @@ public final class CompanionClient implements ClientModInitializer {
     if(command.has("taskId")){try{result.add("task",gson.toJsonTree(tasks.snapshot(command.get("taskId").getAsString())));}catch(IllegalArgumentException error){result.addProperty("error","TASK_NOT_FOUND");}}
     else result.add("tasks",gson.toJsonTree(tasks.snapshots()));
    }
-   case "events" -> result.add("events",gson.toJsonTree(tasks.events(command.get("after").getAsLong())));
+   case "events" -> {
+    var events=gson.toJsonTree(tasks.events(command.get("after").getAsLong())).getAsJsonObject();
+    events.add("chat",gson.toJsonTree(dev.momo.task.GameChat.CURRENT.notification(client.world)));result.add("events",events);
+   }
    case "heartbeat" -> {long now=System.nanoTime()/1000000,lease=command.get("leaseMs").getAsLong();tasks.heartbeat(now,lease);if(guardAuthorized)gameLeaseUntil=now+lease;result.addProperty("active",tasks.active());result.addProperty("controlPaused",pauseBarrier.isPaused());result.addProperty("suspended",suspended(client));}
    case "pause" -> {survival.stop();releaseLegacy(client);focusResumeDeadline=0;pauseBarrier.pause(System.currentTimeMillis());tasks.pause();result.addProperty("paused",true);}
    case "resumeTask" -> {
@@ -390,6 +400,7 @@ public final class CompanionClient implements ClientModInitializer {
   return desired;
  }
  private void tick(MinecraftClient client) {
+  dev.momo.task.GameChat.CURRENT.scene(client.world);
   dev.momo.task.PickupLedger.CURRENT.changeWorld(client.world);
   dev.momo.task.BlockReceipts.CURRENT.changeWorld(client.world);
   dev.momo.task.ShieldBlocks.CURRENT.changeWorld(client.world);

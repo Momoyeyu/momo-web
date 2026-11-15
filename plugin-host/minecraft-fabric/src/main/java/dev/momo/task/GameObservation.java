@@ -41,6 +41,7 @@ public final class GameObservation {
   return recipes;
  }
  public static void append(MinecraftClient c,JsonObject result){
+  result.add("recentChat",new Gson().toJsonTree(GameChat.CURRENT.snapshot(c.world)));
   result.addProperty("shieldBlockCount",ShieldBlocks.CURRENT.count(c.world));
   var p=c.player;var handler=p.currentScreenHandler;
   result.addProperty("screenHandler",screenId(handler));result.addProperty("screenRevision",handler.getRevision());
