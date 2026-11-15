@@ -23,7 +23,7 @@ final class BuilderSkill implements TaskRuntime.Work {
  private BlockPos position(SparseBuild.Cell cell){return new BlockPos(cell.x(),cell.y(),cell.z());}
  public void start(){
   if(c.player==null||c.world==null)throw new TaskRuntime.Rejected("world_unavailable");if(c.currentScreen!=null)throw new TaskRuntime.Rejected("close_station_first");world=c.world;boundary=BlockReceipts.CURRENT.cursor();
-  var needed=new HashMap<net.minecraft.item.Item,Integer>();
+  var needed=new HashMap<net.minecraft.item.Item,Integer>();var clearing=new LinkedHashSet<net.minecraft.block.Block>();
   for(var cell:plan.cells()){
    var pos=position(cell);if(!world.isChunkLoaded(pos)||pos.getSquaredDistance(c.player.getPos())>1024)throw new TaskRuntime.Rejected("outside_known_terrain");
    var id=Identifier.of(cell.block());if(!Registries.BLOCK.containsId(id))throw new TaskRuntime.Rejected("block_unknown");var desired=Registries.BLOCK.get(id).getDefaultState();
@@ -31,13 +31,13 @@ final class BuilderSkill implements TaskRuntime.Work {
    boolean visible=actual.isAir()?world.raycast(new RaycastContext(c.player.getEyePos(),pos.toCenterPos(),RaycastContext.ShapeType.COLLIDER,RaycastContext.FluidHandling.ANY,c.player)).getType()==HitResult.Type.MISS:BlockSight.hit(c,pos)!=null;
    if(!visible)throw new TaskRuntime.Rejected("build_cells_not_visible");
    if(actual.isOf(desired.getBlock())){verified.put(cell,proof(cell,actual.toString(),0));existing++;}
-   else {if(!actual.isAir())throw new TaskRuntime.Rejected("build_target_occupied");needed.merge(desired.getBlock().asItem(),1,Integer::sum);}
+   else {if(!actual.isAir()){if(!actual.isReplaceable()||!actual.getFluidState().isEmpty())throw new TaskRuntime.Rejected("build_target_occupied");clearing.add(actual.getBlock());}needed.merge(desired.getBlock().asItem(),1,Integer::sum);}
   }
   for(var entry:needed.entrySet()){int count=0;for(int i=0;i<36;i++)if(c.player.getInventory().getStack(i).isOf(entry.getKey()))count+=c.player.getInventory().getStack(i).getCount();if(count<entry.getValue())throw new TaskRuntime.Rejected("materials_missing");}
   if(verified.size()==wanted.size())return;
   baritone=BaritoneAPI.getProvider().getPrimaryBaritone();
   if(baritone.getPathingBehavior().isPathing()||baritone.getBuilderProcess().isActive()||baritone.getCustomGoalProcess().isActive()||baritone.getPathingControlManager().mostRecentInControl().filter(p->p.isActive()).isPresent())throw new TaskRuntime.Rejected("body_already_owned");
-  var s=BaritoneAPI.getSettings();borrow(s.allowBreak,false);borrow(s.allowBreakAnyway,List.of());borrow(s.allowPlace,true);borrow(s.allowInventory,true);borrow(s.allowParkourPlace,false);borrow(s.allowWaterBucketFall,false);borrow(s.chunkCaching,false);
+  var s=BaritoneAPI.getSettings();borrow(s.allowBreak,false);borrow(s.allowBreakAnyway,List.copyOf(clearing));borrow(s.allowPlace,true);borrow(s.allowInventory,true);borrow(s.allowParkourPlace,false);borrow(s.allowWaterBucketFall,false);borrow(s.chunkCaching,false);
   borrow(s.chatControl,false);borrow(s.chatControlAnyway,false);borrow(s.prefixControl,false);borrow(s.renderPath,false);borrow(s.renderGoal,false);
   borrow(s.buildIgnoreExisting,false);borrow(s.buildOnlySelection,false);borrow(s.buildInLayers,false);borrow(s.buildRepeat,Vec3i.ZERO);borrow(s.buildRepeatCount,1);borrow(s.buildRepeatSneaky,false);
   borrow(s.buildIgnoreBlocks,List.of());borrow(s.buildSkipBlocks,List.of());borrow(s.buildSubstitutes,Map.of());borrow(s.buildValidSubstitutes,Map.of());borrow(s.buildSchematicRotation,BlockRotation.NONE);borrow(s.buildSchematicMirror,BlockMirror.NONE);

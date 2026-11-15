@@ -4,6 +4,7 @@
 // 曾经误删 settings.title（正则匹配过宽），界面直接把 "settings.title" 显示在工具条上，
 // 是 E2E 才抓到的。这里在 unit 层把它拦住。
 import { describe, expect, it } from "vitest";
+import {readFileSync} from 'node:fs';
 
 import type { QQRuntimeState } from "../services/qqRuntimeClient";
 
@@ -22,6 +23,13 @@ function keyPaths(value: unknown, prefix = ""): string[] {
 const DICTS = { zh, ja, en };
 
 describe("三语字典", () => {
+  it('names every real Minecraft skill in all three languages',()=>{
+    const skills=JSON.parse(readFileSync(new URL('../../../plugin-host/src/minecraft-skills.json',import.meta.url),'utf8'));
+    for(const [lang,dict] of Object.entries(DICTS)){
+      const names:Record<string,string>=dict.minecraft.skill;
+      for(const name of Object.keys(skills))expect(names[name],`${lang}: ${name}`).toBeTypeOf('string');
+    }
+  });
   it("三份字典的键集合完全一致（漏翻或删错键在这里红）", () => {
     const base = keyPaths(zh).sort();
     expect(keyPaths(ja).sort()).toEqual(base);

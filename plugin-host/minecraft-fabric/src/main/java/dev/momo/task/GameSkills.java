@@ -382,7 +382,8 @@ public final class GameSkills {
    boolean adapt=navigate&&args.has("terrain")&&args.get("terrain").getAsString().equals("adapt");
    // Exact navigation names the feet block. Interaction approaches may stop
    // nearby, but must not make a different floor count as an exact arrival.
-   navigation.start(target.getX(),target.getY(),target.getZ(),surface,navigate||skill.equals("pickup"),adapt);
+   if(Set.of("mine","place","interactBlock").contains(skill))navigation.startInteraction(target);
+   else navigation.start(target.getX(),target.getY(),target.getZ(),surface,navigate||skill.equals("pickup"),adapt);
    navigating=true;pathTarget=target;
   }
   private void approach(BlockPos target,int interval){

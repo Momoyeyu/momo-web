@@ -16,5 +16,9 @@ public final class NavigationBoundsSmoke {
   if(NavigationBounds.horizonPitch(90)>20||NavigationBounds.horizonPitch(-90)<-10)throw new AssertionError("Navigation must leave an inspectable horizon, not a floor-only frame");
   if(NavigationBounds.failed(true,true))throw new AssertionError("An airborne surface goal may settle after the path process ends");
   if(!NavigationBounds.failed(false,true))throw new AssertionError("An exhausted path outside the goal remains a failure");
+  var poses=InteractionReach.candidates(0,85,0,0,83,0,1.62,4.5);
+  if(poses.stream().noneMatch(p->p.x()==0&&p.y()==83&&p.z()==0))throw new AssertionError("Reachable standing positions below an overhead log must be navigation goals, not the solid log itself");
+  if(poses.size()>729||poses.stream().anyMatch(p->Math.abs(p.x())>4||Math.abs(p.z())>4))throw new AssertionError("Interaction approaches must have a finite local collision search");
+  if(!InteractionReach.within(0,83,0,0,85,0,1.62,4.5)||InteractionReach.within(0,83,0,6,85,0,1.62,4.5))throw new AssertionError("A nearby elevated target is reachable, a distant target is not");
  }
 }
