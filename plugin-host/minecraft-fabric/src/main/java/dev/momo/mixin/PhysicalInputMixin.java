@@ -14,7 +14,11 @@ public abstract class PhysicalInputMixin {
  @Unique private boolean momo$tracking;
  @Unique private double momo$lastX,momo$lastY;
  @Inject(method="onMouseButton",at=@At("HEAD"))
- private void momo$button(long window,int button,int action,int mods,CallbackInfo ci){var c=MinecraftClient.getInstance();if(window==c.getWindow().getHandle()&&action==1&&c.isWindowFocused()&&(c.currentScreen==null||CompanionClient.ownsCurrentScreen()))CompanionClient.physicalInput();}
+ private void momo$button(long window,int button,int action,int mods,CallbackInfo ci){
+  var c=MinecraftClient.getInstance();if(window!=c.getWindow().getHandle())return;
+  CompanionClient.physicalButton(button,action!=0);
+  if(action==1&&c.isWindowFocused()&&(c.currentScreen==null||CompanionClient.ownsCurrentScreen()))CompanionClient.physicalInput();
+ }
  @Inject(method="onMouseScroll",at=@At("HEAD"))
  private void momo$scroll(long window,double x,double y,CallbackInfo ci){var c=MinecraftClient.getInstance();if(window==c.getWindow().getHandle()&&c.isWindowFocused()&&(c.currentScreen==null||CompanionClient.ownsCurrentScreen()))CompanionClient.physicalInput();}
  @Inject(method="onCursorPos",at=@At("HEAD"))

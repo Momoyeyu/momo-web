@@ -13,7 +13,9 @@ public abstract class PhysicalKeyboardMixin {
  @Inject(method="onKey",at=@At("HEAD"))
  private void momo$key(long window,int key,int scan,int action,int modifiers,CallbackInfo ci){
   var c=MinecraftClient.getInstance();
-  if(action==0||!c.isWindowFocused()||window!=c.getWindow().getHandle())return;
+  if(window!=c.getWindow().getHandle())return;
+  CompanionClient.physicalKey(key,scan,action!=0);
+  if(action==0||!c.isWindowFocused())return;
   if(c.currentScreen!=null){if(CompanionClient.ownsCurrentScreen())CompanionClient.physicalInput();return;}
   var o=c.options;
   for(var binding:new net.minecraft.client.option.KeyBinding[]{o.forwardKey,o.backKey,o.leftKey,o.rightKey,o.jumpKey,o.sneakKey,o.sprintKey,o.attackKey,o.useKey,o.dropKey,o.swapHandsKey,o.inventoryKey})if(binding.matchesKey(key,scan)){CompanionClient.physicalInput();return;}
