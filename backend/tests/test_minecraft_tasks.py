@@ -81,6 +81,16 @@ def test_gameplay_mutation_requires_unified_play_permission():
   with pytest.raises(MinecraftError,match='denied'):m.execute('submit',{'taskId':'x'},0,'owner','lease')
   rt.host.request.assert_not_called()
 
+def test_follow_requires_unified_gameplay_permission_because_its_body_can_defend_and_eat():
+ m,rt=setup();m.permissions={'game.observe','game.move'}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  with pytest.raises(MinecraftError,match='denied'):
+   m.execute('follow',{'player':'Partner','durationMs':500},0,'owner','lease')
+  rt.host.request.assert_not_called()
+  m.permissions={'game.observe','game.modify'}
+  m.execute('follow',{'player':'Partner','durationMs':500},0,'owner','lease')
+  assert rt.host.request.call_args.args[0]=='minecraft.follow'
+
 @pytest.mark.parametrize('reason,code',[('BODY_SUSPENDED','MINECRAFT_SUSPENDED'),('MENU_OPEN','MINECRAFT_SUSPENDED'),('SCENE_OBSERVATION_REQUIRED','MINECRAFT_STALE'),('BODY_BUSY','MINECRAFT_BUSY')])
 def test_game_thread_admission_rejection_is_known_and_does_not_revoke(reason,code):
  m,rt=setup();rt.host.request.return_value={'accepted':False,'error':reason}

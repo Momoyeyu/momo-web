@@ -237,6 +237,13 @@ def test_bound_game_exposes_only_its_observation_lane():
         assert 'minecraft_action' in names
         assert not names & {'screen_observe','computer_targets','computer_request'}
 
+@pytest.mark.parametrize('permissions,allowed',[({'game.observe','game.move'},False),({'game.observe','game.modify'},True)])
+def test_follow_tool_matches_unified_body_authority(permissions,allowed):
+ from app.services.minecraft import minecraft
+ with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'binding',{'world':'fixture'}),patch.object(minecraft,'permissions',permissions),patch('app.services.activities.snapshot',return_value={'enabled':{'computer':True,'browser':True,'minecraft':True}}):
+  declaration=next(row['function'] for row in tools.declarations() if row['function']['name']=='minecraft_action')
+  assert ('follow' in declaration['parameters']['properties']['action']['enum']) is allowed
+
 
 def test_desktop_observation_cannot_steal_bound_game_attention():
     from app.services.computer import Computer, ComputerError

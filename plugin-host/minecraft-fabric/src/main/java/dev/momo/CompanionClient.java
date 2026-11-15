@@ -312,7 +312,7 @@ public final class CompanionClient implements ClientModInitializer {
     String name=command.get("player").getAsString();
     if(!name.matches("[A-Za-z0-9_]{1,16}"))throw new IllegalArgumentException("Invalid player");
     var player=client.world.getPlayers().stream().filter(p->p!=client.player&&p.getName().getString().equals(name)&&client.player.canSee(p)).findFirst().orElseThrow(()->new IllegalArgumentException("Player is not visible"));
-    var args=new JsonObject();args.addProperty("entityId",player.getId());String id="follow-"+java.util.UUID.randomUUID();
+    var args=new JsonObject();args.addProperty("entityId",player.getId());args.addProperty("ticks",dev.momo.task.SkillArguments.legacyFollowTicks(command.has("durationMs")?command.get("durationMs").getAsInt():500));String id="follow-"+java.util.UUID.randomUUID();
     tasks.submit(id,"follow",args.toString(),client.world.getRegistryKey().getValue().toString(),GameSkills.create("follow",args),System.nanoTime()/1000000,10000);
     taskWorld=world;taskAccount=account;taskWorldInstance=client.world;
     result.addProperty("accepted",true);result.add("task",gson.toJsonTree(tasks.snapshot(id)));

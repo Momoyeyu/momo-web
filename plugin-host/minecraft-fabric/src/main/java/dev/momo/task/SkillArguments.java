@@ -8,6 +8,10 @@ public final class SkillArguments {
  private static final JsonObject CONTRACT=load();
  private static JsonObject load(){try(var in=SkillArguments.class.getResourceAsStream("/momo-skills.json")){if(in==null)throw new IOException("Missing skill contract");return JsonParser.parseReader(new InputStreamReader(in,StandardCharsets.UTF_8)).getAsJsonObject();}catch(IOException error){throw new IllegalStateException(error);}}
  public static JsonObject contract(){return CONTRACT.deepCopy();}
+ public static int legacyFollowTicks(int durationMs){
+  if(durationMs<1||durationMs>1000)throw new IllegalArgumentException("Invalid legacy follow duration");
+  return (durationMs+49)/50;
+ }
  public static String resourceId(String value){return net.minecraft.util.Identifier.of(value).toString();}
  public static void validate(String name,JsonObject args){
   if(!CONTRACT.has(name))throw new IllegalArgumentException("Unsupported skill");

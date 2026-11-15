@@ -239,8 +239,7 @@ def declarations(source='meeting'):
         actions=['stop']
         if 'game.observe' in minecraft.permissions: actions.append('observe')
         if 'game.chat' in minecraft.permissions: actions.append('chat')
-        if 'game.move' in minecraft.permissions: actions.append('follow')
-        if 'game.modify' in minecraft.permissions: actions.append('play')
+        if 'game.modify' in minecraft.permissions: actions+=['follow','play']
         if minecraft.capabilities.get('taskProtocol')==1:
             actions+=['capabilities','recipes','task','events']
             if 'game.modify' in minecraft.permissions:actions+=['submit','pause','resume','cancel']

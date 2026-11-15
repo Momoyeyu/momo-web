@@ -131,7 +131,7 @@ class Minecraft:
 
     def execute(self, action, arguments, generation, client, lease):
         if action=='resume':arguments={**arguments,'issuedAt':self._resume_input_time(client)}
-        capability = {'observe':'game.observe','chat':'game.chat','follow':'game.move','play':'game.modify','submit':'game.modify','task':'game.observe','events':'game.observe','capabilities':'game.observe','recipes':'game.observe','pause':'game.modify','resume':'game.modify','cancel':'game.modify'}[action]
+        capability = {'observe':'game.observe','chat':'game.chat','follow':'game.modify','play':'game.modify','submit':'game.modify','task':'game.observe','events':'game.observe','capabilities':'game.observe','recipes':'game.observe','pause':'game.modify','resume':'game.modify','cancel':'game.modify'}[action]
         # Host control serializes dispatch against the coordinator's revoke barrier.
         with runtime.host.control:
             fingerprint = self.gate(client, lease, allow_active=action in {'pause','resume','cancel','task','events','capabilities','recipes'})
