@@ -44,8 +44,8 @@ public final class AcceptanceFixtures implements ModInitializer {
  }
  private static void prepare(MinecraftServer server,Path save)throws Exception{
   ServerWorld world=server.getOverworld();
-  world.setSpawnPos(new BlockPos(0,64,0),0);world.setTimeOfDay(6000);world.setWeather(0,24000,false,false);
-  world.getGameRules().get(GameRules.DO_DAYLIGHT_CYCLE).set(false,server);
+  world.setSpawnPos(new BlockPos(0,64,0),0);world.setTimeOfDay(13000);world.setWeather(0,24000,false,false);
+  world.getGameRules().get(GameRules.DO_DAYLIGHT_CYCLE).set(true,server);
   world.getGameRules().get(GameRules.DO_WEATHER_CYCLE).set(false,server);
   world.getGameRules().get(GameRules.DO_MOB_SPAWNING).set(false,server);
   world.getGameRules().get(GameRules.SPAWN_RADIUS).set(0,server);
@@ -93,7 +93,9 @@ public final class AcceptanceFixtures implements ModInitializer {
   var skeleton=new net.minecraft.entity.mob.SkeletonEntity(EntityType.SKELETON,world);skeleton.setPosition(44.5,64,.5);
   skeleton.initialize(world,world.getLocalDifficulty(skeleton.getBlockPos()),SpawnReason.STRUCTURE,null);skeleton.setPersistent();world.spawnEntity(skeleton);
   var neutral=new net.minecraft.entity.mob.ZombifiedPiglinEntity(EntityType.ZOMBIFIED_PIGLIN,world);neutral.setPosition(32.5,64,-24.5);neutral.setPersistent();world.spawnEntity(neutral);
-  Map<String,Object> report=new LinkedHashMap<>(Map.of("version",2,"setupOnly",true,"spawn",List.of(0,64,0),"stationsRow",List.of(-8,64,6),"supplies",List.of(List.of(-3,64,-2),List.of(-5,64,-2),List.of(-7,64,-5)),"villager",List.of(10,64,2),"water",List.of(-10,61,0),"netherFrame",List.of(-13,65,12),"endFrame",List.of(0,64,12)));
+  var companion=new net.minecraft.entity.passive.CowEntity(EntityType.COW,world);companion.setPosition(-4.5,64,10.5);companion.setPersistent();world.spawnEntity(companion);
+  Map<String,Object> report=new LinkedHashMap<>(Map.of("version",3,"setupOnly",true,"spawn",List.of(0,64,0),"stationsRow",List.of(-8,64,6),"supplies",List.of(List.of(-3,64,-2),List.of(-5,64,-2),List.of(-7,64,-5)),"villager",List.of(10,64,2),"water",List.of(-10,61,0),"netherFrame",List.of(-13,65,12),"endFrame",List.of(0,64,12)));
+  report.put("followTarget",List.of(-4,64,10));report.put("bed",List.of(4,64,-3));report.put("nightWithDaylightCycle",true);
   report.put("combatTargets",List.of(List.of(-32,64,18),List.of(-32,64,28),List.of(-32,64,38),List.of(44,64,0)));report.put("neutral",List.of(32,64,-25));
   Files.writeString(save.resolve(".momo-fixture-prepared"),new Gson().toJson(report),StandardOpenOption.CREATE_NEW);
   System.getLogger("momo-fixture").log(System.Logger.Level.INFO,"Prepared isolated acceptance world; remove this development mod before acceptance");

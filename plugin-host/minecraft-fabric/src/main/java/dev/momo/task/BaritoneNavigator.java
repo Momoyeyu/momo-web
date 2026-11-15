@@ -50,6 +50,7 @@ public final class BaritoneNavigator {
     var floor=world.getBlockState(support).getCollisionShape(world,support);if(floor.isEmpty())continue;
     double y=support.getY()+floor.getMax(net.minecraft.util.math.Direction.Axis.Y);if(Math.floor(y)!=feet.getY())continue;
     var position=new net.minecraft.util.math.Vec3d(feet.getX()+.5,y,feet.getZ()+.5);var eye=position.add(0,eyeHeight,0);
+    if(state.getBlock() instanceof net.minecraft.block.BedBlock&&!InteractionReach.bedApproach(position.x,position.y,position.z,target.getX(),target.getY(),target.getZ()))continue;
     if(eye.squaredDistanceTo(point)>reach*reach||!world.isSpaceEmpty(player,player.getDimensions(net.minecraft.entity.EntityPose.STANDING).getBoxAt(position)))continue;
     var hit=world.raycast(new net.minecraft.world.RaycastContext(eye,point,rayType,net.minecraft.world.RaycastContext.FluidHandling.NONE,player));rays++;
     if(hit.getType()==net.minecraft.util.hit.HitResult.Type.BLOCK&&hit.getBlockPos().equals(target))goals.add(new GoalBlock(feet));

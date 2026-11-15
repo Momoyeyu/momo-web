@@ -37,7 +37,7 @@ public final class CompanionClient implements ClientModInitializer {
  private boolean ownsScreen(MinecraftClient c){return c.currentScreen!=null&&(c.currentScreen==ownedScreen||survival.acceptsScreen(c.currentScreen)||tasks.active()&&tasks.acceptsScreen(c.currentScreen));}
  private boolean deathScreen(MinecraftClient c){return c.player!=null&&!c.player.isAlive()&&c.currentScreen instanceof net.minecraft.client.gui.screen.DeathScreen;}
  private boolean suspended(MinecraftClient c){return !c.isWindowFocused()||(c.currentScreen!=null&&!ownsScreen(c)&&!deathScreen(c));}
- private void rememberScreen(MinecraftClient c){if(c.currentScreen==null)ownedScreen=null;else if(c.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?> && ownsScreen(c))ownedScreen=c.currentScreen;}
+ private void rememberScreen(MinecraftClient c){if(c.currentScreen==null)ownedScreen=null;else if((c.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>||c.currentScreen instanceof net.minecraft.client.gui.screen.SleepingChatScreen)&&ownsScreen(c))ownedScreen=c.currentScreen;}
  private void takeover(MinecraftClient c){physicalTakeover=false;tasks.stop("manual_takeover");tasks.notice("manual_takeover");release(c,true);ownedScreen=null;pauseBarrier.pause(physicalAt);tasks.pause();}
  private void retireScene(MinecraftClient c){release(c);tasks.notice("scene_changed");taskWorldInstance=null;taskWorld=taskAccount=null;sceneObservationRequired=true;}
  private static CompanionClient instance;
@@ -188,7 +188,7 @@ public final class CompanionClient implements ClientModInitializer {
    }
    case "submit" -> {
     String skill=command.get("skill").getAsString();
-    if(client.currentScreen!=null&&!(client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>)&&!skill.equals("respawn")){result.addProperty("accepted",false);result.addProperty("error","MENU_OPEN");return result;}
+    if(client.currentScreen!=null&&!(client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>)&&!ownsScreen(client)&&!skill.equals("respawn")){result.addProperty("accepted",false);result.addProperty("error","MENU_OPEN");return result;}
     if(playing){result.addProperty("accepted",false);result.addProperty("error","BODY_BUSY");return result;}
     String id=command.get("taskId").getAsString();
     JsonObject args=command.has("args")?command.getAsJsonObject("args"):new JsonObject();

@@ -4,6 +4,8 @@ public final class ControlAdmissionSmoke {
   if(!expected.equals(ControlAdmission.reject(type,focused,paused,takeover,scene,screen,owned,dead,skill)))throw new AssertionError("unsafe "+type+" admission");
  }
  public static void main(String[] args){
+  if(!InteractionScreens.accepts(true,true,false,false)||!InteractionScreens.accepts(true,false,true,true))throw new AssertionError("Owned interactions include station screens and the actual bed outcome");
+  if(InteractionScreens.accepts(false,true,false,false)||InteractionScreens.accepts(true,false,true,false)||InteractionScreens.accepts(true,false,false,true))throw new AssertionError("Unrelated menus and unrequested bed screens must remain manual");
   var runtime=new TaskRuntime();var body=new TaskRuntimeSmoke.Work();runtime.submit("body","wait",body,0,1000);
   if(!ControlAdmission.bodyConflict("play",runtime.active()).equals("BODY_BUSY"))throw new AssertionError("legacy input must have a known pre-dispatch rejection while semantic work is queued");
   runtime.tick(1);

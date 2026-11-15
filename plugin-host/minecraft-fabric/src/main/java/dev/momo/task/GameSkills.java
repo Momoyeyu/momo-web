@@ -157,9 +157,10 @@ public final class GameSkills {
      if(phase>=4){haltNavigation();c.player.setPitch(NavigationBounds.horizonPitch(c.player.getPitch()));return done(Map.of("x",c.player.getX(),"y",c.player.getY(),"z",c.player.getZ(),"arrived",true));}
      if(NavigationBounds.failed(arrived,navigation.failed()))return TaskRuntime.Step.failed("unreachable");break;
     case "follow":
-     if(!entity.isAlive())return TaskRuntime.Step.failed("target_lost");
+     if(!entity.isAlive()||entity.squaredDistanceTo(c.player)>4096)return TaskRuntime.Step.failed("target_lost");
      if(!c.player.canSee(entity)){if(++lostTicks>60)return TaskRuntime.Step.failed("target_lost");approach(lastSeen,20);break;}lostTicks=0;lastSeen=entity.getBlockPos();
-     if(entity.squaredDistanceTo(c.player)<9){stopSwimming();haltNavigation();return done(Map.of("entityId",entity.getId(),"distance",Math.sqrt(entity.squaredDistanceTo(c.player))));}
+     if(FollowDuration.complete(ticks,args.has("ticks")?args.get("ticks").getAsInt():null))return done(Map.of("entityId",entity.getId(),"distance",Math.sqrt(entity.squaredDistanceTo(c.player)),"elapsedGameTicks",ticks,"nearby",entity.squaredDistanceTo(c.player)<9));
+     if(entity.squaredDistanceTo(c.player)<9){stopSwimming();haltNavigation();break;}
      if(!swimToward(entity,entity.getEyePos()))approach(entity.getBlockPos(),20);break;
     case "mine":
      var mined=BlockReceipts.CURRENT.after(c.world,pos.getX(),pos.getY(),pos.getZ(),blockBoundary);
@@ -397,7 +398,7 @@ public final class GameSkills {
    return BlockSight.hit(c,target);
   }
   private boolean visible(BlockPos target){return sightHit(target)!=null;}
-  private boolean reachable(BlockPos target){return c.player.canInteractWithBlockAt(target,0)&&visible(target);}
+  private boolean reachable(BlockPos target){return c.player.canInteractWithBlockAt(target,0)&&(!(c.world.getBlockState(target).getBlock() instanceof net.minecraft.block.BedBlock)||InteractionReach.bedWithin(c.player.getX(),c.player.getY(),c.player.getZ(),target.getX(),target.getY(),target.getZ()))&&visible(target);}
   private Direction face(BlockPos target){var hit=sightHit(target);if(hit==null)throw new TaskRuntime.Rejected("target_not_visible");return hit.getSide();}
   private void look(Vec3d target){var delta=target.subtract(c.player.getEyePos());float yaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z)),pitch=(float)-Math.toDegrees(Math.atan2(delta.y,Math.sqrt(delta.x*delta.x+delta.z*delta.z)));c.player.setYaw(c.player.getYaw()+MathHelper.clamp(MathHelper.wrapDegrees(yaw-c.player.getYaw()),-18,18));c.player.setPitch(c.player.getPitch()+MathHelper.clamp(pitch-c.player.getPitch(),-14,14));}
   private void selectTool(){float best=1;int slot=c.player.getInventory().selectedSlot;for(int i=0;i<9;i++){var stack=c.player.getInventory().getStack(i);float speed=stack.getMiningSpeedMultiplier(c.world.getBlockState(pos));if(speed>best){best=speed;slot=i;}}c.player.getInventory().selectedSlot=slot;}
@@ -418,6 +419,6 @@ public final class GameSkills {
   public void stop(){haltNavigation();release();}
   private void release(){if(c.interactionManager!=null){c.interactionManager.cancelBlockBreaking();if(c.player!=null&&c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);}c.options.forwardKey.setPressed(false);c.options.backKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sneakKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.attackKey.setPressed(false);c.options.useKey.setPressed(false);}
   public Map<String,Object> progress(){return Map.of("skill",skill,"ticks",ticks,"phase",craftPhase);}
-  public boolean acceptsScreen(Object screen){return screen==ownedScreen||((skill.equals("interactBlock")||skill.equals("interactEntity"))&&phase>0&&screen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>);}
+  public boolean acceptsScreen(Object screen){return screen==ownedScreen||((skill.equals("interactBlock")||skill.equals("interactEntity"))&&InteractionScreens.accepts(phase>0,screen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>,screen instanceof net.minecraft.client.gui.screen.SleepingChatScreen,c.player!=null&&c.player.isSleeping()));}
  }
 }

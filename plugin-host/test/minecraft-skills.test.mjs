@@ -55,3 +55,7 @@ test('a bounded declarative build is cells, not scripts or repeated support-face
  for(const cells of [[],Array(33).fill(cell),[cell,cell],[cell,{...cell,x:18}]])assert.throws(()=>validateSkill('build',{cells}),/Invalid/);
  assert.throws(()=>validateSkill('build',{cells:[cell],script:'anything'}),/Invalid/);
 });
+test('continuous follow can specify a bounded duration while default follow needs no micro-polling',()=>{
+ validateSkill('follow',{entityId:4});validateSkill('follow',{entityId:4,ticks:120});
+ for(const ticks of [0,1801])assert.throws(()=>validateSkill('follow',{entityId:4,ticks}),/Invalid/);
+});

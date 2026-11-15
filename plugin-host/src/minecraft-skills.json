@@ -71,7 +71,7 @@
     }
   },
   "follow": {
-    "description": "Approach the visible entity to within three blocks.",
+    "description": "Continuously follow a visible living entity for ticks game ticks (default 1200, one minute). Keep within three blocks when possible; keep watching and pursuing if it moves again. Reports actual distance at the end, never claims arrival if still distant. interactEntity approaches its target automatically. Menus, manual takeover and stop still interrupt control.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -79,6 +79,11 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 2147483647
+        },
+        "ticks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1800
         }
       },
       "required": [
