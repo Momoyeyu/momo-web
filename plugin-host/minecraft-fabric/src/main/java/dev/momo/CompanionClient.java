@@ -392,6 +392,7 @@ public final class CompanionClient implements ClientModInitializer {
  private void tick(MinecraftClient client) {
   dev.momo.task.PickupLedger.CURRENT.changeWorld(client.world);
   dev.momo.task.BlockReceipts.CURRENT.changeWorld(client.world);
+  dev.momo.task.ShieldBlocks.CURRENT.changeWorld(client.world);
   dev.momo.task.InventoryReceipts.CURRENT.changeWorld(client.world);
   if(physicalTakeover){takeover(client);return;}
   if(taskWorldInstance!=null&&client.world!=taskWorldInstance){retireScene(client);return;}

@@ -41,6 +41,7 @@ public final class GameObservation {
   return recipes;
  }
  public static void append(MinecraftClient c,JsonObject result){
+  result.addProperty("shieldBlockCount",ShieldBlocks.CURRENT.count(c.world));
   var p=c.player;var handler=p.currentScreenHandler;
   result.addProperty("screenHandler",screenId(handler));result.addProperty("screenRevision",handler.getRevision());
   result.addProperty("perspective",c.options.getPerspective().name());result.addProperty("experience",p.experienceLevel);result.addProperty("onFire",p.isOnFire());result.addProperty("inWater",p.isTouchingWater());result.addProperty("air",p.getAir());result.addProperty("riding",p.hasVehicle());result.addProperty("sleeping",p.isSleeping());
