@@ -51,6 +51,27 @@ public final class TaskPlanSmoke {
    TaskPlan noSkip=new TaskPlan(List.of(new TaskPlan.Node(unconfirmed,()->true,0,true),new TaskPlan.Node(next,()->true,0,false)));
    noSkip.start();check(noSkip.tick().state().equals("failed")&&next.starts==0,"missing final server ACK cannot advance a plan");
   }
+  Work rejected=new Work(){public TaskRuntime.Step tick(){throw new TaskRuntime.Rejected("target_not_visible");}};
+  TaskPlan rejectedRetry=new TaskPlan(List.of(new TaskPlan.Node(rejected,()->true,1,false)));
+  rejectedRetry.start();check(rejectedRetry.tick().state().equals("running")&&rejected.starts==2,"a typed rejection during tick follows the same bounded retry policy as a returned failure");
+  check(rejectedRetry.tick().reason().equals("step_0:target_not_visible")&&rejected.stops==2,"retry exhaustion preserves the typed reason and releases once per attempt");
+  Work absent=new Work(){public TaskRuntime.Step tick(){throw new TaskRuntime.Rejected("target_not_visible");}};Work fallback=new Work();
+  TaskPlan alternative=new TaskPlan(List.of(new TaskPlan.Node(absent,()->true,0,true),new TaskPlan.Node(fallback,()->true,0,false)));
+  alternative.start();check(alternative.tick().state().equals("running")&&fallback.starts==1&&absent.stops==1,"a declared skip handles a known typed tick rejection locally");
+  check(alternative.tick().state().equals("succeeded"),"the fallback still needs its own real result");
+  for(boolean typed:List.of(false,true)){
+   Work uncertainThrow=new Work(){public TaskRuntime.Step tick(){if(typed)throw new TaskRuntime.Rejected("server_confirmation_missing");throw new IllegalStateException("response disappeared");}public Map<String,Object> partialEvidence(){return Map.of("countAfter",5);}};Work later=new Work();
+   TaskPlan uncertainPlan=new TaskPlan(List.of(new TaskPlan.Node(uncertainThrow,()->true,2,true),new TaskPlan.Node(later,()->true,0,false)));
+   TaskRuntime uncertainRuntime=new TaskRuntime();uncertainRuntime.submit("uncertain","plan",uncertainPlan,0,1000);uncertainRuntime.tick(1);
+   var result=uncertainRuntime.snapshot("uncertain");
+   check(result.state().equals("failed")&&result.reason().equals("step_0:"+(typed?"server_confirmation_missing":"execution_failed")),"uncertain tick failure stays unknown and retains its reason");
+   check(uncertainThrow.starts==1&&uncertainThrow.stops==1&&later.starts==0,"uncertain side effects cannot be retried or skipped even if the child advertises retry safety");
+   check(((List<?>)result.evidence().get("steps")).size()==1,"typed and unexpected exceptions retain actual partial state");
+  }
+  Work brokenStart=new Work(){public void start(){super.start();throw new IllegalStateException("unknown start outcome");}public Map<String,Object> partialEvidence(){return Map.of("countAfter",5);}};Work afterStart=new Work();
+  TaskPlan startUnknown=new TaskPlan(List.of(new TaskPlan.Node(brokenStart,()->true,2,true),new TaskPlan.Node(afterStart,()->true,0,false)));
+  startUnknown.start();
+  check(startUnknown.tick().reason().equals("step_0:start_failed")&&brokenStart.starts==1&&afterStart.starts==0,"an unexpected exception during dispatch has the same no-replay/no-skip rule as tick");
   System.out.println("PASS bounded local plans, result verification, conditions and retry ownership");
  }
 }

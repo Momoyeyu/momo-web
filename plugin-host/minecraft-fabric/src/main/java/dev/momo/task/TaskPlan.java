@@ -20,7 +20,15 @@ public final class TaskPlan implements TaskRuntime.Work {
  public TaskRuntime.Step tick(){
   if(failure!=null)return failure;
   if(finished)return TaskRuntime.Step.done(Map.of("steps",List.copyOf(outcomes)));
-  var result=steps.get(index).work.tick();
+  TaskRuntime.Step result;
+  try{
+   result=steps.get(index).work.tick();
+   if(result==null)throw new IllegalStateException("Missing child outcome");
+  }catch(RuntimeException error){
+   // Normalize only the child call. Release failures must reach TaskRuntime's
+   // stop barrier, never be mistaken for permission to replay the child.
+   result=TaskRuntime.Step.failed(TaskRuntime.reason(error,"execution_failed"));
+  }
   if(result.state().equals("succeeded")){
    if(result.evidence().isEmpty()){failed("unverified_result");}
    else {release();outcomes.add(Map.of("step",index,"result",result.evidence()));index++;attempt=0;begin();}
@@ -29,7 +37,7 @@ public final class TaskPlan implements TaskRuntime.Work {
  }
  private void failed(String reason){
   var node=steps.get(index);var partial=node.work.partialEvidence();boolean safe=node.work.retrySafe(reason);
-  boolean unknown=Set.of("server_confirmation_missing","execution_failed","stop_unconfirmed","ingredients_station_or_server_ack_missing","trade_stock_or_currency_missing").contains(reason);
+  boolean unknown=Set.of("server_confirmation_missing","start_failed","execution_failed","stop_unconfirmed","ingredients_station_or_server_ack_missing","trade_stock_or_currency_missing").contains(reason);
   release();
   if(!unknown&&safe&&attempt++<node.retries){begin();return;}
   if(!partial.isEmpty())outcomes.add(Map.of("step",index,"partial",true,"result",partial));
