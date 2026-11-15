@@ -477,6 +477,8 @@ public final class CompanionClient implements ClientModInitializer {
       !client.player.getUuidAsString().equals(boundAccount)||!worldScope(client).equals(boundWorld)) {release(client);return;}
    if(pauseBarrier.isPaused()||!client.isWindowFocused()||client.currentScreen!=null){releaseLegacy(client);return;}
    if(controlLease.primitiveExpired(localNow)){releaseLegacy(client);return;}
+   var danger=chooseReflex(attacking,using&&client.player.isUsingItem());
+   if(danger==SurvivalPolicy.Mode.ESCAPE){releaseLegacy(client);survival.drive(danger);return;}
    var input=(GameplayInputAccess)client;
    drivingInput=true;
    try {

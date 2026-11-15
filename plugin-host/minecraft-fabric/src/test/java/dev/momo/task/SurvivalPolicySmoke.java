@@ -5,6 +5,7 @@ public final class SurvivalPolicySmoke {
   FoodChoiceSmoke.main(args);
   CombatWithdrawalSmoke.main(args);
   ThreatPolicySmoke.main(args);
+  BlastAvoidanceSmoke.main(args);
   ProjectileAimSmoke.main(args);
   SurvivalPolicy p=new SurvivalPolicy();
   check(p.airCritical(99,false),"air escape starts before the last breath");
