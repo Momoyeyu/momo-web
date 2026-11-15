@@ -139,6 +139,13 @@ def compress_once(request=None, tools=None, *, hard=False) -> bool:
     gen_n = snapshot['generation']
     old_summary = str(snapshot['summary'] or '').strip()
     policy = Policy(llm_cfg, checkpoint.audience(), tools)
+    if hard:
+        # If shortening the old summary alone can fit the request, preserve all
+        # recent exchanges. Folding more history first may produce a larger
+        # summary and repeatedly miss the new visual activity's capacity.
+        shortened = _recompress_summary(llm_cfg, request, tools, snapshot, policy)
+        if shortened is not None:
+            return shortened
     header = _summary_messages(state, [], request, snapshot)
     header = [m for m in header if not str(m.get('content','')).startswith(turn.SUMMARY_PREFIX)]
     # The previous summary is replaced by the candidate, not retained beside it.
@@ -149,10 +156,7 @@ def compress_once(request=None, tools=None, *, hard=False) -> bool:
     selected = policy.select(history, Budget.from_config(llm_cfg), overhead, hard=hard, previous_summary_size=len(old_summary.encode('utf-8')))
     fold_n = choose_latest(history, selected) if selected is not None else 0
     if fold_n < 2:
-        # A newly attached visual activity can enlarge fixed context after the
-        # last publication. Keeping two recent exchanges must not make the old
-        # summary permanently impossible to shorten.
-        return _recompress_summary(llm_cfg, request, tools, snapshot, policy) if hard else False
+        return False
     seg = history[:fold_n]
     messages = _summary_messages(state, seg, request, snapshot)
     messages.append({'role': 'user', 'content': _PROMPT})
@@ -182,16 +186,16 @@ def _recompress_summary(llm_cfg, request, tools, snapshot, policy):
     from . import turn, checkpoint
     old = str(snapshot['summary'] or '').strip()
     if not request or not old:
-        return False
+        return None
     budget = Budget.from_config(llm_cfg)
     if estimate(request, tools) <= budget.safe:
-        return False
+        return None
     fixed = [m for m in request if not (m.get('role') == 'system'
              and isinstance(m.get('content'), str) and m['content'].startswith(turn.SUMMARY_PREFIX))]
     target = min(int(len(old.encode()) * .6), budget.safe - estimate(fixed, tools)
                  - len(turn.SUMMARY_PREFIX.encode()) - 128)
     if target < 256:
-        return False  # The immutable context itself needs attention; do not drop facts.
+        return None  # More than the old summary must be folded; retain the normal path.
     # Only the previous summary is a source here. Current pixels, goal receipts,
     # retained messages and avatar instructions are neither folded nor executed.
     # Models follow character guidance more reliably than UTF-8 byte counts.
@@ -200,7 +204,7 @@ def _recompress_summary(llm_cfg, request, tools, snapshot, policy):
     messages = [{'role':'system','content':_PROMPT + f' Rewrite only the previous summary below in at most {target // 4} characters ({target} UTF-8 bytes maximum).'},
                 {'role':'user','content':old}]
     if estimate(messages, []) > budget.safe:
-        return False
+        return None
     policy.start(uuid.uuid4().hex)
     started, usage, published = monotonic(), {}, False
     try:

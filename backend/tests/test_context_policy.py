@@ -250,7 +250,8 @@ def test_hard_capture_budget_replaces_old_summary_instead_of_counting_both(monke
 
 
 @pytest.mark.parametrize('recent_count',[1,8])
-def test_hard_capture_can_shorten_an_old_summary_without_folding_recent_messages(monkeypatch,recent_count):
+@pytest.mark.parametrize('header_bytes',[3500,6500])
+def test_hard_capture_can_shorten_an_old_summary_without_folding_recent_messages(monkeypatch,recent_count,header_bytes):
     from app.core import state, db, llm
     from app.services import compress, turn, checkpoint
     from conftest import add_turn
@@ -262,7 +263,7 @@ def test_hard_capture_can_shorten_an_old_summary_without_folding_recent_messages
     with db.tx() as c:c.execute('UPDATE sessions SET summary=?,summary_cursor=-1 WHERE id=?',(old,db.LIVE_ID))
     before=checkpoint.summary_state();original=checkpoint.live_messages()
     monkeypatch.setattr(compress,'load_state',lambda:cfg)
-    monkeypatch.setattr(turn,'build_system_prompt',lambda *a,**k:'H'*6500)
+    monkeypatch.setattr(turn,'build_system_prompt',lambda *a,**k:'H'*header_bytes)
     messages=turn.build_messages(cfg,'Continue the authorized game.')
     reservation=[{'role':'user','content':[{'type':'image_url','image_url':{'url':'momo-observation:pending'},'vision_tokens':1024}]}]
     assert estimate([*messages,*reservation])>Budget.from_config(cfg['settings']['llm']).safe
