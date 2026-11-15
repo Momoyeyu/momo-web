@@ -1,9 +1,10 @@
-import {validateSkill} from './minecraft-skills.mjs';
+import {validateSkill,SkillInputError} from './minecraft-skills.mjs';
 let bridgeEpoch = Date.now();
 const problem=(message,code='MINECRAFT_INPUT')=>Object.assign(new Error(message),{code});
 const publicCodes=new Set(['MINECRAFT_INPUT','MINECRAFT_STALE','MINECRAFT_REVOKED','MINECRAFT_UNKNOWN','MINECRAFT_BUSY']);
 // Preserve known pre-dispatch rejection without exposing arbitrary transport diagnostics.
 export const minecraftErrorCode=error=>publicCodes.has(error?.code)?error.code:'MINECRAFT_UNKNOWN';
+export const minecraftErrorValidation=error=>error instanceof SkillInputError&&error.code==='MINECRAFT_INPUT'?error.validation:undefined;
 /** Bounded Fabric transport adapter. No inference, login, downloads, or code execution. */
 export function createMinecraftAdapter({ transport, authorize, now = Date.now } = {}) {
   let epoch = ++bridgeEpoch;
@@ -114,7 +115,7 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
       if (!capabilities || capabilities.world !== permission?.world || capabilities.account !== permission?.account || !capabilities.skills.includes(skill))
         return Promise.reject(problem('Unsupported Minecraft skill; query capabilities first'));
       if (!validId(taskId)) return Promise.reject(problem('Invalid Minecraft task'));
-      try {validateSkill(skill,args);} catch(error) {return Promise.reject(problem(error.message));}
+      try {validateSkill(skill,args);} catch(error) {if(error instanceof SkillInputError){error.code='MINECRAFT_INPUT';return Promise.reject(error);}return Promise.reject(problem('Invalid skill arguments'));}
       return execute('submit', {taskId, skill, args, ...(skill === 'navigate' ? args : {})}, permission);
     },
     task(taskId, permission) {

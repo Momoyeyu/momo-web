@@ -351,7 +351,10 @@ def execute(name,args):
                 'MINECRAFT_INPUT':'Arguments were rejected before dispatch; nothing ran. submit requires action="submit", taskId, skill, args. For a plan use skill="plan", args={"steps":[{"skill":"wait","args":{"ticks":20}}]}. Query capabilities with skill for its exact schema.',
                 'MINECRAFT_STALE':'Read a fresh game observation before another action; do not infer completion from this rejection.',
             }
-            if code in recovery:return json.dumps({'ok':False,'code':code,'error':recovery[code]})
+            if code in recovery:
+                result={'ok':False,'code':code,'error':recovery[code]}
+                if code=='MINECRAFT_INPUT' and isinstance(error,HostError) and error.validation is not None:result['validation']=error.validation
+                return json.dumps(result)
         if name in {'computer_observe','screen_observe'}:
             with _lock:_pending.pop(current_run.get(),None)
         diagnostic = {}

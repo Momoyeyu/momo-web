@@ -22,7 +22,7 @@ function child(t) {
   const req = (method, params = {}) => new Promise((resolve, reject) => {
     const id = randomUUID();
     const timeout = setTimeout(() => { pending.delete(id); reject(new Error(`Timeout: ${method}`)); }, 7000);
-    pending.set(id, message => { clearTimeout(timeout); message.ok ? resolve(message.result) : reject(Object.assign(new Error(message.error.message), { code: message.error.code })); });
+    pending.set(id, message => { clearTimeout(timeout); message.ok ? resolve(message.result) : reject(Object.assign(new Error(message.error.message), { code: message.error.code, validation: message.error.validation })); });
     processHandle.stdin.write(`${JSON.stringify({ v: 1, id, token, method, params })}\n`);
   });
   return { processHandle, messages, req, token, stderr: () => stderr };
@@ -97,4 +97,20 @@ test('concurrent Minecraft dispatch preserves no-effect busy rejection over stdi
   const first=req('minecraft.submit',task);await dispatched;
   await assert.rejects(req('minecraft.submit',{...task,taskId:'two'}),error=>error.code==='MINECRAFT_BUSY');
   release();await first;await req('shutdown');
+});
+
+test('Minecraft schema detail survives the real pipe before any task dispatch',async t=>{
+ const commands=[];
+ const server=createServer(async(request,response)=>{
+  let body='';for await(const part of request)body+=part;const command=JSON.parse(body);commands.push(command.type);
+  response.end(JSON.stringify({...command,taskProtocol:1,skills:['selectItem','plan'],stopped:true,heldControls:0}));
+ });
+ server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>server.close());
+ const {req,token}=child(t);await req('hello',{coreInstance:'schema-detail',token});await req('heartbeat',{activityEpoch:1});
+ await req('minecraft.configure',{port:server.address().port,token:'fixture-token-'.repeat(3)});
+ const permission={world:'w',account:'a',activityEpoch:1};await req('minecraft.capabilities',{permission});
+ await assert.rejects(req('minecraft.submit',{permission,taskId:'invalid-slot',skill:'selectItem',args:{item:'minecraft:stone',hotbar:36}}),error=>{
+  assert.equal(error.code,'MINECRAFT_INPUT');assert.deepEqual(error.validation,{path:'args.hotbar',rule:'integer',minimum:0,maximum:8});return true;
+ });
+ assert.equal(commands.includes('submit'),false);await req('shutdown');
 });

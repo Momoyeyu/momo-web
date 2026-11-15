@@ -1,29 +1,34 @@
 import skills from './minecraft-skills.json' with { type: 'json' };
 export {skills};
-function validate(schema,value){
- if(schema.type==='object'){
-  if(!value||Object.getPrototypeOf(value)!==Object.prototype)throw new Error('Invalid skill object');
-  if(schema.additionalProperties===false&&Object.keys(value).some(k=>!Object.hasOwn(schema.properties,k)))throw new Error('Invalid skill field');
-  if(schema.required?.some(k=>!Object.hasOwn(value,k)))throw new Error('Invalid missing skill field');
-  for(const [key,item] of Object.entries(value))if(schema.properties?.[key])validate(schema.properties[key],item);
- }else if(schema.type==='array'){
-  if(!Array.isArray(value)||value.length<schema.minItems||value.length>schema.maxItems)throw new Error('Invalid skill array');
-  value.forEach(item=>validate(schema.items,item));
- }else if(schema.type==='integer'){
-  if(!Number.isSafeInteger(value)||value<schema.minimum||value>schema.maximum)throw new Error('Invalid skill number');
- }else if(schema.type==='string'){
-  if(typeof value!=='string'||value.length<schema.minLength||value.length>schema.maxLength||/[\x00-\x1f]/u.test(value)||schema.enum&&!schema.enum.includes(value))throw new Error('Invalid skill string');
- }else throw new Error('Unsupported skill schema');
- if(schema.anyOf&&!schema.anyOf.some(branch=>{try{validate(branch,value);return true;}catch{return false;}}))throw new Error('Invalid conditional skill fields');
+export class SkillInputError extends Error {
+ constructor(path,rule,limits={}){super(rule==='supported_skill'?'Unsupported Minecraft skill':'Invalid skill arguments');this.validation={path,rule,...limits};}
 }
-export function validateSkill(name,args){
- if(!Object.hasOwn(skills,name))throw new Error('Unsupported Minecraft skill');
- validate(skills[name].parameters,args);
+const invalid=(path,rule,limits)=>{throw new SkillInputError(path,rule,limits);};
+function validate(schema,value,path){
+ if(schema.type==='object'){
+  if(!value||Object.getPrototypeOf(value)!==Object.prototype)invalid(path,'object');
+  if(schema.additionalProperties===false&&Object.keys(value).some(k=>!Object.hasOwn(schema.properties,k)))invalid(path,'unknown_field');
+  const missing=schema.required?.find(k=>!Object.hasOwn(value,k));if(missing)invalid(`${path}.${missing}`,'required');
+  for(const [key,item] of Object.entries(value))if(schema.properties?.[key])validate(schema.properties[key],item,`${path}.${key}`);
+ }else if(schema.type==='array'){
+  if(!Array.isArray(value)||value.length<schema.minItems||value.length>schema.maxItems)invalid(path,'array',{minimum:schema.minItems,maximum:schema.maxItems});
+  value.forEach((item,index)=>validate(schema.items,item,`${path}[${index}]`));
+ }else if(schema.type==='integer'){
+  if(!Number.isSafeInteger(value)||value<schema.minimum||value>schema.maximum)invalid(path,'integer',{minimum:schema.minimum,maximum:schema.maximum});
+ }else if(schema.type==='string'){
+  if(typeof value!=='string'||value.length<schema.minLength||value.length>schema.maxLength||/[\x00-\x1f]/u.test(value))invalid(path,'string',{minimum:schema.minLength,maximum:schema.maxLength});
+  if(schema.enum&&!schema.enum.includes(value))invalid(path,'enum',{choices:schema.enum});
+ }else invalid(path,'schema');
+ if(schema.anyOf&&!schema.anyOf.some(branch=>{try{validate(branch,value,path);return true;}catch{return false;}}))invalid(path,'conditional_fields');
+}
+export function validateSkill(name,args,path='args'){
+ if(!Object.hasOwn(skills,name))invalid('skill','supported_skill');
+ validate(skills[name].parameters,args,path);
  if(name==='build'){
-  if(new Set(args.cells.map(c=>`${c.x},${c.y},${c.z}`)).size!==args.cells.length)throw new Error('Invalid duplicate build cell');
-  for(const axis of ['x','y','z'])if(Math.max(...args.cells.map(c=>c[axis]))-Math.min(...args.cells.map(c=>c[axis]))>=16)throw new Error('Invalid build extent');
+  if(new Set(args.cells.map(c=>`${c.x},${c.y},${c.z}`)).size!==args.cells.length)invalid(`${path}.cells`,'duplicate_cell');
+  for(const axis of ['x','y','z'])if(Math.max(...args.cells.map(c=>c[axis]))-Math.min(...args.cells.map(c=>c[axis]))>=16)invalid(`${path}.cells`,'build_extent',{maximum:16});
  }
- if(name==='plan')for(const step of args.steps)validateSkill(step.skill,step.args);
- if(Buffer.byteLength(JSON.stringify(args),'utf8')>3500)throw new Error('Invalid skill size');
+ if(name==='plan')for(const [index,step] of args.steps.entries())validateSkill(step.skill,step.args,`${path}.steps[${index}].args`);
+ if(Buffer.byteLength(JSON.stringify(args),'utf8')>3500)invalid(path,'bytes',{maximum:3500});
  return args;
 }

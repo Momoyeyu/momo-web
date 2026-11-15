@@ -5,6 +5,7 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import os
+import re
 from pathlib import Path
 import secrets
 import stat
@@ -14,8 +15,28 @@ import threading
 import uuid
 
 
+def _minecraft_validation(value):
+    if not isinstance(value, dict) or not {'path','rule'} <= value.keys() or set(value)-{'path','rule','minimum','maximum','choices'}:
+        return None
+    path, rule = value.get('path'), value.get('rule')
+    if not isinstance(path,str) or len(path)>160 or not re.fullmatch(r'(?:args|skill)(?:\.[A-Za-z][A-Za-z0-9_]{0,40}|\[\d{1,3}\])*',path):
+        return None
+    if not isinstance(rule,str) or rule not in {'object','unknown_field','required','array','integer','string','enum','schema','conditional_fields','supported_skill','duplicate_cell','build_extent','bytes'}:
+        return None
+    for key in ('minimum','maximum'):
+        if key in value and (type(value[key]) is not int or not -2147483647 <= value[key] <= 2147483647):
+            return None
+    if 'minimum' in value and 'maximum' in value and value['minimum']>value['maximum']:
+        return None
+    if 'choices' in value and (not isinstance(value['choices'],list) or not 1<=len(value['choices'])<=32 or any(not isinstance(x,str) or len(x)>80 or any(ord(c)<32 or ord(c)>126 for c in x) for x in value['choices'])):
+        return None
+    return dict(value)
+
+
 class HostError(RuntimeError):
-    pass
+    def __init__(self, message, *, validation=None):
+        super().__init__(message)
+        self.validation = _minecraft_validation(validation) if message=='MINECRAFT_INPUT' else None
 
 
 def managed_qq_runtime_config():
@@ -181,7 +202,8 @@ class PluginHost:
                     else:
                         future.set_exception(
                             HostError(
-                                str(packet.get("error", {}).get("code", "host_error"))
+                                str(packet.get("error", {}).get("code", "host_error")),
+                                validation=packet.get("error", {}).get("validation"),
                             )
                         )
         except Exception:

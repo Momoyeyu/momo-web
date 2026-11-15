@@ -59,3 +59,18 @@ test('continuous follow can specify a bounded duration while default follow need
  validateSkill('follow',{entityId:4});validateSkill('follow',{entityId:4,ticks:120});
  for(const ticks of [0,1801])assert.throws(()=>validateSkill('follow',{entityId:4,ticks}),/Invalid/);
 });
+test('invalid skill inputs identify a bounded field and expected contract without echoing values',()=>{
+ assert.throws(()=>validateSkill('selectItem',{item:'minecraft:stone',hotbar:36}),error=>{
+  assert.deepEqual(error.validation,{path:'args.hotbar',rule:'integer',minimum:0,maximum:8});return true;
+ });
+ assert.throws(()=>validateSkill('plan',{steps:Array(25).fill({skill:'eat',args:{}})}),error=>{
+  assert.deepEqual(error.validation,{path:'args.steps',rule:'array',minimum:1,maximum:24});return true;
+ });
+ assert.throws(()=>validateSkill('plan',{steps:[{skill:'selectItem',args:{item:'minecraft:stone',hotbar:36}}]}),error=>{
+  assert.equal(error.validation.path,'args.steps[0].args.hotbar');return true;
+ });
+ const secret='PRIVATE-INPUT-token';
+ assert.throws(()=>validateSkill('selectItem',{item:'minecraft:stone',hotbar:secret}),error=>{
+  assert.equal(JSON.stringify(error.validation).includes(secret),false);return true;
+ });
+});
