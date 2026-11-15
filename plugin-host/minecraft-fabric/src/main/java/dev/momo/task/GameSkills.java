@@ -22,11 +22,11 @@ public final class GameSkills {
  private GameSkills(){}
  static TaskRuntime.Work consumeFood(){return new Skill("eat",new JsonObject());}
  static TaskRuntime.Work rawMine(JsonObject args,boolean protectedSupport){var work=new Skill("mine",args.deepCopy());work.protectSupport=protectedSupport;return work;}
- static TaskRuntime.Work gatherMine(JsonObject args){SkillArguments.validate("mine",args);return new PreparedMineSkill(args,true);}
+ static TaskRuntime.Work gatherMine(JsonObject args){SkillArguments.validate("mine",args);return PreparedMineSkill.create(args,true);}
  public static TaskRuntime.Work create(String skill,JsonObject args){
   SkillArguments.validate(skill,args);
   if(skill.equals("gather"))return new GatherSkill(args);
-  if(skill.equals("mine"))return new PreparedMineSkill(args,false);
+  if(skill.equals("mine"))return PreparedMineSkill.create(args,false);
   if(skill.equals("eat"))return new EatSkill();
   if(skill.equals("selectItem"))return new SelectItemSkill(args);
   if(skill.equals("placeNearby"))return new NearbyPlacementSkill(args);
@@ -84,7 +84,6 @@ public final class GameSkills {
     if(entity==null||!c.player.canSee(entity)||entity.squaredDistanceTo(c.player)>1024)throw new TaskRuntime.Rejected("target_not_visible");lastSeen=entity.getBlockPos();
    }
    if(skill.equals("navigate"))go(pos);
-   if(skill.equals("mine")&&!c.world.getBlockState(pos).isAir())selectTool();
    if(skill.equals("place")){
     targetSlot=args.get("slot").getAsInt();c.player.getInventory().selectedSlot=targetSlot;var stack=c.player.getMainHandStack();
     if(!(stack.getItem() instanceof BlockItem))throw new TaskRuntime.Rejected("block_item_required");
@@ -176,6 +175,7 @@ public final class GameSkills {
      if(!reachable(pos)){approach(pos,20);break;}haltNavigation();
      if(protectSupport&&belowFeet(pos))return TaskRuntime.Step.failed("unreachable");
      look(pos.toCenterPos());
+     if(!PreparedMineSkill.heldSuitable(c,pos))throw new TaskRuntime.Rejected("tool_required");
      c.interactionManager.updateBlockBreakingProgress(pos,face(pos));c.player.swingHand(Hand.MAIN_HAND);break;
     case "place":
      var built=BlockReceipts.CURRENT.after(c.world,placed.getX(),placed.getY(),placed.getZ(),blockBoundary);
@@ -407,7 +407,6 @@ public final class GameSkills {
   private boolean reachable(BlockPos target){return c.player.canInteractWithBlockAt(target,0)&&(!(c.world.getBlockState(target).getBlock() instanceof net.minecraft.block.BedBlock)||InteractionReach.bedWithin(c.player.getX(),c.player.getY(),c.player.getZ(),target.getX(),target.getY(),target.getZ()))&&visible(target);}
   private Direction face(BlockPos target){var hit=sightHit(target);if(hit==null)throw new TaskRuntime.Rejected("target_not_visible");return hit.getSide();}
   private void look(Vec3d target){var delta=target.subtract(c.player.getEyePos());float yaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z)),pitch=(float)-Math.toDegrees(Math.atan2(delta.y,Math.sqrt(delta.x*delta.x+delta.z*delta.z)));c.player.setYaw(c.player.getYaw()+MathHelper.clamp(MathHelper.wrapDegrees(yaw-c.player.getYaw()),-18,18));c.player.setPitch(c.player.getPitch()+MathHelper.clamp(pitch-c.player.getPitch(),-14,14));}
-  private void selectTool(){float best=1;int slot=c.player.getInventory().selectedSlot;for(int i=0;i<9;i++){var stack=c.player.getInventory().getStack(i);float speed=stack.getMiningSpeedMultiplier(c.world.getBlockState(pos));if(speed>best){best=speed;slot=i;}}c.player.getInventory().selectedSlot=slot;}
   private int foodSlot(){return FoodInventory.find(c,9);}
   private int count(String item){int n=0;for(int i=0;i<c.player.getInventory().size();i++){var stack=c.player.getInventory().getStack(i);if(Registries.ITEM.getId(stack.getItem()).toString().equals(item))n+=stack.getCount();}return n;}
   private String inventoryState(){StringBuilder value=new StringBuilder();for(var slot:c.player.currentScreenHandler.slots){var stack=slot.getStack();if(!stack.isEmpty())value.append(slot.id).append(':').append(Registries.ITEM.getId(stack.getItem())).append('*').append(stack.getCount()).append('@').append(stack.getComponents().hashCode()).append(';');}return value.append("cursor:").append(c.player.currentScreenHandler.getCursorStack()).toString();}
