@@ -222,6 +222,7 @@ public final class CompanionClient implements ClientModInitializer {
     taskWorld=world;taskAccount=account;taskWorldInstance=client.world;
     capture.accept(net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer()));
     GameObservation.append(client,result);
+    result.add("survival",new Gson().toJsonTree(survival.progress()));result.addProperty("gameTick",client.world.getTime());
     result.addProperty("observedAt", System.currentTimeMillis());
     result.addProperty("x",client.player.getX()); result.addProperty("y",client.player.getY()); result.addProperty("z",client.player.getZ());
     result.addProperty("yaw",client.player.getYaw()); result.addProperty("pitch",client.player.getPitch());
@@ -381,6 +382,11 @@ public final class CompanionClient implements ClientModInitializer {
   mining=key.equals("mine")||key.equals("attack");attacking=key.equals("attack");using=key.equals("use")||key.equals("eat");useTicks=0;
   playing=true; boundWorld=world; boundAccount=account;deadline=System.nanoTime()+TimeUnit.MILLISECONDS.toNanos(duration);
  }
+ private SurvivalPolicy.Mode chooseReflex(boolean combatOwned,boolean mealOwned){
+  var desired=survival.choose(combatOwned,mealOwned);
+  if(!survival.replanReason().isEmpty()){tasks.interrupt(survival.replanReason());survival.stop();return SurvivalPolicy.Mode.NONE;}
+  return desired;
+ }
  private void tick(MinecraftClient client) {
   dev.momo.task.PickupLedger.CURRENT.changeWorld(client.world);
   dev.momo.task.BlockReceipts.CURRENT.changeWorld(client.world);
@@ -395,7 +401,7 @@ public final class CompanionClient implements ClientModInitializer {
   if(focusResumeDeadline!=0){if(localNow>=focusResumeDeadline)focusResumeDeadline=0;else if(client.isWindowFocused()){focusResumeDeadline=0;if(client.currentScreen instanceof net.minecraft.client.gui.screen.GameMenuScreen)client.setScreen(null);}}
   if(guardAuthorized&&!tasks.active()){
    if(localNow>=gameLeaseUntil||client.player==null||client.world!=taskWorldInstance||!client.player.isAlive()||!client.player.getUuidAsString().equals(taskAccount)){tasks.notice("scene_or_life_changed");release(client);return;}
-   if(survival.canDrive(pauseBarrier.isPaused(),client.isWindowFocused(),client.currentScreen)){var reflex=survival.choose();if(reflex!=SurvivalPolicy.Mode.NONE){survival.drive(reflex);return;}}
+   if(survival.canDrive(pauseBarrier.isPaused(),client.isWindowFocused(),client.currentScreen)){var reflex=chooseReflex(false,false);if(reflex!=SurvivalPolicy.Mode.NONE){survival.drive(reflex);return;}}
    survival.stop();
    // Idle survival remains bounded by the renewable body lease.
    return;
@@ -405,13 +411,13 @@ public final class CompanionClient implements ClientModInitializer {
    if(client.player==null||(!client.player.isAlive()&&!tasks.snapshots().stream().anyMatch(t->t.skill().equals("respawn")&&(t.state().equals("running")||t.state().equals("queued"))))||(taskWorldInstance!=client.world||!taskWorld.equals(currentWorld))||!taskAccount.equals(client.player.getUuidAsString())){tasks.stop("identity_or_life_changed");release(client);return;}
    if(suspended(client)){survival.stop();tasks.pause();tasks.tick(System.nanoTime()/1000000);return;}
    if(!pauseBarrier.isPaused()&&survival.acceptsScreen(client.currentScreen)){
-    var reflex=survival.choose(tasks.handlesCombat(),tasks.handlesEating());
+    var reflex=chooseReflex(tasks.handlesCombat(),tasks.handlesEating());
     tasks.pause();tasks.tick(localNow);
     if(tasks.active())survival.drive(reflex);else survival.stop();
     return;
    }
    if(!pauseBarrier.isPaused()&&client.currentScreen instanceof net.minecraft.client.gui.screen.ingame.HandledScreen<?>){
-    var reflex=survival.choose(tasks.handlesCombat(),tasks.handlesEating());
+    var reflex=chooseReflex(tasks.handlesCombat(),tasks.handlesEating());
     if(survival.interruptOwnedScreen(reflex,tasks.acceptsScreen(client.currentScreen))){
      tasks.stop("danger_interrupted_station");
      if(!tasks.stopConfirmed()){survival.stop();return;}
@@ -419,7 +425,7 @@ public final class CompanionClient implements ClientModInitializer {
     }
    }
    if(!pauseBarrier.isPaused()&&client.currentScreen==null){
-    var reflex=survival.choose(tasks.handlesCombat(),tasks.handlesEating());
+    var reflex=chooseReflex(tasks.handlesCombat(),tasks.handlesEating());
     if(reflex!=SurvivalPolicy.Mode.NONE){tasks.pause();tasks.tick(System.nanoTime()/1000000);if(tasks.active())survival.drive(reflex);else survival.stop();return;}
    }
    survival.stop();

@@ -13,6 +13,13 @@ public final class TaskRuntimeSmoke {
  }
  static void check(boolean ok,String why){if(!ok)throw new AssertionError(why);}
  public static void main(String[] args){
+  TaskRuntime danger=new TaskRuntime();Work unsafe=new Work(),later=new Work();
+  danger.submit("unsafe","navigate",unsafe,0,10000);danger.submit("later","mine",later,0,10000);danger.tick(1);danger.pause();
+  danger.interrupt("retreated_low_health");danger.resume();danger.tick(2);
+  check(danger.snapshot("unsafe").state().equals("failed")&&danger.snapshot("unsafe").reason().equals("retreated_low_health"),"a survival retreat must be reported as a blocked task rather than silently resume it");
+  check(unsafe.stops==1&&later.starts==0&&danger.snapshot("later").state().equals("cancelled"),"dependent old steps cannot restart after physical safety is recovered");
+  Work revised=new Work();danger.submit("revised","navigate",revised,3,10000);danger.tick(4);
+  check(revised.starts==1,"the same authorized coordinator can submit a revised goal after the interruption");
   TaskRuntime mealRuntime=new TaskRuntime();
   Work meal=new Work(){public boolean handlesEating(){return true;}};
   mealRuntime.submit("meal","eat",meal,0,10000);

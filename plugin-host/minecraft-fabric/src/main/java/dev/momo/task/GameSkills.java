@@ -305,22 +305,36 @@ public final class GameSkills {
    var item=c.player.getMainHandStack().getItem();
    boolean ranged=item instanceof BowItem||item instanceof CrossbowItem||item instanceof TridentItem;
    c.options.useKey.setPressed(false);
+   boolean readyStrike=!ranged&&c.player.canInteractWithEntity(entity,0)&&c.player.getAttackCooldownProgress(0)>=.95;
+   boolean windingUp=entity instanceof LivingEntity living&&(living.isUsingItem()||living.handSwinging||distance<8);
+   boolean incoming=!ranged&&c.world.getEntitiesByClass(net.minecraft.entity.projectile.ProjectileEntity.class,c.player.getBoundingBox().expand(18),projectile->projectile.getOwner()!=c.player&&projectile.getVelocity().lengthSquared()>.01&&projectile.getVelocity().dotProduct(c.player.getEyePos().subtract(projectile.getPos()))>0&&c.player.canSee(projectile)).stream().anyMatch(projectile->{
+    var relative=projectile.getPos().subtract(c.player.getPos().add(0,.9,0));var velocity=projectile.getVelocity();double time=-relative.dotProduct(velocity)/velocity.lengthSquared();return time>0&&time<12&&relative.add(velocity.multiply(time)).lengthSquared()<4;
+   });
+   shield(ProjectileAim.block(c.player.getOffHandStack().isOf(Items.SHIELD)&&!ranged,windingUp,incoming,readyStrike));
    if(distance>(ranged?225:8)){if(!swimToward(entity,entity.getEyePos()))approach(entity.getBlockPos(),10);return TaskRuntime.Step.running();}
-   stopSwimming();haltNavigation();look(entity.getEyePos());
+   stopSwimming();haltNavigation();
    if(ranged){
+    var delta=entity.getBoundingBox().getCenter().subtract(c.player.getEyePos());var velocity=entity.getVelocity();
+    var solution=ProjectileAim.solve(delta.x,delta.y,delta.z,velocity.x,velocity.y,velocity.z,item instanceof CrossbowItem?3.15:item instanceof TridentItem?2.5:3,.05);
+    if(solution.isEmpty())return TaskRuntime.Step.failed("shot_unreachable");
+    var shot=solution.get();var aim=new Vec3d(shot.x(),shot.y(),shot.z());look(c.player.getEyePos().add(aim));
+    boolean aligned=c.player.getRotationVec(1).dotProduct(aim.normalize())>.996;
     var stack=c.player.getMainHandStack();
-    if(item instanceof CrossbowItem&&CrossbowItem.isCharged(stack)){c.interactionManager.interactItem(c.player,Hand.MAIN_HAND);startedUse=false;}
+    if(item instanceof CrossbowItem&&CrossbowItem.isCharged(stack)){if(aligned){c.interactionManager.interactItem(c.player,Hand.MAIN_HAND);startedUse=false;}}
     else{
      if((item instanceof BowItem||item instanceof CrossbowItem)&&!c.player.getAbilities().creativeMode&&c.player.getProjectileType(stack).isEmpty())return TaskRuntime.Step.failed("ammunition_missing");
      c.options.useKey.setPressed(true);
      if(!c.player.isUsingItem()&&!startedUse){c.interactionManager.interactItem(c.player,Hand.MAIN_HAND);startedUse=true;phase=0;}
-     if(startedUse&&++phase>=28){c.options.useKey.setPressed(false);c.interactionManager.stopUsingItem(c.player);startedUse=false;}
+     if(startedUse&&++phase>=28&&aligned){c.options.useKey.setPressed(false);c.interactionManager.stopUsingItem(c.player);startedUse=false;}
     }
    }
-   else if(c.player.getAttackCooldownProgress(0)>=.95&&c.player.canInteractWithEntity(entity,0)){if(c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);c.interactionManager.attackEntity(c.player,entity);c.player.swingHand(Hand.MAIN_HAND);}
-   if(c.player.getOffHandStack().isOf(Items.SHIELD)&&!ranged&&entity instanceof LivingEntity living&&living.handSwinging&&c.player.getAttackCooldownProgress(0)<.8){c.options.useKey.setPressed(true);if(!c.player.isUsingItem())c.interactionManager.interactItem(c.player,Hand.OFF_HAND);}
-   else if(c.player.isUsingItem()&&c.player.getActiveHand()==Hand.OFF_HAND)c.interactionManager.stopUsingItem(c.player);
+   else {look(entity.getEyePos());if(readyStrike){shield(false);c.interactionManager.attackEntity(c.player,entity);c.player.swingHand(Hand.MAIN_HAND);}}
    return TaskRuntime.Step.running();
+  }
+  private void shield(boolean blocking){
+   c.options.useKey.setPressed(blocking);
+   if(blocking){if(!c.player.isUsingItem())c.interactionManager.interactItem(c.player,Hand.OFF_HAND);}
+   else if(c.player.isUsingItem()&&c.player.getActiveHand()==Hand.OFF_HAND)c.interactionManager.stopUsingItem(c.player);
   }
   private void verifiedClick(int slot,int button,SlotActionType mode){
    proofHandler=c.player.currentScreenHandler.syncId;slotBoundary=InventoryReceipts.CURRENT.cursor();slotProof=new SlotProof(SlotConfirmation.snapshot(c),SlotConfirmation.fingerprint(c.player.currentScreenHandler.getCursorStack()));

@@ -83,7 +83,18 @@ public final class AcceptanceFixtures implements ModInitializer {
   var tree=new BlockPos(12,64,-8);
   for(int stage=0;stage<2&&world.getBlockState(tree).isOf(Blocks.OAK_SAPLING);stage++)((SaplingBlock)Blocks.OAK_SAPLING).generate(world,tree,world.getBlockState(tree),world.getRandom());
   if(!world.getBlockState(tree).isIn(net.minecraft.registry.tag.BlockTags.LOGS))throw new IllegalStateException("Fixture tree did not grow");
-  Map<String,Object> report=Map.of("version",1,"setupOnly",true,"spawn",List.of(0,64,0),"stationsRow",List.of(-8,64,6),"supplies",List.of(List.of(-3,64,-2),List.of(-5,64,-2),List.of(-7,64,-5)),"villager",List.of(10,64,2),"water",List.of(-10,61,0),"netherFrame",List.of(-13,65,12),"endFrame",List.of(0,64,12));
+  // Separate ordinary mobs for controlled combat. Their real AI / health and
+  // damage rules remain enabled; setup is removed before the player acts.
+  for(int z:new int[]{18,28,38}){
+   for(int x=-34;x<=-30;x++)for(int dz=z-2;dz<=z+2;dz++)if(x==-34||x==-30||dz==z-2||dz==z+2)block(world,x,64,dz,Blocks.OAK_FENCE);
+   var cow=new net.minecraft.entity.passive.CowEntity(EntityType.COW,world);cow.setPosition(-32.5,64,z+.5);cow.setPersistent();world.spawnEntity(cow);
+  }
+  for(int x=32;x<=56;x++)for(int z=-12;z<=12;z++)block(world,x,68,z,Blocks.STONE);
+  var skeleton=new net.minecraft.entity.mob.SkeletonEntity(EntityType.SKELETON,world);skeleton.setPosition(44.5,64,.5);
+  skeleton.initialize(world,world.getLocalDifficulty(skeleton.getBlockPos()),SpawnReason.STRUCTURE,null);skeleton.setPersistent();world.spawnEntity(skeleton);
+  var neutral=new net.minecraft.entity.mob.ZombifiedPiglinEntity(EntityType.ZOMBIFIED_PIGLIN,world);neutral.setPosition(32.5,64,-24.5);neutral.setPersistent();world.spawnEntity(neutral);
+  Map<String,Object> report=new LinkedHashMap<>(Map.of("version",2,"setupOnly",true,"spawn",List.of(0,64,0),"stationsRow",List.of(-8,64,6),"supplies",List.of(List.of(-3,64,-2),List.of(-5,64,-2),List.of(-7,64,-5)),"villager",List.of(10,64,2),"water",List.of(-10,61,0),"netherFrame",List.of(-13,65,12),"endFrame",List.of(0,64,12)));
+  report.put("combatTargets",List.of(List.of(-32,64,18),List.of(-32,64,28),List.of(-32,64,38),List.of(44,64,0)));report.put("neutral",List.of(32,64,-25));
   Files.writeString(save.resolve(".momo-fixture-prepared"),new Gson().toJson(report),StandardOpenOption.CREATE_NEW);
   System.getLogger("momo-fixture").log(System.Logger.Level.INFO,"Prepared isolated acceptance world; remove this development mod before acceptance");
  }

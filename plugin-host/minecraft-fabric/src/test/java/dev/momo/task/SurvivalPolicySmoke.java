@@ -3,6 +3,8 @@ public final class SurvivalPolicySmoke {
  static void check(boolean b,String s){if(!b)throw new AssertionError(s);}
  public static void main(String[] args){
   FoodChoiceSmoke.main(args);
+  ThreatPolicySmoke.main(args);
+  ProjectileAimSmoke.main(args);
   SurvivalPolicy p=new SurvivalPolicy();
   check(p.airCritical(99,false),"air escape starts before the last breath");
   check(p.airCritical(180,true),"do not immediately dive again with a partially recovered breath");
@@ -16,6 +18,10 @@ public final class SurvivalPolicySmoke {
   check(p.choose(true,false,false,16,10,true,false,false)==SurvivalPolicy.Mode.EAT,"eat from local hunger");
   check(p.choose(true,false,false,15,12,true,true,true)==SurvivalPolicy.Mode.EAT,"minor threat cannot keep interrupting food");
   check(p.choose(true,false,true,4,12,true,true,true)==SurvivalPolicy.Mode.ESCAPE,"critical danger wins over food");
+  check(p.choose(true,false,false,6,12,true,false,true)==SurvivalPolicy.Mode.ESCAPE,"low health must retreat before entering a suicidal last two hearts");
+  check(p.endsRetreat(SurvivalPolicy.Mode.ESCAPE,SurvivalPolicy.Mode.EAT,true),"after reaching safety a combat retreat must request a fresh goal decision");
+  check(!p.endsRetreat(SurvivalPolicy.Mode.ESCAPE,SurvivalPolicy.Mode.NONE,false),"ordinary air recovery does not abandon an otherwise valid task");
+  check(!p.endsRetreat(SurvivalPolicy.Mode.ESCAPE,SurvivalPolicy.Mode.ESCAPE,true),"the body must complete physical escape before reporting a blocked plan");
   check(p.choose(false,false,false,20,20,true,false,true)==SurvivalPolicy.Mode.NONE,"revoked body cannot defend/restart");
   check(p.choose(true,true,false,20,20,true,false,true)==SurvivalPolicy.Mode.NONE,"manual stop wins");
   check(p.choose(true,false,false,20,20,true,false,true)==SurvivalPolicy.Mode.DEFEND,"close hostile defense");

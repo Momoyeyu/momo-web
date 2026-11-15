@@ -123,6 +123,14 @@ public final class TaskRuntime {
   while(!queue.isEmpty())finish(queue.remove(),"cancelled",reason,Map.of());
   paused=false;
  }
+ public void interrupt(String reason){
+  if(reason==null||!reason.matches("[a-z_]{1,50}"))throw new IllegalArgumentException("Invalid interruption");
+  boolean hadWork=current!=null||!queue.isEmpty();
+  if(current!=null)finish(current,"failed",reason,Map.of());
+  while(!queue.isEmpty())finish(queue.remove(),"cancelled",reason,Map.of());
+  paused=false;
+  if(!hadWork)notice(reason);
+ }
  public void resetSession(){
   if(!stopConfirmed())throw new IllegalStateException("Control must stop before changing scope");
   history.clear();journal.clear();sequence=0;paused=false;
