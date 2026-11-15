@@ -31,7 +31,15 @@ SUMMARY_PREFIX = "以下是本次对话此前部分的摘要，其后的最新�
 # ==================== 主流程 ====================
 
 
-def run_turn(text, presentation=None, first_meeting=False, *, run_id=None, source="meeting", external_message_id=None, audience="owner", retry_of=None, plugin_context=None, expected_generation=None, image_ids=None, image_note=None, observation=None):
+def _event_revoked(validate_event, *, refresh=False):
+    if validate_event is None:return False
+    from .coordinator import CoordinationError
+    try:validate_event(refresh=refresh)
+    except (ValueError,CoordinationError):return True
+    return False
+
+
+def run_turn(text, presentation=None, first_meeting=False, *, run_id=None, source="meeting", external_message_id=None, audience="owner", retry_of=None, plugin_context=None, expected_generation=None, image_ids=None, image_note=None, observation=None, validate_event=None):
     # ASGI may resume successive next() calls under different Context objects.
     # Bind privacy for each step, not across a suspended generator yield.
     from .dialogue_input import DialogueInput
@@ -41,7 +49,7 @@ def run_turn(text, presentation=None, first_meeting=False, *, run_id=None, sourc
         image_ids = text.images
         image_note = '\n'.join(text.notes)
         text = text.text
-    iterator = _run_turn(text, presentation, first_meeting, run_id=run_id, source=source, external_message_id=external_message_id, retry_of=retry_of, plugin_context=plugin_context, expected_generation=expected_generation, image_ids=image_ids, image_note=image_note, speech=speech, observation=observation)
+    iterator = _run_turn(text, presentation, first_meeting, run_id=run_id, source=source, external_message_id=external_message_id, retry_of=retry_of, plugin_context=plugin_context, expected_generation=expected_generation, image_ids=image_ids, image_note=image_note, speech=speech, observation=observation,validate_event=validate_event)
     try:
         while True:
             with checkpoint.audience_scope(audience, exclude_run=retry_of), memory.audience_scope(audience):
@@ -71,10 +79,11 @@ def _run_turn(
     image_note=None,
     speech=None,
     observation=None,
+    validate_event=None,
 ) -> Iterator[TurnEvent]:
     """一回合：yield 增量/错误事件（结束即返回）。流程见 services/turn.py。"""
     gen = checkpoint.generation() if expected_generation is None else expected_generation
-    if checkpoint.generation() != gen:
+    if checkpoint.generation() != gen or _event_revoked(validate_event,refresh=True):
         return
     if source == "meeting":
         onboarding.status()  # Only local input participates in first-meeting identity.
@@ -123,7 +132,7 @@ def _run_turn(
         tool_scope=nullcontext(mcp.ExtTools()) if game_event else mcp.open_tools(
             state["settings"]["extensions"] if checkpoint.audience() == "owner" and not intro.restricted() else [], [] if intro.restricted() else builtin_names())
         with tool_scope as ext_tools:
-            for event in react(messages, ext_tools, state, gen, at, presentation, source=source, observation_only=observation is not None and observation.get("kind")!="minecraft",game_event=game_event):
+            for event in react(messages, ext_tools, state, gen, at, presentation, source=source, observation_only=observation is not None and observation.get("kind")!="minecraft",game_event=game_event,validate_event=validate_event):
                 if source == 'qq' and event['t'] == 'error' and not spoken:
                     break
                 if event['t'] == 'sentence' and event.get('text'):
@@ -287,7 +296,7 @@ def build_messages(
             from .minecraft import minecraft
             from .computer_tools import retire_game_observations
             retire_game_observations(projection)
-            fresh=minecraft.stage_decision(observation['generation'])
+            fresh=minecraft.stage_decision(observation['generation'],observation['decisionRevision'])
             observation.clear()
             observation.update(fresh)
             projection.game_observation_retired=False
@@ -354,7 +363,7 @@ def react(
     gen: int,
     at: str,
     presentation: dict | None = None,
-    *, source="meeting", observation_only=False,game_event=False,
+    *, source="meeting", observation_only=False,game_event=False,validate_event=None,
 ) -> Iterator[TurnEvent]:
     """节点 R→D→E→CNT→H：流式调 LLM，正文**边到边切句落账并推句事件**。
 
@@ -382,10 +391,13 @@ def react(
     splitter = SentenceStream()
     seq = 0
 
+    def cancelled(*,refresh=False):
+        return checkpoint.generation()!=gen or _event_revoked(validate_event,refresh=refresh)
+
     def take(sent: Sentence) -> TurnEvent | None:
         """成句 → 落账 → 句事件；None = 代际漂移（读档/打断），调用方应停止。"""
         nonlocal seq
-        if checkpoint.generation() != gen or (
+        if cancelled() or (
             sent.text and not checkpoint.append_sentence(sent.text, gen, at)
         ):
             return None
@@ -418,14 +430,14 @@ def react(
         calls: list[dict[str, Any]] | None = None
         round_text = ""
         reasoning: dict[str, Any] = {}  # Private protocol state, never a TurnEvent.
-        if checkpoint.generation() != gen:
+        if cancelled():
             return
         try:
             from .coordinator import runtime, current_run
             with runtime.reasoning_lock:
                 # A competing inference/compaction may have held this lock
                 # while the user revoked this run's captured generation.
-                if checkpoint.generation() != gen:
+                if cancelled():
                     return
                 observation_budget = computer_tools.observation_budget()
                 if isinstance(messages, ContextMessages):
@@ -435,13 +447,14 @@ def react(
                 # pre-capture metadata reservation. Fit the actual frame again
                 # after receiving them, for both reactions and active play.
                 if observation_budget:
-                    observation_budget=_fit_pending_observation(messages,llm_cfg,tools,game_event=game_event,cancelled=lambda:checkpoint.generation()!=gen)
+                    observation_budget=_fit_pending_observation(messages,llm_cfg,tools,game_event=game_event,cancelled=lambda:cancelled())
                     if not observation_budget:raise vision.VisionError("computer.observationExpired")
                 from .context_policy import Budget, estimate_request
                 if observation_budget and estimate_request(messages,tools,extra_messages=observation_budget)>Budget.from_config(llm_cfg).safe:
                     # Fresh pixels must never wait behind hard maintenance.
                     raise vision.VisionError('computer.budget')
-                compress.guard_request(llm_cfg, messages, tools, cancelled=lambda: checkpoint.generation() != gen, extra_messages=observation_budget)
+                compress.guard_request(llm_cfg, messages, tools, cancelled=lambda: cancelled(), extra_messages=observation_budget)
+                if cancelled(refresh=True):return
                 import copy
                 measured_prefix = copy.deepcopy(list(messages))
                 usage.clear()
@@ -451,9 +464,9 @@ def react(
                     tools=tools,
                     usage_out=usage,
                     reasoning_out=reasoning,
-                    cancelled=lambda: checkpoint.generation() != gen,
+                    cancelled=lambda: cancelled(),
                 ):
-                    if checkpoint.generation() != gen:
+                    if cancelled():
                         return
                     if ev["type"] == "text":
                         delta = str(ev["delta"])
@@ -472,7 +485,7 @@ def react(
                 from .context_policy import Policy
                 Policy(llm_cfg, checkpoint.audience(), tools).record_usage(usage)
         except (llm.LlmError, vision.VisionError) as e:
-            if checkpoint.generation() != gen:
+            if cancelled():
                 return
             if game_event and str(e) in {'Context capacity reached; please retry after maintenance','computer.budget','computer.observationExpired'}:
                 # Tool-round suffixes cannot be compacted in place. End this
@@ -483,7 +496,7 @@ def react(
             yield _error(str(e))  # 节点 ERR（不发 done，由 api 层决定）
             return
 
-        if checkpoint.generation() != gen:
+        if cancelled():
             return
         if game_ack_only:
             # Tools=[] is a provider hint, not an execution barrier. A provider
@@ -511,12 +524,12 @@ def react(
             image_reads = []
             game_yield = False
             for call in calls:
-                if checkpoint.generation() != gen:
+                if cancelled(refresh=True):
                     return
                 with memory.source_scope(
                     checkpoint.run_event_ids(gen, at), generation=gen
                 ):
-                    if checkpoint.generation() != gen:
+                    if cancelled():
                         return
                     capture_edge=1536
                     reservation=computer_tools.capture_budget(call,capture_edge)
@@ -531,7 +544,7 @@ def react(
                             if isinstance(messages,ContextMessages):
                                 messages.fit_images=lambda:vision.fit_history(messages,llm_cfg,tools,extra_messages=reservation)
                             try:
-                                compress.guard_request(llm_cfg,messages,tools,cancelled=lambda:checkpoint.generation()!=gen,extra_messages=reservation)
+                                compress.guard_request(llm_cfg,messages,tools,cancelled=lambda:cancelled(),extra_messages=reservation)
                             except llm.LlmError as error:
                                 capacity_exhausted=str(error)=='Context capacity reached; please retry after maintenance'
                                 if str(error)=='Context capacity reached; please retry after maintenance' and capture_edge!=512:
@@ -544,7 +557,8 @@ def react(
                             import json
                             messages.append({'role':'tool','tool_call_id':call.get('id',''),'content':json.dumps({'ok':False,'code':'COMPUTER_CONTEXT_CAPACITY','error':'Observation was not captured because context preparation could not complete safely. Do not claim pixels or retry mutations.'})})
                             continue
-                        if checkpoint.generation()!=gen:return
+                        if cancelled():return
+                    if cancelled(refresh=True):return
                     with computer_tools.capture_scope(capture_edge):
                         result = run_call(call, ext_tools,origin='minecraft_event') if game_event else run_call(call, ext_tools)
                     messages.append(result)

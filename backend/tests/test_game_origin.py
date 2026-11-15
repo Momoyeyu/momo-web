@@ -3,7 +3,103 @@ from contextlib import contextmanager
 from app.services import capability,turn
 from app.core import llm
 from app.services import computer_tools,vision
+from app.services.minecraft import MinecraftError
 import pytest
+
+@pytest.mark.parametrize('edge',['before_inference','during_maintenance','provider_text','provider_tools','between_tools'])
+def test_revoked_automatic_decision_cannot_infer_publish_or_dispatch_more_tools(monkeypatch,edge):
+ valid=edge!='before_inference';models=[];effects=[];checks=[]
+ def guard(*,refresh=False):
+  checks.append(refresh)
+  if not valid:raise MinecraftError('Game decision revoked',code='MINECRAFT_DECISION_REVOKED')
+ def maintain(*args,**kwargs):
+  nonlocal valid
+  if edge=='during_maintenance':valid=False
+ def provider(*args,**kwargs):
+  nonlocal valid
+  models.append(1)
+  if edge in {'provider_text','provider_tools'}:valid=False
+  if edge=='provider_text':yield {'type':'text','delta':'This never happened.'}
+  else:yield {'type':'tool_calls','calls':[{'id':name,'function':{'name':'memory_add','arguments':'{}'}} for name in ['first','late']]}
+ def effect(call,ext,**kwargs):
+  nonlocal valid
+  effects.append(call['id']);valid=False
+  return {'role':'tool','tool_call_id':call['id'],'content':'{}'}
+ monkeypatch.setattr(turn.compress,'guard_request',maintain)
+ monkeypatch.setattr(llm,'chat_stream',provider)
+ monkeypatch.setattr(turn,'run_call',effect)
+ events=list(turn.run_turn('',observation={'kind':'minecraft','source':'Minecraft','observedAt':1,'state':{}},validate_event=guard))
+ assert models==([] if edge in {'before_inference','during_maintenance'} else [1])
+ assert effects==(['first'] if edge=='between_tools' else [])
+ assert not [event for event in events if event['t']=='sentence']
+ assert True in checks, 'expensive inference and effects need a fresh local body check'
+
+@pytest.mark.parametrize('automatic',[True,False])
+def test_api_rechecks_game_permit_before_publication_but_keeps_owner_chat_available(monkeypatch,automatic):
+ import asyncio,time
+ from app.api import chat as api
+ from app.core import db
+ from app.services.coordinator import Coordinator
+ from app.services.minecraft import minecraft
+ core=Coordinator();core.started=True;core.mode='meeting'
+ core.owner={'clientId':'owner','leaseId':'lease','expiresAt':time.monotonic()+15}
+ monkeypatch.setattr(api,'runtime',core)
+ model_started=False;checks=[]
+ def validate(generation,revision,*,refresh=False):
+  assert (generation,revision)==(17,3)
+  checks.append(refresh)
+  if refresh and model_started:raise MinecraftError('Game decision revoked',code='MINECRAFT_DECISION_REVOKED')
+ def provider(*args,**kwargs):
+  nonlocal model_started
+  model_started=True
+  yield {'type':'text','delta':'A quiet place.'}
+ monkeypatch.setattr(llm,'chat_stream',provider)
+ monkeypatch.setattr(minecraft,'claim_decision',lambda *args:{'kind':'minecraft','generation':17,'decisionRevision':3})
+ monkeypatch.setattr(minecraft,'stage_decision',lambda generation,revision:{'kind':'minecraft','source':'Minecraft','generation':generation,'decisionRevision':revision,'observedAt':1,'state':{}})
+ monkeypatch.setattr(minecraft,'validate_decision',validate)
+ if automatic:response=api.minecraft_decision(api.ScreenReactionIn(clientId='owner',leaseId='lease',generation=17))
+ else:response=api.chat(api.ChatIn(clientId='owner',leaseId='lease',text='hello'))
+ async def consume():
+  frames=[]
+  async for frame in response.body_iterator:frames.append(frame.decode() if isinstance(frame,bytes) else frame)
+  return [json.loads(row[6:]) for row in ''.join(frames).splitlines() if row.startswith('data: ')]
+ events=asyncio.run(consume())
+ assert model_started
+ if automatic:
+  assert True in checks and not [event for event in events if event['t'] in {'sentence','error'}]
+  assert core.presentation is None
+  assert not db.query("SELECT 1 FROM messages WHERE role='assistant' AND visible=1")
+ else:
+  assert checks==[] and [event['text'] for event in events if event['t']=='sentence']==['A quiet place.']
+
+def test_api_marks_silent_revocation_after_a_streamed_sentence_as_suppressed(monkeypatch):
+ import asyncio,time
+ from app.api import chat as api
+ from app.services.coordinator import Coordinator
+ from app.services.minecraft import minecraft
+ core=Coordinator();core.started=True;core.mode='meeting'
+ core.owner={'clientId':'owner','leaseId':'lease','expiresAt':time.monotonic()+15}
+ monkeypatch.setattr(api,'runtime',core)
+ valid=True
+ def validate(*args,**kwargs):
+  if not valid:raise MinecraftError('Game decision revoked',code='MINECRAFT_DECISION_REVOKED')
+ def streamed(*args,**kwargs):
+  nonlocal valid
+  yield {'t':'sentence','no':0,'text':'An earlier line.','cues':[],'generation':0}
+  valid=False  # A cancelled inner turn may return silently, without another event.
+ monkeypatch.setattr(minecraft,'claim_decision',lambda *args:{'kind':'minecraft','generation':17,'decisionRevision':3})
+ monkeypatch.setattr(minecraft,'stage_decision',lambda *args:{'kind':'minecraft','source':'Minecraft','observedAt':1,'state':{}})
+ monkeypatch.setattr(minecraft,'validate_decision',validate)
+ monkeypatch.setattr(turn,'run_turn',streamed)
+ response=api.minecraft_decision(api.ScreenReactionIn(clientId='owner',leaseId='lease',generation=17))
+ async def consume():
+  frames=[]
+  async for frame in response.body_iterator:frames.append(frame.decode() if isinstance(frame,bytes) else frame)
+  return [json.loads(row[6:]) for row in ''.join(frames).splitlines() if row.startswith('data: ')]
+ events=asyncio.run(consume())
+ assert [event['text'] for event in events if event['t']=='sentence']==['An earlier line.']
+ assert events[-1]=={'t':'done','suppressed':True}
+ assert core.presentation is None
 
 
 def test_game_event_cannot_dispatch_unadvertised_owner_or_extension_tools():

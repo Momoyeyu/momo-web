@@ -57,6 +57,9 @@ async function failureOf(signal?: AbortSignal): Promise<unknown> {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("chat 的 SSE 消费", () => {
+  it('preserves a revoked automatic decision marker through SSE decoding',async()=>{
+    expect(await drain(sse([frame({t:'done',suppressed:true})]))).toEqual([{t:'done',suppressed:true}]);
+  });
   it("连续多个 sentence 全部送达（不在第一个句子后结束）", async () => {
     const got = await drain(
       sse([

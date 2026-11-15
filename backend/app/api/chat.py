@@ -162,6 +162,7 @@ def _chat(req: ChatIn, observation=None) -> StreamingResponse:
         presentation_token = None
         generation = None
         generated = False
+        validate_event = None
         try:
             with runtime.run(inbox["run_id"], client=req.clientId, lease=req.leaseId):
                 runtime.inbox_status(inbox["id"], "processing")
@@ -172,7 +173,8 @@ def _chat(req: ChatIn, observation=None) -> StreamingResponse:
                     try:
                         if observation.get('kind')=='minecraft':
                             from ..services.minecraft import minecraft
-                            observed=minecraft.stage_decision(observation['generation'])
+                            validate_event=lambda *,refresh=False:minecraft.validate_decision(observation['generation'],observation['decisionRevision'],refresh=refresh)
+                            observed=minecraft.stage_decision(observation['generation'],observation['decisionRevision'])
                         else:observed = computer.stage_reaction(observation["generation"])
                     finally:
                         current_run.reset(token)
@@ -183,6 +185,7 @@ def _chat(req: ChatIn, observation=None) -> StreamingResponse:
                         first_meeting=req.firstMeeting,
                         run_id=inbox["run_id"],
                         observation=observed,
+                        validate_event=validate_event,
                     )
                 )
                 while True:
@@ -199,8 +202,7 @@ def _chat(req: ChatIn, observation=None) -> StreamingResponse:
                         token=current_run.set(inbox["run_id"])
                         try:
                             if observation.get('kind')=='minecraft':
-                                from ..services.minecraft import minecraft
-                                minecraft.validate_decision(observation['generation'])
+                                validate_event(refresh=True)
                             else:
                                 from ..services.computer import computer, ComputerError
                                 with computer.lock:
@@ -215,10 +217,19 @@ def _chat(req: ChatIn, observation=None) -> StreamingResponse:
                         if presentation_token:
                             ev = {**ev, "presentationToken": presentation_token}
                     yield _sse(ev)
+                # A cancelled inner turn can return without one last sentence.
+                # Retire its already streamed presentation rather than letting
+                # the player finish queued speech under an invalid game claim.
+                if validate_event is not None:
+                    token=current_run.set(inbox['run_id'])
+                    try:validate_event(refresh=True)
+                    finally:current_run.reset(token)
                 generated = True
         except Exception as e:  # 兜底：agent 未捕获的异常也走 error 事件
             errored = True
-            yield _sse({"t": "error", "message": str(e), "service": "backend"})
+            if observation is not None and observation.get('kind')=='minecraft' and getattr(e,'code',None)=='MINECRAFT_DECISION_REVOKED':
+                yield _sse({'t':'done','suppressed':True})
+            else:yield _sse({"t": "error", "message": str(e), "service": "backend"})
         finally:
             if iterator is not None:
                 iterator.close()

@@ -178,6 +178,8 @@ public final class CompanionClient implements ClientModInitializer {
   if(physicalTakeover)takeover(client);
   if(taskWorldInstance!=null&&taskWorldInstance!=client.world)retireScene(client);
   rememberScreen(client);
+  pauseBarrier.observeSuspension(suspended(client));
+  result.addProperty("controlRevision",pauseBarrier.revision());
   String admission=dev.momo.task.ControlAdmission.reject(type,client.isWindowFocused(),pauseBarrier.isPaused(),physicalTakeover,sceneObservationRequired,client.currentScreen!=null,ownsScreen(client),!client.player.isAlive(),command.has("skill")?command.get("skill").getAsString():"");
   if(!admission.isEmpty()){result.addProperty("accepted",false);result.addProperty("error",admission);return result;}
   String conflict=dev.momo.task.ControlAdmission.bodyConflict(type,tasks.active());
@@ -185,6 +187,7 @@ public final class CompanionClient implements ClientModInitializer {
   switch (type) {
    case "capabilities" -> {
     result.addProperty("protocol",1);result.addProperty("taskProtocol",1);
+    result.addProperty("decisionProtocol",1);
     result.addProperty("navigation",BaritoneNavigator.available());result.addProperty("navigationBackend","baritone-1.11.3");
     result.add("skills",gson.toJsonTree(GameSkills.NAMES));result.add("skillDefinitions",dev.momo.task.SkillArguments.contract());
    }
@@ -319,6 +322,8 @@ public final class CompanionClient implements ClientModInitializer {
    }
    default -> throw new IllegalArgumentException("Unsupported command");
   }
+  pauseBarrier.observeSuspension(suspended(client));
+  result.addProperty("controlRevision",pauseBarrier.revision());
   return result;
  }
  private void play(MinecraftClient c,JsonObject cmd,String world,String account) {
@@ -406,6 +411,7 @@ public final class CompanionClient implements ClientModInitializer {
   dev.momo.task.BlockReceipts.CURRENT.changeWorld(client.world);
   dev.momo.task.ShieldBlocks.CURRENT.changeWorld(client.world);
   dev.momo.task.InventoryReceipts.CURRENT.changeWorld(client.world);
+  pauseBarrier.observeSuspension(suspended(client));
   if(physicalTakeover){takeover(client);return;}
   if(taskWorldInstance!=null&&client.world!=taskWorldInstance){retireScene(client);return;}
   rememberScreen(client);

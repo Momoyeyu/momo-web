@@ -25,16 +25,16 @@ def test_game_event_is_not_stored_as_a_player_utterance():
  assert 'gameplay decision event' in messages[-1]['content']
 
 def test_recaptured_event_replaces_old_reads_but_keeps_action_receipts():
- old={'kind':'minecraft','generation':7,'state':{'observedAt':1,'marker':'oldview'}}
+ old={'kind':'minecraft','generation':7,'decisionRevision':3,'state':{'observedAt':1,'marker':'oldview'}}
  messages=turn.build_messages(state.load(),'',observation=old)
  messages.extend([
   {'role':'assistant','tool_calls':[{'id':'read','function':{'name':'minecraft_action','arguments':'{"action":"observe"}'}}]},
   {'role':'tool','tool_call_id':'read','content':json.dumps({'observedAt':1,'marker':'oldtoolview'})},
   {'role':'tool','tool_call_id':'effect','content':'actual_verified_action_receipt'}])
- fresh={'kind':'minecraft','generation':7,'state':{'observedAt':2,'marker':'freshview'}}
+ fresh={'kind':'minecraft','generation':7,'decisionRevision':3,'state':{'observedAt':2,'marker':'freshview'}}
  with patch.object(minecraft,'stage_decision',return_value=fresh) as recapture:
   messages.refresh_observation()
-  recapture.assert_called_once_with(7)
+  recapture.assert_called_once_with(7,3)
  assert any('freshview' in str(m.get('content','')) for m in messages)
  assert not any('oldview' in str(m.get('content','')) or 'oldtoolview' in str(m.get('content','')) for m in messages)
  assert messages[-1]['content']=='actual_verified_action_receipt'

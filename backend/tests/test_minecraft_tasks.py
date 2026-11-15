@@ -6,6 +6,7 @@ from app.services.minecraft import Minecraft,MinecraftError
 
 def setup():
  m=Minecraft();m.binding={'world':'world','account':'player'};m.permissions={'game.observe','game.modify'};m.epoch=7;m.fingerprint='cfg';m.owner=('owner','lease');m.capabilities={'taskProtocol':1,'skills':['navigate']}
+ m.body_revision=0
  rt=SimpleNamespace(host=SimpleNamespace(control=threading.RLock(),request=Mock(return_value={'task':{'taskId':'t1','state':'queued','evidence':{}}})),epoch=7,owner={'clientId':'owner','leaseId':'lease','expiresAt':time.monotonic()+15},started=True,mode='meeting',focus=False,restoring=False)
  return m,rt
 
@@ -110,6 +111,81 @@ def test_goal_recheck_is_event_driven_with_a_30_second_idle_floor():
   with patch('app.services.minecraft.time.monotonic',return_value=133):assert m.claim_decision(0,'owner','lease')
   rt.active='player-conversation'
   with patch('app.services.minecraft.time.monotonic',return_value=170):assert m.claim_decision(0,'owner','lease') is None
+
+def test_pause_then_resume_never_revalidates_a_previously_claimed_automatic_decision():
+ m,rt=setup();m.autonomous=True;m.decision_needed=True
+ rt.active=rt.presentation=None;rt.queue=[];rt.interrupt_hold=False
+ rt.host.request.return_value={}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'),patch('app.services.intro.restricted',return_value=False):
+  claim=m.claim_decision(0,'owner','lease')
+  assert type(claim.get('decisionRevision')) is int, 'a generation alone cannot distinguish pause/resume within one activity'
+  revision=claim['decisionRevision'];m.validate_decision(0,revision)
+  m.execute('pause',{},0,'owner','lease');m.execute('resume',{},0,'owner','lease')
+  with pytest.raises(MinecraftError,match='revoked'):m.validate_decision(0,revision)
+  m.last_decision=0;fresh=m.claim_decision(0,'owner','lease')
+  assert fresh['decisionRevision']!=revision
+  m.validate_decision(0,fresh['decisionRevision'])
+
+def test_menu_suspend_and_return_invalidate_the_old_decision_without_revoking_the_world():
+ m,rt=setup();m.autonomous=True;m.decision_needed=True
+ rt.active=rt.presentation=None;rt.queue=[];rt.interrupt_hold=False
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'),patch.object(m,'_background_valid',return_value=True),patch('app.services.intro.restricted',return_value=False):
+  claim=m.claim_decision(0,'owner','lease')
+  assert type(claim.get('decisionRevision')) is int
+  revision=claim['decisionRevision']
+  for suspended in [True,False]:
+   rt.host.request.side_effect=[{'suspended':suspended},{'events':{'cursor':0,'gap':False,'events':[]}}]
+   m.poll_tasks(0)
+   with pytest.raises(MinecraftError,match='revoked'):m.validate_decision(0,revision)
+  assert m.binding and m.autonomous and not m.suspended
+  m.last_decision=0;fresh=m.claim_decision(0,'owner','lease');m.validate_decision(0,fresh['decisionRevision'])
+
+def test_native_revision_detects_a_menu_roundtrip_between_python_polls():
+ m,rt=setup();m.autonomous=True;m.decision_needed=True;m.body_revision=8
+ rt.active=rt.presentation=None;rt.queue=[];rt.interrupt_hold=False
+ rt.host.request.side_effect=[{'suspended':False,'controlRevision':10},{'events':{'cursor':0,'gap':False,'events':[]}}]
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'),patch.object(m,'_background_valid',return_value=True),patch('app.services.intro.restricted',return_value=False):
+  claim=m.claim_decision(0,'owner','lease');m.poll_tasks(0)
+  with pytest.raises(MinecraftError,match='revoked'):m.validate_decision(0,claim['decisionRevision'])
+
+def test_missing_native_revision_cannot_pass_a_fresh_automatic_gate():
+ m,rt=setup();m.autonomous=True;m.decision_needed=True
+ rt.active=rt.presentation=None;rt.queue=[];rt.interrupt_hold=False
+ rt.host.request.side_effect=[{}, {'events':{'cursor':0,'gap':False,'events':[]}}]
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'),patch.object(m,'_background_valid',return_value=True),patch('app.services.intro.restricted',return_value=False):
+  claim=m.claim_decision(0,'owner','lease')
+  with pytest.raises(MinecraftError,match='revision unavailable'):m.validate_decision(0,claim['decisionRevision'],refresh=True)
+  assert [call.args[0] for call in rt.host.request.call_args_list]==['minecraft.heartbeat','minecraft.events']
+
+def test_gameplay_attach_rejects_an_old_mod_without_a_control_revision():
+ m,rt=setup()
+ def request(method,params=None):
+  if method=='minecraft.capabilities':return {'taskProtocol':1,'skills':['navigate']}
+  return {'stopVerified':True}
+ rt.host.request.side_effect=request
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  with pytest.raises(MinecraftError,match='Update the Minecraft connection mod') as failure:
+   m.connect(1234,'x'*40,'world','player',['game.observe','game.modify'],'owner','lease')
+  assert failure.value.code=='MINECRAFT_PROTOCOL'
+  assert m.binding is None and not m.permissions and not m.autonomous
+
+@pytest.mark.parametrize('changed',['paused','suspended','autonomous'])
+def test_claimed_decision_rechecks_eligibility_after_capture_without_hiding_direct_observe(changed):
+ m,rt=setup();m.autonomous=True;m.decision_needed=True
+ rt.active=rt.presentation=None;rt.queue=[];rt.interrupt_hold=False
+ def captured(*args,**kwargs):
+  setattr(m,changed,changed!='autonomous')
+  return {'frame':'data:image/png;base64,aW1hZ2U=','observedAt':1}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'),patch.object(m,'poll_tasks'),patch('app.services.intro.restricted',return_value=False):
+  claim=m.claim_decision(0,'owner','lease')
+  assert type(claim.get('decisionRevision')) is int
+  with patch.object(m,'execute',side_effect=captured),patch('app.services.computer_tools.stage') as stage:
+   with pytest.raises(MinecraftError,match='revoked'):m.stage_decision(0,claim['decisionRevision'])
+   stage.assert_not_called()
+  # Eligibility is an automatic-decision restriction, not a ban on owner reads.
+  rt.host.request.return_value={};rt.host.request.side_effect=None
+  m.execute('observe',{},0,'owner','lease')
+  assert rt.host.request.call_args.args[0]=='minecraft.observe'
 
 @pytest.mark.parametrize('task_state',['queued','running','paused'])
 def test_body_in_progress_does_not_trigger_idle_model_polls_but_important_events_still_wake(task_state):

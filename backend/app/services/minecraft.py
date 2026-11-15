@@ -32,7 +32,17 @@ class Minecraft:
         self.autonomous = False
         self.last_decision = 0
         self.decision_needed = False
+        self.decision_revision = 0
+        self.body_revision = None
         self.monitor_stop = threading.Event()
+
+    def _eligibility(self, **changes):
+        # The activity generation survives a menu/pause; an already claimed
+        # decision must not regain authority when the same activity resumes.
+        with self.lock:
+            if any(getattr(self,key)!=value for key,value in changes.items()):
+                self.decision_revision += 1
+            for key,value in changes.items():setattr(self,key,value)
 
     def stop(self, reason='stopped', notify=True):
         with self.lock:
@@ -109,18 +119,23 @@ class Minecraft:
                 self.cursor, self.tasks, self.paused = 0, {}, False
                 self.chat_cursor=0
                 self.suspended=False
+                self.body_revision=None
                 permission = {**self.binding, 'activityEpoch': self.epoch}
             try:
                 capabilities = runtime.host.request('minecraft.capabilities', {'permission':permission})
+                body_revision=capabilities.get('controlRevision')
                 if capabilities.get('taskProtocol')==1 and 'game.modify' in self.permissions:
                     resumed=runtime.host.request('minecraft.resume',{'permission':permission,'issuedAt':int(time.time()*1000)})
                     if resumed.get('error'):raise MinecraftError('Game declined the new activity')
+                    body_revision=resumed.get('controlRevision')
+                    if type(body_revision) is not int or body_revision<0:raise MinecraftError('Update the Minecraft connection mod: control revision unavailable',code='MINECRAFT_PROTOCOL')
             except Exception:
                 # No half-attached authority may survive failed negotiation.
                 self.stop('connect_failed')
                 raise
             with self.lock:
                 self.capabilities = capabilities
+                self.body_revision=body_revision
                 self.autonomous = 'game.modify' in self.permissions and capabilities.get('taskProtocol') == 1
                 self.decision_needed = self.autonomous
                 self.last_decision = 0
@@ -160,11 +175,11 @@ class Minecraft:
                     except HostError:pass
                 raise
             if result.get('error') in {'BODY_PAUSED','NEW_PLAYER_INPUT_REQUIRED'}:
-                with self.lock:self.paused=True;self.autonomous=self.decision_needed=False
+                with self.lock:self._eligibility(paused=True,autonomous=False);self.decision_needed=False
                 raise MinecraftError('Fresh player input is required to resume Minecraft',code='MINECRAFT_PAUSED')
             rejection=result.get('error')
             if rejection in {'BODY_SUSPENDED','MENU_OPEN'}:
-                with self.lock:self.suspended=True;self.decision_needed=False
+                with self.lock:self._eligibility(suspended=True);self.decision_needed=False
                 raise MinecraftError('Return to the game or close the player menu before control',code='MINECRAFT_SUSPENDED')
             if rejection=='SCENE_OBSERVATION_REQUIRED':raise MinecraftError('Observe the new scene before new control',code='MINECRAFT_STALE')
             if rejection=='BODY_BUSY':raise MinecraftError('The current body action must settle first',code='MINECRAFT_BUSY')
@@ -190,9 +205,9 @@ class Minecraft:
                 self.record_tasks(([result['task']] if result.get('task') else result.get('tasks',[])), generation)
             if action in {'pause','resume'}:
                 with self.lock:
-                    self.paused = action == 'pause'
+                    self._eligibility(paused=action=='pause')
                     if self.paused:self.decision_needed=False
-                    else:self.decision_needed=True;self.autonomous='game.modify' in self.permissions
+                    else:self.decision_needed=True;self._eligibility(autonomous='game.modify' in self.permissions)
             fingerprint = self.gate(client, lease, allow_active=action in {'pause','resume','cancel','task','events','capabilities','recipes'})
             with self.lock:
                 if generation != self.generation or self.epoch != runtime.epoch or fingerprint != self.fingerprint:
@@ -247,7 +262,7 @@ class Minecraft:
             with self.lock:
                 if generation!=self.generation or not self.binding:raise MinecraftError('Minecraft goal revoked')
                 result=journal.set_goal(self.binding,value)
-                self.autonomous=value['status'] in {'active','blocked'} and not self.paused
+                self._eligibility(autonomous=value['status'] in {'active','blocked'} and not self.paused)
                 # A model-authored progress note is not a new world event.
                 # Preserve pending receipts, but do not make an active wait or
                 # navigation wake the model merely because it wrote its journal.
@@ -264,8 +279,8 @@ class Minecraft:
                 self.tasks[task['taskId']]=task
                 if task['state'] in {'succeeded','failed','cancelled'}:self.decision_needed=self.autonomous
                 if task['state']=='cancelled' and task.get('reason')=='manual_takeover':
-                    self.autonomous=self.decision_needed=False
-                    self.paused=True
+                    self._eligibility(autonomous=False,paused=True)
+                    self.decision_needed=False
             while len(self.tasks)>64:self.tasks.pop(next(iter(self.tasks)))
 
     def claim_decision(self, generation, client, lease):
@@ -279,25 +294,38 @@ class Minecraft:
                 return None
             self.last_decision=now
             self.decision_needed=False
-            return {'kind':'minecraft','generation':generation}
+            return {'kind':'minecraft','generation':generation,'decisionRevision':self.decision_revision}
 
-    def validate_decision(self, generation):
-        self.gate(None,None)
+    def validate_decision(self, generation, revision=None, *, refresh=False):
+        from .coordinator import CoordinationError
+        try:fingerprint=self.gate(None,None)
+        except (ValueError,CoordinationError) as error:
+            raise MinecraftError('Game decision revoked',code='MINECRAFT_DECISION_REVOKED') from error
         with self.lock:
-            if generation!=self.generation or not self.binding:
-                raise MinecraftError('Game decision revoked')
+            owner=runtime.owner or {}
+            if (generation!=self.generation or revision!=self.decision_revision or not self.binding
+                    or not self.autonomous or self.paused or self.suspended or self.epoch!=runtime.epoch
+                    or fingerprint!=self.fingerprint or not {'game.observe','game.modify'}<=self.permissions
+                    or self.owner!=(owner.get('clientId'),owner.get('leaseId')) or owner.get('expiresAt',0)<=time.monotonic()):
+                raise MinecraftError('Game decision revoked',code='MINECRAFT_DECISION_REVOKED')
+        if refresh:
+            self.poll_tasks(generation)
+            with self.lock:
+                if type(self.body_revision) is not int or self.body_revision<0:raise MinecraftError('Minecraft control revision unavailable',code='MINECRAFT_PROTOCOL')
+            self.validate_decision(generation,revision)
 
-    def stage_decision(self, generation):
+    def stage_decision(self, generation, revision):
         import base64
         from .computer_tools import stage
-        self.validate_decision(generation)
+        self.validate_decision(generation,revision,refresh=True)
         result=self.execute('observe',{},generation,None,None)
+        self.validate_decision(generation,revision)
         frame=result.pop('frame',None)
         if frame:
             prefix='data:image/png;base64,'
             if not frame.startswith(prefix) or len(frame)>5400000:raise MinecraftError('Invalid game frame')
-            stage(base64.b64decode(frame[len(prefix):],validate=True),lambda:self.validate_decision(generation))
-        return {'kind':'minecraft','source':'Minecraft','observedAt':result.get('observedAt',time.time()*1000),'generation':generation,'state':self.model_observation(result,compact=True)}
+            stage(base64.b64decode(frame[len(prefix):],validate=True),lambda:self.validate_decision(generation,revision))
+        return {'kind':'minecraft','source':'Minecraft','observedAt':result.get('observedAt',time.time()*1000),'generation':generation,'decisionRevision':revision,'state':self.model_observation(result,compact=True)}
 
     @staticmethod
     def model_observation(value, *, compact=False, query=''):
@@ -467,9 +495,14 @@ class Minecraft:
                 return
             with self.lock:permission={**self.binding,'activityEpoch':self.epoch};cursor=self.cursor
             body=runtime.host.request('minecraft.heartbeat', {'permission':permission})
-            with self.lock:self.suspended=body.get('suspended',False)
+            native_revision=body.get('controlRevision')
+            if native_revision is not None and (type(native_revision) is not int or native_revision<0):raise MinecraftError('Invalid Minecraft control revision',code='MINECRAFT_PROTOCOL')
+            with self.lock:
+                if native_revision!=self.body_revision:self.decision_revision+=1
+                self.body_revision=native_revision
+                self._eligibility(suspended=body.get('suspended',False))
             if body.get('controlPaused'):
-                with self.lock:self.paused=True;self.autonomous=False;self.decision_needed=False
+                with self.lock:self._eligibility(paused=True,autonomous=False);self.decision_needed=False
             packet=runtime.host.request('minecraft.events', {'after':cursor,'permission':permission})['events']
             chat=packet.get('chat',{})
             external=chat.get('externalCursor',0)

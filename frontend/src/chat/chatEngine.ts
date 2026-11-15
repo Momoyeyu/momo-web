@@ -568,10 +568,7 @@ export class ChatEngine {
     const paused=!this.sceneActive||typeof document!=="undefined"&&document.visibilityState==="hidden";
     const turn=this.turn;
     if(turn && typeof turn.screenGeneration==='object' && (paused||turn.silentGame)){
-      turn.silentGame=true;
-      turn.audioAbort.abort();
-      this.safe(()=>this.player.stop());
-      this.tryStage(stage=>stage.cancelPerformance());
+      this.silenceGame(turn);
       this.setPresentationPaused(paused);
       this.maybeFinish(turn);
       return;
@@ -735,6 +732,7 @@ export class ChatEngine {
           this.pushSentence(turn, cfg, ev.text, ev.cues, ev);
           if(this.presentationPaused)this.applyPresentationVisibility();
         } else if(ev.t==='done') {
+          if(ev.suppressed&&typeof turn.screenGeneration==='object')this.silenceGame(turn);
           if(ev.generation!=null)turn.generation=ev.generation;
           if(ev.runId)turn.runId=ev.runId;
           if(ev.presentationToken)turn.presentationToken=ev.presentationToken;
@@ -1011,6 +1009,13 @@ export class ChatEngine {
         if(this.turn===turn){turn.finished=false;this.maybeFinish(turn);}
       },350);
     });
+  }
+
+  private silenceGame(turn:Turn):void {
+    turn.silentGame=true;
+    turn.audioAbort.abort();
+    this.safe(()=>this.player.stop());
+    this.tryStage(stage=>stage.cancelPerformance());
   }
 
   private completeTurn(turn: Turn): void {

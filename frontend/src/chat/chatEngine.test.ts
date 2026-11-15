@@ -613,3 +613,20 @@ it('retries a lost hidden game presentation receipt without re-executing the dec
   expect(chatMock).toHaveBeenCalledTimes(1);expect(eng.status).toBe('idle');
  }finally{eng.dispose();}
 });
+
+it('retires queued game commentary when the server suppresses a revoked decision',async()=>{
+ const owner={clientId:'owner',leaseId:'lease'};vi.mocked(meetingIdentity).mockReturnValue(owner);
+ let cancel:()=>void=()=>{};const gate=new Promise<void>(resolve=>{cancel=resolve;});
+ chatMock.mockImplementation(async function*(){
+  yield {t:'sentence',no:0,text:'Seen. Must not finish.',cues:[],at:'',runId:'revoked-game',generation:7,presentationToken:'revoked-token'};
+  await gate;yield {t:'done',suppressed:true};
+ });
+ const {eng}=makeEngine();
+ try{
+  eng.sendGameDecision(9);await tick();
+  const turn=internals(eng).turn!;clearInterval(turn.timer);turn.disp.reveal=5;
+  cancel();await tick(10);
+  expect(acknowledgePresentation).toHaveBeenCalledWith('revoked-game','revoked-token',7,'discarded','Seen.',owner);
+  expect(eng.status).toBe('idle');expect(interruptMock).not.toHaveBeenCalled();
+ }finally{eng.dispose();}
+});
