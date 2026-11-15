@@ -66,7 +66,7 @@ public final class GameSkills {
   boolean placeSent,inventoryPending,buttonPending,protectSupport,swimming;String placedItem;int verifiedActions;
   net.minecraft.client.world.ClientWorld proofWorld;int proofHandler;long slotBoundary;SlotProof slotProof;
   Map<String,Object> verifiedGain=Map.of(),verifiedSlots=Map.of();
-  InteractionOutcome interaction;
+  InteractionOutcome interaction;SeenTarget<BlockPos> seenTarget;
   Skill(String skill,JsonObject args){this.skill=skill;this.args=args;ownedScreen=c.currentScreen;}
   public void start(){
    if(c.player==null||c.world==null||c.interactionManager==null)throw new TaskRuntime.Rejected("world_unavailable");
@@ -82,13 +82,13 @@ public final class GameSkills {
    }
    if(Set.of("follow","interactEntity","attack").contains(skill)){
     entity=c.world.getEntityById(args.get("entityId").getAsInt());
-    if(entity==null||!c.player.canSee(entity)||entity.squaredDistanceTo(c.player)>1024)throw new TaskRuntime.Rejected("target_not_visible");lastSeen=entity.getBlockPos();
+    if(entity==null||!c.player.canSee(entity)||entity.squaredDistanceTo(c.player)>1024)throw new TaskRuntime.Rejected("target_not_visible");lastSeen=entity.getBlockPos();seenTarget=new SeenTarget<>(lastSeen,60);
    }
    if(skill.equals("navigate"))go(pos);
    if(skill.equals("place")){
     targetSlot=args.get("slot").getAsInt();c.player.getInventory().selectedSlot=targetSlot;var stack=c.player.getMainHandStack();
     if(!(stack.getItem() instanceof BlockItem))throw new TaskRuntime.Rejected("block_item_required");
-    placedItem=Registries.ITEM.getId(stack.getItem()).toString();var dir=direction(args);var hit=new BlockHitResult(pos.toCenterPos().add(Vec3d.of(dir.getVector()).multiply(.5)),dir,pos,false);
+    placedItem=Registries.ITEM.getId(stack.getItem()).toString();var hit=BlockSight.hit(c,pos,direction(args));if(hit==null)throw new TaskRuntime.Rejected("target_not_visible");
     placed=new ItemPlacementContext(c.player,Hand.MAIN_HAND,stack,hit).getBlockPos();beforeState=c.world.getBlockState(placed).toString();
    }
    if(skill.equals("pickup")){
@@ -96,7 +96,7 @@ public final class GameSkills {
     if(PickupLedger.CURRENT.since(c.world,id,c.player.getId(),pickupBoundary)==null){
      entity=c.world.getEntityById(id);
      if(!(entity instanceof net.minecraft.entity.ItemEntity drop)||!c.player.canSee(entity))throw new TaskRuntime.Rejected("target_not_visible");
-     outputItem=Registries.ITEM.getId(drop.getStack().getItem()).toString();beforeCount=count(outputItem);
+     outputItem=Registries.ITEM.getId(drop.getStack().getItem()).toString();beforeCount=count(outputItem);seenTarget=new SeenTarget<>(entity.getBlockPos(),60);
     }
    }
    if(skill.equals("trade")){
@@ -158,8 +158,9 @@ public final class GameSkills {
      if(phase>=4){haltNavigation();c.player.setPitch(NavigationBounds.horizonPitch(c.player.getPitch()));return done(Map.of("x",c.player.getX(),"y",c.player.getY(),"z",c.player.getZ(),"arrived",true));}
      if(NavigationBounds.failed(arrived,navigation.failed()))return TaskRuntime.Step.failed("unreachable");break;
     case "follow":
-     if(!entity.isAlive()||entity.squaredDistanceTo(c.player)>4096)return TaskRuntime.Step.failed("target_lost");
+     if(!entity.isAlive())return TaskRuntime.Step.failed("target_lost");
      if(!c.player.canSee(entity)){if(++lostTicks>60)return TaskRuntime.Step.failed("target_lost");approach(lastSeen,20);break;}lostTicks=0;lastSeen=entity.getBlockPos();
+     if(entity.squaredDistanceTo(c.player)>4096)return TaskRuntime.Step.failed("target_lost");
      if(FollowDuration.complete(ticks,args.has("ticks")?args.get("ticks").getAsInt():null))return done(Map.of("entityId",entity.getId(),"distance",Math.sqrt(entity.squaredDistanceTo(c.player)),"elapsedGameTicks",ticks,"nearby",entity.squaredDistanceTo(c.player)<9));
      if(entity.squaredDistanceTo(c.player)<9){stopSwimming();haltNavigation();break;}
      if(!swimToward(entity,entity.getEyePos()))approach(entity.getBlockPos(),20);break;
@@ -190,7 +191,7 @@ public final class GameSkills {
      if(placementWindow(c.currentScreen)){if(ticks-mutationTick>100)return TaskRuntime.Step.failed("server_confirmation_missing");break;}
      if(!reachable(pos)){approach(pos,20);break;}haltNavigation();
      if(++phase>100)return TaskRuntime.Step.failed(built==null&&placeSent?"server_confirmation_missing":"placement_blocked_or_material_missing");
-     if(ticks%6==1){var direction=direction(args);var hit=new BlockHitResult(pos.toCenterPos().add(Vec3d.of(direction.getVector()).multiply(.5)),direction,pos,false);look(hit.getPos());if(!placeSent){blockBoundary=BlockReceipts.CURRENT.cursor();slotBoundary=InventoryReceipts.CURRENT.cursor();mutationTick=ticks;placeSent=true;}c.interactionManager.interactBlock(c.player,Hand.MAIN_HAND,hit);c.player.swingHand(Hand.MAIN_HAND);}break;
+     if(ticks%6==1){var hit=BlockSight.hit(c,pos,direction(args));if(hit==null)return TaskRuntime.Step.failed("target_not_visible");if(!new ItemPlacementContext(c.player,Hand.MAIN_HAND,c.player.getMainHandStack(),hit).getBlockPos().equals(placed))return TaskRuntime.Step.failed(placeSent?"server_confirmation_missing":"placement_blocked_or_material_missing");look(hit.getPos());if(!placeSent){blockBoundary=BlockReceipts.CURRENT.cursor();slotBoundary=InventoryReceipts.CURRENT.cursor();mutationTick=ticks;placeSent=true;}c.interactionManager.interactBlock(c.player,Hand.MAIN_HAND,hit);c.player.swingHand(Hand.MAIN_HAND);}break;
     case "interactBlock":
      if(phase==0){
       if(!reachable(pos)){approach(pos,20);break;}haltNavigation();
@@ -200,6 +201,8 @@ public final class GameSkills {
      return interactionResult();
     case "interactEntity":
      if(phase==0){
+      if(!entity.isAlive())return TaskRuntime.Step.failed("target_lost");
+      if(!visibleApproach())break;
       if(entity.squaredDistanceTo(c.player)>9){if(!swimToward(entity,entity.getEyePos()))approach(entity.getBlockPos(),20);break;}stopSwimming();haltNavigation();
       look(entity.getEyePos());beginInteraction(entity.getId());c.interactionManager.interactEntity(c.player,entity,Hand.MAIN_HAND);interaction.confirmWindow(c.currentScreen);
      }
@@ -208,6 +211,7 @@ public final class GameSkills {
      var receipt=PickupLedger.CURRENT.since(c.world,args.get("entityId").getAsInt(),c.player.getId(),pickupBoundary);
      if(receipt!=null)return done(Map.of("entityId",receipt.entityId(),"pickedCount",receipt.amount(),"serverPickupSeq",receipt.seq()));
      if(entity==null||entity.isRemoved())return TaskRuntime.Step.failed("drop_gone_without_own_pickup");
+     if(!visibleApproach())break;
      if(swimToward(entity,entity.getPos())){if(++lostTicks>200)return TaskRuntime.Step.failed("unreachable");break;}
      if(navigating&&navigation.arrived()&&pathTarget.equals(entity.getBlockPos())){haltNavigation();phase=1;}
      if(phase>0){
@@ -382,7 +386,15 @@ public final class GameSkills {
    return Map.of("beforeDigest",digest(inventoryBefore),"afterDigest",digest(after),"screen",screenName(),"slots",slots,"cursor",GameObservation.stack(c.player.currentScreenHandler.getCursorStack()),"completedActions",verifiedActions,"serverConfirmationSeq",InventoryReceipts.CURRENT.cursor());
   }
   private static String digest(String value){try{return HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}}
+  private boolean visibleApproach(){
+   boolean visible=c.player.canSee(entity);lastSeen=seenTarget.sample(visible,()->entity.getBlockPos());
+   if(seenTarget.lost())throw new TaskRuntime.Rejected("target_lost");
+   if(visible)return true;
+   stopSwimming();if(c.player.squaredDistanceTo(lastSeen.toCenterPos())>4)approach(lastSeen,20);else{haltNavigation();look(lastSeen.toCenterPos());}
+   return false;
+  }
   private boolean swimToward(Entity target,Vec3d lookAt){
+   if(!c.player.canSee(target)){stopSwimming();return false;}
    var delta=target.getPos().subtract(c.player.getPos());
    var motion=WaterApproach.swim(c.player.isTouchingWater(),target.isTouchingWater(),c.player.canSee(target),delta.x,delta.y,delta.z);
    if(!motion.steer()){stopSwimming();return false;}
@@ -396,7 +408,7 @@ public final class GameSkills {
    boolean surface=navigate&&args.has("height")&&args.get("height").getAsString().equals("surface");
    // Long water approaches use the collision-aware surface route; the short
    // visible approach handles vertical swimming once the target is nearby.
-   if(!navigate&&entity!=null&&WaterApproach.surfaceRoute(c.player.isTouchingWater(),entity.isTouchingWater()))surface=true;
+   if(!navigate&&entity!=null&&c.player.canSee(entity)&&WaterApproach.surfaceRoute(c.player.isTouchingWater(),entity.isTouchingWater()))surface=true;
    boolean adapt=navigate&&args.has("terrain")&&args.get("terrain").getAsString().equals("adapt");
    // Exact navigation names the feet block. Interaction approaches may stop
    // nearby, but must not make a different floor count as an exact arrival.

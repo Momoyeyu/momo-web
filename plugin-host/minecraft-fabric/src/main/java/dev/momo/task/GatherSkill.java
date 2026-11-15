@@ -37,7 +37,7 @@ public final class GatherSkill implements TaskRuntime.Work {
    target=null;foliage=null;phase="search";idle=0;scan=0;return TaskRuntime.Step.running();
   }
   // Pickup entities are already visible normal-player facts, not remote loot scans.
-  var drop=c.world.getOtherEntities(c.player,c.player.getBoundingBox().expand(16),e->blockedDrops.getOrDefault(e.getId(),0)<=ticks&&e instanceof net.minecraft.entity.ItemEntity d&&Registries.ITEM.getId(d.getStack().getItem()).toString().equals(item)&&c.player.canSee(e)).stream().min(Comparator.comparingDouble(e->e.squaredDistanceTo(c.player)));
+  var drop=c.world.getOtherEntities(c.player,c.player.getBoundingBox().expand(16),e->blockedDrops.getOrDefault(e.getId(),0)<=ticks&&e instanceof net.minecraft.entity.ItemEntity d&&c.player.canSee(e)&&Registries.ITEM.getId(d.getStack().getItem()).toString().equals(item)).stream().min(Comparator.comparingDouble(e->e.squaredDistanceTo(c.player)));
   if(drop.isPresent()){dropTarget=drop.get().getId();var args=new JsonObject();args.addProperty("entityId",dropTarget);begin("pickup",args);return TaskRuntime.Step.running();}
   if(++idle<12)return TaskRuntime.Step.running(); // Allow normal drops/server inventory updates to arrive.
   // At most sixteen sight rays per tick; read only the first visible hit of each.
