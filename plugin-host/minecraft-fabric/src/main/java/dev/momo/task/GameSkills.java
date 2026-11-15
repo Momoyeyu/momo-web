@@ -21,10 +21,12 @@ public final class GameSkills {
  public static final List<String> NAMES=List.copyOf(SkillArguments.contract().keySet());
  private GameSkills(){}
  static TaskRuntime.Work consumeFood(){return new Skill("eat",new JsonObject());}
- static TaskRuntime.Work gatherMine(JsonObject args){SkillArguments.validate("mine",args);var work=new Skill("mine",args.deepCopy());work.protectSupport=true;return work;}
+ static TaskRuntime.Work rawMine(JsonObject args,boolean protectedSupport){var work=new Skill("mine",args.deepCopy());work.protectSupport=protectedSupport;return work;}
+ static TaskRuntime.Work gatherMine(JsonObject args){SkillArguments.validate("mine",args);return new PreparedMineSkill(args,true);}
  public static TaskRuntime.Work create(String skill,JsonObject args){
   SkillArguments.validate(skill,args);
   if(skill.equals("gather"))return new GatherSkill(args);
+  if(skill.equals("mine"))return new PreparedMineSkill(args,false);
   if(skill.equals("eat"))return new EatSkill();
   if(skill.equals("selectItem"))return new SelectItemSkill(args);
   if(skill.equals("placeNearby"))return new NearbyPlacementSkill(args);

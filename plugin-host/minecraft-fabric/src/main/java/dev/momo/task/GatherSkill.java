@@ -59,7 +59,7 @@ public final class GatherSkill implements TaskRuntime.Work {
     if(clearedLeaves<8&&item.endsWith("_log")&&block.equals(item.substring(0,item.length()-4)+"_leaves")&&c.player.canInteractWithBlockAt(pos,0)&&(foliage==null||pos.getSquaredDistance(c.player.getPos())<foliage.getSquaredDistance(c.player.getPos())))foliage=pos.toImmutable();
     continue;
    }
-   if(state.isToolRequired()){boolean suitable=false;for(int i=0;i<9;i++)if(c.player.getInventory().getStack(i).isSuitableFor(state))suitable=true;if(!suitable){lastFailure="tool_required";blocked.put(pos.toImmutable(),ticks+200);continue;}}
+   if(state.isToolRequired()&&!c.player.getAbilities().creativeMode){boolean suitable=false;for(int i=0;i<36;i++)if(c.player.getInventory().getStack(i).isSuitableFor(state))suitable=true;if(!suitable){lastFailure="tool_required";blocked.put(pos.toImmutable(),ticks+200);continue;}}
    target=pos.toImmutable();var args=new JsonObject();args.addProperty("x",pos.getX());args.addProperty("y",pos.getY());args.addProperty("z",pos.getZ());begin("mine",args);return TaskRuntime.Step.running();
   }
   if(scan>=512){
@@ -74,6 +74,7 @@ public final class GatherSkill implements TaskRuntime.Work {
  }
  public void pause(){if(child!=null)child.pause();}
  public boolean controlsMining(){return child!=null&&child.controlsMining();}
+ public boolean acceptsScreen(Object screen){return child!=null&&child.acceptsScreen(screen);}
  public boolean retrySafe(String reason){return Set.of("source_not_visible","target_not_visible","tool_required","unreachable").contains(reason);}
  public void resume(){if(child!=null)child.resume();}
  public void stop(){if(child!=null){child.stop();child=null;}}

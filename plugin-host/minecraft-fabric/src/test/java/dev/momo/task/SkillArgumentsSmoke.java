@@ -26,6 +26,7 @@ public final class SkillArgumentsSmoke {
   validate("placeNearby","{\"item\":\"minecraft:crafting_table\"}");
   reject("selectItem","{\"item\":\"minecraft:stone\",\"hotbar\":9}");
   ItemSelectionSmoke.main(args);
+  MiningToolChoiceSmoke.main(args);
   validate("rename","{\"name\":\"\"}");
   reject("rename","{\"name\":\"line\\nbreak\"}");
   validate("gather","{\"item\":\"minecraft:oak_log\",\"count\":4}");
