@@ -4,6 +4,12 @@ public final class ControlAdmissionSmoke {
   if(!expected.equals(ControlAdmission.reject(type,focused,paused,takeover,scene,screen,owned,dead,skill)))throw new AssertionError("unsafe "+type+" admission");
  }
  public static void main(String[] args){
+  var runtime=new TaskRuntime();var body=new TaskRuntimeSmoke.Work();runtime.submit("body","wait",body,0,1000);
+  if(!ControlAdmission.bodyConflict("play",runtime.active()).equals("BODY_BUSY"))throw new AssertionError("legacy input must have a known pre-dispatch rejection while semantic work is queued");
+  runtime.tick(1);
+  if(!ControlAdmission.bodyConflict("play",runtime.active()).equals("BODY_BUSY")||!runtime.snapshot("body").state().equals("running")||body.stops!=0)throw new AssertionError("a busy rejection must preserve the running task, not revoke the body as an unknown result");
+  for(String type:new String[]{"observe","task","events","cancel","pause","stop","chat"})if(!ControlAdmission.bodyConflict(type,runtime.active()).isEmpty())throw new AssertionError("read, chat and explicit stop/pause must stay usable while busy");
+  runtime.stop("requested");if(!ControlAdmission.bodyConflict("play",runtime.active()).isEmpty())throw new AssertionError("an idle body remains available for the UI fallback");
   for(String type:new String[]{"submit","play","follow","chat"}){
    check("BODY_PAUSED",type,true,true,false,false,false,false,false,"");
    check("BODY_PAUSED",type,true,false,true,false,false,false,false,"");

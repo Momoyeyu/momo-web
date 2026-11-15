@@ -173,6 +173,8 @@ public final class CompanionClient implements ClientModInitializer {
   rememberScreen(client);
   String admission=dev.momo.task.ControlAdmission.reject(type,client.isWindowFocused(),pauseBarrier.isPaused(),physicalTakeover,sceneObservationRequired,client.currentScreen!=null,ownsScreen(client),!client.player.isAlive(),command.has("skill")?command.get("skill").getAsString():"");
   if(!admission.isEmpty()){result.addProperty("accepted",false);result.addProperty("error",admission);return result;}
+  String conflict=dev.momo.task.ControlAdmission.bodyConflict(type,tasks.active());
+  if(!conflict.isEmpty()){result.addProperty("accepted",false);result.addProperty("error",conflict);return result;}
   switch (type) {
    case "capabilities" -> {
     result.addProperty("protocol",1);result.addProperty("taskProtocol",1);
