@@ -346,7 +346,7 @@ public final class CompanionClient implements ClientModInitializer {
   String key=cmd.get("control").getAsString();
   int duration=cmd.get("durationMs").getAsInt();
   if(duration<1 || duration>10000 || c.interactionManager==null) throw new IllegalArgumentException("Invalid input");
-  survival.stop(true);releaseLegacy(c);
+  survival.settle(true);releaseLegacy(c);
   if(!controlLease.armed()||controlLease.leaseExpired(System.nanoTime()/1000000))throw new IllegalStateException("Control activity expired");
   var p=c.player;
   if(key.equals("respawn") && !p.isAlive()) {p.requestRespawn();return;}
@@ -418,7 +418,7 @@ public final class CompanionClient implements ClientModInitializer {
  }
  private SurvivalPolicy.Mode chooseReflex(boolean combatOwned,boolean mealOwned){
   var desired=survival.choose(combatOwned,mealOwned);
-  if(!survival.replanReason().isEmpty()){tasks.interrupt(survival.replanReason());survival.stop();return SurvivalPolicy.Mode.NONE;}
+  if(!survival.replanReason().isEmpty()){tasks.interrupt(survival.replanReason());survival.settle();return SurvivalPolicy.Mode.NONE;}
   return desired;
  }
  private void tick(MinecraftClient client) {
@@ -444,7 +444,7 @@ public final class CompanionClient implements ClientModInitializer {
     if(survival.interruptOwnedScreen(danger,true)){client.player.closeHandledScreen();survival.drive(danger);return;}
    }
    if(survival.canDrive(pauseBarrier.isPaused(),client.isWindowFocused(),client.currentScreen)){var reflex=chooseReflex(false,false);if(reflex!=SurvivalPolicy.Mode.NONE){survival.drive(reflex);return;}}
-   survival.stop();
+   survival.settle();
    // Idle survival remains bounded by the renewable body lease.
    return;
   }
@@ -455,7 +455,7 @@ public final class CompanionClient implements ClientModInitializer {
    if(!pauseBarrier.isPaused()&&survival.acceptsScreen(client.currentScreen)){
     var reflex=chooseReflex(tasks.handlesCombat(),tasks.handlesEating());
     tasks.pause();tasks.tick(localNow);
-    if(tasks.active())survival.drive(reflex);else survival.stop();
+    if(tasks.active())survival.drive(reflex);else survival.settle();
     return;
    }
    if(!pauseBarrier.isPaused()&&client.currentScreen!=null&&ownsScreen(client)){
@@ -468,9 +468,9 @@ public final class CompanionClient implements ClientModInitializer {
    }
    if(!pauseBarrier.isPaused()&&client.currentScreen==null){
     var reflex=chooseReflex(tasks.handlesCombat(),tasks.handlesEating());
-    if(reflex!=SurvivalPolicy.Mode.NONE){tasks.pause();tasks.tick(System.nanoTime()/1000000);if(tasks.active())survival.drive(reflex);else survival.stop();return;}
+    if(reflex!=SurvivalPolicy.Mode.NONE){tasks.pause();tasks.tick(System.nanoTime()/1000000);if(tasks.active())survival.drive(reflex);else survival.settle();return;}
    }
-   survival.stop();
+   survival.settle();
    if(!pauseBarrier.isPaused())tasks.resume();
    tasks.tick(System.nanoTime()/1000000);
    rememberScreen(client);

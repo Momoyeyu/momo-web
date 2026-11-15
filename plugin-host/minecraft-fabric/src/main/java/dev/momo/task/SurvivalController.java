@@ -15,6 +15,7 @@ public final class SurvivalController {
  private TaskRuntime.Work foodWork,combatWork;private long foodRetryUntil,combatRetryUntil;private String replanReason="";
  private CombatWithdrawal withdrawal=new CombatWithdrawal();
  private final BlastAvoidance blasts=new BlastAvoidance();
+ private final RetreatMemory retreatMemory=new RetreatMemory();
  private MinecraftClient client(){return MinecraftClient.getInstance();}
  public boolean interruptOwnedScreen(SurvivalPolicy.Mode desired,boolean owned){return policy.interruptOwnedScreen(desired,owned);}
  public boolean acceptsScreen(Object screen){return screen!=null&&foodWork!=null&&foodWork.acceptsScreen(screen);}
@@ -26,6 +27,7 @@ public final class SurvivalController {
  public SurvivalPolicy.Mode choose(boolean combatOwned,boolean mealOwned){
   var c=client();var p=c.player;
   if(p==null||c.world==null||!p.isAlive())return SurvivalPolicy.Mode.NONE;
+  retreatMemory.health(p.getHealth());retreatMemory.damage(p.getRecentDamageSource());
   blasts.update(p.getX(),p.getY(),p.getZ(),c.world.getEntitiesByClass(CreeperEntity.class,p.getBoundingBox().expand(16),e->e.isAlive()&&p.canSee(e)).stream()
     .map(e->new BlastAvoidance.Creeper(e.getId(),e.getX(),e.getY(),e.getZ(),true,e.getFuseSpeed()>0||e.getClientFuseTime(0)>0,e.shouldRenderOverlay())).toList());
   // Preserve one borrowed combat owner while it pursues/briefly reacquires its
@@ -45,13 +47,14 @@ public final class SurvivalController {
   if(threat==null)threatPosition=null;else if(p.canSee(threat))threatPosition=threat.getPos();
   boolean eating=foodWork!=null||(p.isUsingItem()&&p.getActiveItem().contains(DataComponentTypes.FOOD));
   boolean critical=blasts.active()||p.isInLava()||policy.airCritical(p.getAir(),mode==SurvivalPolicy.Mode.ESCAPE)||(p.isOnFire()&&p.getHealth()<8);
-  var desired=policy.choose(true,false,critical,p.getHealth(),p.getHungerManager().getFoodLevel(),foodWork!=null||(System.nanoTime()>=foodRetryUntil&&foodSlot()>=0),eating,threat!=null);
+  boolean hostile=threat!=null&&!retreatMemory.defer(threat.getId(),p.squaredDistanceTo(threatPosition));
+  var desired=policy.choose(true,false,critical,p.getHealth(),p.getHungerManager().getFoodLevel(),foodWork!=null||(System.nanoTime()>=foodRetryUntil&&foodSlot()>=0),eating,hostile);
   desired=policy.forBody(desired,mealOwned||(mode==SurvivalPolicy.Mode.NONE&&eating),combatOwned);
   if(desired==SurvivalPolicy.Mode.DEFEND&&System.nanoTime()<combatRetryUntil)desired=SurvivalPolicy.Mode.NONE;
   if(mode==SurvivalPolicy.Mode.ESCAPE&&combatRetreat&&!critical){
    String retreat=threat==null||!threat.isAlive()?"retreated_low_health":withdrawal.update(p.getHealth(),p.squaredDistanceTo(threatPosition),ticks);
    if(retreat.equals("retreating"))desired=SurvivalPolicy.Mode.ESCAPE;
-   else{replanReason=retreat;desired=SurvivalPolicy.Mode.NONE;}
+   else{if(retreat.equals("retreated_low_health")&&threat!=null)retreatMemory.reachedSafety(threat.getId());replanReason=retreat;desired=SurvivalPolicy.Mode.NONE;}
   }
   return desired;
  }
@@ -72,8 +75,8 @@ public final class SurvivalController {
     try{
      if(foodWork==null){foodWork=GameSkills.create("eat",new com.google.gson.JsonObject());foodWork.start();}
      var result=foodWork.tick();
-     if(!result.state().equals("running")){if(!result.state().equals("succeeded"))foodRetryUntil=System.nanoTime()+5_000_000_000L;stop();}
-    }catch(RuntimeException error){foodRetryUntil=System.nanoTime()+5_000_000_000L;stop();}
+     if(!result.state().equals("running")){if(!result.state().equals("succeeded"))foodRetryUntil=System.nanoTime()+5_000_000_000L;settle();}
+    }catch(RuntimeException error){foodRetryUntil=System.nanoTime()+5_000_000_000L;settle();}
    }
    case DEFEND -> {
     if(threat==null)return;
@@ -83,8 +86,8 @@ public final class SurvivalController {
       var args=new com.google.gson.JsonObject();args.addProperty("entityId",threat.getId());combatWork=GameSkills.create("attack",args);combatWork.start();
      }
      var result=combatWork.tick();
-     if(!result.state().equals("running")){boolean failed=!result.state().equals("succeeded");stop();if(failed){replanReason="defense_blocked";combatRetryUntil=System.nanoTime()+5_000_000_000L;}}
-    }catch(RuntimeException error){stop();replanReason="defense_blocked";combatRetryUntil=System.nanoTime()+5_000_000_000L;}
+     if(!result.state().equals("running")){boolean failed=!result.state().equals("succeeded");settle();if(failed){replanReason="defense_blocked";combatRetryUntil=System.nanoTime()+5_000_000_000L;}}
+    }catch(RuntimeException error){settle();replanReason="defense_blocked";combatRetryUntil=System.nanoTime()+5_000_000_000L;}
    }
    case ESCAPE -> {
     p.setPitch(policy.escapePitch(p.isTouchingWater()&&p.getAir()<250,p.getPitch()));
@@ -103,10 +106,12 @@ public final class SurvivalController {
    default -> {}
   }
  }
+ public void settle(){stop(false,true);}
+ public void settle(boolean preserveScreen){stop(preserveScreen,true);}
  public void stop(){stop(false);}
  public void stop(boolean preserveScreen){stop(preserveScreen,false);}
- private void stop(boolean preserveScreen,boolean preserveBlast){
-  if(!preserveBlast)blasts.clear();
+ private void stop(boolean preserveScreen,boolean preserveReflexState){
+  if(!preserveReflexState){blasts.clear();retreatMemory.clear();}
   var c=client();boolean mealScreen=acceptsScreen(c.currentScreen);
   if(foodWork!=null){foodWork.stop();foodWork=null;}
   if(combatWork!=null){combatWork.stop();combatWork=null;}
