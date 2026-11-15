@@ -179,7 +179,7 @@ public final class GameSkills {
      if(ticks%6==1){var direction=direction(args);var hit=new BlockHitResult(pos.toCenterPos().add(Vec3d.of(direction.getVector()).multiply(.5)),direction,pos,false);look(hit.getPos());if(!placeSent){blockBoundary=BlockReceipts.CURRENT.cursor();placeSent=true;}c.interactionManager.interactBlock(c.player,Hand.MAIN_HAND,hit);c.player.swingHand(Hand.MAIN_HAND);}break;
     case "interactBlock":
      if(!reachable(pos)){approach(pos,20);break;}haltNavigation();
-     if(phase++==0){look(pos.toCenterPos());c.interactionManager.interactBlock(c.player,Hand.MAIN_HAND,new BlockHitResult(pos.toCenterPos(),face(pos),pos,false));}
+     if(phase++==0){var hit=sightHit(pos);if(hit==null)return TaskRuntime.Step.failed("target_not_visible");look(hit.getPos());c.interactionManager.interactBlock(c.player,Hand.MAIN_HAND,hit);}
      if(ticks>4&&(c.currentScreen!=ownedScreen||!c.world.getBlockState(pos).toString().equals(beforeState)||!inventoryState().equals(inventoryBefore)||c.player.hasVehicle()||c.player.isSleeping()))return done(Map.of("screen",screenName(),"block",c.world.getBlockState(pos).toString(),"riding",c.player.hasVehicle(),"sleeping",c.player.isSleeping()));
      if(phase>80)return TaskRuntime.Step.failed("no_interaction_result");break;
     case "interactEntity":
@@ -385,9 +385,19 @@ public final class GameSkills {
   }
   private void haltNavigation(){if(navigating){navigation.stop();navigating=false;}}
   private RaycastContext.ShapeType sightShape(BlockPos target){return c.world.getBlockState(target).getCollisionShape(c.world,target).isEmpty()?RaycastContext.ShapeType.OUTLINE:RaycastContext.ShapeType.COLLIDER;}
-  private boolean visible(BlockPos target){var eye=c.player.getEyePos();if(eye.squaredDistanceTo(target.toCenterPos())>1024)return false;var hit=c.world.raycast(new RaycastContext(eye,target.toCenterPos(),sightShape(target),RaycastContext.FluidHandling.NONE,c.player));return hit.getType()==HitResult.Type.BLOCK&&hit.getBlockPos().equals(target);}
+  private BlockHitResult sightHit(BlockPos target){
+   var eye=c.player.getEyePos();if(eye.squaredDistanceTo(target.toCenterPos())>1024)return null;
+   var state=c.world.getBlockState(target);var shape=state.getCollisionShape(c.world,target);if(shape.isEmpty())shape=state.getOutlineShape(c.world,target);
+   for(var box:shape.getBoundingBoxes().stream().limit(16).toList()){
+    var point=box.getCenter().add(target.getX(),target.getY(),target.getZ());
+    var hit=c.world.raycast(new RaycastContext(eye,point,sightShape(target),RaycastContext.FluidHandling.NONE,c.player));
+    if(hit.getType()==HitResult.Type.BLOCK&&hit.getBlockPos().equals(target))return hit;
+   }
+   return null;
+  }
+  private boolean visible(BlockPos target){return sightHit(target)!=null;}
   private boolean reachable(BlockPos target){return c.player.canInteractWithBlockAt(target,0)&&visible(target);}
-  private Direction face(BlockPos target){var ray=c.world.raycast(new RaycastContext(c.player.getEyePos(),target.toCenterPos(),sightShape(target),RaycastContext.FluidHandling.NONE,c.player));return ray.getSide();}
+  private Direction face(BlockPos target){var hit=sightHit(target);if(hit==null)throw new TaskRuntime.Rejected("target_not_visible");return hit.getSide();}
   private void look(Vec3d target){var delta=target.subtract(c.player.getEyePos());float yaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z)),pitch=(float)-Math.toDegrees(Math.atan2(delta.y,Math.sqrt(delta.x*delta.x+delta.z*delta.z)));c.player.setYaw(c.player.getYaw()+MathHelper.clamp(MathHelper.wrapDegrees(yaw-c.player.getYaw()),-18,18));c.player.setPitch(c.player.getPitch()+MathHelper.clamp(pitch-c.player.getPitch(),-14,14));}
   private void selectTool(){float best=1;int slot=c.player.getInventory().selectedSlot;for(int i=0;i<9;i++){var stack=c.player.getInventory().getStack(i);float speed=stack.getMiningSpeedMultiplier(c.world.getBlockState(pos));if(speed>best){best=speed;slot=i;}}c.player.getInventory().selectedSlot=slot;}
   private int foodSlot(){return FoodInventory.find(c,9);}
