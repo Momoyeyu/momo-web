@@ -86,7 +86,7 @@ class PresentationAckIn(LeaseIn):
     runId: str = Field(min_length=1, max_length=128)
     token: str = Field(min_length=1, max_length=128)
     generation: int = Field(ge=0)
-    outcome: str = Field(pattern="^(completed|stopped|resume)$")
+    outcome: str = Field(pattern="^(completed|stopped|resume|discarded)$")
     text: str = Field(default="", max_length=128000)
 
 
@@ -95,7 +95,10 @@ def presentation(body: PresentationAckIn):
     require(body.clientId, body.leaseId)
     # Validate the owner-bound presentation before changing visible history.
     with runtime.condition:
-        item = runtime.paused_presentations.get(body.token) if body.outcome == "resume" else runtime.presentation
+        item = runtime.presentation_item(body.token, body.outcome)
+        # Discard is an idempotent retirement, not a claim that anything was
+        # displayed. An absent old capability never changes another reply.
+        if body.outcome == "discarded" and item is None: return runtime.snapshot()
         if not item or any(item.get(key) != value for key, value in {"runId": body.runId, "token": body.token, "generation": body.generation, "clientId": body.clientId, "leaseId": body.leaseId}.items()):
             raise HTTPException(409, "Presentation capability is stale")
         if body.outcome == "completed":
@@ -103,7 +106,8 @@ def presentation(body: PresentationAckIn):
             if full != body.text:
                 raise HTTPException(409, "Complete presentation must acknowledge the complete reply")
         if item.get("kind") != "replay" and body.outcome != "resume" and not checkpoint.acknowledge(body.runId, body.text, body.generation, source="meeting"):
-            raise HTTPException(409, "Presentation text belongs to a stale reply")
+            if body.outcome != "discarded" or checkpoint.generation() == body.generation:
+                raise HTTPException(409, "Presentation text belongs to a stale reply")
         try:
             result = runtime.complete_presentation(body.clientId, body.leaseId, body.runId, body.token, body.generation, body.outcome)
         except CoordinationError as error:

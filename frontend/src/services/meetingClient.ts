@@ -146,7 +146,7 @@ export async function controlAttention(action:'focus_on'|'focus_off'|'stop'|'res
   await post('control',{...owner,requestId:crypto.randomUUID(),action});
   await refreshAttention();
 }
-export async function acknowledgePresentation(runId:string,token:string,generation:number,outcome:'completed'|'stopped'|'resume',text:string,owner=meetingIdentity()):Promise<void> {
+export async function acknowledgePresentation(runId:string,token:string,generation:number,outcome:'completed'|'stopped'|'resume'|'discarded',text:string,owner=meetingIdentity()):Promise<void> {
   if(!owner)throw new MeetingError('unavailable');
   await post('presentation',{...owner,runId,token,generation,outcome,text});
 }

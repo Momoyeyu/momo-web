@@ -1320,7 +1320,7 @@
             "title": "Leaseid"
           },
           "outcome": {
-            "pattern": "^(completed|stopped|resume)$",
+            "pattern": "^(completed|stopped|resume|discarded)$",
             "title": "Outcome",
             "type": "string"
           },

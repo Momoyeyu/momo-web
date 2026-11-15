@@ -3,6 +3,8 @@ import {useDesktopWindowBridge,setDesktopMode} from './services/desktopWindow';
 import './styles/desktop-pet.css';
 import {musicDirector} from './audio/director';
 import {useIntro} from './services/introClient';
+import {useMinecraftDecisions} from './services/useMinecraftDecisions';
+import {useActivities} from './services/extensionActivities';
 import {ambient} from './audio/ambient';
 import AppPermissions from './components/AppPermissions';
 import {enterMeeting,leaveMeeting,meetingSnapshot,subscribeMeeting,storedMeetingIdentity,refreshAttention,type AttentionState} from "./services/meetingClient";
@@ -90,6 +92,14 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   const historyReady=activeLease!==null && syncedLease===activeLease;
   const attentionFault=meeting.state==='active' && meeting.attention.activation==='fault';
   const meetingReady = route !== "chat" || meeting.state === "active" && historyReady && !attentionFault;
+  // Chat owns its animated entry. A settings-only reload has no Chat instance
+  // to suspend presentation, so the meeting owner also closes that view gate.
+  useLayoutEffect(()=>{
+    if(route!=='chat'||!ready||!meetingReady)getChatEngine().setSceneActive(false);
+  },[route,ready,meetingReady]);
+  const activities=useActivities();
+  useMinecraftDecisions(route!=='title'&&historyReady&&!attentionFault&&
+    audioIntro==='completed'&&activities.minecraft);
   useEffect(()=>{
     if(!activeLease){setSyncedLease(null);setHistoryFailed(false);return;}
     const request=new AbortController();

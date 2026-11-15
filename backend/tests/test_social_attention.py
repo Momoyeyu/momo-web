@@ -141,6 +141,42 @@ def test_late_streamed_sentence_keeps_the_paused_presentation_capability():
     assert core.presentation is None
     assert not core.paused_presentations
 
+@pytest.mark.parametrize('paused',[False,True])
+def test_discard_hidden_game_speech_releases_only_its_capability_without_publishing_text(monkeypatch,paused):
+    from app.api import meeting
+    core=Coordinator();core.started=True;core.mode='meeting'
+    core.owner={'clientId':'client-one','leaseId':'lease','expiresAt':time.monotonic()+10}
+    monkeypatch.setattr(meeting,'runtime',core)
+    gen=checkpoint.generation()
+    checkpoint.begin_turn('',gen,'at',run_id='game')
+    checkpoint.append_sentence('Not seen or heard.',gen,'at')
+    checkpoint.finish_turn(gen,'at')
+    with core.run('game',client='client-one',lease='lease'):
+        token=core.present('game',gen)
+        if paused:core.complete_presentation('client-one','lease','game',token,gen,'stopped')
+    body=meeting.PresentationAckIn(clientId='client-one',leaseId='lease',runId='game',token=token,generation=gen,outcome='discarded',text='')
+    meeting.presentation(body)
+    assert core.presentation is None and token not in core.paused_presentations
+    assert not db.query("SELECT 1 FROM messages WHERE run_id='game' AND role='assistant' AND visible=1")
+    with core.run('next',client='client-one',lease='lease'):
+        next_token=core.present('next',gen)
+    meeting.presentation(body)  # A lost discard reply may be safely reconciled.
+    assert core.presentation['token']==next_token
+
+def test_discard_paused_speech_does_not_clear_another_active_presentation(monkeypatch):
+    from app.api import meeting
+    core=Coordinator();core.started=True;core.mode='meeting'
+    core.owner={'clientId':'client-one','leaseId':'lease','expiresAt':time.monotonic()+10}
+    monkeypatch.setattr(meeting,'runtime',core)
+    gen=checkpoint.generation();checkpoint.begin_turn('',gen,'at',run_id='old')
+    checkpoint.append_sentence('Seen. Unseen.',gen,'at');checkpoint.finish_turn(gen,'at')
+    with core.run('old',client='client-one',lease='lease'):
+        token=core.present('old',gen);core.complete_presentation('client-one','lease','old',token,gen,'stopped')
+    with core.run('new',client='client-one',lease='lease'):current=core.present('new',gen)
+    meeting.presentation(meeting.PresentationAckIn(clientId='client-one',leaseId='lease',runId='old',token=token,generation=gen,outcome='discarded',text='Seen.'))
+    assert core.presentation['token']==current and token not in core.paused_presentations
+    assert [row['text'] for row in checkpoint.history_page()['messages'] if row['role']=='assistant']==['Seen.']
+
 
 def test_interrupt_retires_a_paused_presentation(monkeypatch):
     from app.api import chat

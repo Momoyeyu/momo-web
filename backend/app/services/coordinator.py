@@ -949,13 +949,30 @@ class Coordinator:
                 self.presentation = {"runId": presented_run, "token": uuid.uuid4().hex, "generation": generation, "clientId": self.owner["clientId"], "leaseId": self.owner["leaseId"], "expiresAt": time.monotonic() + 120}
             return self.presentation["token"]
 
+    def presentation_item(self, token, outcome):
+        if outcome in {"resume", "discarded"}:
+            paused = self.paused_presentations.get(token)
+            if paused is not None or outcome == "resume": return paused
+        if outcome == "discarded":
+            return self.presentation if self.presentation and self.presentation.get("token") == token else None
+        return self.presentation
+
     def complete_presentation(self, client, lease, run_id, token, generation, outcome="completed"):
         self.require_meeting(client, lease)
         with self.condition:
-            item = self.paused_presentations.get(token) if outcome == "resume" else self.presentation
+            item = self.presentation_item(token, outcome)
+            if outcome == "discarded" and item is None: return self.snapshot()
             if not item or any(item.get(k) != value for k, value in {"runId": run_id, "token": token, "generation": generation, "clientId": client, "leaseId": lease}.items()):
                 raise CoordinationError("Presentation capability is stale or belongs to another run")
-            if outcome == "resume":
+            if outcome == "discarded":
+                # Retire only this capability. A later visible reply may already
+                # own presentation; an old hidden turn must not release it.
+                self.paused_presentations.pop(token, None)
+                if self.presentation is item: self.presentation = None
+                if not self.presentation:
+                    self.interrupt_hold = False
+                    self._release_held()
+            elif outcome == "resume":
                 if self.active or self.presentation:
                     raise CoordinationError("Another activity owns attention; retry after it settles")
                 from .checkpoint import generation as current_generation

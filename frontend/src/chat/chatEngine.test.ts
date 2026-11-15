@@ -557,3 +557,59 @@ it('game decisions share the normal engine without a fabricated player message',
  expect(chatMock).toHaveBeenCalledWith('',expect.anything(),expect.anything(),false,expect.any(String),[],{game:7});
  expect(user).not.toHaveBeenCalled();expect(start).not.toHaveBeenCalled();eng.dispose();
 });
+
+it('continues gameplay off the Chat page and retires unpresented speech before the next event',async()=>{
+ const owner={clientId:'owner',leaseId:'lease'};
+ vi.mocked(meetingIdentity).mockReturnValue(owner);
+ chatMock.mockImplementation(async function*(){
+  yield {t:'sentence',no:0,text:'Nobody saw this.',cues:[],at:'',runId:'game-hidden',generation:7,presentationToken:'hidden-token'};
+  yield {t:'done',runId:'game-hidden',generation:7,presentationToken:'hidden-token'};
+ });
+ const {eng}=makeEngine();eng.setSceneActive(false);
+ try{
+  eng.sendGameDecision(9);await tick(10);
+  expect(chatMock).toHaveBeenCalledTimes(1);
+  expect(acknowledgePresentation).toHaveBeenCalledWith('game-hidden','hidden-token',7,'discarded','',owner);
+  expect(eng.history).toHaveLength(0);
+  expect(eng.status).toBe('idle');
+  eng.sendGameDecision(9);await tick(10);
+  expect(chatMock).toHaveBeenCalledTimes(2);
+  expect(interruptMock).not.toHaveBeenCalled();
+ }finally{eng.dispose();}
+});
+
+it('discards only the shown prefix when a game turn leaves Chat and returns mid-stream',async()=>{
+ const owner={clientId:'owner',leaseId:'lease'};vi.mocked(meetingIdentity).mockReturnValue(owner);
+ let finish:()=>void=()=>{};const gate=new Promise<void>(resolve=>{finish=resolve;});
+ chatMock.mockImplementation(async function*(){
+  yield {t:'sentence',no:0,text:'Seen. Not seen.',cues:[],at:'',runId:'game-partial',generation:7,presentationToken:'partial-token'};
+  await gate;yield {t:'done'};
+ });
+ const {eng}=makeEngine();
+ try{
+  eng.sendGameDecision(9);await tick();
+  const turn=internals(eng).turn!;clearInterval(turn.timer);turn.disp.reveal=5;
+  eng.setSceneActive(false);eng.setSceneActive(true);
+  internals(eng).displayTick(turn);finish();await tick(10);
+  expect(acknowledgePresentation).toHaveBeenCalledWith('game-partial','partial-token',7,'discarded','Seen.',owner);
+  expect(vi.mocked(acknowledgePresentation).mock.calls.some(call=>call[3]==='resume')).toBe(false);
+  expect(eng.status).toBe('idle');expect(interruptMock).not.toHaveBeenCalled();
+ }finally{eng.dispose();}
+});
+
+it('retries a lost hidden game presentation receipt without re-executing the decision',async()=>{
+ vi.mocked(meetingIdentity).mockReturnValue({clientId:'owner',leaseId:'lease'});
+ vi.mocked(acknowledgePresentation).mockRejectedValueOnce(new Error('receipt lost'));
+ chatMock.mockImplementation(async function*(){
+  yield {t:'sentence',no:0,text:'Hidden.',cues:[],at:'',runId:'game-retry',generation:7,presentationToken:'retry-token'};
+  yield {t:'done'};
+ });
+ const {eng}=makeEngine();eng.setSceneActive(false);
+ try{
+  eng.sendGameDecision(9);await tick(10);
+  expect(vi.mocked(acknowledgePresentation).mock.calls.filter(call=>call[3]==='discarded')).toHaveLength(1);
+  await new Promise(resolve=>setTimeout(resolve,400));
+  expect(vi.mocked(acknowledgePresentation).mock.calls.filter(call=>call[3]==='discarded')).toHaveLength(2);
+  expect(chatMock).toHaveBeenCalledTimes(1);expect(eng.status).toBe('idle');
+ }finally{eng.dispose();}
+});
