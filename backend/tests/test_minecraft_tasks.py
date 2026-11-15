@@ -148,6 +148,21 @@ def test_native_revision_detects_a_menu_roundtrip_between_python_polls():
   claim=m.claim_decision(0,'owner','lease');m.poll_tasks(0)
   with pytest.raises(MinecraftError,match='revoked'):m.validate_decision(0,claim['decisionRevision'])
 
+@pytest.mark.parametrize('control_paused',[False,True])
+def test_returning_to_a_ready_body_wakes_a_fresh_decision_without_the_idle_delay(control_paused):
+ m,rt=setup();m.autonomous=True;m.decision_needed=False;m.body_revision=8;m.last_decision=100
+ rt.active=rt.presentation=None;rt.queue=[];rt.interrupt_hold=False
+ rt.host.request.side_effect=[{'suspended':False,'controlPaused':control_paused,'controlRevision':10},
+                              {'events':{'cursor':0,'gap':False,'events':[]}}]
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'),patch.object(m,'_background_valid',return_value=True),patch('app.services.intro.restricted',return_value=False),patch('app.services.minecraft.time.monotonic',return_value=103):
+  m.poll_tasks(0)
+  claim=m.claim_decision(0,'owner','lease')
+  if control_paused:
+   assert claim is None and m.paused and not m.autonomous, 'A player takeover still requires fresh player input'
+  else:
+   assert claim is not None, 'A resumed scene is a real event; do not leave the body idle for 30 seconds'
+   assert claim['decisionRevision']==m.decision_revision
+
 def test_missing_native_revision_cannot_pass_a_fresh_automatic_gate():
  m,rt=setup();m.autonomous=True;m.decision_needed=True
  rt.active=rt.presentation=None;rt.queue=[];rt.interrupt_hold=False

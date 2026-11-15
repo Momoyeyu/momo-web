@@ -518,11 +518,16 @@ class Minecraft:
             native_revision=body.get('controlRevision')
             if native_revision is not None and (type(native_revision) is not int or native_revision<0):raise MinecraftError('Invalid Minecraft control revision',code='MINECRAFT_PROTOCOL')
             with self.lock:
-                if native_revision!=self.body_revision:self.decision_revision+=1
+                scene_changed=native_revision!=self.body_revision
+                if scene_changed:self.decision_revision+=1
                 self.body_revision=native_revision
                 self._eligibility(suspended=body.get('suspended',False))
             if body.get('controlPaused'):
                 with self.lock:self._eligibility(paused=True,autonomous=False);self.decision_needed=False
+            elif scene_changed and native_revision is not None:
+                with self.lock:
+                    if self.autonomous and not self.paused and not self.suspended:
+                        self.decision_needed=True
             packet=runtime.host.request('minecraft.events', {'after':cursor,'permission':permission})['events']
             chat=packet.get('chat',{})
             external=chat.get('externalCursor',0)
