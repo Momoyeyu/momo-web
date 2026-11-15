@@ -41,3 +41,10 @@ test('surface navigation does not invent an unused elevation; exact navigation s
  validateSkill('plan',{steps:[{skill:'navigate',args:{x:1,z:2,height:'surface',terrain:'adapt'}}]});
  for(const args of [{x:1,z:2},{x:1,z:2,height:'exact'},{x:1,z:2,height:'surface',y:NaN},{x:1,z:2,height:'surface',y:'64'}])assert.throws(()=>validateSkill('navigate',args),/Invalid/);
 });
+test('ordinary item preparation and nearby placement do not require inventory slot arithmetic',()=>{
+ validateSkill('selectItem',{item:'minecraft:crafting_table'});
+ validateSkill('selectItem',{item:'minecraft:iron_sword',hotbar:2});
+ validateSkill('placeNearby',{item:'minecraft:crafting_table'});
+ validateSkill('plan',{steps:[{skill:'selectItem',args:{item:'minecraft:torch'}},{skill:'placeNearby',args:{item:'minecraft:torch'}}]});
+ for(const [name,args] of [['selectItem',{item:'minecraft:stone',hotbar:9}],['placeNearby',{item:'minecraft:stone',script:'x'}],['selectItem',{item:''}]])assert.throws(()=>validateSkill(name,args),/Invalid/);
+});

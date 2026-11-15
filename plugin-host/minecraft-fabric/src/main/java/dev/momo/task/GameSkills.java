@@ -26,6 +26,8 @@ public final class GameSkills {
   SkillArguments.validate(skill,args);
   if(skill.equals("gather"))return new GatherSkill(args);
   if(skill.equals("eat"))return new EatSkill();
+  if(skill.equals("selectItem"))return new SelectItemSkill(args);
+  if(skill.equals("placeNearby"))return new NearbyPlacementSkill(args);
   if(skill.equals("plan")){
    var work=new ArrayList<TaskPlan.Node>();
    for(var value:args.getAsJsonArray("steps")){
@@ -388,14 +390,7 @@ public final class GameSkills {
   private void haltNavigation(){if(navigating){navigation.stop();navigating=false;}}
   private RaycastContext.ShapeType sightShape(BlockPos target){return c.world.getBlockState(target).getCollisionShape(c.world,target).isEmpty()?RaycastContext.ShapeType.OUTLINE:RaycastContext.ShapeType.COLLIDER;}
   private BlockHitResult sightHit(BlockPos target){
-   var eye=c.player.getEyePos();if(eye.squaredDistanceTo(target.toCenterPos())>1024)return null;
-   var state=c.world.getBlockState(target);var shape=state.getCollisionShape(c.world,target);if(shape.isEmpty())shape=state.getOutlineShape(c.world,target);
-   for(var box:shape.getBoundingBoxes().stream().limit(16).toList()){
-    var point=box.getCenter().add(target.getX(),target.getY(),target.getZ());
-    var hit=c.world.raycast(new RaycastContext(eye,point,sightShape(target),RaycastContext.FluidHandling.NONE,c.player));
-    if(hit.getType()==HitResult.Type.BLOCK&&hit.getBlockPos().equals(target))return hit;
-   }
-   return null;
+   return BlockSight.hit(c,target);
   }
   private boolean visible(BlockPos target){return sightHit(target)!=null;}
   private boolean reachable(BlockPos target){return c.player.canInteractWithBlockAt(target,0)&&visible(target);}

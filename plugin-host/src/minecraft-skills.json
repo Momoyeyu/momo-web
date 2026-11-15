@@ -531,7 +531,9 @@
                   "trade",
                   "gather",
                   "wait",
-                  "rename"
+                  "rename",
+                  "selectItem",
+                  "placeNearby"
                 ]
               },
               "args": {
@@ -651,6 +653,45 @@
       },
       "required": [
         "name"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "selectItem": {
+    "description": "Prepare a real owned item in the main hand by item ID, returning a busy cursor to an empty own slot and using server-verified swaps when needed. Automatically closes its own inventory. Optional hotbar 0..8 is a preferred destination; ordinary use does not require slot arithmetic. Fails honestly for missing items or no cursor storage; never drops items.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "item": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 128
+        },
+        "hotbar": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        }
+      },
+      "required": [
+        "item"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "placeNearby": {
+    "description": "Place one owned block item in a legal nearby empty space within normal reach. Prepares the item automatically, checks actual visible supporting faces, avoids the player and existing blocks, and confirms server placement. No movement, resource discovery or building script. Use place for precise coordinates and face.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "item": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "item"
       ],
       "additionalProperties": false
     }

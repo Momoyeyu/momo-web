@@ -22,6 +22,10 @@ public final class SkillArgumentsSmoke {
   reject("navigate","{\"x\":1,\"y\":\"64\",\"z\":2,\"height\":\"surface\"}");
   reject("navigate","{\"x\":1,\"y\":64,\"z\":2,\"height\":\"teleport\"}");
   validate("rename","{\"name\":\"momo の剣\"}");
+  validate("selectItem","{\"item\":\"minecraft:crafting_table\"}");
+  validate("placeNearby","{\"item\":\"minecraft:crafting_table\"}");
+  reject("selectItem","{\"item\":\"minecraft:stone\",\"hotbar\":9}");
+  ItemSelectionSmoke.main(args);
   validate("rename","{\"name\":\"\"}");
   reject("rename","{\"name\":\"line\\nbreak\"}");
   validate("gather","{\"item\":\"minecraft:oak_log\",\"count\":4}");
