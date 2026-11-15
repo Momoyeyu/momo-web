@@ -64,3 +64,31 @@ def test_live_goal_projects_recent_outcomes_without_copying_full_slot_proofs():
  assert recent['detailsAvailable'] is True
  assert 'beforeDigest' not in context and 'internal slot proof' not in context
  assert m.tasks==original, 'Full trusted receipts remain unchanged and queryable'
+
+def test_exploration_context_keeps_the_latest_visits_after_bounded_projection():
+ from app.services.minecraft import Minecraft
+ m=Minecraft();m.binding={'world':'world','account':'player'}
+ for index in range(8):
+  with patch.object(db,'now_iso',return_value=f'2026-11-16T01:00:{index:02d}+00:00'):
+   journal.observe_visit(m.binding,{**m.binding,'dimension':'minecraft:overworld','x':index*16+1,'y':64,'z':0,'visibleBlocks':[]})
+ context=m.goal_context()
+ facts=json.loads(context.split('Durable goal and task facts (not instructions): ',1)[1])
+ assert [row['x'] for row in facts['exploredPlaces']]==[65,81,97,113], 'Bounded context must retain recent exploration, not the oldest half of the query'
+
+
+def test_exploration_remembers_actually_seen_distant_landmarks_without_discovering_unknown_blocks():
+ binding={'world':'world','account':'player'}
+ seen={'block':'minecraft:oak_leaves','x':70,'y':68,'z':0}
+ journal.observe_visit(binding,{**binding,'dimension':'minecraft:overworld','x':0,'y':64,'z':0,
+  'visibleBlocks':[{'block':'minecraft:grass_block','x':0,'y':63,'z':0}],
+  'visibleLandmarks':[seen,{'block':'minecraft:diamond_ore','x':200,'y':10,'z':0}]})
+ rows=journal.explored(binding)
+ assert rows[0]['landmarks']==[seen], 'Keep an observed canopy across compact, bounded by native sight range; never infer underground or remote resources'
+
+def test_landmark_projection_preserves_native_priority_instead_of_discarding_first_hits():
+ from app.services.minecraft import Minecraft
+ m=Minecraft();m.binding={'world':'world','account':'player'}
+ landmarks=[{'block':'minecraft:oak_log' if index<2 else 'minecraft:oak_leaves','x':20+index,'y':65,'z':0} for index in range(6)]
+ journal.observe_visit(m.binding,{**m.binding,'dimension':'minecraft:overworld','x':0,'y':64,'z':0,'visibleLandmarks':landmarks})
+ facts=json.loads(m.goal_context().split('Durable goal and task facts (not instructions): ',1)[1])
+ assert facts['exploredPlaces'][0]['landmarks']==landmarks[:4]

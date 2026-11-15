@@ -198,14 +198,19 @@ def observe_visit(binding, observation):
     if any(type(v) not in (int,float) or not math.isfinite(v) or abs(v)>30_000_000 for v in xyz):return
     x,y,z=xyz
     landmarks=[]
-    for block in observation.get('visibleBlocks',[])[:8]:
+    samples=[(block,96*96) for block in observation.get('visibleLandmarks',[])[:6]]+[(block,64) for block in observation.get('visibleBlocks',[])[:8]]
+    seen=set()
+    for block,distance_limit in samples:
+        if not isinstance(block,dict):continue
         name=block.get('block','')
         coords=[block.get(k) for k in ('x','y','z')]
         if not isinstance(name,str) or len(name)>128 or not re.fullmatch(r'[a-z0-9_.-]+:[a-z0-9_./-]+',name):continue
         if any(type(v) not in (int,float) or not math.isfinite(v) for v in coords):continue
-        if sum((v-p)**2 for v,p in zip(coords,xyz))>64:continue
+        if sum((v-p)**2 for v,p in zip(coords,xyz))>distance_limit:continue
         if name in {'minecraft:grass_block','minecraft:dirt','minecraft:stone','minecraft:short_grass'}:continue
-        landmarks.append({'block':name,**dict(zip(('x','y','z'),coords))})
+        identity=(name,*coords)
+        if identity in seen:continue
+        seen.add(identity);landmarks.append({'block':name,**dict(zip(('x','y','z'),coords))})
     place={'dimension':dimension,'x':round(x,1),'y':round(y,1),'z':round(z,1),'landmarks':landmarks}
     schema();key=scope(binding)
     with db.tx() as c:

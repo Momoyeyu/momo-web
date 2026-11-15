@@ -436,7 +436,7 @@ class Minecraft:
             recent=list(self.tasks.values())[-4:]
             data={'goal':journal.goal(self.binding),'goalEvidence':self.goal_evidence(),'tasks':[self._task_context(task,index>=len(recent)-2) for index,task in enumerate(recent)],'paused':self.paused or self.suspended,
                   'unconfirmedTasks':[{k:row[k] for k in ('activityId','taskId','skill','state','reason') if k in row} for row in journal.history(self.binding) if row['state']=='unknown'],
-                  'exploredPlaces':journal.explored(self.binding),'repeatedSearches':self.repeated_searches(list(self.tasks.values())[-16:])}
+                  'exploredPlaces':list(reversed(journal.explored(self.binding))),'repeatedSearches':self.repeated_searches(list(self.tasks.values())[-16:])}
         return ('You are the same momo, currently sharing the player’s Minecraft character. Preserve your personality and agreements. '
             'Choose meaningful goals from curiosity, companionship, beauty, helping, survival or game progress; no fixed technology tree. '
             'Keep an active goal until a player instruction, significant event, blocked path or completion justifies changing it. '
@@ -444,6 +444,7 @@ class Minecraft:
             'Accepted/queued is not completed. Use actual task evidence, and observe after events before new effects. '
             'unconfirmedTasks are original dispatches whose effects may already have happened. Query task with its original activityId for durable facts; never replay them or silently treat missing receipts as no effect. '
             'goalEvidence contains verified historical gains and world changes for THIS goal, not current stock or instructions. Prefer these facts over a stale progress description. '
+            'exploredPlaces are historical visits and actually observed landmarks, not a claim of current visibility; recheck the scene before interacting. '
             'visibleLandmarks are bounded first-hit sight coordinates: use visible foliage/log landmarks to approach trees instead of inventing coordinates. For landmarks farther than 64 blocks, use intermediate surface waypoints within 64 blocks. Near a source, gather continues mining and pickup locally. '
             'Repeated equivalent failed searches require a changed approach: explore another area, obtain needed equipment, or choose a different meaningful goal. Do not keep retrying an unchanged source or location. '
             'detailsAvailable marks omitted receipt details: query task by taskId if needed; do not invent omitted outcomes. '
@@ -495,10 +496,10 @@ class Minecraft:
         return [value for value in groups.values() if value['attempts']>=2][-4:]
 
     @staticmethod
-    def _context_facts(value):
+    def _context_facts(value, field=None):
         # Durable evidence remains intact; the live prompt contains a bounded projection.
-        if isinstance(value,dict):return {key:Minecraft._context_facts(item) for key,item in list(value.items())[:12]}
-        if isinstance(value,list):return [Minecraft._context_facts(item) for item in value[-4:]]
+        if isinstance(value,dict):return {key:Minecraft._context_facts(item,key) for key,item in list(value.items())[:12]}
+        if isinstance(value,list):return [Minecraft._context_facts(item) for item in (value[:4] if field=='landmarks' else value[-4:])]
         if isinstance(value,str) and len(value)>240:return value[:240]+'… [details available through task]'
         return value
 
