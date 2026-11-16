@@ -79,7 +79,7 @@ public final class GameSkills {
     if(!c.world.isChunkLoaded(pos)||!NavigationBounds.within(c.player.getX(),c.player.getY(),c.player.getZ(),pos.getX(),pos.getY(),pos.getZ(),surface))throw new TaskRuntime.Rejected("outside_known_terrain");
     if(!skill.equals("navigate")&&!visible(pos)){
      if(skill.equals("mine")&&BlockSight.visibleAbsence(c,pos)){
-      BlockReceipts.CURRENT.observeAbsence(c.world,c.world.getRegistryKey().getValue().toString(),pos.getX(),pos.getY(),pos.getZ());
+      BlockReceipts.CURRENT.observeAbsence(c.world,c.player.getUuidAsString(),c.world.getRegistryKey().getValue().toString(),pos.getX(),pos.getY(),pos.getZ());
       throw new TaskRuntime.Rejected("target_absent");
      }
      throw new TaskRuntime.Rejected("target_not_visible");
@@ -173,7 +173,7 @@ public final class GameSkills {
     case "mine":
      var mined=BlockReceipts.CURRENT.after(c.world,pos.getX(),pos.getY(),pos.getZ(),blockBoundary);
      if(mined!=null&&!mined.block().equals(beforeBlock)){
-      BlockReceipts.CURRENT.claimMine(c.world,c.world.getRegistryKey().getValue().toString(),pos.getX(),pos.getY(),pos.getZ(),blockBoundary,beforeBlock);
+      BlockReceipts.CURRENT.claimMine(c.world,c.player.getUuidAsString(),c.world.getRegistryKey().getValue().toString(),pos.getX(),pos.getY(),pos.getZ(),blockBoundary,beforeBlock);
       return done(Map.of("block",beforeState,"x",pos.getX(),"y",pos.getY(),"z",pos.getZ(),"after",mined.state(),"serverBlockSeq",mined.seq(),"serverObservedAt",mined.observedAt()));
      }
      if(!Registries.BLOCK.getId(c.world.getBlockState(pos).getBlock()).toString().equals(beforeBlock)){

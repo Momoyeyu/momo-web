@@ -295,7 +295,8 @@ def apply_block_facts(binding,facts,*,after=0):
     erase a later observation (including a tree that has actually regrown).
     """
     if not isinstance(facts,list) or len(facts)>128:return after
-    valid=[fact for row in facts if (fact:=_block_fact(row)) is not None and fact['seq']>after]
+    valid=[fact for row in facts if (fact:=_block_fact(row)) is not None and fact['seq']>after
+           and ('account' not in fact or fact['account']==binding.get('account'))]
     if not valid:return after
     newest={}
     for fact in valid:

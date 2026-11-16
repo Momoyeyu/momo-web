@@ -166,3 +166,9 @@ def test_capture_time_is_preserved_when_a_frame_arrives_after_a_mining_receipt()
     'observedAt':REMOVED-1000,'visibleLandmarks':[marker()],'visibleBlocks':[]})
  journal.apply_block_facts(BINDING,[fact()])
  assert journal.recall_places(BINDING,'oak')==[]
+
+
+def test_explicit_fact_account_must_match_the_original_binding():
+ with patch.object(db,'now_iso',return_value=SEEN):visit(markers=[marker()])
+ assert journal.apply_block_facts(BINDING,[fact(account='another-player')])==0
+ assert journal.recall_places(BINDING,'oak')
