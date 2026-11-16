@@ -6,7 +6,7 @@ function fixture(){
  const commands=[];let allowed=true;
  const adapter=createMinecraftAdapter({authorize:async()=>allowed,transport:{request:async command=>{
   commands.push(command);
-  return {...command,stopped:true,heldControls:0,taskProtocol:1,skills:['navigate'],accepted:true,task:{taskId:command.taskId,state:'queued',evidence:{}},events:{cursor:3,gap:false,events:[]}};
+  return {...command,observedAt:Date.now(),stopped:true,heldControls:0,taskProtocol:1,skills:['navigate'],accepted:true,task:{taskId:command.taskId,state:'queued',evidence:{}},events:{cursor:3,gap:false,events:[]}};
  }}});
  return {adapter,commands,revoke(){allowed=false;}};
 }
@@ -93,4 +93,19 @@ test('a transport failure is marked unknown while local input errors do not revo
  const {adapter}=fixture();await adapter.capabilities(permission);
  await assert.rejects(adapter.submit({taskId:'bad',skill:'navigate',args:{}},permission),e=>e.code==='MINECRAFT_INPUT');
  assert.equal(adapter.status().stopped,false);
+});
+
+test('focused observation suppresses only pixels and retains normal read authorization',async()=>{
+ const {adapter,commands,revoke}=fixture();
+ await adapter.observe(permission,false);
+ assert.equal(commands.at(-1).type,'observe');
+ assert.equal(commands.at(-1).frame,false);
+ await adapter.observe(permission);
+ assert.equal(commands.at(-1).frame,true);
+ const count=commands.length;
+ await assert.rejects(adapter.observe(permission,'false'),/Invalid/);
+ assert.equal(commands.length,count);
+ revoke();await assert.rejects(adapter.observe(permission,false),/revoked/);
+ assert.equal(commands.filter(command=>command.type==='observe').length,2);
+ assert.equal(commands.at(-1).type,'stop', 'Revocation still releases the body');
 });

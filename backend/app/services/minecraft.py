@@ -7,6 +7,11 @@ from .coordinator import runtime
 from . import vision
 MODEL_OBSERVATION_BYTES = 6000
 
+def observation_has_pixels(query=''):
+    """Focused facts are fresh reads; the default view supplies visual evidence."""
+    import re
+    return query not in {'inventory','terrain','entities','station','chat'} and re.fullmatch(r'slot:\d{1,3}',query) is None
+
 class MinecraftError(ValueError):
     def __init__(self,message,*,code='MINECRAFT_STATE'):
         super().__init__(message)
@@ -444,7 +449,7 @@ class Minecraft:
             recent=list(self.tasks.values())[-4:]
             data={'goal':journal.goal(self.binding),'goalEvidence':self.goal_evidence(),'tasks':[self._task_context(task,index>=len(recent)-2) for index,task in enumerate(recent)],'paused':self.paused or self.suspended,
                   'unconfirmedTasks':[{k:row[k] for k in ('activityId','taskId','skill','state','reason') if k in row} for row in journal.history(self.binding) if row['state']=='unknown'],
-                  'exploredPlaces':list(reversed(journal.explored(self.binding))),'repeatedSearches':self.repeated_searches(list(self.tasks.values())[-16:])}
+                  'exploredPlaces':list(reversed(journal.explored(self.binding))),'repeatedSearches':self.repeated_searches(journal.history(self.binding,limit=64))}
         return ('You are the same momo sharing the player character. Keep your personality and agreements; choose goals from curiosity, beauty, companionship, helping or game progress, not a fixed tech tree. '
             'Keep a goal until user input, important change, blockage or completion. minecraft_goal records intent; semantic tasks/plans keep acting during chat. Accepted is not completed: observe fresh evidence before effects. '
             'unconfirmedTasks may have happened: query the original activityId/taskId, never replay. goalEvidence is verified history, not current inventory; prefer it over stale progress notes. '
@@ -479,22 +484,37 @@ class Minecraft:
 
     @staticmethod
     def repeated_searches(tasks):
-        groups={}
+        import math
+        groups=[]
         for task in tasks:
-            if task.get('state') not in {'failed','cancelled'}:continue
+            if task.get('state') not in {'succeeded','failed','cancelled'}:continue
             evidence=task.get('evidence',{})
             values=[evidence,*[row.get('result',{}) for row in evidence.get('steps',[]) if isinstance(row,dict)]]
             seen=set()
             for value in values:
-                if value.get('searchResult') not in {'source_not_visible','tool_required','unreachable'}:continue
-                item=value.get('item');pos=value.get('lastObservedPosition',value.get('searchOrigin'))
-                if not isinstance(item,str) or not isinstance(pos,dict) or any(type(pos.get(axis)) not in (int,float) for axis in ('x','y','z')):continue
-                key=(item,value.get('dimension'),*(int(pos[axis]//8) for axis in ('x','y','z')))
+                if value.get('searchResult') not in {'completed','source_not_visible','tool_required','unreachable','gather_timeout'}:continue
+                item=value.get('item');pos=value.get('searchOrigin',value.get('lastObservedPosition'))
+                if not isinstance(item,str) or not isinstance(pos,dict) or any(type(pos.get(axis)) not in (int,float) or not math.isfinite(pos[axis]) for axis in ('x','y','z')):continue
+                def nearby(group):
+                    return (group['item']==item and group['dimension']==value.get('dimension')
+                            and sum((group['near'][axis]-pos[axis])**2 for axis in ('x','y','z'))<=64)
+                before,after=value.get('countBefore'),value.get('countAfter')
+                gained=type(before) in (int,float) and type(after) in (int,float) and after>before
+                if gained or task.get('state')=='succeeded':
+                    # Real gains, even from an otherwise failed partial task,
+                    # supersede the old claim that this area yielded nothing.
+                    groups=[group for group in groups if not nearby(group)]
+                    continue
+                matches=[group for group in groups if nearby(group)]
+                group=min(matches,key=lambda group:sum((group['near'][axis]-pos[axis])**2 for axis in ('x','y','z'))) if matches else None
+                if group is None:
+                    group={'item':item,'dimension':value.get('dimension'),'near':dict(pos),'reason':value['searchResult'],'attempts':0}
+                    groups.append(group)
+                key=(item,group['dimension'],*(group['near'][axis] for axis in ('x','y','z')))
                 if key in seen:continue
                 seen.add(key)
-                previous=groups.get(key,{}).get('attempts',0)
-                groups[key]={'item':item,'dimension':value.get('dimension'),'near':pos,'reason':value['searchResult'],'attempts':previous+1}
-        return [value for value in groups.values() if value['attempts']>=2][-4:]
+                group['attempts']+=1;group['reason']=value['searchResult']
+        return [value for value in groups if value['attempts']>=2][-4:]
 
     @staticmethod
     def _context_facts(value, field=None):

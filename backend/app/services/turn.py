@@ -546,10 +546,13 @@ def react(
                     if cancelled():
                         return
                     capture_edge=1536
+                    if call.get('function',{}).get('name')=='minecraft_action':
+                        import json
+                        try:reading=json.loads(call.get('function',{}).get('arguments','{}')).get('action')=='observe'
+                        except (ValueError,TypeError,AttributeError):reading=False
+                        if reading:computer_tools.retire_game_observations(messages)
                     reservation=computer_tools.capture_budget(call,capture_edge)
                     if reservation:
-                        if call.get('function',{}).get('name')=='minecraft_action':
-                            computer_tools.retire_game_observations(messages)
                         prepared=False
                         capacity_exhausted=False
                         for capture_edge in (1536,1024,512):

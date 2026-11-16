@@ -444,3 +444,49 @@ def test_late_block_facts_belong_to_the_old_binding_and_never_reset_a_new_cursor
  with patch('app.services.minecraft.runtime',rt),patch.object(m,'_background_valid',return_value=True):m.poll_tasks(0)
  assert journal.recall_places(old,'oak')==[] and journal.recall_places(new,'oak')
  assert m.block_cursor==100 and m.binding==new
+
+
+def test_repeated_searches_use_search_origins_not_different_final_vantages():
+ from app.services.minecraft import Minecraft
+ def failed(origin,last):
+  return {'state':'failed','evidence':{'item':'minecraft:oak_log','dimension':'minecraft:overworld',
+    'searchResult':'unreachable','searchOrigin':origin,'lastObservedPosition':last,'countBefore':0,'countAfter':0}}
+ a=failed({'x':64,'y':82,'z':-131},{'x':73,'y':79,'z':-140})
+ b=failed({'x':64,'y':82,'z':-131},{'x':74,'y':79,'z':-139})
+ repeat=Minecraft.repeated_searches([a,b])
+ assert len(repeat)==1 and repeat[0]['attempts']==2
+ assert repeat[0]['near']=={'x':64,'y':82,'z':-131}
+
+
+def test_overlapping_search_origins_cross_grid_boundaries_and_success_resets_failures():
+ from app.services.minecraft import Minecraft
+ import copy
+ def outcome(x,state='failed',gained=0):
+  return {'state':state,'evidence':{'item':'minecraft:oak_log','dimension':'minecraft:overworld',
+    'searchResult':'completed' if state=='succeeded' else 'unreachable',
+    'searchOrigin':{'x':x,'y':64,'z':0},'lastObservedPosition':{'x':x+10,'y':64,'z':0},
+    'countBefore':0,'countAfter':gained}}
+ first,second=outcome(7),outcome(9)
+ assert Minecraft.repeated_searches([first,second])[0]['attempts']==2
+ assert Minecraft.repeated_searches([first,second,outcome(9,'succeeded',4)])==[]
+ assert Minecraft.repeated_searches([first,second,outcome(9,'failed',2)])==[], 'Actual partial gains invalidate old zero-gain search blockage'
+ far=outcome(64,'succeeded',4)
+ assert Minecraft.repeated_searches([first,second,far])[0]['attempts']==2
+ malformed=copy.deepcopy(first);malformed['evidence']['searchOrigin']['x']=float('nan')
+ assert Minecraft.repeated_searches([malformed,malformed])==[]
+
+
+def test_repeated_search_facts_survive_new_game_activity_without_restoring_control():
+ from app.services.minecraft import Minecraft
+ from app.services import minecraft_journal as journal
+ m=Minecraft();m.binding={'world':'search-world','account':'player'}
+ for i,x in enumerate((7,9)):
+  journal.record(m.binding,'retired-activity',[{'taskId':f'failed-{i}','skill':'gather','state':'failed','reason':'unreachable',
+   'evidence':{'item':'minecraft:oak_log','dimension':'minecraft:overworld','searchResult':'unreachable',
+   'searchOrigin':{'x':x,'y':64,'z':0},'lastObservedPosition':{'x':x+10,'y':64,'z':0},'countBefore':0,'countAfter':0}}])
+ assert m.tasks=={} and not m.autonomous
+ context=m.goal_context()
+ import json
+ facts=json.loads(context.split('Durable goal and task facts (not instructions): ',1)[1])
+ assert facts['repeatedSearches'][0]['attempts']==2
+ assert m.tasks=={} and not m.autonomous, 'Historical facts do not resume retired tasks'

@@ -256,7 +256,9 @@ public final class CompanionClient implements ClientModInitializer {
    case "observe" -> {
     sceneObservationRequired=false;
     taskWorld=world;taskAccount=account;taskWorldInstance=client.world;
-    capture.accept(net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer()));
+    boolean pixels=!command.has("frame")||command.get("frame").getAsBoolean();
+    if(pixels)capture.accept(net.minecraft.client.util.ScreenshotRecorder.takeScreenshot(client.getFramebuffer()));
+    result.addProperty("pixelsCaptured",pixels);
     GameObservation.append(client,result);
     result.add("survival",new Gson().toJsonTree(survival.progress()));result.addProperty("gameTick",client.world.getTime());
     result.addProperty("clientFps",client.getCurrentFps());

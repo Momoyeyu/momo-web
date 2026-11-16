@@ -23,6 +23,7 @@ class Connect(Owner):
 class Action(Owner):
     generation: int
     action: Literal['observe','chat','follow','play']
+    query: str = Field(default='',max_length=64)
     text: str = Field(default='', max_length=256)
     held: list[Literal['forward','back','left','right','jump','sneak','sprint']] = Field(default_factory=list,max_length=7)
     x: float = Field(default=0.5,ge=0,le=1)
@@ -47,6 +48,9 @@ def stop(): return invoke(minecraft.stop)
 def action(body: Action):
     args = {'text':body.text} if body.action == 'chat' else {'player':body.player,'durationMs':body.durationMs} if body.action == 'follow' else {}
     if body.action=='play': args=body.model_dump(include={'control','blockIndex','held','text','x','y','scroll','key','durationMs','yaw','pitch','slot','button'})
+    if body.action=='observe':
+        from ..services.minecraft import observation_has_pixels
+        args={'frame':observation_has_pixels(body.query)}
     return invoke(minecraft.execute,body.action,args,body.generation,body.clientId,body.leaseId)
 
 

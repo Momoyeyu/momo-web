@@ -136,7 +136,10 @@ export function createMinecraftAdapter({ transport, authorize, now = Date.now } 
       if (!validId(taskId)) return Promise.reject(problem('Invalid task identifier'));
       return execute('cancel', {taskId}, permission);
     },
-    observe: permission => execute('observe', {}, permission),
+    observe(permission,frame=true) {
+      if(typeof frame!=='boolean')return Promise.reject(problem('Invalid observation frame mode'));
+      return execute('observe',{frame},permission);
+    },
     chat(text, permission) {
       if (typeof text !== 'string' || !text.trim() || text.length > 256 || /[\r\n\x00-\x1f]/u.test(text) || /^[/#]/u.test(text.trimStart())) return Promise.reject(problem('Only bounded plain Minecraft chat is allowed'));
       return execute('chat', { text }, permission);

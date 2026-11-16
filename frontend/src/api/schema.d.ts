@@ -2673,6 +2673,11 @@ export interface components {
              */
             player: string;
             /**
+             * Query
+             * @default
+             */
+            query: string;
+            /**
              * Scroll
              * @default 0
              */

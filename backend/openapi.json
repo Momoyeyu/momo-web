@@ -2417,6 +2417,12 @@
             "title": "Player",
             "type": "string"
           },
+          "query": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Query",
+            "type": "string"
+          },
           "scroll": {
             "default": 0,
             "maximum": 10.0,
