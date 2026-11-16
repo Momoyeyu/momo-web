@@ -1,0 +1,58 @@
+package dev.momo.task;
+import java.util.*;
+/** A blueprint is intent: unseen cells need observation, never blind mutation. */
+public final class BuildTaskSmoke {
+ static final SparseBuild.Cell A=new SparseBuild.Cell(0,66,0,"minecraft:dirt"),B=new SparseBuild.Cell(1,66,0,"minecraft:dirt");
+ static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
+ static class Work implements TaskRuntime.Work {
+  boolean started,stopped,paused;TaskRuntime.Step result;Runnable complete=()->{};
+  Work(TaskRuntime.Step result){this.result=result;}
+  public void start(){started=true;}public TaskRuntime.Step tick(){complete.run();return result;}
+  public void stop(){stopped=true;}public void pause(){paused=true;}public void resume(){paused=false;}
+  public boolean acceptsScreen(Object screen){return "owned".equals(screen);}
+ }
+ static class Scene implements BuildTask.Scene {
+  Set<SparseBuild.Cell> visible=new HashSet<>(),placed=new HashSet<>();List<Work> builds=new ArrayList<>(),moves=new ArrayList<>();boolean valid=true,reveal=true,ackOnly,removeOnMove,rejectFirstStart;
+  public void start(){}public void check(){if(!valid)throw new TaskRuntime.Rejected("world_unavailable");}
+  public List<SparseBuild.Cell> visible(List<SparseBuild.Cell> cells){return cells.stream().filter(visible::contains).toList();}
+  public boolean matches(SparseBuild.Cell cell){return placed.contains(cell);}
+  public TaskRuntime.Work build(List<SparseBuild.Cell> cells){
+   BuildTaskSmoke.check(visible.containsAll(cells),"Never build an unseen cell");
+   var proof=cells.stream().map(c->Map.<String,Object>of("x",c.x(),"y",c.y(),"z",c.z(),"block","Block{"+c.block()+"}",placed.contains(c)?"observedExisting":"serverBlockSeq",placed.contains(c)?Boolean.TRUE:1L)).toList();
+   var work=new Work(TaskRuntime.Step.done(ackOnly?Map.of("accepted",true):Map.of("confirmedCells",proof)));
+   if(rejectFirstStart&&builds.isEmpty())work=new Work(work.result){public void start(){super.start();throw new TaskRuntime.Rejected("build_cells_not_visible");}};
+   work.complete=()->{if(!ackOnly)placed.addAll(cells);};builds.add(work);return work;
+  }
+  public TaskRuntime.Work approach(int attempt){
+   if(attempt>=5)return null;
+   var work=new Work(TaskRuntime.Step.done(Map.of("arrived",true)));work.complete=()->{if(removeOnMove)placed.remove(A);if(reveal)visible.add(B);};moves.add(work);return work;
+  }
+ }
+ static TaskRuntime.Step finish(BuildTask work){TaskRuntime.Step row=null;for(int i=0;i<30;i++){row=work.tick();if(!row.state().equals("running"))return row;}throw new AssertionError("Build did not finish");}
+ public static void main(String[] args){
+  var scene=new Scene();scene.visible.add(A);var work=new BuildTask(List.of(A,B),scene);work.start();
+  var row=finish(work);check(row.state().equals("succeeded"),"Visible subset then approach must finish the same task");
+  check(scene.builds.size()==2&&scene.moves.size()==1,"Only missing cells need another observed batch");
+  check(scene.builds.stream().allMatch(w->w.stopped)&&scene.moves.getFirst().stopped,"Release each child before another body owner");
+  check(((List<?>)row.evidence().get("confirmedCells")).size()==2,"All cells require actual completion evidence");
+  scene=new Scene();scene.visible.add(A);scene.rejectFirstStart=true;work=new BuildTask(List.of(A),scene);work.start();
+  check(finish(work).state().equals("succeeded")&&scene.moves.size()==1,"A changed sight preflight needs a bounded approach, not a terminal parent failure");
+  scene=new Scene();scene.visible.add(A);scene.placed.add(A);work=new BuildTask(List.of(A),scene);work.start();
+  check(((Number)finish(work).evidence().get("observedExisting")).intValue()==1,"Existing blocks remain observations, not newly built receipts");
+  scene=new Scene();scene.visible.add(A);scene.removeOnMove=true;work=new BuildTask(List.of(A,B),scene);work.start();
+  check(finish(work).state().equals("succeeded")&&scene.placed.containsAll(List.of(A,B)),"Recheck prior cells after approaching; old receipts cannot conceal a destroyed part");
+  scene=new Scene();scene.visible.add(A);scene.ackOnly=true;work=new BuildTask(List.of(A),scene);
+  var runtime=new TaskRuntime();runtime.submit("ack-only","build",work,0,10000);runtime.tick(0);runtime.tick(50);
+  check(runtime.snapshot("ack-only").state().equals("failed")&&runtime.snapshot("ack-only").reason().equals("unverified_result"),"An accepted child is not a completed blueprint");
+  check(scene.builds.getFirst().stopped,"A rejected completion must still release the physical child");
+  scene=new Scene();scene.reveal=false;work=new BuildTask(List.of(B),scene);work.start();
+  check(finish(work).state().equals("failed")&&scene.moves.size()<=5,"Unknown cells must stop after bounded approaches");
+  check(scene.builds.isEmpty(),"No approach grants knowledge of hidden cells by itself");
+  scene=new Scene();work=new BuildTask(List.of(B),scene);work.start();work.tick();var move=scene.moves.getFirst();
+  work.pause();check(move.paused,"Pause the current physical child");work.tick();check(scene.builds.isEmpty(),"Paused work cannot move to another stage");
+  work.resume();check(!move.paused,"Resume the same child without replay");work.stop();check(move.stopped,"Stop releases active navigation");
+  work.tick();check(scene.builds.isEmpty(),"A late path result cannot restart a stopped build");
+  scene=new Scene();scene.visible.add(A);work=new BuildTask(List.of(A),scene);work.start();work.tick();scene.valid=false;
+  try{work.tick();throw new AssertionError("A changed scene must revoke continuation");}catch(TaskRuntime.Rejected expected){work.stop();}
+ }
+}

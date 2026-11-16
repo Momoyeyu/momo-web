@@ -703,7 +703,7 @@
     }
   },
   "build": {
-    "description": "Build up to 32 desired world cells through the local Baritone builder, with existing materials and normal player actions. Cells are TARGET block coordinates, not clicked supports. Bounding box at most 16 per axis, every cell initially visible within 32 blocks; accepts empty cells, normally replaceable dry plants/snow, or the already requested block type. No solid terrain clearing, schematics/files/scripts, resource creation, repeated build or substitutions. Confirms actual server changes. Specifies block types; use precise place for special orientation/property control.",
+    "description": "Build up to 32 TARGET block cells, not clicked supports: extent at most 16 per axis, within 32 blocks. Uses observed batches and at most five nearby approaches with owned materials. New cells are checked only after first-hit sight. Accepts empty cells, replaceable dry plants/snow, or the requested block type; no solid terrain clearing, files/scripts or substitutions. May place owned supports; reports material inventory before/after. Confirms all requested block types by actual state/receipts, or bounded failure with partial results. Already correct cells consume no new blocks. Use precise place for special orientation/property control.",
     "parameters": {
       "type": "object",
       "properties": {

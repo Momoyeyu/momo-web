@@ -30,7 +30,7 @@ public final class GameSkills {
   if(skill.equals("eat"))return new EatSkill();
   if(skill.equals("selectItem"))return new SelectItemSkill(args);
   if(skill.equals("placeNearby"))return new NearbyPlacementSkill(args);
-  if(skill.equals("build"))return new BuilderSkill(args);
+  if(skill.equals("build"))return BuildScene.create(args);
   if(skill.equals("plan")){
    var work=new ArrayList<TaskPlan.Node>();
    for(var value:args.getAsJsonArray("steps")){
