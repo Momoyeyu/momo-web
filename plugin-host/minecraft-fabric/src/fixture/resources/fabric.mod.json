@@ -4,6 +4,6 @@
  "version":"0.0.0-dev",
  "name":"momo acceptance setup (development only)",
  "environment":"*",
- "entrypoints":{"main":["dev.momo.fixture.AcceptanceFixtures"]},
+ "entrypoints":{"main":["dev.momo.fixture.AcceptanceFixtures"],"client":["dev.momo.fixture.WorldTransitionFixtures"]},
  "depends":{"fabricloader":">=0.16.14","minecraft":"1.21.1","java":">=21","fabric-api":"*"}
 }

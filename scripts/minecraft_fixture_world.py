@@ -10,6 +10,9 @@ import io
 from pathlib import Path
 import struct
 import time
+import json
+import shutil
+import tempfile
 
 NAME='momo-007-fixtures'
 
@@ -84,10 +87,40 @@ def prepare(template,saves):
     (destination/'.momo-fixture-setup').write_text('momo-007-fixtures-v1\n')
     return destination
 
+def prepare_transition(template,saves):
+    """Make two empty, marked survival saves for a real in-process transition."""
+    saves=Path(saves).resolve()
+    destinations=tuple(saves/name for name in ('momo-007-transition-a','momo-007-transition-b'))
+    for destination in destinations:
+        if destination.exists() or destination.is_symlink():
+            raise FileExistsError('Never replace an existing transition or played save')
+    saves.mkdir(parents=True,exist_ok=True)
+    # Reuse the qualified vanilla level generator, not its server setup marker.
+    with tempfile.TemporaryDirectory(prefix='.momo-transition-stage-',dir=saves) as temporary:
+        staged=prepare(template,Path(temporary))
+        root=decode(gzip.decompress((staged/'level.dat').read_bytes()))
+        payloads=[]
+        for destination in destinations:
+            root[1]['Data'][1]['LevelName']=(8,destination.name.encode())
+            payloads.append(gzip.compress(encode(root),mtime=0))
+    created=[]
+    try:
+        for destination,payload in zip(destinations,payloads):
+            destination.mkdir(mode=0o700);created.append(destination)
+            (destination/'level.dat').write_bytes(payload)
+            (destination/'.momo-transition-test').write_text('momo-007-transition-v1\n')
+    except Exception:
+        for destination in reversed(created):shutil.rmtree(destination)
+        raise
+    return destinations
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--template',type=Path,required=True)
     parser.add_argument('--saves',type=Path,required=True)
-    args=parser.parse_args();print(prepare(args.template,args.saves))
+    parser.add_argument('--transition',action='store_true',help='Prepare the guarded two-save lifecycle test instead of the mechanism setup')
+    args=parser.parse_args()
+    if args.transition:print(json.dumps([str(path) for path in prepare_transition(args.template,args.saves)]))
+    else:print(prepare(args.template,args.saves))
 
 if __name__=='__main__':main()

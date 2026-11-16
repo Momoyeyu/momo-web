@@ -23,5 +23,6 @@ public final class FixtureGuardSmoke {
    check(!FixtureGuard.allowed(root.resolve("missing"),"007-fixtures"),"missing save fails closed");
   }finally{try(var paths=Files.walk(root)){for(var path:paths.sorted(java.util.Comparator.reverseOrder()).toList())Files.delete(path);}}
   System.out.println("PASS fixture opt-in, save isolation, existing-player guard and one-shot barrier");
+  WorldTransitionGuardSmoke.main(args);
  }
 }

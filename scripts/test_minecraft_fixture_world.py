@@ -36,4 +36,33 @@ class FixtureWorldTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):world.prepare(template,root/'saves')
             self.assertEqual(template.read_bytes(),original)
 
+    def test_transition_pair_is_fresh_survival_and_cannot_overwrite_a_save(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);template=root/'source.dat'
+            template.write_bytes(gzip.compress(world.encode(('',{'Data':(10,{'Player':(10,{'Inventory':(9,(10,[]))}),'WorldGenSettings':(10,{'dimensions':(10,{'minecraft:overworld':(10,{'generator':(10,{})})})})})}))))
+            original=template.read_bytes();saves=root/'saves'
+            pair=world.prepare_transition(template,saves)
+            self.assertEqual([p.name for p in pair],['momo-007-transition-a','momo-007-transition-b'])
+            self.assertEqual(sorted(p.name for p in saves.iterdir()),sorted(p.name for p in pair),'No staging world is left behind')
+            for path in pair:
+                data=world.decode(gzip.decompress((path/'level.dat').read_bytes()))[1]['Data'][1]
+                self.assertEqual(data['LevelName'],(8,path.name.encode()))
+                self.assertNotIn('Player',data)
+                self.assertEqual(data['GameType'],(3,0));self.assertEqual(data['allowCommands'],(1,0))
+                self.assertEqual((path/'.momo-transition-test').read_bytes(),b'momo-007-transition-v1\n')
+                self.assertFalse((path/'.momo-fixture-setup').exists(),'The paired world never authorizes server fixture seeding')
+            self.assertEqual(template.read_bytes(),original)
+            before=[(p/'level.dat').read_bytes() for p in pair]
+            with self.assertRaises(FileExistsError):world.prepare_transition(template,saves)
+            self.assertEqual([(p/'level.dat').read_bytes() for p in pair],before)
+
+    def test_existing_transition_destination_prevents_both_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);template=root/'missing-template.dat';saves=root/'saves'
+            existing=saves/'momo-007-transition-b';existing.mkdir(parents=True)
+            (existing/'keep.txt').write_text('player data')
+            with self.assertRaises(FileExistsError):world.prepare_transition(template,saves)
+            self.assertFalse((saves/'momo-007-transition-a').exists())
+            self.assertEqual((existing/'keep.txt').read_text(),'player data')
+
 if __name__=='__main__':unittest.main()
