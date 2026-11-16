@@ -91,6 +91,7 @@ def tasks(body: TaskCommand):
     elif body.action in {'task','cancel'}:
         if body.action=='cancel' and not body.taskId:raise HTTPException(422,'Task ID required')
         if body.taskId:arguments={'taskId':body.taskId}
+        if body.action=='task' and body.query:arguments['query']=body.query
         if body.activityId:
             if body.action!='task':raise HTTPException(422,'Historical activities are read-only')
             arguments['activityId']=body.activityId

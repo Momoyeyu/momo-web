@@ -70,6 +70,37 @@ def history(binding, *, activity=None, task_id=None, limit=12):
     if task_id is not None:where+=' AND t.task_id=?';params.append(task_id)
     rows=db.query('SELECT t.activity,t.data,d.request,d.disposition FROM minecraft_tasks t LEFT JOIN minecraft_dispatches d ON d.scope=t.scope AND d.activity=t.activity AND d.task_id=t.task_id WHERE '+where+' ORDER BY t.updated_at DESC,t.rowid DESC LIMIT ?',(*params,min(64,max(1,limit))))
     return [{**json.loads(row['data']),'activityId':row['activity'],**({'dispatch':row['disposition'],'request':json.loads(row['request'])} if row['request'] else {})} for row in reversed(rows)]
+
+def build_plans(binding, offset=0):
+    """Index this goal's immutable intentions, not newly observed world cells."""
+    if type(offset) is not int or not 0<=offset<=4096:raise ValueError('Invalid build history offset')
+    schema();key=scope(binding)
+    rows=db.query('''SELECT d.activity,d.task_id,d.request,d.disposition,t.data
+        FROM minecraft_dispatches d
+        JOIN minecraft_task_goals a ON a.scope=d.scope AND a.activity=d.activity AND a.task_id=d.task_id
+        JOIN minecraft_goal_instances g ON g.scope=a.scope AND g.goal_id=a.goal_id
+        JOIN minecraft_tasks t ON t.scope=d.scope AND t.activity=d.activity AND t.task_id=d.task_id
+        WHERE d.scope=? AND EXISTS(SELECT 1 FROM json_tree(d.request) WHERE key='skill' AND value='build')
+        ORDER BY d.rowid DESC LIMIT 7 OFFSET ?''',(key,offset))
+    plans=[]
+    for row in rows[:6]:
+        request=json.loads(row['request']);task=json.loads(row['data'])
+        arguments=request.get('args');steps=arguments.get('steps') if isinstance(arguments,dict) else None
+        candidates=[request] if request.get('skill')=='build' else steps[:24] if isinstance(steps,list) else []
+        parts=[]
+        for part in candidates:
+            if isinstance(part,dict) and part.get('skill')=='build':
+                arguments=part.get('args');parts.append(arguments.get('cells',[]) if isinstance(arguments,dict) else [])
+        cells=[cell for part in parts if isinstance(part,list) for cell in part[:32]
+               if isinstance(cell,dict) and all(type(cell.get(axis)) is int for axis in ('x','y','z'))]
+        entry={'activityId':row['activity'],'taskId':row['task_id'],'state':task['state'],'dispatch':row['disposition'],
+               'partCount':len(parts),'requestedCells':len(cells),
+               'bounds':{'min':{axis:min(cell[axis] for cell in cells) for axis in ('x','y','z')},
+                         'max':{axis:max(cell[axis] for cell in cells) for axis in ('x','y','z')}} if cells else None}
+        if task.get('dimension'):entry['dimension']=task['dimension']
+        plans.append(entry)
+    return {'buildPlans':plans,'nextOffset':offset+6 if len(rows)>6 and offset+6<=4096 else None}
+
 def goal(binding):
     schema()
     rows=db.query('SELECT data FROM minecraft_goals WHERE scope=?',(scope(binding),))

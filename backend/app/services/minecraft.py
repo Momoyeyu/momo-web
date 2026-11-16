@@ -173,6 +173,13 @@ class Minecraft:
                 permission = {**self.binding, 'activityEpoch': runtime.epoch}
                 task_binding,task_activity=dict(self.binding),self.activity_id
             from . import minecraft_journal as journal
+            if action=='task' and arguments.get('query'):
+                import re
+                match=re.fullmatch(r'build(?::([0-9]{1,4}))?',arguments['query'])
+                if not match or arguments.get('taskId') or arguments.get('activityId') or int(match[1] or 0)>4096:
+                    raise MinecraftError('Invalid build history query',code='MINECRAFT_INPUT')
+                return {**journal.build_plans(task_binding,int(match[1] or 0)),
+                        'notice':'Stored intended cells, not current visibility or completion. Read the original activityId/taskId for its exact request and receipts; observe before further construction.'}
             if action=='places':
                 return {'historical':True,'places':journal.recall_places(task_binding,arguments.get('query','')),
                         'notice':'Past sightings may have changed. Observe the current scene before interacting.'}
