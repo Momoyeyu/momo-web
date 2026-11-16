@@ -409,3 +409,38 @@ def test_body_state_rejection_is_not_misreported_as_malformed_tool_arguments(nat
   assert len(rows)==1 and rows[0]['state']=='failed'
   assert rows[0]['reason']=='submission_rejected'
   rt.host.request.assert_called_once()
+
+
+def test_event_block_facts_update_place_memory_without_resuming_the_body():
+ from app.core import db
+ from app.services import minecraft_journal as journal
+ from tests.test_minecraft_places import fact,marker,visit,SEEN
+ m,rt=setup();m.paused=True
+ with patch.object(db,'now_iso',return_value=SEEN):visit(markers=[marker()],binding=m.binding)
+ rt.host.request.side_effect=[{}, {'events':{'cursor':4,'events':[],'blockFacts':[fact(seq=7)]}}]
+ original=m.record_tasks
+ def records(rows,generation):
+  assert journal.recall_places(m.binding,'oak')==[], 'Reconcile world facts before a terminal task wakes the planner'
+  return original(rows,generation)
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'_background_valid',return_value=True),patch.object(m,'record_tasks',side_effect=records):m.poll_tasks(0)
+ assert journal.recall_places(m.binding,'oak')==[]
+ assert m.block_cursor==7 and m.cursor==4
+ assert m.paused and not m.autonomous and not m.decision_needed
+ assert [call.args[0] for call in rt.host.request.call_args_list]==['minecraft.heartbeat','minecraft.events']
+
+
+def test_late_block_facts_belong_to_the_old_binding_and_never_reset_a_new_cursor():
+ from app.core import db
+ from app.services import minecraft_journal as journal
+ from tests.test_minecraft_places import fact,marker,visit,SEEN
+ m,rt=setup();old=dict(m.binding);new={'world':'new','account':'player'}
+ with patch.object(db,'now_iso',return_value=SEEN):
+  visit(markers=[marker()],binding=old);visit(markers=[marker()],binding=new)
+ def request(method,args):
+  if method=='minecraft.heartbeat':return {}
+  m.generation+=1;m.binding=new;m.block_cursor=100
+  return {'events':{'cursor':4,'events':[],'blockFacts':[fact(seq=7)]}}
+ rt.host.request.side_effect=request
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'_background_valid',return_value=True):m.poll_tasks(0)
+ assert journal.recall_places(old,'oak')==[] and journal.recall_places(new,'oak')
+ assert m.block_cursor==100 and m.binding==new

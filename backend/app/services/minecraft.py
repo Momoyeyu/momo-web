@@ -25,6 +25,7 @@ class Minecraft:
         self.owner = None
         self.capabilities = {}
         self.cursor = 0
+        self.block_cursor = 0
         self.chat_cursor = 0
         self.tasks = {}
         self.paused = False
@@ -119,6 +120,7 @@ class Minecraft:
                 self.epoch, self.fingerprint = runtime.epoch, fingerprint
                 self.owner = (client, lease)
                 self.cursor, self.tasks, self.paused = 0, {}, False
+                self.block_cursor = 0
                 self.chat_cursor=0
                 self.suspended=False
                 self.body_revision=None
@@ -519,7 +521,8 @@ class Minecraft:
             if not self._background_valid(generation):
                 if generation==self.generation:self.stop('game_activity_expired')
                 return
-            with self.lock:permission={**self.binding,'activityEpoch':self.epoch};cursor=self.cursor
+            with self.lock:
+                binding=dict(self.binding);permission={**binding,'activityEpoch':self.epoch};cursor=self.cursor;block_cursor=self.block_cursor
             body=runtime.host.request('minecraft.heartbeat', {'permission':permission})
             native_revision=body.get('controlRevision')
             if native_revision is not None and (type(native_revision) is not int or native_revision<0):raise MinecraftError('Invalid Minecraft control revision',code='MINECRAFT_PROTOCOL')
@@ -543,9 +546,13 @@ class Minecraft:
                     if external>self.chat_cursor and self.autonomous and not self.paused and not self.suspended:self.decision_needed=True
                     self.chat_cursor=external
             rows=runtime.host.request('minecraft.task', {'permission':permission}).get('tasks',[]) if packet.get('gap') else [event['task'] for event in packet.get('events',[])]
+            from . import minecraft_journal as journal
+            # Facts stay with the binding that requested them, including late
+            # deliveries. They cannot authorize or alter a replacement body.
+            block_cursor=journal.apply_block_facts(binding,packet.get('blockFacts',[]),after=block_cursor)
             self.record_tasks(rows,generation)
             with self.lock:
-                if generation==self.generation:self.cursor=packet['cursor']
+                if generation==self.generation:self.cursor=packet['cursor'];self.block_cursor=block_cursor
 
     def _monitor(self, generation, stop):
         while not stop.wait(2):

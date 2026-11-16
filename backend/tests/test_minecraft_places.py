@@ -90,3 +90,79 @@ def test_places_tool_and_api_pass_the_query_without_staging_a_frame():
         command=TaskCommand(clientId='owner',leaseId='lease',generation=0,action='places',query='oak')
         assert tasks(command)==reply
         assert execute.call_args.args[:2]==('places',{'query':'oak'})
+
+
+SEEN='2026-11-16T01:00:00+00:00'
+REMOVED=1794790801000  # 2026-11-16 01:00:01 UTC
+
+def fact(seq=1,**values):
+ return {'seq':seq,'source':'mined','serverBlockSeq':seq,'observedAt':REMOVED,
+         'dimension':'minecraft:overworld','x':60,'y':68,'z':0,'block':'minecraft:air',**values}
+
+def test_confirmed_mining_prunes_all_old_sightings_without_inventing_a_visit():
+ with patch.object(db,'now_iso',return_value=SEEN):
+  visit(markers=[marker()]);visit(x=17,markers=[marker()])
+ before=db.query('SELECT updated_at FROM minecraft_places ORDER BY rowid')
+ assert journal.apply_block_facts(BINDING,[fact()])==1
+ assert journal.recall_places(BINDING,'oak')==[]
+ assert db.query('SELECT updated_at FROM minecraft_places ORDER BY rowid')==before
+ assert journal.goal(BINDING) is None
+ assert journal.apply_block_facts(BINDING,[fact()],after=1)==1
+
+@pytest.mark.parametrize('change',[{'source':'unknown'},{'serverBlockSeq':0},{'x':True},{'y':999},{'observedAt':0},{'dimension':'bad'},{'block':'private command'},{'seq':False}])
+def test_unconfirmed_or_malformed_changes_do_not_delete_resource_memory(change):
+ with patch.object(db,'now_iso',return_value=SEEN):visit(markers=[marker()])
+ assert journal.apply_block_facts(BINDING,[fact(**change)])==0
+ assert len(journal.recall_places(BINDING,'oak'))==1
+
+def test_clear_line_of_sight_absence_is_not_a_claim_of_a_server_mutation():
+ with patch.object(db,'now_iso',return_value=SEEN):visit(markers=[marker()])
+ assert journal.apply_block_facts(BINDING,[fact(source='visible_absence',serverBlockSeq=0)])==1
+ assert journal.recall_places(BINDING,'oak')==[]
+
+
+def test_fresh_regrowth_wins_over_late_old_receipts_and_wrong_scopes():
+ with patch.object(db,'now_iso',return_value='2026-11-16T01:00:02+00:00'):visit(markers=[marker()])
+ journal.apply_block_facts(BINDING,[fact()])
+ assert journal.recall_places(BINDING,'oak')
+ with patch.object(db,'now_iso',return_value=SEEN):visit(markers=[marker()],dimension='minecraft:the_nether')
+ journal.apply_block_facts({'world':'other','account':'player'},[fact(observedAt=REMOVED+2000)])
+ assert len(journal.recall_places(BINDING,'oak'))==2
+ journal.apply_block_facts(BINDING,[fact(seq=2,observedAt=REMOVED+2000)])
+ assert [p['dimension'] for p in journal.recall_places(BINDING,'oak')]==['minecraft:the_nether']
+
+
+def test_legacy_successful_receipts_filter_recall_without_replaying_or_editing_history():
+ with patch.object(db,'now_iso',return_value=SEEN):visit(markers=[marker()])
+ raw=json.dumps({'taskId':'old-mine','skill':'plan','state':'succeeded','dimension':'minecraft:overworld',
+   'evidence':{'steps':[{'result':{'x':60,'y':68,'z':0,'block':'Block{minecraft:oak_log}[axis=y]',
+                                  'after':'Block{minecraft:air}','serverBlockSeq':7}}]}})
+ with db.tx() as c:c.execute('INSERT INTO minecraft_tasks VALUES(?,?,?,?,?)',(journal.scope(BINDING),'old','old-mine',raw,'2026-11-16T01:00:01+00:00'))
+ assert journal.recall_places(BINDING,'oak')==[]
+ assert db.query('SELECT data FROM minecraft_tasks')[0]['data']==raw
+
+
+def test_queued_or_failed_absence_without_a_real_receipt_is_not_negative_knowledge():
+ with patch.object(db,'now_iso',return_value=SEEN):visit(markers=[marker()])
+ journal.record(BINDING,'a',[{'taskId':'not-seen','skill':'mine','state':'failed','reason':'target_not_visible','dimension':'minecraft:overworld','evidence':{}}])
+ assert journal.recall_places(BINDING,'oak')
+
+
+def test_late_terminal_receipt_preserves_newer_regrowth_and_queued_receipts_are_not_facts():
+ with patch.object(db,'now_iso',return_value='2026-11-16T01:00:02+00:00'):visit(markers=[marker()])
+ evidence={'x':60,'y':68,'z':0,'block':'Block{minecraft:oak_log}[axis=y]',
+           'after':'Block{minecraft:air}','serverBlockSeq':7,'serverObservedAt':REMOVED}
+ with patch.object(db,'now_iso',return_value='2026-11-16T01:00:03+00:00'):
+  journal.record(BINDING,'old',[{'taskId':'late','state':'succeeded','dimension':'minecraft:overworld','evidence':evidence}])
+ assert journal.recall_places(BINDING,'oak')
+ evidence={**evidence,'serverObservedAt':REMOVED+3000}
+ journal.record(BINDING,'old',[{'taskId':'queued','state':'queued','dimension':'minecraft:overworld','evidence':evidence}])
+ assert journal.recall_places(BINDING,'oak')
+
+
+def test_capture_time_is_preserved_when_a_frame_arrives_after_a_mining_receipt():
+ with patch.object(db,'now_iso',return_value='2026-11-16T01:00:03+00:00'):
+  journal.observe_visit(BINDING,{**BINDING,'dimension':'minecraft:overworld','x':1,'y':64,'z':0,
+    'observedAt':REMOVED-1000,'visibleLandmarks':[marker()],'visibleBlocks':[]})
+ journal.apply_block_facts(BINDING,[fact()])
+ assert journal.recall_places(BINDING,'oak')==[]

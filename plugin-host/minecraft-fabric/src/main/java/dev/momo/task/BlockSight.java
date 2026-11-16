@@ -6,6 +6,15 @@ import net.minecraft.world.RaycastContext;
 /** Shared actual voxel-shape sight and face checks, never hidden-block discovery. */
 final class BlockSight {
  private BlockSight(){}
+ static boolean visibleAbsence(MinecraftClient c,BlockPos target){
+  if(!c.world.isChunkLoaded(target))return false;
+  var eye=c.player.getEyePos();
+  return visibleAbsence(eye,target,end->c.world.raycast(new RaycastContext(eye,end,RaycastContext.ShapeType.OUTLINE,RaycastContext.FluidHandling.ANY,c.player)),()->c.world.getBlockState(target).isAir());
+ }
+ static boolean visibleAbsence(Vec3d eye,BlockPos target,java.util.function.Function<Vec3d,BlockHitResult> cast,java.util.function.BooleanSupplier air){
+  // Only read the named cell after the entire sight segment is unobstructed.
+  return eye.squaredDistanceTo(target.toCenterPos())<=1024&&cast.apply(target.toCenterPos()).getType()==HitResult.Type.MISS&&air.getAsBoolean();
+ }
  static BlockHitResult hit(MinecraftClient c,BlockPos target){return hit(c,target,null);}
  static BlockHitResult hit(MinecraftClient c,BlockPos target,Direction face){
   return hit(c,target,face,null);

@@ -77,7 +77,13 @@ public final class GameSkills {
     boolean surface=skill.equals("navigate")&&args.has("height")&&args.get("height").getAsString().equals("surface");
     pos=surface&&!args.has("y")?new BlockPos(integer(args,"x",-30000000,30000000),c.player.getBlockY(),integer(args,"z",-30000000,30000000)):position(args);
     if(!c.world.isChunkLoaded(pos)||!NavigationBounds.within(c.player.getX(),c.player.getY(),c.player.getZ(),pos.getX(),pos.getY(),pos.getZ(),surface))throw new TaskRuntime.Rejected("outside_known_terrain");
-    if(!skill.equals("navigate")&&!visible(pos))throw new TaskRuntime.Rejected("target_not_visible");
+    if(!skill.equals("navigate")&&!visible(pos)){
+     if(skill.equals("mine")&&BlockSight.visibleAbsence(c,pos)){
+      BlockReceipts.CURRENT.observeAbsence(c.world,c.world.getRegistryKey().getValue().toString(),pos.getX(),pos.getY(),pos.getZ());
+      throw new TaskRuntime.Rejected("target_absent");
+     }
+     throw new TaskRuntime.Rejected("target_not_visible");
+    }
     if(!skill.equals("navigate")){beforeState=c.world.getBlockState(pos).toString();beforeBlock=Registries.BLOCK.getId(c.world.getBlockState(pos).getBlock()).toString();blockBoundary=BlockReceipts.CURRENT.cursor();}
    }
    if(Set.of("follow","interactEntity","attack").contains(skill)){
@@ -166,7 +172,10 @@ public final class GameSkills {
      if(!swimToward(entity,entity.getEyePos()))approach(entity.getBlockPos(),20);break;
     case "mine":
      var mined=BlockReceipts.CURRENT.after(c.world,pos.getX(),pos.getY(),pos.getZ(),blockBoundary);
-     if(mined!=null&&!mined.block().equals(beforeBlock))return done(Map.of("block",beforeState,"x",pos.getX(),"y",pos.getY(),"z",pos.getZ(),"after",mined.state(),"serverBlockSeq",mined.seq()));
+     if(mined!=null&&!mined.block().equals(beforeBlock)){
+      BlockReceipts.CURRENT.claimMine(c.world,c.world.getRegistryKey().getValue().toString(),pos.getX(),pos.getY(),pos.getZ(),blockBoundary,beforeBlock);
+      return done(Map.of("block",beforeState,"x",pos.getX(),"y",pos.getY(),"z",pos.getZ(),"after",mined.state(),"serverBlockSeq",mined.seq(),"serverObservedAt",mined.observedAt()));
+     }
      if(!Registries.BLOCK.getId(c.world.getBlockState(pos).getBlock()).toString().equals(beforeBlock)){
       if(predictedChangeTick==0)predictedChangeTick=ticks;
       if(ticks-predictedChangeTick>100)return TaskRuntime.Step.failed("server_confirmation_missing");

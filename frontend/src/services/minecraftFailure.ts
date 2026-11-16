@@ -1,6 +1,6 @@
 /** Only reviewed reason codes reach the UI; arbitrary bridge text stays internal. */
 const reasons:Record<string,string>={
- target_not_visible:'target',target_lost:'target',drop_gone_without_own_pickup:'target',source_not_visible:'source',
+ target_absent:'target',target_not_visible:'target',target_lost:'target',drop_gone_without_own_pickup:'target',source_not_visible:'source',
  unreachable:'path',outside_known_terrain:'path',tool_required:'tool',material_missing:'materials',food_missing:'materials',
  placement_blocked_or_material_missing:'materials',ingredients_station_or_server_ack_missing:'station',station_required:'station',
  materials_missing:'materials',item_missing:'materials',build_blocked:'build',build_incomplete:'build',build_target_occupied:'build',build_cells_not_visible:'target',build_timeout:'timeout',

@@ -235,6 +235,7 @@ public final class CompanionClient implements ClientModInitializer {
    }
    case "events" -> {
     var events=gson.toJsonTree(tasks.events(command.get("after").getAsLong())).getAsJsonObject();
+    events.add("blockFacts",gson.toJsonTree(dev.momo.task.BlockReceipts.CURRENT.facts(client.world)));
     events.add("chat",gson.toJsonTree(dev.momo.task.GameChat.CURRENT.notification(client.world)));result.add("events",events);
    }
    case "heartbeat" -> {long now=System.nanoTime()/1000000,lease=command.get("leaseMs").getAsLong();tasks.heartbeat(now,lease);controlLease.renew(now,lease);result.addProperty("active",tasks.active());result.addProperty("controlPaused",pauseBarrier.isPaused());result.addProperty("suspended",suspended(client));}

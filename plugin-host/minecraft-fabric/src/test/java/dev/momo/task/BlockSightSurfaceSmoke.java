@@ -14,6 +14,13 @@ final class BlockSightSurfaceSmoke {
   var hit=BlockSight.hit(eye,target,boxes,null,floor);
   if(hit==null||!hit.getBlockPos().equals(target)||hit.getSide()!=Direction.UP)throw new AssertionError("A visible far floor tile needs a top-face sight sample, not only its occluded center");
   if(BlockSight.hit(eye,target,boxes,Direction.DOWN,floor)!=null)throw new AssertionError("Seeing the top never authorizes an occluded requested bottom face");
+  var reads=new java.util.concurrent.atomic.AtomicInteger();
+  java.util.function.BooleanSupplier air=()->{reads.incrementAndGet();return true;};
+  if(BlockSight.visibleAbsence(eye,target,floor,air)||reads.get()!=0)throw new AssertionError("An occluding hit must prevent even reading a hidden target state");
+  java.util.function.Function<Vec3d,BlockHitResult> clear=end->BlockHitResult.createMissed(end,Direction.UP,target);
+  if(!BlockSight.visibleAbsence(eye,target,clear,air)||reads.get()!=1)throw new AssertionError("A clear visible empty cell can invalidate a past sighting");
+  if(BlockSight.visibleAbsence(eye,new BlockPos(100,0,0),clear,air)||reads.get()!=1)throw new AssertionError("Do not inspect out-of-range coordinates");
+  if(BlockSight.visibleAbsence(eye,target,clear,()->false))throw new AssertionError("A partial non-air shape must never be invented as absent");
   // A thin natural gap can expose a real log corner while all seven canonical
   // center/face samples are blocked. Preserve the actual discovery ray.
   var cornerEye=new Vec3d(0,1,.5);var corner=new BlockPos(3,0,0);
