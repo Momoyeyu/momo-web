@@ -1,6 +1,10 @@
 package dev.momo.task;
 public final class CombatWithdrawalSmoke {
  public static void main(String[] args){
+  var prey=new CombatWithdrawal();
+  if(!prey.update(2,9,0,false,false).isEmpty())throw new AssertionError("Low health alone must not prevent hunting a harmless prey animal");
+  if(!prey.update(2,9,1,false,true).equals("retreating"))throw new AssertionError("A target that actually becomes dangerous must still trigger retreat immediately");
+  if(!prey.update(8,25,20,false,false).equals("retreating"))throw new AssertionError("Once danger started a retreat, momentary calm cannot turn the body back");
   var retreat=new CombatWithdrawal();
   if(!retreat.update(20,9,1,false).isEmpty())throw new AssertionError("Healthy combat does not retreat without danger");
   if(!retreat.update(5.3f,9,2,false).equals("retreating"))throw new AssertionError("Low health begins withdrawal immediately");

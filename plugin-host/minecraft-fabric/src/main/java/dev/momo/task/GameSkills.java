@@ -343,7 +343,11 @@ public final class GameSkills {
    }
    lostTicks=0;lastSeen=entity.getBlockPos();
    if(entity.squaredDistanceTo(c.player)>1024)return TaskRuntime.Step.failed("target_lost");
-   String retreat=withdrawal.update(c.player.getHealth(),entity.squaredDistanceTo(c.player),ticks,ThreatRange.ranged(entity));
+   var damage=c.player.getRecentDamageSource();
+   boolean recentAttacker=ThreatPolicy.recent(c.player.getAttacker()==entity,c.player.age-c.player.getLastAttackedTime(),damage!=null&&damage.getAttacker()==entity);
+   boolean dangerous=entity instanceof net.minecraft.entity.player.PlayerEntity||entity instanceof net.minecraft.entity.mob.Monster||entity instanceof net.minecraft.entity.mob.Angerable
+    ||entity instanceof net.minecraft.entity.mob.MobEntity mob&&(mob.isAttacking()||mob.getTarget()==c.player)||recentAttacker;
+   String retreat=withdrawal.update(c.player.getHealth(),entity.squaredDistanceTo(c.player),ticks,ThreatRange.ranged(entity),dangerous);
    if(!retreat.isEmpty()){
     haltNavigation();
     if(!retreat.equals("retreating"))return TaskRuntime.Step.failed(retreat);

@@ -3,6 +3,10 @@ package dev.momo.task;
 final class CombatWithdrawal {
  private boolean active,ranged;private double best;private int improved;
  String update(float health,double distanceSquared,int tick,boolean rangedThreat){
+  return update(health,distanceSquared,tick,rangedThreat,true);
+ }
+ String update(float health,double distanceSquared,int tick,boolean rangedThreat,boolean dangerous){
+  if(!active&&!dangerous)return "";
   if(!active){if(health>6)return "";active=true;best=distanceSquared;improved=tick;}
   ranged|=rangedThreat;
   // Ranged danger is recognized out to 24 blocks. Keep four blocks of margin
