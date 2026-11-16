@@ -32,3 +32,7 @@ Goals survive compaction and restart as intentions, never restored permission. E
 ## Verification status
 
 The current contract, full vanilla capability matrix, final installed acceptance gates and known remaining work are in [007](007-flowing-minecraft.md). Actual tests, failures and scope limits are in [the evidence record](evidence/007-minecraft.md). Source tests and isolated fixtures do not establish complete autonomous play, physical takeover, or installed product parity. Keep 007 active until those full-scope gates pass.
+
+## Additional building reference
+
+The user-supplied [minecraft-build-design assessment](minecraft-build-design-reference.md) records pinned source links and the useful declarative-design, materials and liveability checks. Its Litematica paste test is distinct from survival execution. No shell, save scanning, dependency or second model loop was added by this assessment.
