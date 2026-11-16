@@ -140,7 +140,7 @@ public final class GameSkills {
    }
    if(skill.equals("waitFor")&&args.get("area").getAsString().equals("screen")&&StationOutputs.indices(screenName()).isEmpty())throw new TaskRuntime.Rejected("station_required");
    if(skill.equals("craft")){
-    var recipe=c.world.getRecipeManager().get(identifier(args,"recipe")).orElseThrow(()->new IllegalArgumentException("Unknown recipe"));
+    var recipe=c.world.getRecipeManager().get(identifier(args,"recipe")).orElseThrow(()->new TaskRuntime.Rejected("recipe_unknown"));
     if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.CraftingScreenHandler||c.player.currentScreenHandler instanceof net.minecraft.screen.PlayerScreenHandler))throw new TaskRuntime.Rejected("station_required");
     if(!c.player.getRecipeBook().contains(recipe))throw new TaskRuntime.Rejected("recipe_unknown");
     var grid=(net.minecraft.screen.AbstractRecipeScreenHandler<?,?>)c.player.currentScreenHandler;
@@ -303,7 +303,7 @@ public final class GameSkills {
       if(gained>=args.get("count").getAsInt())return done(verifiedGain);
       craftPhase=0;
      }
-     if(craftPhase==0){c.interactionManager.clickRecipe(c.player.currentScreenHandler.syncId,c.world.getRecipeManager().get(identifier(args,"recipe")).orElseThrow(),false);mutationTick=ticks;craftPhase=1;}
+     if(craftPhase==0){c.interactionManager.clickRecipe(c.player.currentScreenHandler.syncId,c.world.getRecipeManager().get(identifier(args,"recipe")).orElseThrow(()->new TaskRuntime.Rejected("recipe_unknown")),false);mutationTick=ticks;craftPhase=1;}
      else takeOneOutput(0);
      if(ticks-mutationTick>100)return TaskRuntime.Step.failed("ingredients_station_or_server_ack_missing");break;
     case "closeScreen":if(c.currentScreen==null)return done(Map.of("screen","world"));break;

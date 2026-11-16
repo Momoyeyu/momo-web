@@ -6,6 +6,20 @@ from app.services import minecraft_journal as journal
 import json
 import copy
 
+def test_failed_build_context_keeps_bounded_grounded_diagnostics_including_plan_steps():
+ from app.services.minecraft import Minecraft
+ blocked=[{'x':i,'y':70,'z':2,'requested':'minecraft:dirt','actual':'minecraft:grass_block','observedAt':123} for i in range(12)]
+ missing=[{'item':'minecraft:dirt','required':20,'available':4,'missing':16,'debug':'not player context'} for _ in range(12)]
+ proof={'blockedCells':blocked,'missingMaterials':missing,'beforeDigest':'not player context'}
+ task={'taskId':'build','skill':'build','state':'failed','reason':'build_target_occupied','evidence':proof}
+ projected=Minecraft._task_context(task)['evidence']
+ assert projected['blockedCells']==blocked[:4]
+ assert projected['missingMaterials']==[{k:v for k,v in row.items() if k!='debug'} for row in missing[:4]]
+ assert 'beforeDigest' not in projected
+ assert task['evidence']==proof
+ plan={**task,'skill':'plan','evidence':{'steps':[{'skill':'build','state':'failed','result':proof}]}}
+ assert Minecraft._task_context(plan)['evidence']['steps'][0]['result']==projected
+
 def test_durable_goal_is_reinjected_only_into_owner_local_context():
  binding={'world':'private-world','account':'player'}
  goal={'title':'做花园','reason':'好奇','source':'curiosity','expected':'看到花','status':'active'}

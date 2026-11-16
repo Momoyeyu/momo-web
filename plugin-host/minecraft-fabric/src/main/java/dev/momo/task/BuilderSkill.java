@@ -18,10 +18,12 @@ final class BuilderSkill implements TaskRuntime.Work {
  private final Map<SparseBuild.Cell,BlockState> wanted=new LinkedHashMap<>();private final Map<SparseBuild.Cell,Map<String,Object>> verified=new LinkedHashMap<>();
  private final Map<Settings.Setting<?>,Runnable> settings=new LinkedHashMap<>();private IBaritone baritone;private net.minecraft.client.world.ClientWorld world;
  private long boundary;private int ticks,existing;private boolean started;private final BuildSettlement settlement=new BuildSettlement(20);private final BuildProgress movement=new BuildProgress(200,600);
+ private List<Map<String,Object>> blockedCells=List.of(),missingMaterials=List.of();
  BuilderSkill(JsonObject args){plan=SparseBuild.from(args);}
  private <T> void borrow(Settings.Setting<T> setting,T value){T previous=setting.value;settings.putIfAbsent(setting,()->setting.value=previous);setting.value=value;}
  private BlockPos position(SparseBuild.Cell cell){return new BlockPos(cell.x(),cell.y(),cell.z());}
  public void start(){
+  blockedCells=missingMaterials=List.of();
   if(c.player==null||c.world==null)throw new TaskRuntime.Rejected("world_unavailable");if(c.currentScreen!=null)throw new TaskRuntime.Rejected("close_station_first");world=c.world;boundary=BlockReceipts.CURRENT.cursor();
   var needed=new HashMap<net.minecraft.item.Item,Integer>();var clearing=new LinkedHashSet<net.minecraft.block.Block>();
   for(var cell:plan.cells()){
@@ -31,9 +33,15 @@ final class BuilderSkill implements TaskRuntime.Work {
    boolean visible=actual.isAir()?world.raycast(new RaycastContext(c.player.getEyePos(),pos.toCenterPos(),RaycastContext.ShapeType.COLLIDER,RaycastContext.FluidHandling.ANY,c.player)).getType()==HitResult.Type.MISS:BlockSight.hit(c,pos)!=null;
    if(!visible)throw new TaskRuntime.Rejected("build_cells_not_visible");
    if(actual.isOf(desired.getBlock())){verified.put(cell,proof(cell,actual.toString(),0));existing++;}
-   else {if(!actual.isAir()){if(!actual.isReplaceable()||!actual.getFluidState().isEmpty())throw new TaskRuntime.Rejected("build_target_occupied");clearing.add(actual.getBlock());}needed.merge(desired.getBlock().asItem(),1,Integer::sum);}
+   else {if(!actual.isAir()){if(!actual.isReplaceable()||!actual.getFluidState().isEmpty()){
+    // This state is disclosed only after the preceding normal sight check.
+    blockedCells=List.of(Map.of("x",cell.x(),"y",cell.y(),"z",cell.z(),"requested",cell.block(),"actual",Registries.BLOCK.getId(actual.getBlock()).toString(),"observedAt",System.currentTimeMillis()));
+    throw new TaskRuntime.Rejected("build_target_occupied");
+   }clearing.add(actual.getBlock());}needed.merge(desired.getBlock().asItem(),1,Integer::sum);}
   }
-  for(var entry:needed.entrySet()){int count=0;for(int i=0;i<36;i++)if(c.player.getInventory().getStack(i).isOf(entry.getKey()))count+=c.player.getInventory().getStack(i).getCount();if(count<entry.getValue())throw new TaskRuntime.Rejected("materials_missing");}
+  var shortages=new ArrayList<Map<String,Object>>();
+  for(var entry:needed.entrySet()){int count=0;for(int i=0;i<36;i++)if(c.player.getInventory().getStack(i).isOf(entry.getKey()))count+=c.player.getInventory().getStack(i).getCount();if(count<entry.getValue())shortages.add(Map.of("item",Registries.ITEM.getId(entry.getKey()).toString(),"required",entry.getValue(),"available",count,"missing",entry.getValue()-count));}
+  missingMaterials=List.copyOf(shortages);if(!missingMaterials.isEmpty())throw new TaskRuntime.Rejected("materials_missing");
   if(verified.size()==wanted.size())return;
   baritone=BaritoneAPI.getProvider().getPrimaryBaritone();
   if(baritone.getPathingBehavior().isPathing()||baritone.getBuilderProcess().isActive()||baritone.getCustomGoalProcess().isActive()||baritone.getPathingControlManager().mostRecentInControl().filter(p->p.isActive()).isPresent())throw new TaskRuntime.Rejected("body_already_owned");
@@ -73,5 +81,5 @@ final class BuilderSkill implements TaskRuntime.Work {
  public void stop(){try{if(started){baritone.getBuilderProcess().onLostControl();baritone.getPathingBehavior().cancelEverything();baritone.getInputOverrideHandler().clearAllKeys();releaseKeys();if(baritone.getBuilderProcess().isActive())throw new IllegalStateException("Builder stop unconfirmed");started=false;}}finally{settings.values().forEach(Runnable::run);settings.clear();}}
  public boolean acceptsScreen(Object screen){return started&&screen instanceof InventoryScreen;}
  public Map<String,Object> progress(){return Map.of("skill","build","engine","baritone","confirmed",verified.size(),"requested",wanted.size(),"ticks",ticks);}
- public Map<String,Object> partialEvidence(){return Map.of("confirmedCells",List.copyOf(verified.values()),"remainingCells",plan.cells().stream().filter(cell->!verified.containsKey(cell)).map(cell->Map.of("x",cell.x(),"y",cell.y(),"z",cell.z(),"block",cell.block())).toList());}
+ public Map<String,Object> partialEvidence(){return Map.of("confirmedCells",List.copyOf(verified.values()),"remainingCells",plan.cells().stream().filter(cell->!verified.containsKey(cell)).map(cell->Map.of("x",cell.x(),"y",cell.y(),"z",cell.z(),"block",cell.block())).toList(),"blockedCells",blockedCells,"missingMaterials",missingMaterials);}
 }

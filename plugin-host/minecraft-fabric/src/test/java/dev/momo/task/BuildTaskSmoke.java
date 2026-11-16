@@ -54,5 +54,18 @@ public final class BuildTaskSmoke {
   work.tick();check(scene.builds.isEmpty(),"A late path result cannot restart a stopped build");
   scene=new Scene();scene.visible.add(A);work=new BuildTask(List.of(A),scene);work.start();work.tick();scene.valid=false;
   try{work.tick();throw new AssertionError("A changed scene must revoke continuation");}catch(TaskRuntime.Rejected expected){work.stop();}
+  // A failed child must retain the observed cause as well as completed cells.
+  for(String diagnostic:List.of("blockedCells","missingMaterials")){
+   var detail=diagnostic.equals("blockedCells")?Map.<String,Object>of("x",0,"y",66,"z",0,"requested","minecraft:dirt","actual","minecraft:stone"):Map.<String,Object>of("item","minecraft:dirt","required",2,"available",0,"missing",2);
+   var supplied=List.of(detail);
+   var failedScene=new Scene(){
+    public TaskRuntime.Work build(List<SparseBuild.Cell> cells){return new Work(TaskRuntime.Step.failed("build_target_occupied")){
+     public Map<String,Object> partialEvidence(){return Map.of(diagnostic,supplied);}
+    };}
+   };
+   failedScene.visible.add(A);var failed=new BuildTask(List.of(A),failedScene);
+   var jobs=new TaskRuntime();jobs.submit("diagnostic","build",failed,0,10000);jobs.tick(0);jobs.tick(50);
+   check(jobs.snapshot("diagnostic").evidence().get(diagnostic)!=null&&jobs.snapshot("diagnostic").evidence().get(diagnostic).equals(supplied),"Preserve the actual child diagnostic through task failure and child release: "+diagnostic);
+  }
  }
 }

@@ -481,6 +481,13 @@ class Minecraft:
         def outcome(proof):
             result={key:item for key,item in proof.items()
                     if key not in {'beforeDigest','afterDigest'} and (item is None or isinstance(item,(str,int,float,bool)))}
+            fields={'blockedCells':('x','y','z','requested','actual','observedAt'),
+                    'missingMaterials':('item','required','available','missing')}
+            for field,keys in fields.items():
+                if isinstance(proof.get(field),list) and proof[field]:
+                    result[field]=[{key:row[key] for key in keys if key in row and
+                                    (row[key] is None or isinstance(row[key],(str,int,float,bool)))}
+                                   for row in proof[field][:4] if isinstance(row,dict)]
             if isinstance(proof.get('steps'),list):
                 result['steps']=[{**{key:item for key,item in row.items() if key!='result'},
                                   **({'result':outcome(row['result'])} if isinstance(row.get('result'),dict) else {})}

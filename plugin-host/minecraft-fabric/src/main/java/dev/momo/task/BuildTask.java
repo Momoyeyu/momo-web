@@ -12,6 +12,7 @@ final class BuildTask implements TaskRuntime.Work {
  }
  private final List<SparseBuild.Cell> cells;private final Scene scene;
  private final Map<SparseBuild.Cell,Map<String,Object>> confirmed=new LinkedHashMap<>();
+ private final Map<String,Object> diagnostics=new LinkedHashMap<>();
  private TaskRuntime.Work child;private List<SparseBuild.Cell> batch=List.of();
  private int ticks,approaches;private boolean moving,paused,closed=true,forceApproach;
  BuildTask(List<SparseBuild.Cell> cells,Scene scene){this.cells=List.copyOf(cells);this.scene=scene;}
@@ -19,6 +20,7 @@ final class BuildTask implements TaskRuntime.Work {
  private List<SparseBuild.Cell> pending(){return cells.stream().filter(c->!confirmed.containsKey(c)).toList();}
  private boolean coordinate(Object value,int expected){return value instanceof Number n&&n.doubleValue()==expected;}
  private void collect(Map<String,Object> evidence,boolean required){
+  for(String field:List.of("blockedCells","missingMaterials"))if(evidence.get(field) instanceof List<?> rows&&!rows.isEmpty())diagnostics.put(field,List.copyOf(rows));
   Object value=evidence.get("confirmedCells");
   if(value instanceof List<?> rows)for(Object entry:rows){
    if(!(entry instanceof Map<?,?> row))continue;
@@ -56,7 +58,7 @@ final class BuildTask implements TaskRuntime.Work {
   var visible=forceApproach?List.<SparseBuild.Cell>of():scene.visible(pending);
   if(!visible.isEmpty()){
    if(!pending.containsAll(visible))throw new TaskRuntime.Rejected("unverified_result");
-   batch=List.copyOf(visible);moving=false;child=scene.build(batch);
+   batch=List.copyOf(visible);moving=false;diagnostics.clear();child=scene.build(batch);
    try{child.start();}
    catch(TaskRuntime.Rejected error){
     if(!error.reason.equals("build_cells_not_visible"))throw error;
@@ -75,5 +77,5 @@ final class BuildTask implements TaskRuntime.Work {
  public void stop(){closed=true;if(child!=null&&!moving)collect(child.partialEvidence(),false);releaseChild();}
  public boolean acceptsScreen(Object screen){return child!=null&&child.acceptsScreen(screen);}
  public Map<String,Object> progress(){return Map.of("skill","build","engine","baritone","phase",child==null?"planning":moving?"approach":"build","confirmed",confirmed.size(),"requested",cells.size(),"approaches",approaches,"ticks",ticks);}
- public Map<String,Object> partialEvidence(){if(child!=null&&!moving)collect(child.partialEvidence(),false);return Map.of("confirmedCells",List.copyOf(confirmed.values()),"remainingCells",pending().stream().map(c->Map.of("x",c.x(),"y",c.y(),"z",c.z(),"block",c.block())).toList(),"approaches",approaches,"materialInventory",scene.materials());}
+ public Map<String,Object> partialEvidence(){if(child!=null&&!moving)collect(child.partialEvidence(),false);var result=new LinkedHashMap<String,Object>(diagnostics);result.putAll(Map.of("confirmedCells",List.copyOf(confirmed.values()),"remainingCells",pending().stream().map(c->Map.of("x",c.x(),"y",c.y(),"z",c.z(),"block",c.block())).toList(),"approaches",approaches,"materialInventory",scene.materials()));return Map.copyOf(result);}
 }
