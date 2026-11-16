@@ -175,10 +175,10 @@ class Minecraft:
             from . import minecraft_journal as journal
             if action=='task' and arguments.get('query'):
                 import re
-                match=re.fullmatch(r'build(?::([0-9]{1,4}))?',arguments['query'])
-                if not match or arguments.get('taskId') or arguments.get('activityId') or int(match[1] or 0)>4096:
+                match=re.fullmatch(r'build(?::([0-9]{1,19}))?',arguments['query'])
+                if not match or arguments.get('taskId') or arguments.get('activityId') or match[1] is not None and not 0<int(match[1])<=2**63-1:
                     raise MinecraftError('Invalid build history query',code='MINECRAFT_INPUT')
-                return {**journal.build_plans(task_binding,int(match[1] or 0)),
+                return {**journal.build_plans(task_binding,int(match[1]) if match[1] is not None else None),
                         'notice':'Stored intended cells, not current visibility or completion. Read the original activityId/taskId for its exact request and receipts; observe before further construction.'}
             if action=='places':
                 return {'historical':True,'places':journal.recall_places(task_binding,arguments.get('query','')),

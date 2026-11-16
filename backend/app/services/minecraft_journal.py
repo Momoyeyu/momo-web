@@ -28,6 +28,7 @@ def schema():
         c.execute('CREATE TABLE IF NOT EXISTS minecraft_goal_instances(scope TEXT PRIMARY KEY,goal_id TEXT NOT NULL)')
         c.execute('CREATE TABLE IF NOT EXISTS minecraft_task_goals(scope TEXT NOT NULL,activity TEXT NOT NULL,task_id TEXT NOT NULL,goal_id TEXT NOT NULL,progress TEXT,updated_at TEXT NOT NULL,PRIMARY KEY(scope,activity,task_id))')
         c.execute('CREATE INDEX IF NOT EXISTS minecraft_goal_progress ON minecraft_task_goals(scope,goal_id,updated_at DESC)')
+        c.execute('CREATE INDEX IF NOT EXISTS minecraft_goal_intents ON minecraft_task_goals(scope,goal_id)')
         c.execute('CREATE TABLE IF NOT EXISTS minecraft_dispatches(scope TEXT NOT NULL,activity TEXT NOT NULL,task_id TEXT NOT NULL,request TEXT NOT NULL,disposition TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(scope,activity,task_id))')
 
 def prepare_dispatch(binding, activity, command):
@@ -71,22 +72,26 @@ def history(binding, *, activity=None, task_id=None, limit=12):
     rows=db.query('SELECT t.activity,t.data,d.request,d.disposition FROM minecraft_tasks t LEFT JOIN minecraft_dispatches d ON d.scope=t.scope AND d.activity=t.activity AND d.task_id=t.task_id WHERE '+where+' ORDER BY t.updated_at DESC,t.rowid DESC LIMIT ?',(*params,min(64,max(1,limit))))
     return [{**json.loads(row['data']),'activityId':row['activity'],**({'dispatch':row['disposition'],'request':json.loads(row['request'])} if row['request'] else {})} for row in reversed(rows)]
 
-def build_plans(binding, offset=0):
+def build_plans(binding, before=None):
     """Index this goal's immutable intentions, not newly observed world cells."""
-    if type(offset) is not int or not 0<=offset<=4096:raise ValueError('Invalid build history offset')
+    if before is not None and (type(before) is not int or not 0<before<=2**63-1):raise ValueError('Invalid build history cursor')
     schema();key=scope(binding)
-    rows=db.query('''SELECT d.activity,d.task_id,d.request,d.disposition,t.data
-        FROM minecraft_dispatches d
-        JOIN minecraft_task_goals a ON a.scope=d.scope AND a.activity=d.activity AND a.task_id=d.task_id
-        JOIN minecraft_goal_instances g ON g.scope=a.scope AND g.goal_id=a.goal_id
+    rows=db.query('''SELECT a.rowid AS cursor,d.activity,d.task_id,d.request,d.disposition,t.data
+        FROM minecraft_task_goals a INDEXED BY minecraft_goal_intents
+        JOIN minecraft_dispatches d ON d.scope=a.scope AND d.activity=a.activity AND d.task_id=a.task_id
         JOIN minecraft_tasks t ON t.scope=d.scope AND t.activity=d.activity AND t.task_id=d.task_id
-        WHERE d.scope=? AND EXISTS(SELECT 1 FROM json_tree(d.request) WHERE key='skill' AND value='build')
-        ORDER BY d.rowid DESC LIMIT 7 OFFSET ?''',(key,offset))
-    plans=[]
-    for row in rows[:6]:
+        WHERE a.scope=? AND a.goal_id=(SELECT goal_id FROM minecraft_goal_instances WHERE scope=?) AND a.rowid<=?
+        ORDER BY a.rowid DESC LIMIT 129''',(key,key,before if before is not None else 2**63-1))
+    plans=[];scanned=0;last=None
+    for row in rows[:128]:
+        scanned+=1;last=row['cursor']
         request=json.loads(row['request']);task=json.loads(row['data'])
         arguments=request.get('args');steps=arguments.get('steps') if isinstance(arguments,dict) else None
         candidates=[request] if request.get('skill')=='build' else steps[:24] if isinstance(steps,list) else []
+        has_build=(request.get('skill')=='build' or request.get('skill')=='plan' and
+                   (any(isinstance(part,dict) and part.get('skill')=='build' for part in candidates)
+                    or isinstance(steps,dict) and steps.get('skill')=='build'))
+        if not has_build:continue
         parts=[]
         for part in candidates:
             if isinstance(part,dict) and part.get('skill')=='build':
@@ -99,7 +104,8 @@ def build_plans(binding, offset=0):
                          'max':{axis:max(cell[axis] for cell in cells) for axis in ('x','y','z')}} if cells else None}
         if task.get('dimension'):entry['dimension']=task['dimension']
         plans.append(entry)
-    return {'buildPlans':plans,'nextOffset':offset+6 if len(rows)>6 and offset+6<=4096 else None}
+        if len(plans)==6:break
+    return {'buildPlans':plans,'nextCursor':last-1 if last and last>1 and len(rows)>scanned else None}
 
 def goal(binding):
     schema()

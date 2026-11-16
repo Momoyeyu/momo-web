@@ -19,12 +19,27 @@ def test_build_plan_index_recalls_original_intent_beyond_recent_tasks_without_cl
  for index in range(100):journal.prepare_dispatch(BINDING,'later',{'taskId':f'walk-{index}','skill':'navigate','args':{'x':index}})
  before=journal.history(BINDING,activity='original',task_id='walls')
  result=journal.build_plans(BINDING)
- assert result['nextOffset'] is None and len(result['buildPlans'])==1
+ assert result['nextCursor'] is None and len(result['buildPlans'])==1
  plan=result['buildPlans'][0]
  assert plan=={'activityId':'original','taskId':'walls','state':'unknown','dispatch':'pending',
                'partCount':1,'requestedCells':2,'bounds':{'min':{'x':10,'y':64,'z':20},'max':{'x':12,'y':66,'z':23}}}
  assert journal.history(BINDING,activity='original',task_id='walls')==before
  assert before[0]['request']['args']['cells']==CELLS
+
+
+def test_build_history_bounds_each_scan_and_seek_continuation_is_stable_when_new_work_arrives():
+ journal.set_goal(BINDING,GOAL);build(task_id='original-layout')
+ for index in range(300):journal.prepare_dispatch(BINDING,'walks',{'taskId':f'w{index}','skill':'navigate','args':{'x':index}})
+ first=journal.build_plans(BINDING)
+ assert first['buildPlans']==[], 'A sparse history page must stop scanning before decoding the entire lifetime journal'
+ cursor=first['nextCursor'];assert type(cursor) is int and cursor>0
+ build(activity='new',task_id='new-layout')
+ second=journal.build_plans(BINDING,cursor)
+ third=journal.build_plans(BINDING,second['nextCursor'])
+ assert second['buildPlans']==[]
+ assert [p['taskId'] for p in third['buildPlans']]==['original-layout']
+ assert third['nextCursor'] is None
+ assert journal.build_plans(BINDING)['buildPlans'][0]['taskId']=='new-layout'
 
 def test_build_index_is_goal_world_account_scoped_and_includes_nested_parts_with_pagination():
  journal.set_goal(BINDING,GOAL);build(task_id='old')
@@ -33,12 +48,12 @@ def test_build_index_is_goal_world_account_scoped_and_includes_nested_parts_with
  journal.record(BINDING,'new',[{'taskId':'part-0','skill':'plan','state':'failed','reason':'materials_missing','evidence':{}}])
  for binding in [{'world':'other','account':'player'},{'world':'build-world','account':'other'}]:
   journal.set_goal(binding,GOAL);build(binding=binding,task_id='private')
- first=journal.build_plans(BINDING);second=journal.build_plans(BINDING,first['nextOffset'])
+ first=journal.build_plans(BINDING);second=journal.build_plans(BINDING,first['nextCursor'])
  assert [p['taskId'] for p in first['buildPlans']]==[f'part-{index}' for index in range(7,1,-1)]
  assert [p['taskId'] for p in second['buildPlans']]==['part-1','part-0']
- assert first['nextOffset']==6 and second['nextOffset'] is None
+ assert type(first['nextCursor']) is int and first['nextCursor']>0 and second['nextCursor'] is None
  assert all(p['partCount']==1 and p['requestedCells']==2 for p in first['buildPlans'])
- assert journal.build_plans({'world':'absent','account':'player'})=={'buildPlans':[],'nextOffset':None}
+ assert journal.build_plans({'world':'absent','account':'player'})=={'buildPlans':[],'nextCursor':None}
 
 def test_build_index_read_retains_permission_generation_and_does_not_dispatch_or_restore_control():
  from tests.test_minecraft_tasks import setup
@@ -74,7 +89,7 @@ def test_build_index_tool_api_propagate_query_without_pixels_and_refuse_ambiguou
  from app.services import computer_tools as tools
  from app.services.minecraft import minecraft
  from app.api.minecraft import TaskCommand,tasks
- reply={'buildPlans':[],'nextOffset':None}
+ reply={'buildPlans':[],'nextCursor':None}
  with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'execute',return_value=reply) as execute,patch.object(tools,'stage') as stage:
   assert json.loads(tools.execute('minecraft_action',{'action':'task','query':'build:6'}))==reply
   assert execute.call_args.args[:2]==('task',{'query':'build:6'})
@@ -84,6 +99,6 @@ def test_build_index_tool_api_propagate_query_without_pixels_and_refuse_ambiguou
  from tests.test_minecraft_tasks import setup
  m,runtime=setup()
  with patch('app.services.minecraft.runtime',runtime),patch.object(m,'gate',return_value='cfg'):
-  for args in [{'query':'build','taskId':'walls'},{'query':'build','activityId':'a'},{'query':'build:-1'},{'query':'build:99999'},{'query':'anything'}]:
+  for args in [{'query':'build','taskId':'walls'},{'query':'build','activityId':'a'},{'query':'build:-1'},{'query':'build:0'},{'query':'build:9223372036854775808'},{'query':'anything'}]:
    with pytest.raises(ValueError,match='Invalid'):m.execute('task',args,0,'owner','lease')
   runtime.host.request.assert_not_called()
