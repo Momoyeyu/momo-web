@@ -4,6 +4,7 @@ public final class SightLandmarksSmoke {
  public static void main(String[] args){
   GameChatSmoke.main(args);
   VisibilityBoundarySmoke.main(args);
+  BlockSightSurfaceSmoke.main(args);
   var calls=new AtomicInteger();
   var hits=SightLandmarks.collect(0,64,0,(x,y,z)->{calls.incrementAndGet();return new SightLandmarks.Hit(20,64,0,"minecraft:oak_leaves",1);});
   if(calls.get()>128||hits.size()!=1)throw new AssertionError("Sight must be bounded and deduplicated");

@@ -16,10 +16,13 @@ final class BlockSight {
  }
  static BlockHitResult hit(Vec3d eye,BlockPos target,java.util.List<Box> boxes,Direction face,java.util.function.Function<Vec3d,BlockHitResult> cast){
   for(var box:boxes.stream().limit(16).toList()){
-   var point=box.getCenter();
-   if(face!=null)point=point.add(face.getOffsetX()*(box.maxX-box.minX)*.4999,face.getOffsetY()*(box.maxY-box.minY)*.4999,face.getOffsetZ()*(box.maxZ-box.minZ)*.4999);
-   var ray=cast.apply(point.add(target.getX(),target.getY(),target.getZ()));
-   if(ray.getType()==HitResult.Type.BLOCK&&ray.getBlockPos().equals(target)&&(face==null||ray.getSide()==face))return ray;
+   var points=new java.util.ArrayList<Vec3d>();
+   if(face==null)points.add(box.getCenter());
+   for(var side:face==null?Direction.values():new Direction[]{face})points.add(box.getCenter().add(side.getOffsetX()*(box.maxX-box.minX)*.4999,side.getOffsetY()*(box.maxY-box.minY)*.4999,side.getOffsetZ()*(box.maxZ-box.minZ)*.4999));
+   for(var point:points){
+    var ray=cast.apply(point.add(target.getX(),target.getY(),target.getZ()));
+    if(ray.getType()==HitResult.Type.BLOCK&&ray.getBlockPos().equals(target)&&(face==null||ray.getSide()==face))return ray;
+   }
   }return null;
  }
 }
