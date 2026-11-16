@@ -425,11 +425,14 @@ def react(
 
     game_ack_only = False
     round_limit = MAX_ROUNDS
+    prefix_scope = None
     if source == "meeting" and not observation_only:
         from .minecraft import minecraft
         from .native_control import native_control
         if minecraft.binding and "game.modify" in minecraft.permissions:
             round_limit = 12
+            from ..core import state as state_store
+            prefix_scope = (str(state_store.DATA_DIR), checkpoint.audience(), gen)
         elif native_control.target and native_control.grant and "interact" in native_control.grant.get("capabilities", []):
             round_limit = 24
     for _ in range(round_limit):
@@ -438,6 +441,9 @@ def react(
         reasoning: dict[str, Any] = {}  # Private protocol state, never a TurnEvent.
         if cancelled():
             return
+        if prefix_scope is not None:
+            from .prefix_budget import measured_prefixes
+            measured_prefixes.restore(messages, llm_cfg, tools, prefix_scope)
         try:
             from .coordinator import runtime, current_run
             with runtime.reasoning_lock:
@@ -488,6 +494,8 @@ def react(
                 prompt_tokens = usage.get("prompt_tokens")
                 if isinstance(messages, ContextMessages) and type(prompt_tokens) is int and prompt_tokens > 0:
                     messages.usage_anchor = (measured_prefix, copy.deepcopy(tools), prompt_tokens)
+                    if prefix_scope is not None:
+                        measured_prefixes.remember(measured_prefix, llm_cfg, tools, prefix_scope, prompt_tokens)
                 from .context_policy import Policy
                 Policy(llm_cfg, checkpoint.audience(), tools).record_usage(usage)
         except (llm.LlmError, vision.VisionError) as e:
