@@ -678,3 +678,5 @@ The body now remembers at most sixteen escaped threats during the current activi
 回归先复现失败，再修复；另验证 UTF-8 字节超限、工具调用、源前缀／代次／摘要版本变化不得发布，并发新对话保持。全 Python：1033 passed、3 skipped。真实 API 诊断 `cold-compaction-diagnostics-model.log`：原 157 行历史、固定开销 17,944，保留近期候选 881 字节；同配置维修 API 用量 8,305 prompt／3,323 completion，生成 2,475 字节摘要，之后进入一次游戏推理调用桩、无工具派发。此检查只证明真实维修后请求获准，不证明模型实际施工；第一次较早的诊断尚处旧失败退避期，仍为 0 调用，结果保留。
 
 用户提供的新建筑参考已完成固定源码调研，见 [取舍记录](../minecraft-build-design-reference.md)；没有运行其 Python 设计或 Litematica 粘贴流程。
+
+冷启动修复后的真实模型续跑 `cold-recovered-autonomy-model` 已完整退出：94 次推理、99 次工具调用、52 条本地任务记录；795,130 prompt／71,426 completion tokens（总 866,556，含缓存口径），本次没有额外维修 API。仍触发 37 次工具轮容量保护，不能据此声称观察体验已全部修复。模型实际死亡后重生、导航、采石、挖煤、合成四支火把并正常放置；一次采石 17→27，其他失败保留部分成果。三次附近采木均四次换位／2560 射线后不可达，封洞建造因目标被占用失败，没有伪报成功。最终落脚点目标仍 active，角色位于约 (49.49,73,-137.42)，HP 12.33／food 6；清理后 `cleanupPaused=true`，无停止错误、无 SSE 错误。完整房屋、手动接管及最终安装版验收仍未通过。本轮未重装应用或重新请求系统权限。
