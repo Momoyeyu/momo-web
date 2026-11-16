@@ -14,5 +14,24 @@ final class BlockSightSurfaceSmoke {
   var hit=BlockSight.hit(eye,target,boxes,null,floor);
   if(hit==null||!hit.getBlockPos().equals(target)||hit.getSide()!=Direction.UP)throw new AssertionError("A visible far floor tile needs a top-face sight sample, not only its occluded center");
   if(BlockSight.hit(eye,target,boxes,Direction.DOWN,floor)!=null)throw new AssertionError("Seeing the top never authorizes an occluded requested bottom face");
+  // A thin natural gap can expose a real log corner while all seven canonical
+  // center/face samples are blocked. Preserve the actual discovery ray.
+  var cornerEye=new Vec3d(0,1,.5);var corner=new BlockPos(3,0,0);
+  java.util.function.Function<Vec3d,BlockHitResult> gap=end->{
+   var ray=end.subtract(cornerEye);var wall=cornerEye.add(ray.multiply(2.5/ray.x));
+   if(wall.y>.86&&wall.y<.88&&wall.z>.22&&wall.z<.24){
+    var point=cornerEye.add(ray.multiply(3/ray.x));
+    return new BlockHitResult(point,Direction.WEST,corner,false);
+   }
+   return new BlockHitResult(wall,Direction.WEST,new BlockPos(2,0,0),false);
+  };
+  var seen=new Vec3d(3.0001,.84,.18);
+  if(BlockSight.hit(cornerEye,corner,boxes,null,gap)!=null)throw new AssertionError("Fixture must expose only the off-center gap");
+  var known=BlockSight.hit(cornerEye,corner,boxes,null,gap,seen);
+  if(known==null||!known.getBlockPos().equals(corner))throw new AssertionError("An actually observed corner must survive handoff to mining");
+  java.util.function.Function<Vec3d,BlockHitResult> closed=end->new BlockHitResult(new Vec3d(2.5,.87,.23),Direction.WEST,new BlockPos(2,0,0),false);
+  if(BlockSight.hit(cornerEye,corner,boxes,null,closed,seen)!=null)throw new AssertionError("Past sight never bypasses new occlusion");
+  if(BlockSight.hit(cornerEye,corner,boxes,Direction.UP,gap,seen)!=null)throw new AssertionError("A west-face discovery cannot authorize the top face");
+
  }
 }

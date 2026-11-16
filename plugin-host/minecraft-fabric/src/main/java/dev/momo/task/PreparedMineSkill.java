@@ -12,17 +12,20 @@ final class PreparedMineSkill implements TaskRuntime.Work {
  private boolean started,paused,closed;
  PreparedMineSkill(TaskRuntime.Work mine,Supplier<TaskRuntime.Work> prepareTool,BooleanSupplier suitable){this.mine=mine;this.prepareTool=prepareTool;this.suitable=suitable;}
  static TaskRuntime.Work create(JsonObject args,boolean protectSupport){
+  return create(args,protectSupport,null);
+ }
+ static TaskRuntime.Work create(JsonObject args,boolean protectSupport,net.minecraft.util.math.Vec3d observedPoint){
   var owned=args.deepCopy();var pos=new BlockPos(owned.get("x").getAsInt(),owned.get("y").getAsInt(),owned.get("z").getAsInt());
-  return new PreparedMineSkill(GameSkills.rawMine(owned,protectSupport),()->prepare(pos),()->heldSuitable(MinecraftClient.getInstance(),pos));
+  return new PreparedMineSkill(GameSkills.rawMine(owned,protectSupport,observedPoint),()->prepare(pos,observedPoint),()->heldSuitable(MinecraftClient.getInstance(),pos));
  }
  static boolean heldSuitable(MinecraftClient c,BlockPos pos){
   if(c.player==null||c.world==null)return false;
   var state=c.world.getBlockState(pos);
   return c.player.getAbilities().creativeMode||!state.isToolRequired()||c.player.getMainHandStack().isSuitableFor(state);
  }
- private static TaskRuntime.Work prepare(BlockPos pos){
+ private static TaskRuntime.Work prepare(BlockPos pos,net.minecraft.util.math.Vec3d observedPoint){
   var c=MinecraftClient.getInstance();if(c.player==null||c.world==null)throw new TaskRuntime.Rejected("world_unavailable");
-  if(BlockSight.hit(c,pos)==null)throw new TaskRuntime.Rejected("target_not_visible");
+  if(BlockSight.hit(c,pos,null,observedPoint)==null)throw new TaskRuntime.Rejected("target_not_visible");
   var state=c.world.getBlockState(pos);int selected=c.player.getInventory().selectedSlot;
   var tools=new ArrayList<MiningToolChoice.Tool>();
   for(int i=0;i<36;i++){var stack=c.player.getInventory().getStack(i);if(!stack.isEmpty())tools.add(new MiningToolChoice.Tool(i,stack.isSuitableFor(state),stack.getMiningSpeedMultiplier(state)));}

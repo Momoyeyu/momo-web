@@ -8,13 +8,29 @@ final class BlockSight {
  private BlockSight(){}
  static BlockHitResult hit(MinecraftClient c,BlockPos target){return hit(c,target,null);}
  static BlockHitResult hit(MinecraftClient c,BlockPos target,Direction face){
+  return hit(c,target,face,null);
+ }
+ static BlockHitResult hit(MinecraftClient c,BlockPos target,Direction face,Vec3d observedPoint){
   var eye=c.player.getEyePos();if(eye.squaredDistanceTo(target.toCenterPos())>1024)return null;
   var state=c.world.getBlockState(target);var shape=state.getCollisionShape(c.world,target);var type=RaycastContext.ShapeType.COLLIDER;
   if(shape.isEmpty()){shape=state.getOutlineShape(c.world,target);type=RaycastContext.ShapeType.OUTLINE;}
   var rayType=type;
-  return hit(eye,target,shape.getBoundingBoxes(),face,end->c.world.raycast(new RaycastContext(eye,end,rayType,RaycastContext.FluidHandling.NONE,c.player)));
+  return hit(eye,target,shape.getBoundingBoxes(),face,end->c.world.raycast(new RaycastContext(eye,end,rayType,RaycastContext.FluidHandling.NONE,c.player)),observedPoint);
  }
  static BlockHitResult hit(Vec3d eye,BlockPos target,java.util.List<Box> boxes,Direction face,java.util.function.Function<Vec3d,BlockHitResult> cast){
+  return hit(eye,target,boxes,face,cast,null);
+ }
+ static BlockHitResult hit(Vec3d eye,BlockPos target,java.util.List<Box> boxes,Direction face,java.util.function.Function<Vec3d,BlockHitResult> cast,Vec3d observedPoint){
+  // A discovery ray can see a corner that canonical face samples miss. This is
+  // only an aiming hint: cast again from the CURRENT eye and require first hit.
+  if(observedPoint!=null&&Double.isFinite(observedPoint.x)&&Double.isFinite(observedPoint.y)&&Double.isFinite(observedPoint.z)
+    &&observedPoint.x>=target.getX()-.001&&observedPoint.x<=target.getX()+1.001
+    &&observedPoint.y>=target.getY()-.001&&observedPoint.y<=target.getY()+1.001
+    &&observedPoint.z>=target.getZ()-.001&&observedPoint.z<=target.getZ()+1.001){
+   var end=observedPoint.add(observedPoint.subtract(eye).normalize().multiply(.001));
+   var ray=cast.apply(end);
+   if(ray.getType()==HitResult.Type.BLOCK&&ray.getBlockPos().equals(target)&&(face==null||ray.getSide()==face))return ray;
+  }
   for(var box:boxes.stream().limit(16).toList()){
    var points=new java.util.ArrayList<Vec3d>();
    if(face==null)points.add(box.getCenter());

@@ -63,7 +63,7 @@ public final class GatherSkill implements TaskRuntime.Work {
     continue;
    }
    if(state.isToolRequired()&&!c.player.getAbilities().creativeMode){boolean suitable=false;for(int i=0;i<36;i++)if(c.player.getInventory().getStack(i).isSuitableFor(state))suitable=true;if(!suitable){lastFailure="tool_required";blocked.put(pos.toImmutable(),ticks+200);continue;}}
-   target=pos.toImmutable();var args=new JsonObject();args.addProperty("x",pos.getX());args.addProperty("y",pos.getY());args.addProperty("z",pos.getZ());begin("mine",args);return TaskRuntime.Step.running();
+   target=pos.toImmutable();var args=new JsonObject();args.addProperty("x",pos.getX());args.addProperty("y",pos.getY());args.addProperty("z",pos.getZ());begin("mine",args,hit.getPos());return TaskRuntime.Step.running();
   }
   if(scan>=512){
    if(foliage!=null){target=foliage;foliage=null;clearedLeaves++;var args=new JsonObject();args.addProperty("x",target.getX());args.addProperty("y",target.getY());args.addProperty("z",target.getZ());begin("mine",args);scan=0;return TaskRuntime.Step.running();}
@@ -77,7 +77,10 @@ public final class GatherSkill implements TaskRuntime.Work {
   return TaskRuntime.Step.running();
  }
  private void begin(String skill,JsonObject args){
-  child=skill.equals("mine")?GameSkills.gatherMine(args):GameSkills.create(skill,args);phase=skill;
+  begin(skill,args,null);
+ }
+ private void begin(String skill,JsonObject args,Vec3d observedPoint){
+  child=skill.equals("mine")?GameSkills.gatherMine(args,observedPoint):GameSkills.create(skill,args);phase=skill;
   try{child.start();}catch(RuntimeException error){child.stop();child=null;lastFailure=TaskRuntime.reason(error,"start_failed");if(target!=null)blocked.put(target,ticks+200);target=null;phase="search";}
  }
  public void pause(){if(child!=null)child.pause();}
