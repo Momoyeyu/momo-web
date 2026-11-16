@@ -140,3 +140,12 @@ def test_game_event_has_live_acting_but_no_second_visual_novel_tutorial():
  reminder=next(m['content'] for m in messages if 'Live performance mode remains active' in str(m.get('content','')))
  assert len(reminder.encode())<250
  assert 'attention_control' not in '\n'.join(m['content'] for m in messages if isinstance(m.get('content'),str)), 'An automatic event is not authority to change local attention'
+
+
+def test_focused_observation_identifies_the_shared_game_avatar_separately_from_the_owner():
+ from app.services.minecraft import Minecraft
+ raw={'world':'world','account':'avatar-uuid','playerName':'FixturePlayer','health':0,'screen':'death','observedAt':123}
+ for query in ['','inventory','terrain','chat']:
+  view=Minecraft.model_observation(raw,compact=True,query=query)
+  assert view['playerName']=='FixturePlayer' and view['account']=='avatar-uuid'
+  assert view['health']==0 and view['screen']=='death'

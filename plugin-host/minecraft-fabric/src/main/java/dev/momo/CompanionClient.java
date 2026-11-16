@@ -263,6 +263,7 @@ public final class CompanionClient implements ClientModInitializer {
     result.add("survival",new Gson().toJsonTree(survival.progress()));result.addProperty("gameTick",client.world.getTime());
     result.addProperty("clientFps",client.getCurrentFps());
     result.addProperty("observedAt", System.currentTimeMillis());
+    result.addProperty("playerName",client.player.getName().getString());
     result.addProperty("x",client.player.getX()); result.addProperty("y",client.player.getY()); result.addProperty("z",client.player.getZ());
     result.addProperty("yaw",client.player.getYaw()); result.addProperty("pitch",client.player.getPitch());
     result.addProperty("screen",client.currentScreen==null?"world":
