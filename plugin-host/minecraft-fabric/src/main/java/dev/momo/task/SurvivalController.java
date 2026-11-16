@@ -40,19 +40,19 @@ public final class SurvivalController {
     boolean recent=ThreatPolicy.recent(p.getAttacker()==e,p.age-p.getLastAttackedTime(),damage!=null&&damage.getAttacker()==e);
     boolean neutral=e instanceof EndermanEntity||e instanceof PiglinEntity||e instanceof ZombifiedPiglinEntity||e instanceof SpiderEntity&&c.world.isDay();
     boolean aggressive=e instanceof MobEntity mob&&(mob.isAttacking()||mob.getTarget()==p)||e instanceof EndermanEntity enderman&&enderman.isAngry();
-    boolean ranged=e instanceof net.minecraft.entity.ai.RangedAttackMob||e instanceof GhastEntity||e instanceof BlazeEntity||e instanceof GuardianEntity;
+    boolean ranged=ThreatRange.ranged(e);
     return ThreatPolicy.danger(true,e instanceof Monster,neutral,aggressive,recent,ranged,p.squaredDistanceTo(e));
    }).stream().min(java.util.Comparator.comparingDouble(e->e.squaredDistanceTo(p))).orElse(null);
   }
   if(threat==null)threatPosition=null;else if(p.canSee(threat))threatPosition=threat.getPos();
   boolean eating=foodWork!=null||(p.isUsingItem()&&p.getActiveItem().contains(DataComponentTypes.FOOD));
   boolean critical=blasts.active()||p.isInLava()||policy.airCritical(p.getAir(),mode==SurvivalPolicy.Mode.ESCAPE)||(p.isOnFire()&&p.getHealth()<8);
-  boolean hostile=threat!=null&&!retreatMemory.defer(threat.getId(),p.squaredDistanceTo(threatPosition));
+  boolean hostile=threat!=null&&!retreatMemory.defer(threat.getId(),p.squaredDistanceTo(threatPosition),ThreatRange.ranged(threat));
   var desired=policy.choose(true,false,critical,p.getHealth(),p.getHungerManager().getFoodLevel(),foodWork!=null||(System.nanoTime()>=foodRetryUntil&&foodSlot()>=0),eating,hostile);
   desired=policy.forBody(desired,mealOwned||(mode==SurvivalPolicy.Mode.NONE&&eating),combatOwned);
   if(desired==SurvivalPolicy.Mode.DEFEND&&System.nanoTime()<combatRetryUntil)desired=SurvivalPolicy.Mode.NONE;
   if(mode==SurvivalPolicy.Mode.ESCAPE&&combatRetreat&&!critical){
-   String retreat=threat==null||!threat.isAlive()?"retreated_low_health":withdrawal.update(p.getHealth(),p.squaredDistanceTo(threatPosition),ticks);
+   String retreat=threat==null||!threat.isAlive()?"retreated_low_health":withdrawal.update(p.getHealth(),p.squaredDistanceTo(threatPosition),ticks,ThreatRange.ranged(threat));
    if(retreat.equals("retreating"))desired=SurvivalPolicy.Mode.ESCAPE;
    else{if(retreat.equals("retreated_low_health")&&threat!=null)retreatMemory.reachedSafety(threat.getId());replanReason=retreat;desired=SurvivalPolicy.Mode.NONE;}
   }
@@ -68,7 +68,7 @@ public final class SurvivalController {
  }
  public void drive(SurvivalPolicy.Mode desired){
   var c=client();var p=c.player;
-  if(desired!=mode){var selectedThreat=threat;var selectedPosition=threatPosition;stop(false,true);threat=selectedThreat;threatPosition=selectedPosition;mode=desired;savedSlot=p.getInventory().selectedSlot;ticks=0;escapeYaw=p.getYaw();combatRetreat=desired==SurvivalPolicy.Mode.ESCAPE&&p.getHealth()<=6&&threat!=null;if(combatRetreat)withdrawal.update(p.getHealth(),p.squaredDistanceTo(threatPosition),ticks);}
+  if(desired!=mode){var selectedThreat=threat;var selectedPosition=threatPosition;stop(false,true);threat=selectedThreat;threatPosition=selectedPosition;mode=desired;savedSlot=p.getInventory().selectedSlot;ticks=0;escapeYaw=p.getYaw();combatRetreat=desired==SurvivalPolicy.Mode.ESCAPE&&p.getHealth()<=6&&threat!=null;if(combatRetreat)withdrawal.update(p.getHealth(),p.squaredDistanceTo(threatPosition),ticks,ThreatRange.ranged(threat));}
   ticks++;
   switch(mode){
    case EAT -> {

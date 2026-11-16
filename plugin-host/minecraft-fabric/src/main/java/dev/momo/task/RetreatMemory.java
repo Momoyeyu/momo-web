@@ -7,8 +7,8 @@ final class RetreatMemory {
  void health(float value){if(value>6||Float.isFinite(previous)&&value<previous-.01f)escaped.clear();previous=value;}
  void damage(Object value){if(value!=null&&value!=damage)escaped.clear();damage=value;}
  void reachedSafety(int entity){escaped.remove(entity);escaped.add(entity);while(escaped.size()>16)escaped.remove(escaped.iterator().next());}
- boolean defer(int entity,double distanceSquared){
-  if(!Double.isFinite(distanceSquared)||distanceSquared<81){escaped.remove(entity);return false;}
+ boolean defer(int entity,double distanceSquared,boolean ranged){
+  if(!Double.isFinite(distanceSquared)||distanceSquared<(ranged?625:81)){escaped.remove(entity);return false;}
   return escaped.contains(entity);
  }
  void clear(){escaped.clear();previous=Float.NaN;damage=null;}

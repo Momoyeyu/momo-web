@@ -335,7 +335,7 @@ public final class GameSkills {
    }
    lostTicks=0;lastSeen=entity.getBlockPos();
    if(entity.squaredDistanceTo(c.player)>1024)return TaskRuntime.Step.failed("target_lost");
-   String retreat=withdrawal.update(c.player.getHealth(),entity.squaredDistanceTo(c.player),ticks);
+   String retreat=withdrawal.update(c.player.getHealth(),entity.squaredDistanceTo(c.player),ticks,ThreatRange.ranged(entity));
    if(!retreat.isEmpty()){
     haltNavigation();look(entity.getEyePos());
     if(!retreat.equals("retreating"))return TaskRuntime.Step.failed(retreat);
