@@ -199,7 +199,7 @@ def observe_visit(binding, observation):
     x,y,z=xyz
     landmarks=[]
     samples=[(block,96*96) for block in observation.get('visibleLandmarks',[])[:6]]+[(block,64) for block in observation.get('visibleBlocks',[])[:8]]
-    seen=set()
+    seen=set();observed_positions=set()
     for block,distance_limit in samples:
         if not isinstance(block,dict):continue
         name=block.get('block','')
@@ -207,6 +207,7 @@ def observe_visit(binding, observation):
         if not isinstance(name,str) or len(name)>128 or not re.fullmatch(r'[a-z0-9_.-]+:[a-z0-9_./-]+',name):continue
         if any(type(v) not in (int,float) or not math.isfinite(v) for v in coords):continue
         if sum((v-p)**2 for v,p in zip(coords,xyz))>distance_limit:continue
+        observed_positions.add(tuple(coords))
         if name in {'minecraft:grass_block','minecraft:dirt','minecraft:stone','minecraft:short_grass'}:continue
         identity=(name,*coords)
         if identity in seen:continue
@@ -214,11 +215,62 @@ def observe_visit(binding, observation):
     place={'dimension':dimension,'x':round(x,1),'y':round(y,1),'z':round(z,1),'landmarks':landmarks}
     schema();key=scope(binding)
     with db.tx() as c:
+        previous=c.execute('SELECT data,updated_at FROM minecraft_places WHERE scope=? AND dimension=? AND chunk_x=? AND chunk_z=?',
+                           (key,dimension,math.floor(x/16),math.floor(z/16))).fetchone()
+        known=[{**block,'seenAt':db.now_iso()} for block in landmarks]
+        if previous:
+            old=json.loads(previous['data'])
+            for block in old.get('knownLandmarks',old.get('landmarks',[]))[:32]:
+                value=_stored_marker(block,previous['updated_at'])
+                if value and tuple(value[k] for k in ('x','y','z')) not in observed_positions:
+                    known.append(value)
+        unique={}
+        for block in known:
+            unique.setdefault(tuple(block[k] for k in ('x','y','z')),block)
+        place['knownLandmarks']=list(unique.values())[:32]
         c.execute('INSERT INTO minecraft_places VALUES(?,?,?,?,?,?) ON CONFLICT(scope,dimension,chunk_x,chunk_z) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at',
                   (key,dimension,math.floor(x/16),math.floor(z/16),json.dumps(place),db.now_iso()))
         c.execute('DELETE FROM minecraft_places WHERE scope=? AND rowid NOT IN (SELECT rowid FROM minecraft_places WHERE scope=? ORDER BY updated_at DESC LIMIT 1024)',(key,key))
 
 def explored(binding,limit=8):
     schema()
-    return [json.loads(row['data']) for row in db.query('SELECT data FROM minecraft_places WHERE scope=? ORDER BY updated_at DESC LIMIT ?',
-                                                       (scope(binding),min(32,max(1,limit))))]
+    return [{k:v for k,v in json.loads(row['data']).items() if k!='knownLandmarks'}
+            for row in db.query('SELECT data FROM minecraft_places WHERE scope=? ORDER BY updated_at DESC LIMIT ?',
+                                (scope(binding),min(32,max(1,limit))))]
+
+
+def _stored_marker(block,at):
+    if not isinstance(block,dict):return None
+    name=block.get('block','');coords=[block.get(k) for k in ('x','y','z')]
+    if not isinstance(name,str) or len(name)>128 or not re.fullmatch(r'[a-z0-9_.-]+:[a-z0-9_./-]+',name):return None
+    if any(type(v) not in (int,float) or not math.isfinite(v) or abs(v)>30_000_000 for v in coords):return None
+    seen=block.get('seenAt',at)
+    if not isinstance(seen,str) or len(seen)>64:seen=at
+    return {'block':name,**dict(zip(('x','y','z'),coords)),'seenAt':seen}
+
+
+def recall_places(binding,query=''):
+    """Bounded historical sightings from this world/account, never a world read."""
+    if not isinstance(query,str) or len(query)>64:raise ValueError('Invalid place query')
+    schema()
+    rows=db.query('SELECT data,updated_at FROM minecraft_places WHERE scope=? ORDER BY updated_at DESC LIMIT 1024',(scope(binding),))
+    origin=json.loads(rows[0]['data']) if rows else {}
+    points={}
+    for row in rows:
+        place=json.loads(row['data']);dimension=place.get('dimension')
+        if not isinstance(dimension,str):continue
+        for block in place.get('knownLandmarks',place.get('landmarks',[]))[:32]:
+            marker=_stored_marker(block,row['updated_at'])
+            if not marker or query.strip().lower() not in marker['block']:continue
+            identity=(dimension,*(marker[k] for k in ('x','y','z')))
+            marker={**marker,'dimension':dimension}
+            if identity not in points or marker['seenAt']>points[identity]['seenAt']:points[identity]=marker
+    def distance(point):
+        return sum((point[k]-origin.get(k,0))**2 for k in ('x','y','z'))
+    result=[];areas=set()
+    for point in sorted(points.values(),key=lambda p:(p['dimension']!=origin.get('dimension'),distance(p))):
+        area=(point['dimension'],math.floor(point['x']/16),math.floor(point['z']/16))
+        if area in areas:continue
+        areas.add(area);result.append(point)
+        if len(result)==6:break
+    return result

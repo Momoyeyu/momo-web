@@ -1968,6 +1968,7 @@
             "enum": [
               "capabilities",
               "recipes",
+              "places",
               "submit",
               "task",
               "events",

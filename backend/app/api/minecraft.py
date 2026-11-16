@@ -69,7 +69,7 @@ from pydantic import ConfigDict
 class TaskCommand(Owner):
     model_config = ConfigDict(extra='forbid')
     generation: int
-    action: Literal['capabilities','recipes','submit','task','events','pause','resume','cancel']
+    action: Literal['capabilities','recipes','places','submit','task','events','pause','resume','cancel']
     taskId: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{1,80}$')
     activityId: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{1,80}$')
     skill: str | None = Field(default=None,max_length=32)
@@ -92,5 +92,5 @@ def tasks(body: TaskCommand):
             arguments['activityId']=body.activityId
     elif body.action=='events':arguments={'after':body.after}
     elif body.action=='capabilities' and body.skill:arguments={'skill':body.skill}
-    elif body.action=='recipes':arguments={'query':body.query}
+    elif body.action in {'recipes','places'}:arguments={'query':body.query}
     return invoke(minecraft.execute,body.action,arguments,body.generation,body.clientId,body.leaseId)

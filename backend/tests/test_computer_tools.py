@@ -368,10 +368,13 @@ def test_game_declaration_keeps_semantic_tasks_small_and_manual_controls_on_dema
 
 def test_full_game_catalog_leaves_context_for_goal_and_current_pixels():
  from pathlib import Path
+ from typing import get_args
+ from app.api.minecraft import Action,TaskCommand
  from app.services.minecraft import minecraft
  definitions=json.loads((Path(__file__).parents[2]/'plugin-host/src/minecraft-skills.json').read_text())
  with patch.object(minecraft,'capabilities',{'skillDefinitions':definitions}):
-  declaration=tools._minecraft_declaration(['observe','submit','capabilities','play'])
+  actions=sorted({'stop',*get_args(Action.model_fields['action'].annotation),*get_args(TaskCommand.model_fields['action'].annotation)})
+  declaration=tools._minecraft_declaration(actions)
  assert len(json.dumps(declaration,ensure_ascii=False).encode())<=3000
  description=declaration['function']['description']
  assert all(name+'(' in description for name in definitions), 'Keep every actual skill discoverable'
