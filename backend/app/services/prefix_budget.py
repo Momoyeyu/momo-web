@@ -1,7 +1,7 @@
 """Hash-only budget calibration; never a conversation or authorization cache.
 
 A provider's measured WHOLE prompt is an upper bound for its unchanged leading
-system messages. Charge every later/new message and image in full conservative
+text messages. Charge every later/new message and image in full conservative
 bytes. Do not guess a tokenizer ratio or subtract the removed old suffix.
 """
 from collections import OrderedDict
@@ -21,10 +21,14 @@ class MeasuredPrefixes:
         self.records = OrderedDict()
 
     @staticmethod
-    def _headers(messages):
+    def _prefix(messages):
+        if not messages or messages[0].get('role') != 'system':
+            return ()
         result = []
-        for message in messages[:32]:
-            if message.get('role') != 'system':
+        for message in messages[:64]:
+            # Stop before multimodal content. Pixel reservations and fresh
+            # observations must remain fully charged, even for identical URLs.
+            if not isinstance(message.get('content'), str):
                 break
             raw = json.dumps(message, ensure_ascii=False, sort_keys=True).encode()
             result.append(hashlib.sha256(raw).digest())
@@ -37,7 +41,7 @@ class MeasuredPrefixes:
     def remember(self, messages, cfg, tools, scope, tokens):
         if type(tokens) is not int or tokens <= 0:
             return
-        headers = self._headers(messages)
+        headers = self._prefix(messages)
         if not headers:
             return
         key, now = self._key(cfg, tools, scope), self.clock()
@@ -50,7 +54,7 @@ class MeasuredPrefixes:
                 self.records.popitem(last=False)
 
     def restore(self, messages, cfg, tools, scope):
-        headers = self._headers(messages)
+        headers = self._prefix(messages)
         if not headers:
             return False
         key, now = self._key(cfg, tools, scope), self.clock()

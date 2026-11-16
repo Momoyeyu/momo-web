@@ -53,7 +53,7 @@ Game-thread code must not block on model, HTTP, screenshot encoding or large pat
 
 Plans compose typed skills with bounded sequences, conditions and retries. No arbitrary JS. Keep low-level GUI/slot controls for uncommon mechanics, with honest capability reporting. Replace the old per-minute micro-action count with separate queue, work, time and event budgets.
 
-实际 UI 请求包含形象清单、目标事实和视觉信息。除去重复教程后，仍可能因 UTF-8 保守估算反复触发容量维护。因此游戏回合沿用现有 `usage_anchor` 的真实 provider token 口径：在数据目录、受众、会话代次、模型配置和工具 schema 相同，且开头 system 消息的哈希匹配时，将旧完整请求的实测用量作为这段前缀的保守上界；新消息和图像继续全额计费。缓存只存哈希、数值和时间，5 分钟过期，最多 32 组／每组 8 个样本。无可靠用量或前缀不匹配时使用原估算；硬预算和全部权限校验保留。
+实际 UI 请求包含形象清单、目标事实和视觉信息。除去重复教程后，仍可能因 UTF-8 保守估算反复触发容量维护。因此游戏回合沿用现有 `usage_anchor` 的真实 provider token 口径：在数据目录、受众、会话代次、模型配置和工具 schema 相同，且从首条 system 开始的连续文本消息哈希匹配时，将旧完整请求的实测用量作为这段前缀的保守上界；新消息和图像继续全额计费。缓存只存哈希、数值和时间，5 分钟过期，最多 32 组／每组 8 个样本，每个样本最多 64 条消息哈希，遇到多模态消息即停止。无可靠用量或前缀不匹配时使用原估算；硬预算和全部权限校验保留。
 
 探索记忆保存当前世界／账号真正见过的地标；转头或走到别处不会抹去旧观察。模型可通过只读 `places query` 检索较早的记录，每次最多返回六处，附维度与观察时间；结果属于历史，不代表当前仍存在，交互前必须重新观察。默认目标上下文仍只携带少量最近地点，避免不断扩大提示词；检索不读取未知地形、不派发游戏动作、不恢复旧授权。
 

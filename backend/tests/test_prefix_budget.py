@@ -81,3 +81,37 @@ def test_new_system_messages_and_new_images_remain_fully_charged():
     assert cache.restore(messages,CFG,TOOLS,SCOPE)
     image=[{'role':'user','content':[{'type':'image_url','image_url':{'url':'pending'},'vision_tokens':8192}]}]
     assert estimate_request(messages,TOOLS,extra_messages=image)>Budget.from_config(CFG).safe
+
+
+def test_unchanged_text_history_is_covered_by_the_measured_whole_prompt():
+    cache=MeasuredPrefixes()
+    history=[{'role':'system','content':'same rules'},
+             {'role':'user','content':'约定与探索经历。'*1500},
+             {'role':'assistant','content':'保留的原始回答。'*1200}]
+    old=[*history,{'role':'system','content':'old current world'}]
+    cache.remember(old,CFG,TOOLS,SCOPE,3000)
+    messages=ContextMessages([*copy.deepcopy(history),{'role':'system','content':'new world facts'}])
+    assert estimate_request(messages,TOOLS)>Budget.from_config(CFG).safe
+    assert cache.restore(messages,CFG,TOOLS,SCOPE)
+    assert messages.usage_anchor[0]==history
+    assert estimate_request(messages,TOOLS)<Budget.from_config(CFG).safe
+    assert '探索经历' not in str(cache.records), 'Only hashes, counts and timestamps are retained'
+
+
+def test_changed_history_stops_matching_before_the_changed_message():
+    cache=MeasuredPrefixes();header={'role':'system','content':'H'*10000}
+    cache.remember([header,{'role':'user','content':'old'}, {'role':'assistant','content':'same tail'}],CFG,TOOLS,SCOPE,3000)
+    messages=ContextMessages([header,{'role':'user','content':'new'}, {'role':'assistant','content':'same tail'}])
+    assert cache.restore(messages,CFG,TOOLS,SCOPE)
+    assert messages.usage_anchor[0]==[header], 'A later matching message cannot skip a changed prefix'
+
+
+def test_visual_content_is_never_part_of_the_reused_text_prefix():
+    from app.services.context_policy import estimate
+    cache=MeasuredPrefixes();header={'role':'system','content':'H'*10000}
+    image={'role':'user','content':[{'type':'image_url','image_url':{'url':'pending'},'vision_tokens':8192}]}
+    cache.remember([header,image,{'role':'assistant','content':'same text'}],CFG,TOOLS,SCOPE,3000)
+    messages=ContextMessages([header,copy.deepcopy(image),{'role':'assistant','content':'same text'}])
+    assert cache.restore(messages,CFG,TOOLS,SCOPE)
+    assert messages.usage_anchor[0]==[header]
+    assert estimate_request(messages,TOOLS)>=3000+estimate(messages[1:])
