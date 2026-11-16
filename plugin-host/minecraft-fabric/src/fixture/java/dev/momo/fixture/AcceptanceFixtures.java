@@ -101,6 +101,7 @@ public final class AcceptanceFixtures implements ModInitializer {
   var neutral=new net.minecraft.entity.mob.ZombifiedPiglinEntity(EntityType.ZOMBIFIED_PIGLIN,world);neutral.setPosition(32.5,64,-24.5);neutral.setPersistent();world.spawnEntity(neutral);
   var companion=new net.minecraft.entity.passive.CowEntity(EntityType.COW,world);companion.setPosition(-4.5,64,10.5);companion.setPersistent();world.spawnEntity(companion);
   var horse=new net.minecraft.entity.passive.HorseEntity(EntityType.HORSE,world);horse.setPosition(-4.5,64,12.5);horse.setTame(true);horse.setPersistent();world.spawnEntity(horse);
+  block(world,24,68,-26,Blocks.OAK_LOG); // Isolated overhead sight regression.
   // A separated ordinary hillside and creeper for local blast/step escape.
   // Setup only: no damage, fuse, health, teleport or runtime command hooks.
   for(int x=56;x<=76;x++)for(int z=30;z<=46;z++){
@@ -111,6 +112,7 @@ public final class AcceptanceFixtures implements ModInitializer {
   var creeper=new net.minecraft.entity.mob.CreeperEntity(EntityType.CREEPER,world);creeper.setPosition(65.5,66,38.5);
   creeper.initialize(world,world.getLocalDifficulty(creeper.getBlockPos()),SpawnReason.STRUCTURE,null);creeper.setPersistent();world.spawnEntity(creeper);
   Map<String,Object> report=new LinkedHashMap<>(Map.of("version",5,"setupOnly",true,"spawn",List.of(0,64,0),"stationsRow",List.of(-8,64,6),"supplies",List.of(List.of(-3,64,-2),List.of(-5,64,-2),List.of(-7,64,-5)),"villager",List.of(10,64,2),"water",List.of(-10,61,0),"netherFrame",List.of(-13,65,12),"endFrame",List.of(0,64,12)));
+  report.put("overheadLog",List.of(24,68,-26));
   report.put("blastHillside",List.of(65,66,38));report.put("blastTestSetupOnly",true);
   report.put("reviewSupplies",List.of(-10,64,-6));report.put("ore",List.of(-15,64,-9));report.put("hiddenDropWall",List.of(-12,65,-14));report.put("horse",List.of(-4,64,12));
   report.put("followTarget",List.of(-4,64,10));report.put("bed",List.of(4,64,-3));report.put("nightWithDaylightCycle",true);

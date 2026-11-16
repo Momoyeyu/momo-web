@@ -4,6 +4,7 @@ public final class SkillArgumentsSmoke {
  static void validate(String skill,String json){SkillArguments.validate(skill,JsonParser.parseString(json).getAsJsonObject());}
  static void reject(String skill,String json){try{validate(skill,json);throw new AssertionError("Accepted invalid task: "+skill);}catch(IllegalArgumentException expected){}}
  public static void main(String[] args){
+  GatherSightSmoke.main(args);
   if(SkillArguments.legacyFollowTicks(1)!=1||SkillArguments.legacyFollowTicks(51)!=2||SkillArguments.legacyFollowTicks(500)!=10||SkillArguments.legacyFollowTicks(1000)!=20)throw new AssertionError("Legacy bounded follow milliseconds must not become a one-minute task");
   for(int duration:new int[]{0,-1,1001})try{SkillArguments.legacyFollowTicks(duration);throw new AssertionError("Invalid legacy follow duration");}catch(IllegalArgumentException expected){}
   if(!GatherSight.belowFeet(0,63,0,.2,.2,.8,.8,64)||!GatherSight.belowFeet(0,62,0,.2,.2,.8,.8,64))throw new AssertionError("Gather must not dig down through the player's support column");
