@@ -154,7 +154,11 @@ class Policy:
             if cut < 2:
                 continue
             old = estimate(rows[:cut]) + previous_summary_size
-            after = overhead + estimate(rows[cut:]) + max(512, old * .35)
+            # A ratio is a soft planning estimate, not a minimum summary size.
+            # Cold requests have no measured prefix anchor; emergency recovery
+            # can explicitly bound and validate a smaller generated summary.
+            summary_size = 512 if hard else max(512, old * .35)
+            after = overhead + estimate(rows[cut:]) + summary_size
             if after > limit:
                 continue
             free = (budget.safe-after)/budget.window

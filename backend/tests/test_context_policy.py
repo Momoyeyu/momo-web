@@ -15,7 +15,8 @@ def test_latest_never_splits_runs_and_has_bounds():
     assert choose_latest(rows, 99) == 0
 
 
-def test_background_prefix_publish_preserves_new_suffix(monkeypatch):
+@pytest.mark.parametrize('hard', [False, True])
+def test_background_prefix_publish_preserves_new_suffix(monkeypatch, hard):
     from app.services import compress, checkpoint
     from app.core import llm
     from conftest import add_turn
@@ -27,13 +28,14 @@ def test_background_prefix_publish_preserves_new_suffix(monkeypatch):
         add_turn('new while compacting', 'new answer', at='new')
         return {'content':'shared experiences'}
     monkeypatch.setattr(llm, 'chat_completion', summary)
-    assert compress.compress_once()
+    assert compress.compress_once(hard=hard)
     assert checkpoint.live_messages()[:len(before)] == before
     assert checkpoint.context_rows(limit=None)[-1]['text'] == 'new answer'
     assert len({r['run_id'] for r in checkpoint.context_rows(limit=None)}) == 5
 
 
-def test_configuration_change_discards_candidate(monkeypatch):
+@pytest.mark.parametrize('hard', [False, True])
+def test_configuration_change_discards_candidate(monkeypatch, hard):
     from app.services import compress, checkpoint
     from app.core import llm, state
     from conftest import add_turn
@@ -44,7 +46,7 @@ def test_configuration_change_discards_candidate(monkeypatch):
         monkeypatch.setattr(compress, 'load_state', lambda:cfg)
         return {'content':'stale'}
     monkeypatch.setattr(llm,'chat_completion',summary)
-    assert not compress.compress_once()
+    assert not compress.compress_once(hard=hard)
     assert not checkpoint.live_summary()
 
 
@@ -332,3 +334,65 @@ def test_summary_only_recompression_keeps_the_contact_audience_separate(monkeypa
         assert checkpoint.summary_state()['cursor']==-1
         assert checkpoint.live_summary()=='Contact shared experiences retained.'
     assert checkpoint.live_summary()=='PRIVATE OWNER HISTORY'
+
+
+@pytest.mark.parametrize('invalid', [None, 'unicode_bytes', 'generation', 'summary_version', 'source_changed', 'tool_call'])
+def test_cold_long_game_history_compacts_without_the_live_avatar_or_tools(monkeypatch, invalid):
+    """Restart has no usage anchor; a 35% summary guess must not deadlock admission."""
+    from app.core import state, db, llm
+    from app.services import compress, turn, checkpoint
+    from conftest import add_turn
+    from tests.test_checkpoint import _InlineThread
+    cfg = state.load()
+    cfg['settings']['llm'].update(contextWindow=32768, maxOutputTokens=4096)
+    for i in range(32):
+        add_turn('Earlier discussion ' + str(i) + 'q'*150, 'Confirmed game progress ' + str(i) + 'a'*280, at=str(i))
+    old = 'Earlier shared experiences and an unfinished agreement. '*90
+    with db.tx() as c:
+        c.execute('UPDATE sessions SET summary=? WHERE id=?', (old, db.LIVE_ID))
+    original = checkpoint.live_messages()
+    monkeypatch.setattr(compress, 'load_state', lambda: cfg)
+    monkeypatch.setattr(turn, 'build_system_prompt', lambda *a, **k: 'AVATAR CATALOG ' + 'H'*8400)
+    messages = turn.build_messages(cfg, 'Continue the existing authorized goal.')
+    goal = {'role':'system','content':'AUTHORITATIVE LIVE GOAL ' + 'g'*4800}
+    messages.append(goal)
+    tools = [{'type':'function','function':{'name':'minecraft_submit','description':'t'*6400,'parameters':{'type':'object'}}}]
+    reservation = [{'role':'user','content':[{'type':'image_url','image_url':{'url':'momo-observation:pending'},'vision_tokens':1024}]}]
+    budget = Budget.from_config(cfg['settings']['llm'])
+    assert estimate([*messages, *reservation], tools) > budget.safe
+    calls = []
+    def summarize(config, prompt, **kwargs):
+        calls.append(prompt)
+        assert kwargs['tools'] == [] and kwargs['tool_choice'] == 'none'
+        assert 'AVATAR CATALOG' not in str(prompt) and 'AUTHORITATIVE LIVE GOAL' not in str(prompt)
+        assert 'momo-observation:' not in str(prompt)
+        assert old.strip() in str(prompt)
+        assert 'Earlier discussion 0' in str(prompt)
+        assert estimate(prompt, []) <= budget.safe
+        if invalid in {'generation', 'summary_version'}:
+            with db.tx() as c:
+                c.execute('UPDATE sessions SET ' + invalid + '=' + invalid + '+1 WHERE id=?', (db.LIVE_ID,))
+        if invalid == 'source_changed':
+            with db.tx() as c:
+                c.execute('UPDATE messages SET text=? WHERE seq=0 AND session_id=?', ('Changed source', db.LIVE_ID))
+        if invalid == 'unicode_bytes':
+            return {'content':'界'*5000}  # Under 6000 characters and 90% source bytes, over the foreground byte budget.
+        if invalid == 'tool_call':
+            return {'content':'Short summary', 'tool_calls':[{'id':'must-not-execute'}]}
+        add_turn('Arrived during maintenance', 'Keep the concurrent suffix.', at='concurrent')
+        return {'content':'Shared experiences preserved; the authorized resting place remains unfinished.'}
+    monkeypatch.setattr(llm, 'chat_completion', summarize)
+    monkeypatch.setattr(compress, 'Thread', _InlineThread)
+    if invalid:
+        with pytest.raises(llm.LlmError, match='Context capacity reached'):
+            compress.guard_request(cfg['settings']['llm'], messages, tools, cancelled=lambda:False, extra_messages=reservation)
+        assert calls and checkpoint.live_summary() == old
+        return
+    compress.guard_request(cfg['settings']['llm'], messages, tools, cancelled=lambda:False, extra_messages=reservation)
+    assert calls
+    assert checkpoint.live_messages()[:len(original)] == original
+    assert checkpoint.context_rows(limit=None)[-1]['text'] == 'Keep the concurrent suffix.'
+    assert estimate([*messages, *reservation], tools) <= budget.safe
+    assert messages[0]['content'].startswith('AVATAR CATALOG')
+    assert messages[-1] == goal
+    assert messages[-2]['content'] == 'Continue the existing authorized goal.'
