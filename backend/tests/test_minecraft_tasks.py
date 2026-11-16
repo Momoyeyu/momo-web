@@ -361,3 +361,36 @@ def test_compact_game_chat_prioritizes_recent_players_over_overlay_flood():
  assert any(row['seq']==1 for row in result['recentChat']['messages'])
  assert result['recentChat']['messages'][-1]['seq']==41
  assert len(result['recentChat']['messages'])<=4
+
+
+def test_stopped_activity_does_not_advertise_stale_running_or_paused_work():
+ from app.services import minecraft_journal as journal
+ m,rt=setup();m.tasks={'owned':{'taskId':'owned','skill':'wait','state':'running','evidence':{}}};m.paused=True
+ journal.record(m.binding,m.activity_id,list(m.tasks.values()))
+ rt.host.request.return_value={'stopped':True,'stopVerified':True,'retiredTasks':[{'taskId':'owned','skill':'wait','state':'cancelled','reason':'control_released','evidence':{}}]}
+ binding=dict(m.binding)
+ with patch('app.services.minecraft.runtime',rt):
+  m.stop('game_transport_lost');status=m.status()
+ assert status['active'] is False and status['tasks']==[] and status['paused'] is False
+ assert journal.recent(binding)[0]['state']=='cancelled','A cleared live view must not erase real terminal history'
+
+
+def test_stop_failure_clears_the_live_view_but_retains_unknown_history():
+ from app.services import minecraft_journal as journal
+ m,rt=setup();m.tasks={'owned':{'taskId':'owned','skill':'wait','state':'running','evidence':{}}}
+ journal.record(m.binding,m.activity_id,list(m.tasks.values()));binding=dict(m.binding)
+ rt.host.request.side_effect=RuntimeError('transport unavailable')
+ with patch('app.services.minecraft.runtime',rt),pytest.raises(RuntimeError):m.stop()
+ assert not m.tasks and m.binding is None
+ assert journal.recent(binding)[0]['state']=='unknown','Transport loss cannot invent task completion'
+
+
+def test_late_stop_receipt_does_not_clear_a_new_activity_live_view():
+ m,rt=setup();m.tasks={'old':{'taskId':'old','skill':'wait','state':'running','evidence':{}}}
+ new={'taskId':'new','skill':'wait','state':'running','evidence':{}}
+ def transport(method):
+  m.generation+=1;m.binding={'world':'new-world','account':'player'};m.tasks={'new':new};m.paused=True
+  return {'stopped':True,'stopVerified':True,'retiredTasks':[{'taskId':'old','skill':'wait','state':'cancelled','evidence':{}}]}
+ rt.host.request.side_effect=transport
+ with patch('app.services.minecraft.runtime',rt):m.stop()
+ assert m.tasks=={'new':new} and m.paused is True and m.binding['world']=='new-world'

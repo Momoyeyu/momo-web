@@ -54,6 +54,8 @@ class Minecraft:
             self.generation += 1
             self.permissions.clear()
             self.binding = None
+            self.tasks = {}
+            self.paused = False
         from . import minecraft_journal as journal
         try:
             if notify and runtime.host:
