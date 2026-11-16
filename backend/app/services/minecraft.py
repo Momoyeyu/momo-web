@@ -211,7 +211,8 @@ class Minecraft:
                 raise MinecraftError('Return to the game or close the player menu before control',code='MINECRAFT_SUSPENDED')
             if rejection=='SCENE_OBSERVATION_REQUIRED':raise MinecraftError('Observe the new scene before new control',code='MINECRAFT_STALE')
             if rejection=='BODY_BUSY':raise MinecraftError('The current body action must settle first',code='MINECRAFT_BUSY')
-            if rejection in {'DEAD_REPLAN','TASK_REJECTED'}:raise MinecraftError('Inspect the current state and exact skill arguments',code='MINECRAFT_INPUT')
+            if rejection=='DEAD_REPLAN':raise MinecraftError('The character has died; inspect the scene before choosing whether to respawn',code='MINECRAFT_DEAD')
+            if rejection=='TASK_REJECTED':raise MinecraftError('No task was accepted; inspect the current scene and skill contract',code='MINECRAFT_TASK_REJECTED')
             if action=='observe':
                 from . import minecraft_journal as journal
                 with self.lock:

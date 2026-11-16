@@ -394,3 +394,18 @@ def test_late_stop_receipt_does_not_clear_a_new_activity_live_view():
  rt.host.request.side_effect=transport
  with patch('app.services.minecraft.runtime',rt):m.stop()
  assert m.tasks=={'new':new} and m.paused is True and m.binding['world']=='new-world'
+
+
+@pytest.mark.parametrize('native,code',[('DEAD_REPLAN','MINECRAFT_DEAD'),('TASK_REJECTED','MINECRAFT_TASK_REJECTED')])
+def test_body_state_rejection_is_not_misreported_as_malformed_tool_arguments(native,code):
+ from app.services import minecraft_journal as journal
+ m,rt=setup();rt.host.request.return_value={'accepted':False,'error':native}
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  with pytest.raises(MinecraftError) as caught:
+   m.execute('submit',{'taskId':'body-rejected','skill':'navigate','args':{'height':'surface','x':1,'z':2}},0,'owner','lease')
+  assert caught.value.code==code
+  assert m.binding=={'world':'world','account':'player'}
+  rows=journal.history(m.binding,activity=m.activity_id,task_id='body-rejected')
+  assert len(rows)==1 and rows[0]['state']=='failed'
+  assert rows[0]['reason']=='submission_rejected'
+  rt.host.request.assert_called_once()

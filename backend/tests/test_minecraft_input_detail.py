@@ -44,3 +44,16 @@ def test_model_tool_receives_exact_field_bounds_with_original_known_rejection(mo
  assert result['ok'] is False and result['code']=='MINECRAFT_INPUT'
  assert result['validation']==DETAIL
  assert 'nothing ran' in result['error']
+
+
+@pytest.mark.parametrize('code,expected',[('MINECRAFT_DEAD','respawn'),('MINECRAFT_TASK_REJECTED','capabilities')])
+def test_model_receives_body_recovery_without_a_false_envelope_syntax_error(monkeypatch,code,expected):
+ from app.services.minecraft import minecraft,MinecraftError
+ monkeypatch.setattr(computer_tools,'require_local',lambda **_:None)
+ def reject(*_):raise MinecraftError('private native diagnostic',code=code)
+ monkeypatch.setattr(minecraft,'execute',reject)
+ result=json.loads(computer_tools.execute('minecraft_action',{'action':'submit','taskId':'body-rejected','skill':'navigate','args':{'height':'surface','x':1,'z':2}}))
+ assert result['ok'] is False and result['code']==code
+ assert expected in result['error']
+ assert 'submit requires' not in result['error'] and 'private native diagnostic' not in result['error']
+ assert 'validation' not in result

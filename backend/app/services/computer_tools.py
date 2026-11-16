@@ -348,6 +348,8 @@ def execute(name,args):
                 'MINECRAFT_BUSY':'Another bounded action currently owns the body. Wait for its actual receipt; do not replay or cancel it just to poll.',
                 'MINECRAFT_RESULT_UNKNOWN':'This task ID already has a durable dispatch intent or conflicts with it. Inspect task history and its original activityId. Its effects may already have happened; never replay or claim nothing ran.',
                 'MINECRAFT_UNKNOWN':'The transport outcome is unknown. Effects may already have happened. After the player explicitly reconnects, inspect task history and its original activityId; never replay the command.',
+                'MINECRAFT_DEAD':'The character has died. This task was not accepted; its envelope is not the problem. Observe the death screen, then decide whether to submit skill=respawn with args={}. Retain the goal, but recheck inventory and location after respawning.',
+                'MINECRAFT_TASK_REJECTED':'The body did not accept this task. Read a fresh observation and query capabilities with skill for its exact contract. Keep action, taskId and skill outside args; args contains only that skill’s parameters. No task started from this rejection.',
                 'MINECRAFT_INPUT':'Arguments were rejected before dispatch; nothing ran. submit requires action="submit", taskId, skill, args. For a plan use skill="plan", args={"steps":[{"skill":"wait","args":{"ticks":20}}]}. Query capabilities with skill for its exact schema.',
                 'MINECRAFT_STALE':'Read a fresh game observation before another action; do not infer completion from this rejection.',
             }
