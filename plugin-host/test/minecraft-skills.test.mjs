@@ -74,3 +74,20 @@ test('invalid skill inputs identify a bounded field and expected contract withou
   assert.equal(JSON.stringify(error.validation).includes(secret),false);return true;
  });
 });
+test('an unknown navigation field reports trusted allowed names without echoing input',()=>{
+ for(const field of ['points','waypoints','PRIVATE-INPUT-token']){
+  assert.throws(()=>validateSkill('navigate',{height:'surface',terrain:'adapt',[field]:[{x:10,z:20}]}),error=>{
+   assert.equal(error.validation.path,'args');assert.equal(error.validation.rule,'unknown_field');
+   assert.deepEqual(new Set(error.validation.choices),new Set(['x','y','z','height','terrain']));
+   assert.equal(JSON.stringify(error.validation).includes(field),false);return true;
+  });
+ }
+ assert.throws(()=>validateSkill('plan',{steps:[{skill:'navigate',args:{points:[]}}]}),error=>{
+  assert.equal(error.validation.path,'args.steps[0].args');
+  assert.ok(error.validation.choices.includes('x'));return true;
+ });
+ assert.throws(()=>validateSkill('eat',{unexpected:true}),error=>{
+  assert.equal(error.validation.rule,'unknown_field');
+  assert.equal(Object.hasOwn(error.validation,'choices'),false);return true;
+ });
+});

@@ -7,7 +7,10 @@ const invalid=(path,rule,limits)=>{throw new SkillInputError(path,rule,limits);}
 function validate(schema,value,path){
  if(schema.type==='object'){
   if(!value||Object.getPrototypeOf(value)!==Object.prototype)invalid(path,'object');
-  if(schema.additionalProperties===false&&Object.keys(value).some(k=>!Object.hasOwn(schema.properties,k)))invalid(path,'unknown_field');
+  if(schema.additionalProperties===false&&Object.keys(value).some(k=>!Object.hasOwn(schema.properties,k))){
+   const choices=Object.keys(schema.properties??{}).slice(0,32);
+   invalid(path,'unknown_field',choices.length?{choices}:{});
+  }
   const missing=schema.required?.find(k=>!Object.hasOwn(value,k));if(missing)invalid(`${path}.${missing}`,'required');
   for(const [key,item] of Object.entries(value))if(schema.properties?.[key])validate(schema.properties[key],item,`${path}.${key}`);
  }else if(schema.type==='array'){
