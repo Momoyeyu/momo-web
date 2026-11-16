@@ -11,7 +11,8 @@ public final class SurvivalController {
  private final SurvivalPolicy policy=new SurvivalPolicy();
  private SurvivalPolicy.Mode mode=SurvivalPolicy.Mode.NONE;
  private Vec3d threatPosition;
- private LivingEntity threat;private int savedSlot=-1,ticks;private float escapeYaw;private boolean escapeSafe,combatRetreat;
+ private LivingEntity threat;private int savedSlot=-1,ticks;private boolean combatRetreat;
+ private final EscapeMovement escape=new EscapeMovement();
  private TaskRuntime.Work foodWork,combatWork;private long foodRetryUntil,combatRetryUntil;private String replanReason="";
  private CombatWithdrawal withdrawal=new CombatWithdrawal();
  private final BlastAvoidance blasts=new BlastAvoidance();
@@ -68,7 +69,7 @@ public final class SurvivalController {
  }
  public void drive(SurvivalPolicy.Mode desired){
   var c=client();var p=c.player;
-  if(desired!=mode){var selectedThreat=threat;var selectedPosition=threatPosition;stop(false,true);threat=selectedThreat;threatPosition=selectedPosition;mode=desired;savedSlot=p.getInventory().selectedSlot;ticks=0;escapeYaw=p.getYaw();combatRetreat=desired==SurvivalPolicy.Mode.ESCAPE&&p.getHealth()<=6&&threat!=null;if(combatRetreat)withdrawal.update(p.getHealth(),p.squaredDistanceTo(threatPosition),ticks,ThreatRange.ranged(threat));}
+  if(desired!=mode){var selectedThreat=threat;var selectedPosition=threatPosition;stop(false,true);threat=selectedThreat;threatPosition=selectedPosition;mode=desired;savedSlot=p.getInventory().selectedSlot;ticks=0;combatRetreat=desired==SurvivalPolicy.Mode.ESCAPE&&p.getHealth()<=6&&threat!=null;if(combatRetreat)withdrawal.update(p.getHealth(),p.squaredDistanceTo(threatPosition),ticks,ThreatRange.ranged(threat));}
   ticks++;
   switch(mode){
    case EAT -> {
@@ -90,18 +91,11 @@ public final class SurvivalController {
     }catch(RuntimeException error){settle();replanReason="defense_blocked";combatRetryUntil=System.nanoTime()+5_000_000_000L;}
    }
    case ESCAPE -> {
-    p.setPitch(policy.escapePitch(p.isTouchingWater()&&p.getAir()<250,p.getPitch()));
-    // Evaluate a few nearby collision cells, never hidden resources or global terrain.
-    if(ticks==1||ticks%(blasts.active()?4:20)==0){double best=-Double.MAX_VALUE;escapeSafe=false;for(int i=0;i<8;i++){
-     float yaw=p.getYaw()+i*45;double angle=Math.toRadians(yaw);var pos=BlockPos.ofFloored(p.getX()-Math.sin(angle)*2,p.getY(),p.getZ()+Math.cos(angle)*2);
-     if(!c.world.isChunkLoaded(pos)||!c.world.getBlockState(pos).getCollisionShape(c.world,pos).isEmpty()||c.world.getFluidState(pos).isIn(net.minecraft.registry.tag.FluidTags.LAVA))continue;
-     if(!c.world.getBlockState(pos.down()).isSolidBlock(c.world,pos.down())&&!p.isTouchingWater()&&!p.isInLava())continue;
-     var point=pos.toCenterPos();
+    escape.drive(c,point->{
      double score=blasts.active()?blasts.score(point.x,point.y,point.z):threat==null?0:point.squaredDistanceTo(threatPosition);
-     if(!blasts.active()&&c.world.getFluidState(pos).isIn(net.minecraft.registry.tag.FluidTags.WATER))score+=100;
-     if(score>best){best=score;escapeYaw=yaw;escapeSafe=true;}
-    }}
-    p.setYaw(escapeYaw);c.options.forwardKey.setPressed(escapeSafe);c.options.sprintKey.setPressed(true);c.options.jumpKey.setPressed(p.isTouchingWater()||p.isInLava()||p.horizontalCollision);
+     if(!blasts.active()&&c.world.getFluidState(BlockPos.ofFloored(point)).isIn(net.minecraft.registry.tag.FluidTags.WATER))score+=100;
+     return score;
+    });
    }
    default -> {}
   }
@@ -111,6 +105,7 @@ public final class SurvivalController {
  public void stop(){stop(false);}
  public void stop(boolean preserveScreen){stop(preserveScreen,false);}
  private void stop(boolean preserveScreen,boolean preserveReflexState){
+  escape.reset();
   if(!preserveReflexState){blasts.clear();retreatMemory.clear();}
   var c=client();boolean mealScreen=acceptsScreen(c.currentScreen);
   if(foodWork!=null){foodWork.stop();foodWork=null;}

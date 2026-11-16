@@ -60,6 +60,7 @@ public final class GameSkills {
   final String skill;final JsonObject args;final MinecraftClient c=MinecraftClient.getInstance();
   final BaritoneNavigator navigation=new BaritoneNavigator();
   final CombatWithdrawal withdrawal=new CombatWithdrawal();
+  final EscapeMovement escape=new EscapeMovement();
   BlockPos pos,placed,pathTarget,lastSeen;Entity entity;Screen ownedScreen;boolean navigating,startedUse;int ticks,actionIndex,phase,startFood,beforeCount,lostTicks;String beforeState,inventoryBefore,outputItem;InventoryEvidence inventoryProof;int mutationTick,craftPhase;final long pickupBoundary=PickupLedger.CURRENT.cursor();float startHealth;int targetSlot;
   long renameBoundary;String renameName;boolean renameUnchanged;int startExperience;
   long blockBoundary;String beforeBlock;int predictedChangeTick;
@@ -344,9 +345,11 @@ public final class GameSkills {
    if(entity.squaredDistanceTo(c.player)>1024)return TaskRuntime.Step.failed("target_lost");
    String retreat=withdrawal.update(c.player.getHealth(),entity.squaredDistanceTo(c.player),ticks,ThreatRange.ranged(entity));
    if(!retreat.isEmpty()){
-    haltNavigation();look(entity.getEyePos());
+    haltNavigation();
     if(!retreat.equals("retreating"))return TaskRuntime.Step.failed(retreat);
-    c.options.backKey.setPressed(true);c.options.sprintKey.setPressed(true);return TaskRuntime.Step.running();
+    c.options.useKey.setPressed(false);c.options.attackKey.setPressed(false);
+    if(c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);
+    escape.drive(c,point->point.squaredDistanceTo(entity.getPos()));return TaskRuntime.Step.running();
    }
    double distance=entity.squaredDistanceTo(c.player);
    var item=c.player.getMainHandStack().getItem();
@@ -531,7 +534,7 @@ public final class GameSkills {
   }
   public void resume(){if(Set.of("inventory","workstation","craft","trade","waitFor","rename").contains(skill)&&c.currentScreen!=ownedScreen)throw new IllegalStateException("station_screen_changed");if(skill.equals("navigate"))go(pos);}
   public void stop(){haltNavigation();release();}
-  private void release(){if(c.interactionManager!=null){c.interactionManager.cancelBlockBreaking();if(c.player!=null&&c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);}c.options.forwardKey.setPressed(false);c.options.backKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sneakKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.attackKey.setPressed(false);c.options.useKey.setPressed(false);}
+  private void release(){escape.reset();if(c.interactionManager!=null){c.interactionManager.cancelBlockBreaking();if(c.player!=null&&c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);}c.options.forwardKey.setPressed(false);c.options.backKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sneakKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.attackKey.setPressed(false);c.options.useKey.setPressed(false);}
   public Map<String,Object> progress(){return Map.of("skill",skill,"ticks",ticks,"phase",craftPhase);}
   public boolean acceptsScreen(Object screen){return screen==ownedScreen||placementWindow(screen)||interaction!=null&&c.player!=null&&interaction.ownsWindow(screen,c.player.currentScreenHandler.syncId,interactionServerContainer(screen),screen instanceof net.minecraft.client.gui.screen.SleepingChatScreen,sleepingAtTarget());}
  }

@@ -2,6 +2,7 @@ package dev.momo.task;
 public final class SurvivalPolicySmoke {
  static void check(boolean b,String s){if(!b)throw new AssertionError(s);}
  public static void main(String[] args){
+  EscapeRouteSmoke.main(args);
   RetreatMemorySmoke.main(args);
   FoodChoiceSmoke.main(args);
   CombatWithdrawalSmoke.main(args);
