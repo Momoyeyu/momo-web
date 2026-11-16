@@ -104,16 +104,16 @@ public final class AcceptanceFixtures implements ModInitializer {
   block(world,24,68,-26,Blocks.OAK_LOG); // Isolated overhead sight regression.
   // A separated ordinary hillside and creeper for local blast/step escape.
   // Setup only: no damage, fuse, health, teleport or runtime command hooks.
-  for(int x=56;x<=76;x++)for(int z=30;z<=46;z++){
+  for(int x=56;x<=76;x++)for(int z=-94;z<=-78;z++){
    int feet=64+Math.min(4,(x-56)/4);
    for(int y=62;y<feet;y++)block(world,x,y,z,y==feet-1?Blocks.GRASS_BLOCK:Blocks.STONE);
    for(int y=feet;y<=75;y++)block(world,x,y,z,Blocks.AIR);
   }
-  var creeper=new net.minecraft.entity.mob.CreeperEntity(EntityType.CREEPER,world);creeper.setPosition(65.5,66,38.5);
+  var creeper=new net.minecraft.entity.mob.CreeperEntity(EntityType.CREEPER,world);creeper.setPosition(65.5,66,-85.5);
   creeper.initialize(world,world.getLocalDifficulty(creeper.getBlockPos()),SpawnReason.STRUCTURE,null);creeper.setPersistent();world.spawnEntity(creeper);
-  Map<String,Object> report=new LinkedHashMap<>(Map.of("version",5,"setupOnly",true,"spawn",List.of(0,64,0),"stationsRow",List.of(-8,64,6),"supplies",List.of(List.of(-3,64,-2),List.of(-5,64,-2),List.of(-7,64,-5)),"villager",List.of(10,64,2),"water",List.of(-10,61,0),"netherFrame",List.of(-13,65,12),"endFrame",List.of(0,64,12)));
+  Map<String,Object> report=new LinkedHashMap<>(Map.of("version",6,"setupOnly",true,"spawn",List.of(0,64,0),"stationsRow",List.of(-8,64,6),"supplies",List.of(List.of(-3,64,-2),List.of(-5,64,-2),List.of(-7,64,-5)),"villager",List.of(10,64,2),"water",List.of(-10,61,0),"netherFrame",List.of(-13,65,12),"endFrame",List.of(0,64,12)));
   report.put("overheadLog",List.of(24,68,-26));
-  report.put("blastHillside",List.of(65,66,38));report.put("blastTestSetupOnly",true);
+  report.put("blastHillside",List.of(65,66,-86));report.put("blastTestSetupOnly",true);
   report.put("reviewSupplies",List.of(-10,64,-6));report.put("ore",List.of(-15,64,-9));report.put("hiddenDropWall",List.of(-12,65,-14));report.put("horse",List.of(-4,64,12));
   report.put("followTarget",List.of(-4,64,10));report.put("bed",List.of(4,64,-3));report.put("nightWithDaylightCycle",true);
   report.put("combatTargets",List.of(List.of(-32,64,18),List.of(-32,64,28),List.of(-32,64,38),List.of(44,64,0)));report.put("neutral",List.of(32,64,-25));
