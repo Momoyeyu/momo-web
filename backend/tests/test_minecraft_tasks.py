@@ -18,6 +18,35 @@ def test_submit_uses_current_binding_without_waiting_for_completion():
   assert rt.host.request.call_args.args[0]=='minecraft.submit'
   assert rt.host.request.call_args.args[1]['permission']=={'world':'world','account':'player','activityEpoch':7}
 
+def test_corrected_request_after_known_rejection_has_a_distinct_recovery_without_dispatch():
+ from app.services import minecraft_journal as journal
+ m,rt=setup();original={'taskId':'bad-height','skill':'navigate','args':{'x':1,'z':2,'height':1}}
+ journal.prepare_dispatch(m.binding,m.activity_id,original)
+ journal.dispatch_failed(m.binding,m.activity_id,'bad-height',rejected=True,reason='submission_rejected')
+ before=journal.history(m.binding,activity=m.activity_id,task_id='bad-height')
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  with pytest.raises(MinecraftError) as error:m.execute('submit',{**original,'args':{'x':1,'z':2,'height':'surface'}},0,'owner','lease')
+ assert error.value.code=='MINECRAFT_REJECTED_ID'
+ rt.host.request.assert_not_called()
+ assert journal.history(m.binding,activity=m.activity_id,task_id='bad-height')==before
+ assert not m.tasks
+
+
+@pytest.mark.parametrize('disposition',['pending','unknown','observed'])
+def test_corrections_never_rewrite_an_intent_that_may_have_executed(disposition):
+ from app.services import minecraft_journal as journal
+ m,rt=setup();original={'taskId':'possibly-ran','skill':'navigate','args':{'x':1,'y':64,'z':2}}
+ journal.prepare_dispatch(m.binding,m.activity_id,original)
+ if disposition=='unknown':journal.dispatch_failed(m.binding,m.activity_id,'possibly-ran')
+ elif disposition=='observed':journal.record(m.binding,m.activity_id,[{'taskId':'possibly-ran','skill':'navigate','state':'succeeded','evidence':{'arrived':True}}])
+ before=journal.history(m.binding,activity=m.activity_id,task_id='possibly-ran')
+ with patch('app.services.minecraft.runtime',rt),patch.object(m,'gate',return_value='cfg'):
+  with pytest.raises(MinecraftError) as error:m.execute('submit',{**original,'args':{'x':2,'y':64,'z':3}},0,'owner','lease')
+ assert error.value.code=='MINECRAFT_RESULT_UNKNOWN'
+ assert journal.history(m.binding,activity=m.activity_id,task_id='possibly-ran')==before
+ rt.host.request.assert_not_called()
+
+
 def test_task_is_bound_to_its_goal_before_dispatch_not_when_result_arrives():
  from app.services import minecraft_journal as journal
  from app.core import db

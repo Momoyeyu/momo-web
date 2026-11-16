@@ -13,6 +13,7 @@ from ..core import db
 
 STATUSES={'active','paused','completed','abandoned','blocked'}
 class DispatchConflict(ValueError):pass
+class RejectedDispatchConflict(DispatchConflict):pass
 def scope(binding):
     return hashlib.sha256(json.dumps(binding,sort_keys=True).encode()).hexdigest()
 def schema():
@@ -41,7 +42,9 @@ def prepare_dispatch(binding, activity, command):
     with db.tx() as c:
         old=c.execute('SELECT request,disposition FROM minecraft_dispatches WHERE scope=? AND activity=? AND task_id=?',(key,activity,task_id)).fetchone()
         if old:
-            if old['request']!=request:raise DispatchConflict('Task identity conflict')
+            if old['request']!=request:
+                if old['disposition']=='rejected':raise RejectedDispatchConflict('Known rejected task ID; use a new taskId for corrected arguments')
+                raise DispatchConflict('Task identity conflict')
             if old['disposition']=='observed':return False
             if old['disposition']!='rejected':raise DispatchConflict('Task already dispatched; inspect its original receipt without replay')
         now=db.now_iso()

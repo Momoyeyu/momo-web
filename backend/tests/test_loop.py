@@ -358,3 +358,32 @@ def test_accepted_game_task_acknowledgement_cannot_dispatch_or_retry(monkeypatch
     assert dispatched==['submit'], 'An acknowledgement must never poll, cancel or stop a body that is already working'
     assert len(seen)==2, 'Empty acknowledgements must not become another inference loop'
     assert not [e for e in events if e['t']=='error']
+
+
+@pytest.mark.parametrize('chunks,expected',[
+    (['<｜','｜DSML｜｜ calls>\n','<｜｜DSML｜｜ invoke name="minecraft_action">','private parameters','</｜｜DSML｜｜ calls>'],[]),
+    (['我去那边看看。','<｜DSML｜tool_calls>','do not execute or store this'],['我去那边看看。']),
+    (['</||DSML|| invoke>'],[]),
+    (['<｜DS'],[]),
+    (['我不把 DSML 当作对话。'],['我不把 DSML 当作对话。']),
+])
+def test_game_acknowledgement_quarantines_internal_tool_markup_before_speech_and_history(monkeypatch,chunks,expected):
+    rounds=[];dispatched=[]
+    def provider(cfg,messages,tools=None,**kwargs):
+        rounds.append(tools)
+        if len(rounds)==1:
+            yield {'type':'tool_calls','calls':[_tool_call('minecraft_action','{"action":"submit","taskId":"walk","skill":"navigate","args":{"x":1,"y":64,"z":2}}')]}
+        else:
+            assert tools==[]
+            for chunk in chunks:yield {'type':'text','delta':chunk}
+    def dispatch(call,ext):
+        dispatched.append(call['id'])
+        return {'role':'tool','tool_call_id':call['id'],'content':json.dumps({'accepted':True,'task':{'taskId':'walk','state':'running','evidence':{}}})}
+    monkeypatch.setattr(llm,'chat_stream',provider)
+    monkeypatch.setattr(turn,'run_call',dispatch)
+    events=list(turn.run_turn('去那边看看'))
+    assert [e['text'] for e in events if e['t']=='sentence']==expected
+    assert len(dispatched)==1 and len(rounds)==2, 'Malformed acknowledgement text cannot become an action or retry loop'
+    acknowledge_events(events)
+    history=checkpoint.live_messages()
+    assert not any('private parameters' in m.get('content','') or '<｜' in m.get('content','') or '<||' in m.get('content','') for m in history)

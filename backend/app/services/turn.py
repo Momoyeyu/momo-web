@@ -39,6 +39,17 @@ def _event_revoked(validate_event, *, refresh=False):
     return False
 
 
+def _game_acknowledgement_text(text):
+    """Presentation only: leaked provider syntax must never become an action.
+
+    Keep a natural preface, quarantine the serialization tail (also when its
+    final token is incomplete). Ordinary mentions of DSML remain ordinary text.
+    """
+    import re
+    marker=re.search(r'<[/]?[|｜]+(?:DSML[|｜]+|(?:D(?:S(?:M(?:L)?)?)?)?$)',text)
+    return text[:marker.start()] if marker else text
+
+
 def run_turn(text, presentation=None, first_meeting=False, *, run_id=None, source="meeting", external_message_id=None, audience="owner", retry_of=None, plugin_context=None, expected_generation=None, image_ids=None, image_note=None, observation=None, validate_event=None):
     # ASGI may resume successive next() calls under different Context objects.
     # Bind privacy for each step, not across a suspended generator yield.
@@ -483,6 +494,10 @@ def react(
                     if ev["type"] == "text":
                         delta = str(ev["delta"])
                         round_text += delta
+                        # A no-tools acknowledgement can still contain raw
+                        # provider serialization. Hold this short final reply
+                        # until it can be checked across arbitrary SSE chunks.
+                        if game_ack_only:continue
                         if source == "qq": runtime.append_phone_draft(current_run.get(), delta)
                         for sent in splitter.push(delta):
                             out = take(sent)
@@ -516,6 +531,10 @@ def react(
             # Tools=[] is a provider hint, not an execution barrier. A provider
             # may still emit old tool syntax or no text. This one acknowledgement
             # must never dispatch a poll/stop or start another inference round.
+            for sent in splitter.push(_game_acknowledgement_text(round_text)):
+                out=take(sent)
+                if out is None:return
+                yield out
             for sent in splitter.flush():
                 out = take(sent)
                 if out is None:return

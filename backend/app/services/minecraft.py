@@ -190,6 +190,7 @@ class Minecraft:
                 try:
                     if not journal.prepare_dispatch(task_binding,task_activity,arguments):
                         return {'accepted':False,'duplicate':True,'task':journal.history(task_binding,activity=task_activity,task_id=arguments['taskId'])[-1]}
+                except journal.RejectedDispatchConflict as error:raise MinecraftError(str(error),code='MINECRAFT_REJECTED_ID') from error
                 except journal.DispatchConflict as error:raise MinecraftError(str(error),code='MINECRAFT_RESULT_UNKNOWN') from error
                 except ValueError as error:raise MinecraftError(str(error),code='MINECRAFT_INPUT') from error
             try:result = runtime.host.request('minecraft.' + action, {**arguments, 'permission': permission})
