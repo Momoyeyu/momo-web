@@ -607,7 +607,7 @@
     }
   },
   "gather": {
-    "description": "Continuously collect additional items locally: find normal line-of-sight sources or dropped stacks, navigate, use a suitable tool, break and pick up, until inventory really gains count. No hidden ore/resource scans. If no source is visible, explore another area rather than repeatedly retrying the same spot.",
+    "description": "Gain count new items by mining and picking up visible sources. After an empty scan, walk to at most four nearby viewpoints within the local bound; first-hit sight only, never hidden ore scans. Reports actual gains and search limits.",
     "parameters": {
       "type": "object",
       "properties": {
