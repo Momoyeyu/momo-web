@@ -2,6 +2,9 @@ package dev.momo.task;
 import java.util.*;
 /** Actual window input only; software KeyBinding changes never enter this state. */
 public final class PhysicalInputState {
+ public static boolean pointerMoved(boolean active,boolean resetting,double previousX,double previousY,double x,double y){
+  return active&&!resetting&&Math.abs(x-previousX)+Math.abs(y-previousY)>.5;
+ }
  public enum Kind {KEY,SCAN,MOUSE}
  private final Map<Kind,Set<Integer>> held=new EnumMap<>(Kind.class);
  private void record(Kind kind,int code,boolean down){

@@ -3,6 +3,11 @@ public final class PhysicalInputStateSmoke {
  static void check(boolean value,String why){if(!value)throw new AssertionError(why);}
  public static void main(String[] args){
   var raw=new PhysicalInputState();
+  check(!PhysicalInputState.pointerMoved(true,false,427,240,427,240),"vanilla centers its own coordinates before GLFW recenter; that warp is not player motion");
+  check(!PhysicalInputState.pointerMoved(true,true,12,34,427,240),"the first callback after lock/resize is discarded by vanilla too");
+  check(PhysicalInputState.pointerMoved(true,false,427,240,429,241),"the very next ordinary mouse delta must still hand off immediately");
+  check(!PhysicalInputState.pointerMoved(false,false,427,240,900,600),"inactive or unlocked UI movement is not gameplay takeover");
+
   raw.key(87,17,true);raw.button(0,true);
   // Software key cleanup is separate from actual GLFW events. The same raw
   // state is used to rebuild current bindings after the AI releases its keys.
