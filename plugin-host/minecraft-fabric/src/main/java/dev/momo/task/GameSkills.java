@@ -311,17 +311,24 @@ public final class GameSkills {
    }
    return TaskRuntime.Step.running();
   }
-  private boolean roomFor(ItemStack output){return !output.isEmpty()&&c.player.currentScreenHandler.slots.stream().anyMatch(slot->slot.inventory==c.player.getInventory()&&slot.canInsert(output)&&(slot.getStack().isEmpty()||(ItemStack.areItemsAndComponentsEqual(slot.getStack(),output)&&slot.getStack().getCount()+output.getCount()<=slot.getMaxItemCount(output))));}
+  private OptionalInt outputDestination(ItemStack output){
+   if(output.isEmpty())return OptionalInt.empty();
+   var slots=c.player.currentScreenHandler.slots.stream().map(slot->new ItemSelection.OutputSlot(slot.id,
+    slot.inventory==c.player.getInventory()&&slot.getIndex()>=0&&slot.getIndex()<36,slot.canInsert(output),
+    ItemStack.areItemsAndComponentsEqual(slot.getStack(),output),slot.getStack().getCount(),slot.getMaxItemCount(output))).toList();
+   return ItemSelection.output(slots,output.getCount());
+  }
+  private boolean roomFor(ItemStack output){return outputDestination(output).isPresent();}
   private void takeOneOutput(int outputSlot){
    if(craftPhase==1&&ticks-mutationTick>=4&&!c.player.currentScreenHandler.getSlot(outputSlot).getStack().isEmpty()){
+      if(!roomFor(c.player.currentScreenHandler.getSlot(outputSlot).getStack()))throw new TaskRuntime.Rejected("inventory_full");
       // Pickup exactly one recipe output, rather than shift-crafting every available ingredient.
       verifiedClick(outputSlot,0,SlotActionType.PICKUP);craftPhase=2;
      }else if(craftPhase==2&&ticks-mutationTick>=3&&!c.player.currentScreenHandler.getCursorStack().isEmpty()){
       var cursor=c.player.currentScreenHandler.getCursorStack();
-      var destination=c.player.currentScreenHandler.slots.stream().filter(slot->slot.inventory==c.player.getInventory()&&slot.canInsert(cursor)&&slot.getStack().isEmpty()).findFirst();
-      if(destination.isEmpty())destination=c.player.currentScreenHandler.slots.stream().filter(slot->slot.inventory==c.player.getInventory()&&slot.canInsert(cursor)&&net.minecraft.item.ItemStack.areItemsAndComponentsEqual(slot.getStack(),cursor)&&slot.getStack().getCount()+cursor.getCount()<=slot.getMaxItemCount(cursor)).findFirst();
+      var destination=outputDestination(cursor);
       if(destination.isEmpty())throw new TaskRuntime.Rejected("inventory_full");
-      verifiedClick(destination.get().id,0,SlotActionType.PICKUP);inventoryProof.mutated(ticks,c.player.currentScreenHandler.getRevision());craftPhase=3;
+      verifiedClick(destination.getAsInt(),0,SlotActionType.PICKUP);inventoryProof.mutated(ticks,c.player.currentScreenHandler.getRevision());craftPhase=3;
      }
   }
   private TaskRuntime.Step combat(){

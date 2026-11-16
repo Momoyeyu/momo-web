@@ -12,6 +12,15 @@ public final class ItemSelectionSmoke {
   check(ItemSelection.choose(List.of(0,2),-1,2).orElseThrow().hotbar()==2,"the already selected matching item should remain stable");
   check(ItemSelection.choose(List.of(),-1,0).isEmpty(),"missing materials cannot be fabricated");
   boolean invalid=false;try{ItemSelection.choose(List.of(45),-1,0);}catch(IllegalArgumentException expected){invalid=true;}check(invalid,"armor/output slots are not main inventory item candidates");
+  var empty=new ItemSelection.OutputSlot(9,true,true,false,0,64);
+  var partial=new ItemSelection.OutputSlot(10,true,true,true,4,64);
+  check(ItemSelection.output(List.of(empty,partial),4).orElseThrow()==10,"repeated four-plank recipe outputs must merge before consuming another empty slot");
+  check(ItemSelection.output(List.of(new ItemSelection.OutputSlot(10,true,true,true,61,64),empty),4).orElseThrow()==9,"the entire output must fit before picking up one recipe batch");
+  check(ItemSelection.output(List.of(new ItemSelection.OutputSlot(10,true,true,false,4,64),empty),4).orElseThrow()==9,"different item components cannot be merged");
+  check(ItemSelection.output(List.of(new ItemSelection.OutputSlot(45,false,true,false,0,64)),4).isEmpty(),"offhand/armor/output slots do not count as acquired main-inventory output");
+  check(ItemSelection.output(List.of(new ItemSelection.OutputSlot(10,true,false,true,4,64)),4).isEmpty(),"a slot rejecting insertion cannot receive output");
+  check(ItemSelection.output(List.of(new ItemSelection.OutputSlot(10,true,true,true,15,16)),2).isEmpty(),"use the actual item and slot limit rather than assuming 64");
+  check(ItemSelection.output(List.of(empty),0).isEmpty(),"an empty recipe preview is not extractable output");
   System.out.println("PASS semantic item preparation, real slot mapping and stable selection");
  }
 }
