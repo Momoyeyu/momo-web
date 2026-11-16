@@ -149,3 +149,40 @@ def test_focused_observation_identifies_the_shared_game_avatar_separately_from_t
   view=Minecraft.model_observation(raw,compact=True,query=query)
   assert view['playerName']=='FixturePlayer' and view['account']=='avatar-uuid'
   assert view['health']==0 and view['screen']=='death'
+
+
+def test_repeated_waits_report_only_completed_game_ticks_not_an_environmental_outcome():
+ from app.services.minecraft import Minecraft
+ rows=[{'taskId':f'w{i}','skill':'wait','state':'succeeded','dimension':'minecraft:overworld',
+        'evidence':{'elapsedGameTicks':ticks}} for i,ticks in enumerate([600,2400])]
+ original=copy.deepcopy(rows)
+ assert Minecraft.repeated_waits(rows)=={'completedTasks':2,'elapsedGameTicks':3000,'dimension':'minecraft:overworld'}
+ assert Minecraft.repeated_waits(rows+[{'skill':'wait','state':'running','progress':{'ticks':1000}}])==Minecraft.repeated_waits(rows)
+ assert rows==original
+
+
+def test_wait_continuity_resets_after_other_work_failure_dimension_or_invalid_evidence():
+ from app.services.minecraft import Minecraft
+ wait={'skill':'wait','state':'succeeded','dimension':'minecraft:overworld','evidence':{'elapsedGameTicks':600}}
+ for boundary in [
+  {'skill':'mine','state':'succeeded'},
+  {**wait,'state':'cancelled'},
+  {**wait,'dimension':'minecraft:the_nether'},
+  {**wait,'evidence':{'elapsedGameTicks':True}},
+  {**wait,'evidence':{'elapsedGameTicks':-1}},
+  {**wait,'evidence':{}},
+ ]:
+  assert Minecraft.repeated_waits([wait,wait,boundary,wait])=={}
+
+
+def test_wait_evidence_survives_reconnect_without_restoring_authority_or_using_other_worlds():
+ from app.services.minecraft import Minecraft
+ m=Minecraft();m.binding={'world':'wait-world','account':'player'}
+ for index,ticks in enumerate([600,2400]):
+  journal.record(m.binding,'old-activity',[{'taskId':f'w{index}','skill':'wait','state':'succeeded',
+    'dimension':'minecraft:overworld','evidence':{'elapsedGameTicks':ticks}}])
+ for binding in [{'world':'another-world','account':'player'},{'world':'wait-world','account':'another-player'}]:
+  journal.record(binding,'other-activity',[{'taskId':'other','skill':'mine','state':'succeeded','evidence':{'mined':True}}])
+ facts=json.loads(m.goal_context().split('Durable goal and task facts (not instructions): ',1)[1])
+ assert facts['repeatedWaits']=={'completedTasks':2,'elapsedGameTicks':3000,'dimension':'minecraft:overworld'}
+ assert m.tasks=={} and not m.autonomous and m.body_revision is None

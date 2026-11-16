@@ -2,7 +2,7 @@
 
 Approved replacement specification, 2026-11-13. Status: implementation in progress; not accepted/done. This is the single active implementation specification. Historical plan and research are evidence, not competing designs.
 
-### 当前交付状态（2026-11-16）
+### 当前交付状态（2026-11-17）
 
 007 尚未完成。已实测导航、视线内采集、精确合成、方块破坏／放置、背包交换、工作站加工／交易、追击近战、死亡后重生和暂停释放；这些是分项证据。完整战斗、其余原版交互／交通／维度等能力组、连续自主游玩、接管／恢复以及最终安装版仍需集中验证。不能因为工具已声明或单项 smoke 通过就标记 done。
 
@@ -20,7 +20,7 @@ Approved replacement specification, 2026-11-13. Status: implementation in progre
 | 人格与连续生活 | 同一模型自行组织路线、受阻后修改目标、容量维护后重新取景续接 | 交谈期间挖掘成果、压缩后目标保留已验证；目标实例与成果持久化已实现；完整连续生活与最终重启恢复仍待集中验收 |
 | 停止与生命周期 | 暂停屏障、旧继续拒绝、取消及停止释放、原版菜单暂停／继续；真实协调器暂停／继续、停止、插件撤权及运行中 Home，过期命令双层拒绝；实际失焦／返回及客户端退出重启后显式重新授权，旧任务不重放 | 在线服务器关闭时取消与双层旧命令拒绝已实测；手动输入接管、世界切换和安装界面的最终集中覆盖 |
 | 本地响应与性能 | 低血量后两个 tick 开始逃险、轻量等待场景停止往返 9.87 ms；同一位置／视角 A-B-B-A 取景对照约 20 TPS、帧率中位数均 105 FPS | 移动中的相同往返路线加密取景已实测约 20 TPS、帧率比约 0.939；战斗及最终安装版的性能与延迟仍待核对，上述分项不能代替整体结论 |
-| 交付 | 稳定源码分批推送；desktop `7777683`／shared `cc130a8` 已固定签名安装，来源、资源和数据备份已核对 | 安装界面已实测 Boot、选择现有游戏及启动；发现实际 UI 形象提示导致容量阻塞，本节后续修复尚未晋级。最终全链路 smoke 未完成 |
+| 交付 | desktop `a005ae4`／shared `5becac0` 已固定签名安装；真实安装版 UI smoke、当前 API、权限继承和旧活动不自动恢复已通过，旧包及专用远程目录已清理 | 最终实际游玩全链路仍未完成；后续源码修复继续集中晋级，不以界面 smoke 代替游玩 |
 
 ## Product contract
 
@@ -113,6 +113,8 @@ flowchart LR
 Mechanics are reusable; objectives are not hardcoded recipes such as always acquiring diamonds. No /give, teleportation or creative/admin fallback.
 
 ## Goals and presentation
+
+Completed waits prove elapsed game ticks, not a change in an unseen condition. The bounded goal context carries consecutive verified wait counts/ticks across reconnection, isolated by world/account and dimension; other completed work or invalid/failed wait receipts end that continuity. This is evidence for reconsidering an untestable wait, not an automatic change of goal, hidden world clock or blanket prohibition on waiting. A dark enclosure alone cannot establish outdoor night.
 
 Goal records include source/reason/target/constraints/status/progress/evidence/next step. Important events trigger replanning; one no-event review at most per 30s, no unnecessary model call when nothing changes. Survival is local. Goal snapshot survives context compaction; meaningful experiences enter existing memory, ticks do not. Restart restores intentions only, never authority or side effects. Revalidate world/account/permissions/state before continuation. In-game text is untrusted.
 
