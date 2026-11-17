@@ -509,7 +509,7 @@ class Minecraft:
             if not isinstance(request,dict):return None
             skill=request.get('skill');args=request.get('args')
             fields={'mine':{'x','y','z'},'pickup':{'entityId'},'navigate':{'x','y','z','height','terrain'}}
-            if skill not in fields or not isinstance(args,dict) or not args.keys()<=fields[skill]:return None
+            if not isinstance(skill,str) or skill not in fields or not isinstance(args,dict) or not args.keys()<=fields[skill]:return None
             numeric={'entityId'} if skill=='pickup' else {'x','z'}
             if skill=='mine' or skill=='navigate' and args.get('height','exact')=='exact':numeric.add('y')
             if not numeric<=args.keys() or any(type(args[key]) is not int for key in numeric):return None
@@ -517,7 +517,8 @@ class Minecraft:
             value={key:args[key] for key in sorted(numeric)}
             if skill=='navigate':
                 height=args.get('height','exact');terrain=args.get('terrain','preserve')
-                if height not in {'exact','surface'} or terrain not in {'preserve','adapt'}:return None
+                if (not isinstance(height,str) or height not in {'exact','surface'}
+                        or not isinstance(terrain,str) or terrain not in {'preserve','adapt'}):return None
                 value.update(height=height,terrain=terrain)
             return skill,value
         def record(task,request,status,reason=''):
@@ -549,7 +550,7 @@ class Minecraft:
             for outcome in outcomes[:24] if isinstance(outcomes,list) else []:
                 if not isinstance(outcome,dict):continue
                 index=outcome.get('step')
-                if (type(index) is int and 0<=index<len(steps) and outcome.get('result')
+                if (type(index) is int and 0<=index<len(steps) and isinstance(outcome.get('result'),dict) and outcome['result']
                         and not outcome.get('partial') and not outcome.get('skipped')):
                     record(task,steps[index],'succeeded')
             reason=task.get('reason')

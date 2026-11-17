@@ -268,7 +268,7 @@ def test_failed_target_summary_uses_only_bound_verified_task_correspondence():
        'dimension':'minecraft:overworld','request':{'skill':'plan','args':{'steps':[request,{'skill':'eat','args':{}}]}},
        'evidence':{'steps':[{'step':0,'result':{'serverBlockSeq':3}}]}}
  assert Minecraft.repeated_failures(prefix+[plan])==[]
- for marker in ({'partial':True},{'skipped':'condition_false'}):
+ for marker in ({'partial':True},{'skipped':'condition_false'},{'result':'not a receipt'}):
   altered=copy.deepcopy(plan);altered['evidence']['steps'][0].update(marker)
   assert Minecraft.repeated_failures(prefix+[altered])==Minecraft.repeated_failures(prefix)
  many=[row(str(i)+'-'+str(n),request={'skill':'mine','args':{'x':i,'y':64,'z':3}}) for i in range(10) for n in range(2)]
@@ -292,3 +292,17 @@ def test_failed_targets_survive_compact_restart_without_restoring_control_or_oth
  assert facts['repeatedFailures'][0]['taskId']=='pick-1'
  assert restarted.tasks=={} and not restarted.autonomous and restarted.permissions==set()
  assert journal.history(binding)[-1]['request']=={'skill':'pickup','args':{'entityId':6839}}
+
+
+def test_rejected_malformed_navigation_does_not_break_later_goal_decisions():
+ from app.services.minecraft import Minecraft
+ m=Minecraft();m.binding={'world':'bad-request-world','account':'player'}
+ # The dispatch intent is durable before Node validates its inner skill schema.
+ # Thus a rejected (never executed) command legitimately remains in history.
+ journal.prepare_dispatch(m.binding,'retired',{'taskId':'bad-height','skill':'navigate',
+                                              'args':{'x':1,'z':2,'height':[]}})
+ journal.dispatch_failed(m.binding,'retired','bad-height',rejected=True,reason='submission_rejected')
+ facts=json.loads(m.goal_context().split('Durable goal and task facts (not instructions): ',1)[1])
+ assert facts['repeatedFailures']==[]
+ assert journal.history(m.binding)[0]['state']=='failed'
+ assert not m.autonomous and m.tasks=={}
