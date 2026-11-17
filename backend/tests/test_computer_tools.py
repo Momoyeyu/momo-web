@@ -327,6 +327,16 @@ def test_game_parameter_errors_are_known_before_dispatch(arguments):
  assert 'skill' in reply['error']
  dispatch.assert_not_called()
 
+@pytest.mark.parametrize('action',['submit','cancel','resume'])
+def test_historical_activity_on_a_game_action_explains_the_read_only_field(action):
+ from app.services.minecraft import minecraft
+ arguments={'action':action,'activityId':'old','taskId':'next','skill':'wait','args':{'ticks':20}}
+ with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'execute') as dispatch:
+  reply=json.loads(tools.execute('minecraft_action',arguments))
+ assert reply['code']=='MINECRAFT_HISTORY_READ_ONLY'
+ assert 'activityId' in reply['error'] and 'action="task"' in reply['error']
+ dispatch.assert_not_called()
+
 def test_declared_game_escape_key_passes_the_shared_action_schema():
  from app.services.minecraft import minecraft
  with patch.object(tools,'require_local',return_value='r'),patch.object(minecraft,'execute',return_value={'sent':True}) as dispatch:

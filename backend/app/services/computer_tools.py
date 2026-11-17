@@ -208,7 +208,7 @@ def _minecraft_declaration(actions):
             'action':{'type':'string','enum':actions},
             'query':{'type':'string','maxLength':64,'description':'recipes: item/pattern; places: block ID; task: build[:cursor]; observe: listed view'},
             'taskId':{'type':'string','pattern':'^[A-Za-z0-9_-]{1,80}$','description':'submit: new ID; unknown effects: query SAME ID.'},
-            'activityId':{'type':'string','pattern':'^[A-Za-z0-9_-]{1,80}$','description':'Pair with taskId for original intent/receipt; fresh binding, no resume/replay.'},
+            'activityId':{'type':'string','pattern':'^[A-Za-z0-9_-]{1,80}$','description':'Only action=task: read original intent/receipt with taskId. Omit on new actions.'},
             'skill':{'type':'string','description':'submit: skill; capabilities: skill name or controls for manual fallback'},
             'args':{'type':'object','description':'Skill arguments; plan uses steps. play/chat/follow use validated control/text/player fields. No code.'},
             'after':{'type':'integer','minimum':0}},'required':['action'],'additionalProperties':False}}}
@@ -320,7 +320,7 @@ def execute(name,args):
                 command=({'query':parsed.query} if parsed.action in {'recipes','places'} else {'skill':parsed.skill} if parsed.action=='capabilities' and parsed.skill else {'taskId':parsed.taskId,'skill':parsed.skill,'args':parsed.args} if parsed.action=='submit' else {'after':parsed.after} if parsed.action=='events' else {'taskId':parsed.taskId} if parsed.taskId else {})
                 if parsed.action=='task' and parsed.query:command['query']=parsed.query
                 if parsed.activityId:
-                    if parsed.action!='task':raise MinecraftError('Historical activities are read-only',code='MINECRAFT_INPUT')
+                    if parsed.action!='task':raise MinecraftError('Historical activities are read-only',code='MINECRAFT_HISTORY_READ_ONLY')
                     command['activityId']=parsed.activityId
                 if parsed.action=='submit' and (not parsed.taskId or not parsed.skill):raise MinecraftError('Task ID and skill required',code='MINECRAFT_INPUT')
             elif parsed.action=='observe':
@@ -363,6 +363,7 @@ def execute(name,args):
                 'MINECRAFT_DEAD':'The character has died. This task was not accepted; its envelope is not the problem. Observe the death screen, then decide whether to submit skill=respawn with args={}. Retain the goal, but recheck inventory and location after respawning.',
                 'MINECRAFT_TASK_REJECTED':'The body did not accept this task. Read a fresh observation and query capabilities with skill for its exact contract. Keep action, taskId and skill outside args; args contains only that skill’s parameters. No task started from this rejection.',
                 'MINECRAFT_INPUT':'Arguments were rejected before dispatch; nothing ran. submit requires action="submit", taskId, skill, args. For a plan use skill="plan", args={"steps":[{"skill":"wait","args":{"ticks":20}}]}. Query capabilities with skill for its exact schema.',
+                'MINECRAFT_HISTORY_READ_ONLY':'activityId is only for action="task" to read an original intent/receipt. Omit activityId from submit, cancel, resume and other actions; it is not a new task or goal ID. This request was rejected before dispatch; nothing ran.',
                 'MINECRAFT_STALE':'Read a fresh game observation before another action; do not infer completion from this rejection.',
             }
             if code in recovery:
