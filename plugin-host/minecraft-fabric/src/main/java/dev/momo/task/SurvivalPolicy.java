@@ -11,11 +11,11 @@ public final class SurvivalPolicy {
   return desired;
  }
  public boolean interruptOwnedScreen(Mode mode,boolean owned){return owned&&(mode==Mode.DEFEND||mode==Mode.ESCAPE);}
- public Mode choose(boolean authorized,boolean stopped,boolean critical,float health,int food,boolean hasFood,boolean eating,boolean hostile){
+ public Mode choose(boolean authorized,boolean stopped,boolean critical,float health,float maxHealth,int food,boolean hasFood,boolean eating,boolean hostile){
   if(!authorized||stopped)return Mode.NONE;
   if(critical||(health<=6&&hostile))return Mode.ESCAPE;
   if(eating&&hasFood)return Mode.EAT;
-  if(hasFood&&food<=14&&!hostile)return Mode.EAT;
+  if(hasFood&&!hostile&&(food<=14||health<maxHealth&&food<18))return Mode.EAT;
   return hostile?Mode.DEFEND:Mode.NONE;
  }
 }

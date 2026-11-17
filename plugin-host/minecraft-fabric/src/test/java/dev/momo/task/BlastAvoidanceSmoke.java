@@ -7,7 +7,7 @@ public final class BlastAvoidanceSmoke {
   var blast=new BlastAvoidance();var policy=new SurvivalPolicy();
   blast.update(0,0,0,List.of(view(1,3,true,true,false)));
   check(blast.active(),"a visible priming creeper is critical even with full health");
-  var desired=policy.choose(true,false,blast.active(),20,20,false,false,true);
+  var desired=policy.choose(true,false,blast.active(),20,20,20,false,false,true);
   check(policy.forBody(desired,true,true)==SurvivalPolicy.Mode.ESCAPE,"blast escape preempts owned melee and eating, rather than approaching for defense");
   blast.update(0,0,0,List.of(view(1,3,true,false,false)));
   check(blast.active(),"brief defusing must not send the body straight back into the blast radius");

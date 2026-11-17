@@ -13,7 +13,7 @@ public final class RetreatMemorySmoke {
   memory.damage(new Object());check(!memory.defer(8,169,false),"a fresh received hit rearms protection even with absorption");
   memory.reachedSafety(8);
   memory.health(4);check(!memory.defer(8,169,false),"actual health loss invalidates old safety");
-  var policy=new SurvivalPolicy();check(policy.choose(true,false,true,5,17,false,false,!memory.defer(8,169,false))==SurvivalPolicy.Mode.ESCAPE,"critical blast/air/fire always overrides the separation memory");
+  var policy=new SurvivalPolicy();check(policy.choose(true,false,true,5,20,17,false,false,!memory.defer(8,169,false))==SurvivalPolicy.Mode.ESCAPE,"critical blast/air/fire always overrides the separation memory");
   memory.reachedSafety(8);memory.health(7);check(!memory.defer(8,169,false),"healing out of emergency state clears old safety");
   memory.health(5);memory.reachedSafety(8);memory.clear();check(!memory.defer(8,169,false),"stop or new activity cannot inherit reflex memory");
   var ranged=new RetreatMemory();ranged.health(5);ranged.reachedSafety(10);
