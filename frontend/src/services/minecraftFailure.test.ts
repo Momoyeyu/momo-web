@@ -21,3 +21,8 @@ it('keeps a queued retreat visible and distinguishes it from an ordinary user ca
  expect(minecraftTaskStateKey('failed','step_2:retreated_low_health')).toBe('minecraft.taskState.retreated');
  expect(minecraftTaskStateKey('paused','paused')).toBe('minecraft.taskState.paused');
 });
+
+it('explains an unavailable surface as a route problem without exposing bridge text',()=>{
+ expect(minecraftFailureKey('surface_unavailable')).toBe('minecraft.reason.path');
+ expect(minecraftFailureKey('step_1:surface_unavailable')).toBe('minecraft.reason.path');
+});

@@ -1,6 +1,7 @@
 package dev.momo.task;
 public final class NavigationBoundsSmoke {
  public static void main(String[] args){
+  SurfaceGoalsSmoke.main(args);
   NavigationUseSmoke.main(args);
   FollowDurationSmoke.main(args);
   WaterApproachSmoke.main(args);

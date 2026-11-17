@@ -6,7 +6,6 @@ import baritone.api.Settings;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import baritone.api.pathing.goals.GoalNear;
-import baritone.api.pathing.goals.GoalXZ;
 import baritone.api.pathing.goals.Goal;
 import baritone.api.pathing.goals.GoalBlock;
 import baritone.api.pathing.goals.GoalComposite;
@@ -32,7 +31,7 @@ public final class BaritoneNavigator {
   start(x,y,z,surface,precise,false);
  }
  public void start(int x,int y,int z,boolean surface,boolean precise,boolean adaptTerrain){
-  startGoal(surface?new GoalXZ(x,z):new GoalNear(new BlockPos(x,y,z),precise?0:1),adaptTerrain);
+  startGoal(surface?GameSurfaceGoals.create(x,z):new GoalNear(new BlockPos(x,y,z),precise?0:1),adaptTerrain);
  }
  public void startInteraction(BlockPos target){startGoal(interactionGoal(target),false);}
  private Goal interactionGoal(BlockPos target){
