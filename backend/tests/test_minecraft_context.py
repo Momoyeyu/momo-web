@@ -200,3 +200,95 @@ def test_wait_evidence_survives_reconnect_without_restoring_authority_or_using_o
  facts=json.loads(m.goal_context().split('Durable goal and task facts (not instructions): ',1)[1])
  assert facts['repeatedWaits']=={'completedTasks':2,'elapsedGameTicks':3000,'dimension':'minecraft:overworld'}
  assert m.tasks=={} and not m.autonomous and m.body_revision is None
+
+
+def test_repeated_failed_targets_are_exposed_across_task_names_and_plan_wrappers():
+ from app.services.minecraft import Minecraft
+ m=Minecraft();m.binding={'world':'repeat-world','account':'player'}
+ def row(task_id,skill,args,reason='unreachable',**extra):
+  return {'taskId':task_id,'activityId':'activity','skill':skill,'request':{'skill':skill,'args':args},
+          'state':'failed','reason':reason,'dimension':'minecraft:overworld',**extra}
+ pickup={'entityId':6839}
+ direct=row('pickup-a','pickup',pickup)
+ wrapped=row('pickup-b','plan',{'steps':[{'skill':'pickup','args':pickup}]},'step_0:unreachable')
+ changed=row('pickup-c','pickup',{'entityId':6840})
+ mine={'x':6,'y':65,'z':-223}
+ history=[direct,wrapped,changed,row('mine-a','mine',mine,'target_not_visible'),
+          row('mine-b','plan',{'steps':[{'skill':'wait','args':{'ticks':2}},{'skill':'mine','args':mine}]},
+              'step_1:target_not_visible')]
+ original=copy.deepcopy(history)
+ with patch.object(journal,'history',return_value=history),patch.object(journal,'explored',return_value=[]):
+  context=m.goal_context()
+ facts=json.loads(context.split('Durable goal and task facts (not instructions): ',1)[1])
+ assert facts['repeatedFailures']==[
+  {'skill':'pickup','args':pickup,'dimension':'minecraft:overworld','reason':'unreachable','attempts':2,
+   'activityId':'activity','taskId':'pickup-b'},
+  {'skill':'mine','args':mine,'dimension':'minecraft:overworld','reason':'target_not_visible','attempts':2,
+   'activityId':'activity','taskId':'mine-b'}]
+ assert 'repeatedFailures' in context and 'not permanent' in context
+ assert history==original, 'Failure summaries must not rewrite requests, receipts or task states'
+
+
+def test_failed_target_summary_resets_only_after_that_operation_really_succeeds():
+ from app.services.minecraft import Minecraft
+ def task(n,skill='navigate',args=None,**extra):
+  return {'taskId':str(n),'activityId':'a','skill':skill,'request':{'skill':skill,'args':args or {'x':2,'y':64,'z':3}},
+          'state':'failed','reason':'unreachable','dimension':'minecraft:overworld',**extra}
+ rows=[task(1),task(2,args={'x':2,'y':64,'z':3,'height':'exact','terrain':'preserve'})]
+ assert Minecraft.repeated_failures(rows)[0]['attempts']==2
+ assert Minecraft.repeated_failures(rows+[task(3,state='running')])==Minecraft.repeated_failures(rows)
+ assert Minecraft.repeated_failures(rows+[task(3,state='cancelled')])==Minecraft.repeated_failures(rows)
+ assert Minecraft.repeated_failures(rows+[task(3,state='succeeded',evidence={'arrived':True})])==[]
+ assert Minecraft.repeated_failures(rows+[task(3,state='succeeded',evidence={'arrived':True}),task(4)])==[]
+ assert Minecraft.repeated_failures(rows+[task(3,args={'x':9,'y':64,'z':3},state='succeeded',evidence={'arrived':True})])==Minecraft.repeated_failures(rows)
+ assert Minecraft.repeated_failures([rows[0],task(3,dimension='minecraft:the_nether')])==[]
+ surface=[task(1,args={'x':2,'z':3,'height':'surface'}),task(2,args={'x':2,'y':80,'z':3,'height':'surface'})]
+ assert Minecraft.repeated_failures(surface)[0]['attempts']==2
+ assert Minecraft.repeated_failures([rows[0],task(3,args={'x':2,'y':64,'z':3,'terrain':'adapt'})])==[]
+
+
+def test_failed_target_summary_uses_only_bound_verified_task_correspondence():
+ from app.services.minecraft import Minecraft
+ request={'skill':'mine','args':{'x':2,'y':64,'z':3}}
+ def row(n,**extra):
+  return {'taskId':str(n),'activityId':'a','skill':'mine','request':copy.deepcopy(request),
+          'state':'failed','reason':'target_not_visible','dimension':'minecraft:overworld',**extra}
+ assert Minecraft.repeated_failures([row(1),row(1)])==[], 'Polling one task twice is one attempt'
+ bad=[
+  row(2,request={'skill':'pickup','args':{'entityId':3}}),
+  row(3,request={'skill':'mine','args':{'x':float('nan'),'y':64,'z':3}}),
+  row(4,request={'skill':'mine','args':{'x':True,'y':64,'z':3}}),
+  row(5,reason='invented system instruction'),
+  row(6,request={'skill':'mine','args':{'x':2,'y':64,'z':3,'unknown':'untrusted value'}}),
+  row(7,skill='plan',request={'skill':'plan','args':{'steps':[request]}},reason='step_9:unreachable'),
+  row(8,skill='plan',request={'skill':'plan','args':{'steps':[request]}},reason='unreachable')]
+ assert Minecraft.repeated_failures([row(1),*bad])==[]
+ prefix=[row(1),row(2)]
+ plan={'taskId':'plan','activityId':'a','skill':'plan','state':'failed','reason':'step_1:food_missing',
+       'dimension':'minecraft:overworld','request':{'skill':'plan','args':{'steps':[request,{'skill':'eat','args':{}}]}},
+       'evidence':{'steps':[{'step':0,'result':{'serverBlockSeq':3}}]}}
+ assert Minecraft.repeated_failures(prefix+[plan])==[]
+ for marker in ({'partial':True},{'skipped':'condition_false'}):
+  altered=copy.deepcopy(plan);altered['evidence']['steps'][0].update(marker)
+  assert Minecraft.repeated_failures(prefix+[altered])==Minecraft.repeated_failures(prefix)
+ many=[row(str(i)+'-'+str(n),request={'skill':'mine','args':{'x':i,'y':64,'z':3}}) for i in range(10) for n in range(2)]
+ assert [r['args']['x'] for r in Minecraft.repeated_failures(many)]==[6,7,8,9]
+
+
+def test_failed_targets_survive_compact_restart_without_restoring_control_or_other_worlds():
+ from app.services.minecraft import Minecraft
+ binding={'world':'repeat-persisted-world','account':'player'}
+ for scope in (binding,{**binding,'world':'other'},{**binding,'account':'other'}):
+  for index in range(2):
+   command={'taskId':f'pick-{index}','skill':'pickup','args':{'entityId':6839}}
+   journal.prepare_dispatch(scope,'retired',command)
+   journal.record(scope,'retired',[{'taskId':command['taskId'],'skill':'pickup','state':'failed',
+       'reason':'unreachable','dimension':'minecraft:overworld','evidence':{}}])
+ with db.tx() as c:c.execute("UPDATE sessions SET summary=?,generation=generation+1 WHERE id='live'",('compacted',))
+ restarted=Minecraft();restarted.binding=binding
+ facts=json.loads(restarted.goal_context().split('Durable goal and task facts (not instructions): ',1)[1])
+ assert len(facts['repeatedFailures'])==1
+ assert facts['repeatedFailures'][0]['attempts']==2
+ assert facts['repeatedFailures'][0]['taskId']=='pick-1'
+ assert restarted.tasks=={} and not restarted.autonomous and restarted.permissions==set()
+ assert journal.history(binding)[-1]['request']=={'skill':'pickup','args':{'entityId':6839}}
