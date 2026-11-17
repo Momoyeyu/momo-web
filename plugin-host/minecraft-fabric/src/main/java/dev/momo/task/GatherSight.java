@@ -3,9 +3,9 @@ package dev.momo.task;
 public final class GatherSight {
  private GatherSight(){}
  public static boolean belowFeet(int x,int y,int z,double minX,double minZ,double maxX,double maxZ,double feetY){return y<feetY&&x+1>minX&&x<maxX&&z+1>minZ&&z<maxZ;}
- // Equal-area spherical sampling reaches the zenith/nadir too. The old
- // nine latitude bands stopped at |y|=.9 and missed trunks above our head.
- public static double[] direction(int index){double y=1-2*(index+.5)/512,angle=index*2.399963229728653,r=Math.sqrt(Math.max(0,1-y*y));return new double[]{Math.sin(angle)*r,y,Math.cos(angle)*r};}
+ // Keep the same equal-area sphere, but interleave latitudes in each bounded
+ // tick batch. Zenith-first ordering chased distant uphill soil before nearby floor.
+ public static double[] direction(int index){int sample=Integer.reverse(index)>>>23;double y=1-2*(sample+.5)/512,angle=sample*2.399963229728653,r=Math.sqrt(Math.max(0,1-y*y));return new double[]{Math.sin(angle)*r,y,Math.cos(angle)*r};}
  public static boolean normalDrop(String block,String item){
   return switch(block){
    case "minecraft:stone" -> item.equals("minecraft:cobblestone");

@@ -44,6 +44,7 @@ public final class GatherSkill implements TaskRuntime.Work {
   if(drop.isPresent()){dropTarget=drop.get().getId();var args=new JsonObject();args.addProperty("entityId",dropTarget);begin("pickup",args);return TaskRuntime.Step.running();}
   if(++idle<12)return TaskRuntime.Step.running(); // Allow normal drops/server inventory updates to arrive.
   // At most sixteen sight rays per tick; read only the first visible hit of each.
+  BlockHitResult nearest=null;double nearestDistance=Double.POSITIVE_INFINITY;
   for(int n=0;n<16&&scan<512;n++,scan++){
    totalRays++;
    double[] direction=GatherSight.direction(scan);var eye=c.player.getEyePos();var end=eye.add(direction[0]*16,direction[1]*16,direction[2]*16);
@@ -63,8 +64,9 @@ public final class GatherSkill implements TaskRuntime.Work {
     continue;
    }
    if(state.isToolRequired()&&!c.player.getAbilities().creativeMode){boolean suitable=false;for(int i=0;i<36;i++)if(c.player.getInventory().getStack(i).isSuitableFor(state))suitable=true;if(!suitable){lastFailure="tool_required";blocked.put(pos.toImmutable(),ticks+200);continue;}}
-   target=pos.toImmutable();var args=new JsonObject();args.addProperty("x",pos.getX());args.addProperty("y",pos.getY());args.addProperty("z",pos.getZ());begin("mine",args,hit.getPos());return TaskRuntime.Step.running();
+   double distance=eye.squaredDistanceTo(hit.getPos());if(distance<nearestDistance){nearest=hit;nearestDistance=distance;}
   }
+  if(nearest!=null){target=nearest.getBlockPos().toImmutable();var args=new JsonObject();args.addProperty("x",target.getX());args.addProperty("y",target.getY());args.addProperty("z",target.getZ());begin("mine",args,nearest.getPos());return TaskRuntime.Step.running();}
   if(scan>=512){
    if(foliage!=null){target=foliage;foliage=null;clearedLeaves++;var args=new JsonObject();args.addProperty("x",target.getX());args.addProperty("y",target.getY());args.addProperty("z",target.getZ());begin("mine",args);scan=0;return TaskRuntime.Step.running();}
    // A local scan can miss another side of the same hill/canopy. Change
