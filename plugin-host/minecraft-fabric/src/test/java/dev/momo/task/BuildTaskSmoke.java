@@ -31,6 +31,7 @@ public final class BuildTaskSmoke {
  }
  static TaskRuntime.Step finish(BuildTask work){TaskRuntime.Step row=null;for(int i=0;i<30;i++){row=work.tick();if(!row.state().equals("running"))return row;}throw new AssertionError("Build did not finish");}
  public static void main(String[] args){
+  BuildRecoverySmoke.run();
   var empty=new SparseBuild.Cell(0,66,0,"minecraft:air");
   var airScene=new Scene(){public TaskRuntime.Work build(List<SparseBuild.Cell> cells){
    return new Work(TaskRuntime.Step.done(Map.of("confirmedCells",List.of(Map.of("x",0,"y",66,"z",0,"block","Block{minecraft:cave_air}","observedExisting",true))))){public TaskRuntime.Step tick(){placed.add(empty);return super.tick();}public boolean controlsMining(){return true;}};

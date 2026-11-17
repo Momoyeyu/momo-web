@@ -53,6 +53,8 @@ Game-thread code must not block on model, HTTP, screenshot encoding or large pat
 
 Plans compose typed skills with bounded sequences, conditions and retries. No arbitrary JS. Keep low-level GUI/slot controls for uncommon mechanics, with honest capability reporting. Replace the old per-minute micro-action count with separate queue, work, time and event budgets.
 
+建造子执行器的 `build_blocked` 表示已一段时间没有位置或成果进展，不等于目标永久不可达。父任务与视线丢失沿用同一最多五次换位预算：先收回旧身体，保留并复查已确认方块，只为剩余格子重新观察和施工。永久卡住保留 `build_blocked` 原因；缺料、实心占位、缺少服务器回执或构建结果不完整不走此恢复路径。整个任务仍受原有总 tick、距离、许可与停止约束。
+
 实际 UI 请求包含形象清单、目标事实和视觉信息。除去重复教程后，仍可能因 UTF-8 保守估算反复触发容量维护。因此游戏回合沿用现有 `usage_anchor` 的真实 provider token 口径：在数据目录、受众、会话代次、模型配置和工具 schema 相同，且从首条 system 开始的连续文本消息哈希匹配时，将旧完整请求的实测用量作为这段前缀的保守上界；新消息和图像继续全额计费。缓存只存哈希、数值和时间，5 分钟过期，最多 32 组／每组 8 个样本，每个样本最多 64 条消息哈希，遇到多模态消息即停止。无可靠用量或前缀不匹配时使用原估算；硬预算和全部权限校验保留。
 
 重启后没有缓存时，紧急容量维护按剩余预算生成明确受字节限制的摘要，不把固定压缩比例当作不可降低的下限。维修请求只带冻结的旧摘要与可见对话数据，图片保留引用；当前目标、权限、画面、形象和工具仍在正式请求中单独保留、完整计费。只有来源、代次、配置和摘要版本仍匹配才发布；正式请求必须刷新后再次通过硬预算。真实维修 API 已验证，完整自主施工仍待验收。
