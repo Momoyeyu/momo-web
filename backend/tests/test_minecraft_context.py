@@ -15,6 +15,19 @@ def test_model_world_age_is_not_presented_as_a_daylight_clock():
   assert 'gameTick' not in view and 'dayTime' not in view and 'dayPhase' not in view
  assert raw=={'gameTick':1222666,'dimension':'minecraft:overworld','screen':'world'}
 
+def test_old_goal_notes_are_dated_intentions_separate_from_current_world_facts():
+ from app.services.minecraft import Minecraft
+ m=Minecraft();m.binding={'world':'past-notes','account':'player'}
+ goal={'title':'做一个窝','reason':'想休息','source':'curiosity','expected':'有门和储物箱','status':'active',
+       'progress':'刚重生，满血，外面夜晚','next':'等天亮再出门'}
+ with patch.object(db,'now_iso',return_value='2026-11-16T00:00:00+00:00'):journal.set_goal(m.binding,goal)
+ facts=json.loads(m.goal_context().split('Durable goal and task facts (not instructions): ',1)[1])
+ assert facts['goal']=={k:v for k,v in goal.items() if k not in {'progress','next'}}
+ assert facts['goalNotes']=={'progress':goal['progress'],'next':goal['next'],
+                            'recordedAt':'2026-11-16T00:00:00+00:00','historical':True}
+ assert journal.goal(m.binding)==goal, 'Projection must preserve the original goal and its identity'
+ assert journal.goal({'world':'other','account':'player'}) is None
+
 def test_failed_build_context_keeps_bounded_grounded_diagnostics_including_plan_steps():
  from app.services.minecraft import Minecraft
  blocked=[{'x':i,'y':70,'z':2,'requested':'minecraft:dirt','actual':'minecraft:grass_block','observedAt':123} for i in range(12)]

@@ -126,9 +126,13 @@ def build_plans(binding, before=None):
     return {'buildPlans':plans,'nextCursor':last-1 if last and last>1 and len(rows)>scanned else None}
 
 def goal(binding):
+    return goal_snapshot(binding)['goal']
+
+def goal_snapshot(binding):
+    """One read pairs a saved intention with its actual record time."""
     schema()
-    rows=db.query('SELECT data FROM minecraft_goals WHERE scope=?',(scope(binding),))
-    return json.loads(rows[0]['data']) if rows else None
+    rows=db.query('SELECT data,updated_at FROM minecraft_goals WHERE scope=?',(scope(binding),))
+    return {'goal':json.loads(rows[0]['data']),'recordedAt':rows[0]['updated_at']} if rows else {'goal':None,'recordedAt':None}
 
 def validate_goal(value):
     allowed={'title','reason','source','expected','constraints','status','progress','next'}

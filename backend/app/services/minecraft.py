@@ -463,13 +463,16 @@ class Minecraft:
             if not self.binding:return ''
             recent=list(self.tasks.values())[-4:]
             history=journal.history(self.binding,limit=64)
-            data={'goal':journal.goal(self.binding),'goalEvidence':self.goal_evidence(),'tasks':[self._task_context(task,index>=len(recent)-2) for index,task in enumerate(recent)],'paused':self.paused or self.suspended,
+            snapshot=journal.goal_snapshot(self.binding);goal=snapshot['goal']
+            notes={key:goal.pop(key) for key in ('progress','next') if goal and key in goal}
+            if notes:notes.update(recordedAt=snapshot['recordedAt'],historical=True)
+            data={'goal':goal,'goalNotes':notes,'goalEvidence':self.goal_evidence(),'tasks':[self._task_context(task,index>=len(recent)-2) for index,task in enumerate(recent)],'paused':self.paused or self.suspended,
                   'unconfirmedTasks':[{k:row[k] for k in ('activityId','taskId','skill','state','reason') if k in row} for row in history if row['state']=='unknown'],
                   'exploredPlaces':list(reversed(journal.explored(self.binding))),'repeatedSearches':self.repeated_searches(history),'repeatedWaits':self.repeated_waits(history),
                   'repeatedFailures':self.repeated_failures(history)}
-        return ('You are the same momo sharing playerName, the avatar: injury/death is not harm to the real person. Keep personality and agreements; choose curiosity, beauty, companionship, helping or game progress, not a fixed tech tree. '
+        return ('Same momo sharing playerName, the avatar: injury/death is not real-person harm. Keep personality/agreements; choose curiosity, beauty, companionship, helping or progress, not a fixed tech tree. '
             'Keep goals until user input, important change, blockage or completion. minecraft_goal records intent; tasks/plans continue during chat. Accepted is not completed; observe before effects. '
-            'unconfirmedTasks may have happened: query original activityId/taskId, never replay. goalEvidence is verified history, not inventory; prefer over stale notes. '
+            'unconfirmedTasks may have happened: query original activityId/taskId, never replay. goalNotes are dated intentions, not current facts. goalEvidence is verified history, not inventory. '
             'exploredPlaces are past sightings; places recalls older ones. Approach visibleLandmarks via surface navigation within 64 blocks; gather is local. Change approach after failed searches. '
             'repeatedWaits/worldAgeTicks measure elapsed ticks, not daylight. A dark roof cannot prove night; check evidence. '
             'repeatedFailures counts same-target failures across task names/plans, not permanent prohibitions. Refresh evidence or change approach, not just task names. '
