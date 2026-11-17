@@ -198,3 +198,26 @@ def test_game_frame_revocation_during_maintenance_prevents_recapture(monkeypatch
  monkeypatch.setattr(turn.compress,'guard_request',lambda *a,**k:None)
  with pytest.raises(llm.LlmError,match='cancelled'):
   turn._fit_pending_observation(Messages(),{},[],game_event=True,cancelled=lambda:True)
+
+@pytest.mark.parametrize('automatic',[True,False])
+@pytest.mark.parametrize('speaks',[True,False])
+def test_accepted_autonomous_task_yields_without_forcing_another_model_ack(monkeypatch,automatic,speaks):
+ calls=[];effects=[]
+ def provider(*args,**kwargs):
+  calls.append(1)
+  if len(calls)==1:
+   if speaks:yield {'type':'text','delta':'I want to explore the hill.'}
+   yield {'type':'tool_calls','calls':[{'id':'move','function':{'name':'minecraft_action','arguments':'{"action":"submit","taskId":"hill","skill":"navigate","args":{"x":3,"z":4,"height":"surface"}}'}}]}
+  else:yield {'type':'text','delta':'I am heading there.'}
+ def execute(call,ext,**kwargs):
+  effects.append(json.loads(call['function']['arguments']))
+  return {'role':'tool','tool_call_id':call['id'],'content':json.dumps({'accepted':True,'task':{'taskId':'hill','state':'queued'}})}
+ monkeypatch.setattr(llm,'chat_stream',provider)
+ monkeypatch.setattr(turn,'run_call',execute)
+ event={'kind':'minecraft','source':'Minecraft','observedAt':1,'state':{}} if automatic else None
+ events=list(turn.run_turn('' if automatic else 'Please go to the hill.',observation=event))
+ assert len(effects)==1 and effects[0]['taskId']=='hill'
+ assert len(calls)==(1 if automatic or speaks else 2)
+ speech=''.join(e['text'] for e in events if e['t']=='sentence')
+ assert speech==('I want to explore the hill.' if speaks else '' if automatic else 'I am heading there.')
+ assert not [e for e in events if e['t']=='error']

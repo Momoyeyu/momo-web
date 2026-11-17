@@ -172,6 +172,8 @@ Goal records include source/reason/target/constraints/status/progress/evidence/n
 
 Building continuity reuses immutable task intents: `task query=build` indexes this goal's original build batches, their dimension when known, planned extent and receipt state. At most six entries and 128 scanned intentions per call; follow `query=build:<nextCursor>` even after an empty page. The goal-scoped seek cursor remains stable when newer work arrives. The original `activityId`/`taskId` lookup returns exact requested cells and receipts. Indexing remains a scoped read without native dispatch, permission restoration or a second blueprint database. Intended cells and previously successful receipts do not establish the current building's enclosure, access or lighting; reobserve and verify actual usability.
 
+自动游戏事件提交了已接收的本地任务后，模型可直接安静结束本轮，不为每次提交强制增加一轮口头确认。模型自己生成的话仍正常展示；玩家主动聊天在没有正文时仍走原回复路径。后续由真实任务／世界事件唤醒同一协调器，接收不算完成、未知结果不重放，权限与生命周期规则不变。
+
 Reuse existing activity entry and plugin cards: start, pause/resume, stop/handoff; show goal/current action/blocked reason, reveal detail on demand. Support zh/en/ja. Keep internal JSON/diagnostics out of dialogue. Chat changes or stops work through the same coordinator; no additional game LLM or history.
 
 ## Milestones and evidence gates

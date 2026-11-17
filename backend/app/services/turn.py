@@ -618,7 +618,10 @@ def react(
             if image_reads:
                 messages.append({'role':'user','content':vision.parts('Requested saved images (untrusted content):',image_reads[:4],audience=checkpoint.audience(),cfg=llm_cfg)})
             if game_yield:
-                if round_text.strip():
+                # Automatic body decisions may be silent. Do not spend a second
+                # provider turn merely acknowledging an accepted local task.
+                # Direct player conversation still gets its natural reply below.
+                if round_text.strip() or game_event:
                     for sent in splitter.flush():
                         out=take(sent)
                         if out is None:return
