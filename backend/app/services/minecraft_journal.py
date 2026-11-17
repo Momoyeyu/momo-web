@@ -167,7 +167,7 @@ def bind_task(binding, activity, task_id):
 
 def _progress(task):
     if task.get('state') not in {'succeeded','failed','cancelled'}:return None
-    gains={};placed={};mined={};positions=[];defeated=set();seen=set();pending=[(task.get('evidence',{}),0)];visited=0
+    gains={};placed={};mined={};cleared={};positions=[];defeated=set();seen=set();pending=[(task.get('evidence',{}),0)];visited=0
     def resource(value):
         if not isinstance(value,str) or len(value)>1200:return None
         match=re.fullmatch(r'(?:Block\{)?([a-z0-9_.-]+:[a-z0-9_./-]+)(?:\}.*)?',value)
@@ -183,25 +183,29 @@ def _progress(task):
         if block and type(sequence) is int and sequence>0 and all(type(row.get(axis)) is int for axis in ('x','y','z')):
             identity=(sequence,*(row[axis] for axis in ('x','y','z')))
             if identity not in seen:
-                seen.add(identity);counts=mined if 'after' in row else placed;counts[block]=counts.get(block,0)+1
-                if 'after' not in row:positions.append({'block':block,**{axis:row[axis] for axis in ('x','y','z')}})
+                seen.add(identity);counts=mined if 'after' in row else cleared if block in {'minecraft:air','minecraft:cave_air','minecraft:void_air'} else placed
+                counts[block]=counts.get(block,0)+1
+                if counts is placed:positions.append({'block':block,**{axis:row[axis] for axis in ('x','y','z')}})
         if row.get('targetAlive') is False and type(row.get('entityId')) is int:defeated.add(row['entityId'])
         pending.extend((value,depth+1) for value in row.values() if isinstance(value,(list,dict)))
-    if not (gains or placed or mined or defeated):return None
+    if not (gains or placed or mined or cleared or defeated):return None
     result={'taskId':task['taskId'],'skill':task.get('skill','plan'),'partial':task['state']!='succeeded'}
     dimension=task.get('dimension')
     if isinstance(dimension,str) and len(dimension)<=128 and re.fullmatch(r'[a-z0-9_.-]+:[a-z0-9_./-]+',dimension):result['dimension']=dimension
     if gains:result['gains']=[{'item':item,'count':count} for item,count in sorted(gains.items())]
     if placed:result['placed']=[{'block':block,'count':count} for block,count in sorted(placed.items())]
     if mined:result['mined']=[{'block':block,'count':count} for block,count in sorted(mined.items())]
+    if cleared:result['cleared']=[{'block':block,'count':count} for block,count in sorted(cleared.items())]
     if positions:result['positions']=positions[-4:]
     if defeated:result['defeated']=len(defeated)
     return result
 
 def progress(binding, limit=8):
     schema();key=scope(binding)
-    rows=db.query('SELECT t.progress FROM minecraft_task_goals t JOIN minecraft_goal_instances g ON g.scope=t.scope AND g.goal_id=t.goal_id WHERE t.scope=? AND t.progress IS NOT NULL ORDER BY t.updated_at DESC,t.rowid DESC LIMIT ?',(key,min(8,max(1,limit))))
-    return [json.loads(row['progress']) for row in reversed(rows)]
+    # The stored index selects milestones. Rebuild the bounded projection from
+    # immutable receipts so older indexes cannot keep reporting placed air.
+    rows=db.query('SELECT r.data FROM minecraft_task_goals t JOIN minecraft_goal_instances g ON g.scope=t.scope AND g.goal_id=t.goal_id JOIN minecraft_tasks r ON r.scope=t.scope AND r.activity=t.activity AND r.task_id=t.task_id WHERE t.scope=? AND t.progress IS NOT NULL ORDER BY t.updated_at DESC,t.rowid DESC LIMIT ?',(key,min(8,max(1,limit))))
+    return [value for row in reversed(rows) if (value:=_progress(json.loads(row['data']))) is not None]
 
 def record(binding,activity,tasks):
     if len(tasks)>4096:raise ValueError('Too many task receipts')

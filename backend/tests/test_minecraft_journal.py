@@ -117,6 +117,24 @@ def test_partial_goal_progress_requires_real_changes_and_preserves_original_proo
  built=next(f for f in facts if f['taskId']=='building');assert built['placed']==[{'block':'minecraft:oak_planks','count':1}] and built['partial'] is True
  assert next(t for t in journal.recent(b) if t['taskId']=='building')==raw
 
+def test_build_air_receipts_are_clearance_not_placed_material_and_old_projection_is_rebuilt():
+ import json
+ b={'world':'clearing','account':'p'};journal.set_goal(b,intent());journal.bind_task(b,'a','clear')
+ cells=[{'x':x,'y':64,'z':0,'block':'Block{'+block+'}',**proof} for x,block,proof in (
+  (0,'minecraft:air',{'serverBlockSeq':10}),
+  (1,'minecraft:cave_air',{'serverBlockSeq':11}),
+  (2,'minecraft:void_air',{'observedExisting':True}),
+  (3,'minecraft:dirt',{'serverBlockSeq':12}))]
+ task={'taskId':'clear','skill':'build','state':'succeeded','evidence':{'confirmedCells':cells}}
+ journal.record(b,'a',[task]);facts=journal.progress(b)
+ assert facts[0]['cleared']==[{'block':'minecraft:air','count':1},{'block':'minecraft:cave_air','count':1}]
+ assert facts[0]['placed']==[{'block':'minecraft:dirt','count':1}]
+ assert facts[0]['positions']==[{'block':'minecraft:dirt','x':3,'y':64,'z':0}]
+ # An older derived index must not continue claiming that air was placed.
+ with db.tx() as c:c.execute('UPDATE minecraft_task_goals SET progress=? WHERE task_id=?',(json.dumps({'taskId':'clear','placed':[{'block':'minecraft:air','count':2}]}),'clear'))
+ assert journal.progress(b)==facts
+ assert journal.recent(b)[0]['evidence']==task['evidence']
+
 
 def test_verified_progress_keeps_original_task_dimension_and_never_invents_one_for_legacy_facts():
  b={'world':'home','account':'p'};journal.set_goal(b,intent())
