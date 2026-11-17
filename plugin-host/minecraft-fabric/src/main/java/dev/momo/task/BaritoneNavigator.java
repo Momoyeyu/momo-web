@@ -18,7 +18,7 @@ public final class BaritoneNavigator {
  private IBaritone baritone;
  private Goal goal;
  private int warmup,pendingTicks;
- private boolean started,pending;
+ private boolean started,pending,preserve;
  private static IBaritone releasedByUs;
  private final Map<Settings.Setting<?>,Runnable> settings=new LinkedHashMap<>();
  private <T> void override(Settings.Setting<T> setting,T value){T previous=setting.value;settings.putIfAbsent(setting,()->setting.value=previous);setting.value=value;}
@@ -74,13 +74,14 @@ public final class BaritoneNavigator {
   override(config.failureTimeoutMS,Math.min(3000L,Math.max(1L,config.failureTimeoutMS.value)));
   override(config.planAheadPrimaryTimeoutMS,Math.min(500L,Math.max(1L,config.planAheadPrimaryTimeoutMS.value)));
   override(config.planAheadFailureTimeoutMS,Math.min(1500L,Math.max(1L,config.planAheadFailureTimeoutMS.value)));
-  goal=requested;
+  goal=requested;preserve=!adaptTerrain;
   warmup=4;
   pendingTicks=0;started=false;pending=baritone.getPathingBehavior().getInProgress().isPresent();
   if(!pending)begin();
  }
- private void begin(){baritone.getCustomGoalProcess().setGoalAndPath(goal);started=true;pending=false;warmup=4;}
+ private void begin(){baritone.getCustomGoalProcess().setGoalAndPath(goal);NavigationUseGuard.CURRENT.begin(this,preserve);started=true;pending=false;warmup=4;}
  public void stop(){
+  NavigationUseGuard.CURRENT.end(this);
   if(baritone!=null&&goal!=null&&started){baritone.getCustomGoalProcess().setGoal(null);baritone.getPathingBehavior().cancelEverything();baritone.getInputOverrideHandler().clearAllKeys();releasedByUs=baritone;}
   goal=null;pending=started=false;
   settings.values().forEach(Runnable::run);settings.clear();

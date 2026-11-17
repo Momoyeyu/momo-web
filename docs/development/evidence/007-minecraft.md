@@ -887,3 +887,19 @@ desktop `a005ae4`／shared `5becac0` 的固定签名包已安装；模组 SHA-25
 源码 9549a92 精确 CI 44160096402 成功；正式模组 SHA256 为 99e1e2993b78ca1cbe986db6fb85519f12b42ef1bb08b0c4aac180a369c9b3d5。在既有账号和客户端实际测试：室外从 sunset 等到 night，961 个执行 tick 后才成功，回执为真实天空的 night；相反条件 20 tick 超时报 condition_timeout，健康阈值读取、暂停／恢复／取消也通过。随后用 fixture 自有材料正常搭建四格支架／顶盖，进入下方时明确观测 sky_occluded；waitUntil(daylight) 第一个 tick 就以 condition_unobservable 结束。离开后正常采掘清掉临时顶盖，fixture 保存暂停，20 血、17 饥饿值，原存档恢复暂停且血量／饥饿值保持，无清理错误。
 
 两版早期驱动的失败保留：第一版把黑图误当原位置上方必有顶盖，实际向上视线却报告 day／sky；第二版把室外前置条件写成只有 day／night，碰到正常 sunset 时失败。修正的是测试前提，未改变产品判断或世界时间。第三版接受四种可见天象、等待真实过渡，并在独立 fixture 构造可验证遮挡，全部通过。原土坑当前位置实际有通往天空的视线，先前黑图／模型“头顶全封住”的叙述不能证明当前位置不能看见室外；新的原存档观测为 day／sky，同样条件的只读等待立即成功。没有给原角色补血、材料或更改时间。此为条件技能的真实组件证据，完整自主住所仍待验证。
+
+
+### 条件观测后的自主续跑与导航误用定位
+
+9549a92 的正式身体在原存档、原目标上续跑 600 秒，共 41 次模型调用、36 次工具调用，287849 prompt／26917 completion tokens（含 API 缓存计数）。这次实际离开原位置、跨自然地形探索、采集樱花原木并制作木板／工作台，正常放置工作台；不是仅等待。但门制作遇到 station_required，夜间挖掘后的放置遇到 target_not_visible，重复挖空气遇到 target_absent。进入新的遮挡位置后，模型采用 waitUntil(daylight)，回执正确报 condition_unobservable，随后又选择普通计时等待。因此只能登记新观测／接口的实际采用，不能登记完整目标完成。
+
+结束运行内位置约 (-176.60,118,-179.45)，1.833 血、8 饥饿值；目标仍 active，完整的门／火把／储物箱封闭住所没有达成。驱动 errors 为空，结束正常暂停；目标里此前自述的死亡、满血和位置笔记仍是带日期的历史信息，不能用来覆盖上述现场。没有恢复旧任务、变更目标或向原角色提供 fixture 资源。
+
+独立 fixture 重放栅栏门附近路径时，旧正式模组再次于第 21 tick 打开未归属的 minecraft:loom，导航暂停。临时只读调用追踪确认：Baritone 自动右键沿 BlockPlaceHelper／InputOverrideHandler 调用了原版 interactBlock，实际命中 (6,64,6) 的织布机，而非当时要打开的栅栏门。追踪只用于隔离测试并已从源码移除；没有把它推断成真人输入或自动关闭该界面。
+
+对照固定版本 [MovementTraverse](https://github.com/cabaletta/baritone/blob/v1.11.3/src/main/java/baritone/pathing/movement/movements/MovementTraverse.java) 与 [BlockPlaceHelper](https://github.com/cabaletta/baritone/blob/v1.11.3/src/main/java/baritone/utils/BlockPlaceHelper.java)：导航先请求旋转与右键，后者可在视角尚未对准时使用当前射线的方块，并在失败后尝试主／副手物品。因此对 momo 拥有的 terrain=preserve 路径加上有范围的自动使用过滤：只允许门／栅栏门／活板门，不让开门请求打开工作站或使用手中物品。判断要求实际 Baritone 调用来源与强制右键；玩家接管优先、明确工作站／盾牌技能及 terrain=adapt 保留原路径。停止释放所属过滤，旧导航清理不能清掉新的所属范围；没有 fork 上游 JAR 或改变用户导航偏好。
+
+新回归先以“误对准织布机仍可使用”的行为失败，修复后完整 Fabric 25 tasks 通过。源码候选 JAR 在同一已有客户端和 fixture 复放该路径，第 42 tick 实际抵达，始终为正常世界界面；随后保存 fixture 并恢复原存档暂停，无清理错误。这是源码候选的真实部件回归，不是最终签名安装或完整自主建造通过。
+
+
+追加候选部件复查：四次同路径穿门均成功；随后明确 interactBlock 到同一织布机，获得 minecraft:loom 界面并成功 closeScreen，再执行 terrain=adapt 导航及 stop。没有把工作站正常使用一并封掉。首次驱动在已经 stop 后继续发送暂停按键，收尾请求报 400，不能记作一次无误清理；之后显式恢复仅属于本测试的临时控制、打开暂停并保存 fixture，再恢复原存档暂停，独立收尾记录确认成功。产品停止／许可规则没有为测试放宽。

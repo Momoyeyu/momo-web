@@ -38,6 +38,7 @@ public final class CompanionClient implements ClientModInitializer {
  public static void physicalKey(int key,int scan,boolean down){if(instance!=null)instance.physicalKeys.key(key,scan,down);}
  public static void physicalButton(int button,boolean down){if(instance!=null)instance.physicalKeys.button(button,down);}
  public static void physicalInput(){if(instance!=null&&controlling()){instance.physicalAt=System.currentTimeMillis();instance.physicalTakeover=true;}}
+ public static boolean physicalTakeoverPending(){return instance!=null&&instance.physicalTakeover;}
  public static boolean ownsCurrentScreen(){return instance!=null&&instance.ownsScreen(MinecraftClient.getInstance());}
  private boolean ownsScreen(MinecraftClient c){return c.currentScreen!=null&&(c.currentScreen==ownedScreen||requestedInventoryScreen(c)||survival.acceptsScreen(c.currentScreen)||tasks.active()&&tasks.acceptsScreen(c.currentScreen));}
  private boolean requestedInventoryScreen(MinecraftClient c){

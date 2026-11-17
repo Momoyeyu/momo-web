@@ -1,6 +1,7 @@
 package dev.momo.task;
 public final class NavigationBoundsSmoke {
  public static void main(String[] args){
+  NavigationUseSmoke.main(args);
   FollowDurationSmoke.main(args);
   WaterApproachSmoke.main(args);
   if(!NavigationBounds.within(10.5,90,10.5,20,0,10,true))throw new AssertionError("Surface navigation must ignore unused target Y");
