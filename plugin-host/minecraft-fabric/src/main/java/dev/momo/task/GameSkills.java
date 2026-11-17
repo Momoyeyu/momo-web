@@ -31,6 +31,7 @@ public final class GameSkills {
   if(skill.equals("selectItem"))return new SelectItemSkill(args);
   if(skill.equals("placeNearby"))return new NearbyPlacementSkill(args);
   if(skill.equals("build"))return BuildScene.create(args);
+  if(skill.equals("waitUntil"))return GameConditionWait.create(args);
   if(skill.equals("plan")){
    var work=new ArrayList<TaskPlan.Node>();
    for(var value:args.getAsJsonArray("steps")){

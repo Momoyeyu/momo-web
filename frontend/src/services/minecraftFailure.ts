@@ -7,7 +7,7 @@ const reasons:Record<string,string>={
  recipe_unknown:'station',trade_unavailable:'station',trade_stock_or_currency_missing:'materials',
  inventory_full:'inventory',cursor_not_empty:'inventory',screen_changed:'station',station_screen_changed:'station',
  lease_expired:'connection',world_unavailable:'connection',identity_or_life_changed:'connection',
- skill_timeout:'timeout',gather_timeout:'timeout',processing_result_timeout:'timeout',
+ skill_timeout:'timeout',gather_timeout:'timeout',processing_result_timeout:'timeout',condition_timeout:'timeout',condition_unobservable:'condition',
  retreated_low_health:'retreat',
 };
 export function minecraftFailureKey(reason:string){

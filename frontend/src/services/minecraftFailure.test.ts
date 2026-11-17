@@ -1,5 +1,9 @@
 import {expect,it} from 'vitest';
 import {minecraftFailureKey,minecraftTaskVisible,minecraftTaskStateKey} from './minecraftFailure';
+it('explains an unobservable condition separately from a condition timeout',()=>{
+ expect(minecraftFailureKey('condition_unobservable')).toBe('minecraft.reason.condition');
+ expect(minecraftFailureKey('step_1:condition_timeout')).toBe('minecraft.reason.timeout');
+});
 it('explains a local plan failure while keeping untrusted diagnostic text out of UI',()=>{
  expect(minecraftFailureKey('step_2:target_not_visible')).toBe('minecraft.reason.target');
  expect(minecraftFailureKey('target_absent')).toBe('minecraft.reason.target');

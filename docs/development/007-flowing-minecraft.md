@@ -133,6 +133,23 @@ Chat 的右侧工具栏在 Minecraft 插件启用后直接提供游戏手柄入�
 
 Completed waits prove elapsed game ticks, not a change in an unseen condition. The bounded goal context carries consecutive verified wait counts/ticks across reconnection, isolated by world/account and dimension; other completed work or invalid/failed wait receipts end that continuity. This is evidence for reconsidering an untestable wait, not an automatic change of goal, hidden world clock or blanket prohibition on waiting. A dark enclosure alone cannot establish outdoor night.
 
+`waitUntil(condition,ticks,minimum?)` 在身体本地等待实际条件：daylight／night，或自身 health／food 达到 minimum。最多 12000 tick，约每秒检查一次；条件成立才成功，未达成超时报 condition_timeout，无法观察则立即报 condition_unobservable。普通 wait 保留为主动休息的计时动作，不能证明天亮或回血。
+
+昼夜来自当前可直视的自然天空或自己背包里的时钟，只输出 day／sunset／night／dawn，不输出隐藏的精确时间。当前适配用向上的碰撞／液体视线保守判断：遮挡且没有时钟时返回 unknown，固定天象或非自然维度同样不猜测；玻璃等碰撞面暂也按遮挡处理。模型观测、聚焦查询和条件任务使用同一来源。字段和技能随当前客户端实际 capabilities 提供，旧客户端不宣称支持新条件任务。暂停、撤权、接管、世界切换和本地生存仲裁沿用原有屏障，目标仍由唯一协调器决定。
+
+```mermaid
+flowchart LR
+  Intent[等待一个实际条件] --> Sample[本地检查天空／时钟／自身状态]
+  Sample --> Known{能够确认?}
+  Known -->|否| Unknown[失败：条件不可观测]
+  Known -->|是| Match{条件达成?}
+  Match -->|是| Result[成功：实际观测回执]
+  Match -->|否，预算内| Sample
+  Match -->|否，超时| Timeout[失败：条件未达成]
+  Unknown --> Decide[同一 momo 重新判断]
+  Timeout --> Decide
+```
+
 Goal records include source/reason/target/constraints/status/progress/evidence/next step. Important events trigger replanning; one no-event review at most per 30s, no unnecessary model call when nothing changes. Survival is local. Goal snapshot survives context compaction; meaningful experiences enter existing memory, ticks do not. Restart restores intentions only, never authority or side effects. Revalidate world/account/permissions/state before continuation. In-game text is untrusted.
 
 Building continuity reuses immutable task intents: `task query=build` indexes this goal's original build batches, their dimension when known, planned extent and receipt state. At most six entries and 128 scanned intentions per call; follow `query=build:<nextCursor>` even after an empty page. The goal-scoped seek cursor remains stable when newer work arrives. The original `activityId`/`taskId` lookup returns exact requested cells and receipts. Indexing remains a scoped read without native dispatch, permission restoration or a second blueprint database. Intended cells and previously successful receipts do not establish the current building's enclosure, access or lighting; reobserve and verify actual usability.

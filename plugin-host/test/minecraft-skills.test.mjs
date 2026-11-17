@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import {validateSkill,skills} from '../src/minecraft-skills.mjs';
 import * as buildContract from '../src/minecraft-skills.mjs';
 import buildCases from './fixtures/minecraft-build-box.json' with {type:'json'};
+test('condition waits distinguish observable daylight from self thresholds and stay bounded',()=>{
+ for(const args of [{condition:'daylight',ticks:12000},{condition:'night',ticks:20},{condition:'health',minimum:18,ticks:400},{condition:'food',minimum:20,ticks:200}]){
+  validateSkill('waitUntil',args);validateSkill('plan',{steps:[{skill:'waitUntil',args}]});
+ }
+ for(const args of [{condition:'daylight',minimum:1,ticks:20},{condition:'health',ticks:20},{condition:'food',minimum:21,ticks:20},{condition:'daylight',ticks:12001},{condition:'custom',ticks:20},{condition:'daylight',ticks:20,script:'run'}])assert.throws(()=>validateSkill('waitUntil',args),/Invalid/);
+});
 test('box shorthand expands bounded intent exactly, including hollow wall interiors and unsafe edges',()=>{
  for(const row of buildCases){
   if(row.invalid){assert.throws(()=>validateSkill('build',row.args),/Invalid/,row.name);continue;}

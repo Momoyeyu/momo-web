@@ -404,7 +404,7 @@ class Minecraft:
         import copy,json,re
         frame=value.get('frame')
         data=copy.deepcopy({k:v for k,v in value.items() if k!='frame'})
-        core={'world','account','playerName','epoch','observedAt','dimension','worldAgeTicks','x','y','z','yaw','pitch','health','food','air','onFire','inWater','screen','screenHandler','screenRevision','selectedHotbar','cursor','experience','gameMode','difficulty','biome','riding','sleeping','perspective','survival','recipeQueryAvailable','shieldBlockCount'}
+        core={'world','account','playerName','epoch','observedAt','dimension','worldAgeTicks','daylight','x','y','z','yaw','pitch','health','food','air','onFire','inWater','screen','screenHandler','screenRevision','selectedHotbar','cursor','experience','gameMode','difficulty','biome','riding','sleeping','perspective','survival','recipeQueryAvailable','shieldBlockCount'}
         groups={'inventory':{'slots','emptySlots'},'terrain':{'visibleBlocks','visibleLandmarks','targetBlock'},'entities':{'visibleEntities','visiblePlayers','nearbyDrops'},'station':{'station'},'chat':{'recentChat'}}
         slot=re.fullmatch(r'slot:(\d{1,3})',query)
         fields=groups.get(query,set().union(*groups.values()))

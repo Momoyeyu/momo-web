@@ -8,6 +8,11 @@ public final class SkillArgumentsSmoke {
   GatherSearchSmoke.main(args);
   BuildTaskSmoke.main(args);
   BuildClearanceSmoke.main(args);
+  ConditionWaitSmoke.main(args);
+  validate("waitUntil","{\"condition\":\"daylight\",\"ticks\":12000}");
+  validate("waitUntil","{\"condition\":\"health\",\"minimum\":18,\"ticks\":400}");
+  validate("plan","{\"steps\":[{\"skill\":\"waitUntil\",\"args\":{\"condition\":\"night\",\"ticks\":400}}]}");
+  for(String json:new String[]{"{\"condition\":\"daylight\",\"minimum\":1,\"ticks\":20}","{\"condition\":\"health\",\"ticks\":20}","{\"condition\":\"food\",\"minimum\":21,\"ticks\":20}","{\"condition\":\"daylight\",\"ticks\":12001}","{\"condition\":\"custom\",\"ticks\":20}"})reject("waitUntil",json);
   if(SkillArguments.legacyFollowTicks(1)!=1||SkillArguments.legacyFollowTicks(51)!=2||SkillArguments.legacyFollowTicks(500)!=10||SkillArguments.legacyFollowTicks(1000)!=20)throw new AssertionError("Legacy bounded follow milliseconds must not become a one-minute task");
   for(int duration:new int[]{0,-1,1001})try{SkillArguments.legacyFollowTicks(duration);throw new AssertionError("Invalid legacy follow duration");}catch(IllegalArgumentException expected){}
   if(!GatherSight.belowFeet(0,63,0,.2,.2,.8,.8,64)||!GatherSight.belowFeet(0,62,0,.2,.2,.8,.8,64))throw new AssertionError("Gather must not dig down through the player's support column");

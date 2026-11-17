@@ -15,6 +15,21 @@ def test_model_world_age_is_not_presented_as_a_daylight_clock():
   assert 'gameTick' not in view and 'dayTime' not in view and 'dayPhase' not in view
  assert raw=={'gameTick':1222666,'dimension':'minecraft:overworld','screen':'world'}
 
+def test_grounded_daylight_or_its_occlusion_survives_focused_model_reads():
+ from app.services.minecraft import Minecraft
+ for daylight in ({'phase':'unknown','source':'none','reason':'sky_occluded'},{'phase':'day','source':'sky'},{'phase':'night','source':'clock'}):
+  raw={'daylight':daylight,'screen':'world','slots':[]}
+  for query in ('','terrain','entities','inventory','details'):
+   assert Minecraft.model_observation(raw,compact=True,query=query)['daylight']==daylight
+  assert raw['daylight']==daylight
+
+def test_older_native_capabilities_do_not_advertise_condition_waits():
+ from app.services import computer_tools
+ definitions={'wait':{'parameters':{'properties':{'ticks':{'type':'integer'}}}}}
+ with patch.object(minecraft,'capabilities',{'skillDefinitions':definitions}):
+  description=computer_tools._minecraft_declaration(['submit'])['function']['description']
+ assert 'waitUntil' not in description
+
 def test_old_goal_notes_are_dated_intentions_separate_from_current_world_facts():
  from app.services.minecraft import Minecraft
  m=Minecraft();m.binding={'world':'past-notes','account':'player'}

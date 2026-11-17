@@ -6,6 +6,16 @@ import net.minecraft.item.ItemStack;
 
 /** Bounded normal-player facts; no hidden entities, underground scans or server privileges. */
 public final class GameObservation {
+ public static java.util.Map<String,Object> daylight(MinecraftClient c){
+  var dimension=c.world.getDimension();boolean natural=dimension.natural()&&dimension.hasSkyLight()&&dimension.fixedTime().isEmpty();
+  if(!natural)return DaylightState.observe(false,false,false,0);
+  boolean clock=false;
+  for(int i=0;i<c.player.getInventory().size();i++)if(c.player.getInventory().getStack(i).isOf(net.minecraft.item.Items.CLOCK)){clock=true;break;}
+  var eye=c.player.getEyePos();
+  var sky=c.world.raycast(new net.minecraft.world.RaycastContext(eye,new net.minecraft.util.math.Vec3d(eye.x,c.world.getTopY()+1,eye.z),net.minecraft.world.RaycastContext.ShapeType.COLLIDER,net.minecraft.world.RaycastContext.FluidHandling.ANY,c.player));
+  boolean visible=sky.getType()==net.minecraft.util.hit.HitResult.Type.MISS;
+  return DaylightState.observe(true,visible,clock,visible||clock?c.world.getTimeOfDay():0);
+ }
  public static JsonObject stack(ItemStack stack){var o=new JsonObject();o.addProperty("item",Registries.ITEM.getId(stack.getItem()).toString());o.addProperty("count",stack.getCount());o.addProperty("name",stack.getName().getString());o.addProperty("damage",stack.getDamage());o.addProperty("maxDamage",stack.getMaxDamage());
   var components=new JsonObject();
   for(var type:java.util.List.of(net.minecraft.component.DataComponentTypes.ENCHANTMENTS,net.minecraft.component.DataComponentTypes.STORED_ENCHANTMENTS,net.minecraft.component.DataComponentTypes.POTION_CONTENTS,net.minecraft.component.DataComponentTypes.FOOD,net.minecraft.component.DataComponentTypes.BANNER_PATTERNS)){
@@ -42,6 +52,7 @@ public final class GameObservation {
   return recipes;
  }
  public static void append(MinecraftClient c,JsonObject result){
+  result.add("daylight",new Gson().toJsonTree(daylight(c)));
   result.add("recentChat",new Gson().toJsonTree(GameChat.CURRENT.snapshot(c.world)));
   result.addProperty("shieldBlockCount",ShieldBlocks.CURRENT.count(c.world));
   var p=c.player;var handler=p.currentScreenHandler;
