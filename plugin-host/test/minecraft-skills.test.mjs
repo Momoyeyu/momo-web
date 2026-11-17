@@ -1,6 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validateSkill,skills} from '../src/minecraft-skills.mjs';
+import * as buildContract from '../src/minecraft-skills.mjs';
+import buildCases from './fixtures/minecraft-build-box.json' with {type:'json'};
+test('box shorthand expands bounded intent exactly, including hollow wall interiors and unsafe edges',()=>{
+ for(const row of buildCases){
+  if(row.invalid){assert.throws(()=>validateSkill('build',row.args),/Invalid/,row.name);continue;}
+  validateSkill('build',row.args);const cells=buildContract.buildCells(row.args);
+  assert.equal(cells.length,row.count,row.name);assert.equal(new Set(cells.map(c=>`${c.x},${c.y},${c.z}`)).size,row.count);
+  for(const [index,axis] of ['x','y','z'].entries()){
+   assert.equal(Math.min(...cells.map(c=>c[axis])),row.min[index]);assert.equal(Math.max(...cells.map(c=>c[axis])),row.max[index]);
+  }
+  assert.ok(cells.every(c=>c.block===row.args.box.block));
+  for(const [x,y,z] of row.excluded??[])assert.ok(!cells.some(c=>c.x===x&&c.y===y&&c.z===z),row.name);
+ }
+});
 test('every nonrecursive skill can be used in a bounded plan',()=>{
  assert.deepEqual([...skills.plan.parameters.properties.steps.items.properties.skill.enum].sort(),Object.keys(skills).filter(name=>name!=='plan').sort());
 });

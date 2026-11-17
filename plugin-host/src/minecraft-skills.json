@@ -703,7 +703,7 @@
     }
   },
   "build": {
-    "description": "Build up to 32 TARGET cells: extent <=16 per axis, within 32 blocks. Set block=minecraft:air to clear an exact named cell by normal mining; visible existing air is already satisfied. Explicit air cells clear before placement in each observed batch. Other cells accept empty space, replaceable dry plants/snow or the requested block type; occupied solid cells are not implicitly excavated. Uses first-hit sight and <=5 approaches, owned materials/tools, actual block receipts and final state checks. No hidden scanning, files/scripts or substitutions. May place owned supports; reports material inventory and partial results. Use precise place for special orientation/properties.",
+    "description": "Choose cells OR box, never both. box{x,y,z,width,height,length,block,mode} expands a rectangular part: solid(default)=filled floor/roof/prism; walls=vertical perimeter with empty interior, no floor/roof. Each part still expands to <=32 TARGET cells, extent <=16/axis, within 32 blocks. Compose parts with plan. block=minecraft:air clears named space first by normal mining; existing visible air is satisfied. Other targets never implicitly excavate solid terrain. Actual sight, owned materials/tools and server receipts required. <=5 approaches; supports may consume extra materials. No hidden scan, files, scripts or substitutions. Precise place controls orientation.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -743,12 +743,82 @@
             ],
             "additionalProperties": false
           }
+        },
+        "box": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "integer",
+              "minimum": -30000000,
+              "maximum": 30000000
+            },
+            "y": {
+              "type": "integer",
+              "minimum": -64,
+              "maximum": 319
+            },
+            "z": {
+              "type": "integer",
+              "minimum": -30000000,
+              "maximum": 30000000
+            },
+            "block": {
+              "type": "string",
+              "minLength": 3,
+              "maxLength": 128
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16
+            },
+            "mode": {
+              "type": "string",
+              "enum": [
+                "solid",
+                "walls"
+              ],
+              "minLength": 5,
+              "maxLength": 5
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "z",
+            "width",
+            "height",
+            "length",
+            "block"
+          ],
+          "additionalProperties": false
         }
       },
-      "required": [
-        "cells"
-      ],
-      "additionalProperties": false
+      "additionalProperties": false,
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "cells"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "box"
+          ]
+        }
+      ]
     }
   }
 }

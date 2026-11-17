@@ -37,6 +37,7 @@ tasks.named('processResources') {
  from('../src/minecraft-skills.json') { rename { 'momo-skills.json' } }
  from('../../scripts/minecraft-resources.json') { into 'META-INF/momo' }
 }
+tasks.named('processTestResources') { from('../test/fixtures/minecraft-build-box.json') }
 tasks.register('skillArgumentsSmoke', JavaExec) {
  dependsOn testClasses
  classpath = sourceSets.test.runtimeClasspath

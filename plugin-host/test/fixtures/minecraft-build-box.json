@@ -1,0 +1,303 @@
+[
+  {
+    "name": "solid-floor",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 3,
+        "height": 1,
+        "length": 2,
+        "block": "minecraft:dirt"
+      }
+    },
+    "count": 6,
+    "min": [
+      -2,
+      64,
+      3
+    ],
+    "max": [
+      0,
+      64,
+      4
+    ]
+  },
+  {
+    "name": "walls-with-empty-interior",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 3,
+        "height": 2,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "walls"
+      }
+    },
+    "count": 16,
+    "min": [
+      -2,
+      64,
+      3
+    ],
+    "max": [
+      0,
+      65,
+      5
+    ],
+    "excluded": [
+      [
+        -1,
+        64,
+        4
+      ],
+      [
+        -1,
+        65,
+        4
+      ]
+    ]
+  },
+  {
+    "name": "full-wall-budget",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 5,
+        "height": 2,
+        "length": 5,
+        "block": "minecraft:air",
+        "mode": "walls"
+      }
+    },
+    "count": 32,
+    "min": [
+      -2,
+      64,
+      3
+    ],
+    "max": [
+      2,
+      65,
+      7
+    ],
+    "excluded": [
+      [
+        0,
+        64,
+        5
+      ],
+      [
+        0,
+        65,
+        5
+      ]
+    ]
+  },
+  {
+    "name": "too-many-solid",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 3,
+        "height": 4,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "solid"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "too-many-walls",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 6,
+        "height": 2,
+        "length": 6,
+        "block": "minecraft:air",
+        "mode": "walls"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "world-edge",
+    "args": {
+      "box": {
+        "x": 30000000,
+        "y": 64,
+        "z": 3,
+        "width": 2,
+        "height": 2,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "walls"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "height-edge",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 319,
+        "z": 3,
+        "width": 3,
+        "height": 2,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "walls"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "fraction",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 2.5,
+        "height": 2,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "walls"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "bool",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": true,
+        "height": 2,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "walls"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "zero",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 0,
+        "height": 2,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "walls"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "extent",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 17,
+        "height": 2,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "walls"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "unknown-mode",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 3,
+        "height": 2,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "shell"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "program",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 3,
+        "height": 2,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "walls",
+        "script": "not allowed"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "missing-length",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 3,
+        "height": 2,
+        "block": "minecraft:air",
+        "mode": "walls"
+      }
+    },
+    "invalid": true
+  },
+  {
+    "name": "ambiguous-both",
+    "args": {
+      "box": {
+        "x": -2,
+        "y": 64,
+        "z": 3,
+        "width": 3,
+        "height": 2,
+        "length": 3,
+        "block": "minecraft:air",
+        "mode": "walls"
+      },
+      "cells": [
+        {
+          "x": 0,
+          "y": 64,
+          "z": 0,
+          "block": "minecraft:dirt"
+        }
+      ]
+    },
+    "invalid": true
+  }
+]

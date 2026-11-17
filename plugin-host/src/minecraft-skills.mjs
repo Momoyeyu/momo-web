@@ -22,14 +22,33 @@ function validate(schema,value,path){
   if(typeof value!=='string'||value.length<schema.minLength||value.length>schema.maxLength||/[\x00-\x1f]/u.test(value))invalid(path,'string',{minimum:schema.minLength,maximum:schema.maxLength});
   if(schema.enum&&!schema.enum.includes(value))invalid(path,'enum',{choices:schema.enum});
  }else invalid(path,'schema');
- if(schema.anyOf&&!schema.anyOf.some(branch=>{try{validate(branch,value,path);return true;}catch{return false;}}))invalid(path,'conditional_fields');
+ for(const rule of ['anyOf','oneOf'])if(schema[rule]){
+  const matches=schema[rule].filter(branch=>{try{validate(branch,value,path);return true;}catch{return false;}}).length;
+  if(!matches||rule==='oneOf'&&matches!==1)invalid(path,'conditional_fields');
+ }
+}
+/** Geometry only; does not read game state or add targets outside the declared part. */
+export function buildCells(args,path='args'){
+ validate(skills.build.parameters,args,path);
+ if(Object.hasOwn(args,'cells')===Object.hasOwn(args,'box'))invalid(path,'conditional_fields');
+ if(Object.hasOwn(args,'cells'))return args.cells;
+ const b=args.box,{width:w,height:h,length:l}=b,mode=b.mode??'solid';
+ const count=(mode==='walls'?w*l-Math.max(0,w-2)*Math.max(0,l-2):w*l)*h;
+ if(count>32)invalid(`${path}.box`,'build_size',{maximum:32});
+ const cells=[];
+ for(let x=0;x<w;x++)for(let y=0;y<h;y++)for(let z=0;z<l;z++){
+  if(mode==='walls'&&x>0&&x<w-1&&z>0&&z<l-1)continue;
+  cells.push({x:b.x+x,y:b.y+y,z:b.z+z,block:b.block});
+ }
+ validate(skills.build.parameters.properties.cells,cells,`${path}.box`);return cells;
 }
 export function validateSkill(name,args,path='args'){
  if(!Object.hasOwn(skills,name))invalid('skill','supported_skill');
  validate(skills[name].parameters,args,path);
  if(name==='build'){
-  if(new Set(args.cells.map(c=>`${c.x},${c.y},${c.z}`)).size!==args.cells.length)invalid(`${path}.cells`,'duplicate_cell');
-  for(const axis of ['x','y','z'])if(Math.max(...args.cells.map(c=>c[axis]))-Math.min(...args.cells.map(c=>c[axis]))>=16)invalid(`${path}.cells`,'build_extent',{maximum:16});
+  const cells=buildCells(args,path);
+  if(new Set(cells.map(c=>`${c.x},${c.y},${c.z}`)).size!==cells.length)invalid(`${path}.cells`,'duplicate_cell');
+  for(const axis of ['x','y','z'])if(Math.max(...cells.map(c=>c[axis]))-Math.min(...cells.map(c=>c[axis]))>=16)invalid(`${path}.cells`,'build_extent',{maximum:16});
  }
  if(name==='plan')for(const [index,step] of args.steps.entries())validateSkill(step.skill,step.args,`${path}.steps[${index}].args`);
  if(Buffer.byteLength(JSON.stringify(args),'utf8')>3500)invalid(path,'bytes',{maximum:3500});

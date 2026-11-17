@@ -1,5 +1,6 @@
 import copy
 import json
+from pathlib import Path
 from unittest.mock import patch
 import pytest
 from app.services import minecraft_journal as journal
@@ -8,6 +9,21 @@ BINDING={'world':'build-world','account':'player'}
 GOAL={'title':'休息处','reason':'想歇脚','source':'rest','expected':'有门和顶的空间','status':'active'}
 CELLS=[{'x':10,'y':64,'z':20,'block':'minecraft:dirt'},
        {'x':12,'y':66,'z':23,'block':'minecraft:oak_planks'}]
+
+def test_box_intent_uses_the_shared_bounded_geometry_without_faking_world_facts():
+ cases=json.loads((Path(__file__).parents[2]/'plugin-host/test/fixtures/minecraft-build-box.json').read_text())
+ journal.set_goal(BINDING,GOAL)
+ for index,row in enumerate(cases):
+  identity=f'box-{index}'
+  journal.prepare_dispatch(BINDING,'boxes',{'taskId':identity,'skill':'build','args':row['args']})
+  entry=journal.build_plans(BINDING)['buildPlans'][0]
+  assert entry['taskId']==identity and entry['state']=='unknown'
+  if row.get('invalid'):
+   assert entry['requestedCells']==0 and entry['bounds'] is None
+  else:
+   assert entry['requestedCells']==row['count']
+   assert entry['bounds']=={side:dict(zip(('x','y','z'),row[side])) for side in ('min','max')}
+  assert journal.history(BINDING,activity='boxes',task_id=identity)[0]['request']['args']==row['args']
 
 def build(binding=BINDING,activity='original',task_id='walls',cells=CELLS,skill='build'):
  args={'cells':copy.deepcopy(cells)}

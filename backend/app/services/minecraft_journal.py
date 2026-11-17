@@ -75,6 +75,21 @@ def history(binding, *, activity=None, task_id=None, limit=12):
     rows=db.query('SELECT t.activity,t.data,d.request,d.disposition FROM minecraft_tasks t LEFT JOIN minecraft_dispatches d ON d.scope=t.scope AND d.activity=t.activity AND d.task_id=t.task_id WHERE '+where+' ORDER BY t.updated_at DESC,t.rowid DESC LIMIT ?',(*params,min(64,max(1,limit))))
     return [{**json.loads(row['data']),'activityId':row['activity'],**({'dispatch':row['disposition'],'request':json.loads(row['request'])} if row['request'] else {})} for row in reversed(rows)]
 
+def _planned_build_cells(arguments):
+    if not isinstance(arguments,dict) or ('cells' in arguments)==('box' in arguments):return []
+    if 'cells' in arguments:return arguments['cells'] if isinstance(arguments['cells'],list) else []
+    box=arguments['box']
+    if not isinstance(box,dict) or set(box)-{'x','y','z','width','height','length','block','mode'}:return []
+    if any(type(box.get(k)) is not int for k in ('x','y','z','width','height','length')):return []
+    x,y,z,w,h,l=(box[k] for k in ('x','y','z','width','height','length'))
+    if not all(1<=size<=16 for size in (w,h,l)) or not (-30000000<=x<=x+w-1<=30000000 and -64<=y<=y+h-1<=319 and -30000000<=z<=z+l-1<=30000000):return []
+    mode=box.get('mode','solid');block=box.get('block')
+    if mode not in ('solid','walls') or not isinstance(block,str) or not 3<=len(block)<=128 or any(ord(c)<32 for c in block):return []
+    count=(w*l-max(0,w-2)*max(0,l-2) if mode=='walls' else w*l)*h
+    if count>32:return []
+    return [{'x':x+dx,'y':y+dy,'z':z+dz,'block':block} for dx in range(w) for dy in range(h) for dz in range(l)
+            if mode!='walls' or dx in (0,w-1) or dz in (0,l-1)]
+
 def build_plans(binding, before=None):
     """Index this goal's immutable intentions, not newly observed world cells."""
     if before is not None and (type(before) is not int or not 0<before<=2**63-1):raise ValueError('Invalid build history cursor')
@@ -98,7 +113,7 @@ def build_plans(binding, before=None):
         parts=[]
         for part in candidates:
             if isinstance(part,dict) and part.get('skill')=='build':
-                arguments=part.get('args');parts.append(arguments.get('cells',[]) if isinstance(arguments,dict) else [])
+                parts.append(_planned_build_cells(part.get('args')))
         cells=[cell for part in parts if isinstance(part,list) for cell in part[:32]
                if isinstance(cell,dict) and all(type(cell.get(axis)) is int for axis in ('x','y','z'))]
         entry={'activityId':row['activity'],'taskId':row['task_id'],'state':task['state'],'dispatch':row['disposition'],
