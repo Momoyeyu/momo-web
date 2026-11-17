@@ -125,6 +125,8 @@ Mechanics are reusable; objectives are not hardcoded recipes such as always acqu
 
 ## Goals and presentation
 
+Chat 的右侧工具栏在 Minecraft 插件启用后直接提供游戏手柄入口，不依赖另行开启桌面插件或桌宠窗口。侧边小面板复用游戏连接／权限／暂停继续／停止组件，不遮罩整个场景；窄窗口允许内部滚动，返回设置、进入桌宠或回标题时关闭展示层，不因关面板而停止游戏。连接状态仅用当前临时客户端句柄匹配已发现游戏；重开面板不遗忘当前连接，也不恢复历史许可。桌宠仍使用既有活动入口，QQ 继续由手机承载。
+
 Completed waits prove elapsed game ticks, not a change in an unseen condition. The bounded goal context carries consecutive verified wait counts/ticks across reconnection, isolated by world/account and dimension; other completed work or invalid/failed wait receipts end that continuity. This is evidence for reconsidering an untestable wait, not an automatic change of goal, hidden world clock or blanket prohibition on waiting. A dark enclosure alone cannot establish outdoor night.
 
 Goal records include source/reason/target/constraints/status/progress/evidence/next step. Important events trigger replanning; one no-event review at most per 30s, no unnecessary model call when nothing changes. Survival is local. Goal snapshot survives context compaction; meaningful experiences enter existing memory, ticks do not. Restart restores intentions only, never authority or side effects. Revalidate world/account/permissions/state before continuation. In-game text is untrusted.

@@ -23,6 +23,7 @@ class Minecraft:
         self.generation = 0
         self.activity_id = 'game-' + uuid.uuid4().hex
         self.binding = None
+        self.session_id = None
         self.permissions = set()
         self.epoch = None
         self.actions = 0
@@ -60,6 +61,7 @@ class Minecraft:
             self.generation += 1
             self.permissions.clear()
             self.binding = None
+            self.session_id = None
             self.tasks = {}
             self.paused = False
         from . import minecraft_journal as journal
@@ -78,6 +80,7 @@ class Minecraft:
         # Binding authority is separate from the adapter's last action/stop state.
         with self.lock:
             return {**result, 'active': self.binding is not None, 'generation': self.generation,
+                    'sessionId': self.session_id if self.binding else None,
                     'permissions': sorted(self.permissions), 'managedProvisioningAvailable': False,
                     'tasks': list(self.tasks.values())[-5:], 'paused': self.paused or self.suspended,
                     'autonomous': self.autonomous, 'decisionNeeded': self._decision_due(time.monotonic()),
@@ -117,6 +120,7 @@ class Minecraft:
             runtime.host.request('minecraft.configure', {'port': port, 'token': token, 'pid': pid})
             with self.lock:
                 self.binding = {'world': world, 'account': account}
+                self.session_id = str(pid) if type(pid) is int and pid > 0 else None
                 self.activity_id = 'game-' + uuid.uuid4().hex
                 from . import minecraft_journal as journal
                 journal.reconcile(self.binding)

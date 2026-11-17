@@ -1,7 +1,7 @@
 import {apiJson} from './http';
 export type GameTask={taskId:string;skill:string;state:'queued'|'running'|'paused'|'succeeded'|'failed'|'cancelled';reason:string;progress?:{skill?:string;action?:{skill?:string}}};
 export type GoalEvidence={taskId:string;skill:string;partial:boolean;gains?:{item:string;count:number}[];placed?:{block:string;count:number}[];mined?:{block:string;count:number}[];defeated?:number};
-export type GameStatus={active:boolean;generation:number;permissions?:string[];paused:boolean;autonomous:boolean;decisionNeeded:boolean;tasks:GameTask[];goal:{title:string;status:string;next?:string}|null;goalEvidence?:GoalEvidence[]};
+export type GameStatus={active:boolean;sessionId?:string|null;generation:number;permissions?:string[];paused:boolean;autonomous:boolean;decisionNeeded:boolean;tasks:GameTask[];goal:{title:string;status:string;next?:string}|null;goalEvidence?:GoalEvidence[]};
 let snapshot:GameStatus|null=null,pending:Promise<GameStatus>|null=null,last=0;
 let sequence=0;
 const listeners=new Set<()=>void>();

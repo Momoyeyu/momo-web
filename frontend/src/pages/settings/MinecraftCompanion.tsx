@@ -15,7 +15,7 @@ import Select from '../../ui/Select';
 import Switch from '../../ui/Switch';
 
 type Session={id:string;pid:number;world:string;account:string;playerName:string;worldName?:string;ready:boolean};
-export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'activity'}){
+export default function MinecraftCompanion({mode='settings',onDismiss}:{mode?:'settings'|'activity';onDismiss?:()=>void}){
  const t=useT(),enabled=useActivities().minecraft,meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(false),[active,setActive]=useState(false);
  const [sessions,setSessions]=useState<Session[]>([]),[selected,setSelected]=useState(''),[path,setPath]=useState('');
@@ -49,7 +49,7 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
   catch{if(mounted.current)setError(true);}
   finally{operation.current=false;if(mounted.current)setBusy(false);}
  };
- const current=sessions.find(s=>s.id===selected);
+ const current=active&&game?.sessionId?sessions.find(s=>s.id===game.sessionId):sessions.find(s=>s.id===selected);
  const evidence=game?.goalEvidence?.at(-1);
  const evidenceSkill=evidence?.placed?.length?'build':evidence?.gains?.length?(evidence.skill==='craft'?'craft':'gather'):evidence?.mined?.length?'mine':'attack';
  const evidenceRows=evidence?.placed?.length?evidence.placed:evidence?.gains?.length?evidence.gains:evidence?.mined||[];
@@ -57,21 +57,21 @@ export default function MinecraftCompanion({mode='settings'}:{mode?:'settings'|'
  const body=<div className="extension-detail">
   <header className="extension-detail-header">
    <div><h3>{t('minecraft.title')}</h3><span className="extension-detail-status">{t(active?'minecraft.running':'minecraft.stopped')}</span></div>
-   {mode==='settings'&&<button type="button" className="icon-btn" aria-label={t('minecraft.dismiss')} onClick={()=>setOpen(false)}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>}
+   {(mode==='settings'||onDismiss)&&<button type="button" className="icon-btn" aria-label={t('minecraft.dismiss')} onClick={mode==='settings'?()=>setOpen(false):onDismiss}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>}
   </header>
   <section className="extension-detail-section">
    <FieldRow label={t('minecraft.session')} hint={t('minecraft.existingHint')}>
-    {busy||active?<span>{current?`${current.playerName} · ${current.worldName||current.world}`:t('minecraft.selectSession')}</span>:<Select value={selected} options={[{value:'',label:t('minecraft.selectSession')},...sessions.filter(s=>s.ready).map(s=>({value:s.id,label:`${s.playerName} · ${s.worldName||s.world}`}))]} onChange={setSelected}/>}
+    {busy||active?<span>{current?`${current.playerName} · ${current.worldName||current.world}`:t(active?'minecraft.running':'minecraft.selectSession')}</span>:<Select value={selected} options={[{value:'',label:t('minecraft.selectSession')},...sessions.filter(s=>s.ready).map(s=>({value:s.id,label:`${s.playerName} · ${s.worldName||s.world}`}))]} onChange={setSelected}/>}
    </FieldRow>
-   <div className="extension-detail-actions"><Button variant="ghost" disabled={busy} onClick={()=>void run(async()=>{})}>{t('minecraft.refresh')}</Button></div>
+   {(!active||mode==='settings')&&<div className="extension-detail-actions"><Button variant="ghost" disabled={busy} onClick={()=>void run(async()=>{})}>{t('minecraft.refresh')}</Button></div>}
   </section>
   <section className="extension-detail-section">
-   <h4>{t('minecraft.permissions')} <Hint text={t('minecraft.permissionsHint')}/></h4>
-   <FieldRow label={t('minecraft.play')}><Switch title={t('minecraft.play')} on={preferences.minecraftPlay===true} onChange={value=>updateGeneral({minecraftPlay:value})} disabled={busy||active}/></FieldRow>
+   {(!active||mode==='settings')&&<><h4>{t('minecraft.permissions')} <Hint text={t('minecraft.permissionsHint')}/></h4>
+   <FieldRow label={t('minecraft.play')}><Switch title={t('minecraft.play')} on={preferences.minecraftPlay===true} onChange={value=>updateGeneral({minecraftPlay:value})} disabled={busy||active}/></FieldRow></>}
    <div className="extension-detail-actions">
-    <Button disabled={!enabled||busy||active||!current?.ready||meeting.state!=='active'} onClick={()=>void run(()=>apiJson('/api/minecraft/attach',jsonInit('POST',{...meetingIdentity(),sessionId:current!.id,world:current!.world,account:current!.account,permissions:['game.observe',...(gameplay?['game.chat','game.move','game.modify']:[])]})))}>{t('minecraft.start')}</Button>
+    {(!active||mode==='settings')&&<Button disabled={!enabled||busy||active||!current?.ready||meeting.state!=='active'} onClick={()=>void run(()=>apiJson('/api/minecraft/attach',jsonInit('POST',{...meetingIdentity(),sessionId:current!.id,world:current!.world,account:current!.account,permissions:['game.observe',...(gameplay?['game.chat','game.move','game.modify']:[])]})))}>{t('minecraft.start')}</Button>}
     {active&&game?.permissions?.includes('game.modify')&&<Button variant="ghost" disabled={busy} onClick={()=>void run(()=>apiJson('/api/minecraft/tasks',jsonInit('POST',{...meetingIdentity(),generation:game!.generation,action:game?.paused?'resume':'pause'})))}>{t(game?.paused?'minecraft.resumePlay':'minecraft.pausePlay')}</Button>}
-    <Button variant="ghost" disabled={busy||!active} onClick={()=>void run(()=>apiJson('/api/minecraft/stop',jsonInit('POST',{})))}>{t('minecraft.stop')}</Button>
+    {(active||mode==='settings')&&<Button variant="ghost" disabled={busy||!active} onClick={()=>void run(()=>apiJson('/api/minecraft/stop',jsonInit('POST',{})))}>{t('minecraft.stop')}</Button>}
    </div>
   </section>
   {active&&game&&<section className="extension-detail-section game-progress" aria-live="polite">

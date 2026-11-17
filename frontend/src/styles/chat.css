@@ -342,7 +342,8 @@
 .chat-phone-status { color:var(--accent); }
 .chat-toolbar .tb-focus { gap:7px; }
 .chat-toolbar .tb-focus.is-active,
-.chat-toolbar .tb-proactive.is-active { color:var(--accent);background:rgba(231,190,119,.075); }
+.chat-toolbar .tb-proactive.is-active,
+.chat-toolbar .tb-game.is-active { color:var(--accent);background:rgba(231,190,119,.075); }
 @keyframes phone-breathe { 50% { opacity:.5;transform:rotate(-7deg); } }
 @media(prefers-reduced-motion:reduce) { .phone-status-icon { animation:none; } }
 

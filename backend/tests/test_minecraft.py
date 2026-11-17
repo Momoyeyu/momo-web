@@ -13,6 +13,18 @@ def active():
     host = SimpleNamespace(control=threading.RLock(),request=Mock(return_value={'ok':True}))
     return m, SimpleNamespace(host=host, epoch=5)
 
+def test_status_projects_only_the_current_client_handle_for_reopened_controls():
+    m, runtime = active()
+    m.session_id = '42'
+    runtime.host.request.return_value = {'sessionId':'stale-client'}
+    with patch('app.services.minecraft.runtime',runtime):
+        status = m.status()
+        assert status['sessionId'] == '42'
+        assert 'world' not in status and 'account' not in status
+        m.binding = None
+        status = m.status()
+        assert status['sessionId'] is None
+
 def test_revoked_generation_never_dispatches():
     m, runtime = active()
     with patch('app.services.minecraft.runtime',runtime), patch.object(m,'gate',return_value='verified'):
@@ -45,8 +57,9 @@ def test_attached_status_is_active_before_first_observe_and_inactive_after_stop(
     runtime = SimpleNamespace(host=SimpleNamespace(control=threading.RLock(), request=request), epoch=5)
     with patch('app.services.minecraft.runtime', runtime), patch.object(m, 'gate', return_value='verified'):
         assert m.status()['active'] is False
-        status = m.connect(1234, 'x'*32, 'private-test', 'fixture', ['game.observe'], 'owner', 'lease')
+        status = m.connect(1234, 'x'*32, 'private-test', 'fixture', ['game.observe'], 'owner', 'lease', pid=42)
         assert status['active'] is True
+        assert status['sessionId'] == '42'
         assert status['stopped'] is True  # Transport has not executed an action yet.
         assert status['permissions'] == ['game.observe']
         assert m.execute('observe', {}, status['generation'], 'owner', 'lease') == {'observed': True}
@@ -54,6 +67,7 @@ def test_attached_status_is_active_before_first_observe_and_inactive_after_stop(
         assert m.status()['stopped'] is False
         m.stop()
         assert m.status()['active'] is False
+        assert m.status()['sessionId'] is None
         assert m.status()['stopped'] is True
         assert m.status()['permissions'] == []
 

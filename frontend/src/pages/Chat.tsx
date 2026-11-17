@@ -304,7 +304,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
           <Button className={`tb tb-focus tip${attention.focus?' is-active':''}`} aria-pressed={attention.focus} disabled={controlling} onClick={()=>void control(attention.focus?'focus_off':'focus_on')} aria-label={t('attention.focus')} data-tip={t('attention.focus')} data-tip-detail={t('attention.focusHint')}><Icon name="focus" size={16}/></Button>
           {phoneBusy && <Button className="tb" disabled={controlling} onClick={()=>void control('stop')} aria-label={t('attention.stopPhone')} title={t('attention.stopPhone')}><Icon name="stop" size={15}/></Button>}
           {attention.phonePaused && !attention.focus && <Button className="tb" disabled={controlling} onClick={()=>void control('resume_phone')} title={t('attention.resumePhone')}><Icon name="play" size={16}/></Button>}
-          {!introActive&&<ExtensionActivities/>}
+          {active&&!introActive&&desktopWindow.mode!=='pet'&&<ExtensionActivities/>}
           {!introActive&&activities.computer&&desktopWindow.mode!=='pet'&&<ProactiveResponseToggle/>}
           {!introActive&&<PhoneSurface active={interactive&&desktopWindow.mode!=='pet'} attention={attention} onVisibilityChange={setPhoneOpen} closeSignal={phoneClose}/>}
           <Button

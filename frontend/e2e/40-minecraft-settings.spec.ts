@@ -1,5 +1,46 @@
 import {test,expect} from './fixtures';
 import {bootChat,openExtensionTab} from './helpers';
+test('chat offers independent game control beside the scene, with reachable pause and stop',async({page},info)=>{
+ let active=false,paused=false;let attached:Record<string,unknown>|null=null;const actions:string[]=[];
+ await page.setViewportSize({width:1600,height:900});
+ await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:false,browser:false,minecraft:true}}}));
+ await page.route('**/api/minecraft/**',async r=>{
+  const path=new URL(r.request().url()).pathname;
+  if(path.endsWith('/sessions')){await r.fulfill({json:{sessions:[{id:'fixture',pid:42,world:'local/test',account:'owner',playerName:'momo-test',ready:true}]}});return;}
+  if(path.endsWith('/attach')){attached=r.request().postDataJSON();active=true;}
+  if(path.endsWith('/tasks')){const action=r.request().postDataJSON().action;actions.push(action);paused=action==='pause';}
+  if(path.endsWith('/stop'))active=false;
+  await r.fulfill({json:{active,sessionId:active?'fixture':null,generation:17,permissions:active?['game.observe','game.chat','game.move','game.modify']:[],paused,autonomous:false,decisionNeeded:false,tasks:[],goal:null}});
+ });
+ await bootChat(page);
+ const trigger=page.getByRole('button',{name:'Minecraft 陪玩',exact:true});await trigger.click();
+ const panel=page.locator('#chat-game-activity');await expect(panel).toBeVisible();
+ await expect(page.locator('.modal-overlay')).toHaveCount(0);
+ const box=(await panel.boundingBox())!,stage=(await page.locator('.app-stage').boundingBox())!;
+ expect(box.x).toBeGreaterThan(stage.x+stage.width/2);expect(box.y).toBeGreaterThanOrEqual(stage.y);
+ expect(box.y+box.height).toBeLessThanOrEqual(stage.y+stage.height);
+ await panel.locator('.sel-face').click();await panel.getByRole('option',{name:'momo-test · local/test'}).click();
+ const permit=panel.getByRole('switch',{name:'操控角色与世界交互'});
+ const originallyPermitted=await permit.getAttribute('aria-checked')==='true';
+ if(!originallyPermitted)await permit.click();
+ await panel.getByRole('button',{name:'启动陪玩'}).click();
+ await expect.poll(()=>attached).toMatchObject({sessionId:'fixture',permissions:['game.observe','game.chat','game.move','game.modify']});
+ await expect(panel.getByRole('button',{name:'启动陪玩'})).toHaveCount(0);await expect(permit).toHaveCount(0);
+ await panel.getByRole('button',{name:'暂停游玩'}).click();await expect.poll(()=>actions).toEqual(['pause']);
+ await panel.getByRole('button',{name:'继续游玩'}).click();await expect.poll(()=>actions).toEqual(['pause','resume']);
+ await page.screenshot({path:info.outputPath('game-entry-wide.png')});
+ await page.keyboard.press('Escape');await expect(panel).toHaveCount(0);expect(active).toBe(true);await expect(trigger).toBeFocused();
+ await trigger.click();await expect(panel).toBeVisible();await expect(panel.getByText('momo-test · local/test',{exact:true})).toBeVisible();
+ await page.evaluate(()=>{location.hash='#/settings';});await expect(page.locator('.settings-page')).toBeVisible();await expect(panel).toHaveCount(0);expect(active).toBe(true);
+ await page.getByRole('button',{name:'返回对话',exact:true}).click();await expect(trigger).toBeVisible();await trigger.click();await expect(panel).toBeVisible();
+ await page.setViewportSize({width:800,height:450});
+ await expect.poll(async()=>{const a=await panel.boundingBox(),b=await page.locator('.app-stage').boundingBox();return !!a&&!!b&&a.x>=b.x+b.width/2&&a.y>=b.y&&a.y+a.height<=b.y+b.height+1;}).toBe(true);
+ await panel.getByRole('button',{name:'停止陪玩'}).scrollIntoViewIfNeeded();await panel.getByRole('button',{name:'停止陪玩'}).click();
+ await expect.poll(()=>active).toBe(false);await expect(panel.getByText('已停止',{exact:true})).toBeVisible();await page.screenshot({path:info.outputPath('game-entry-compact.png')});
+ if(!originallyPermitted)await permit.click();
+ await expect.poll(async()=>Boolean((await (await page.request.get('/api/state')).json()).settings.general.minecraftPlay)).toBe(originallyPermitted);
+ await panel.getByRole('button',{name:'关闭',exact:true}).click();await expect(panel).toHaveCount(0);
+});
 test('Minecraft attaches existing world without launcher or login',async({page})=>{
  let active=false;let attached:Record<string,unknown>|null=null;
  await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:true}}}));

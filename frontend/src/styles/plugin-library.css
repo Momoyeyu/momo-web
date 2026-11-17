@@ -16,6 +16,15 @@
 .extension-modal{width:min(720px,92cqw);max-height:86cqh;min-height:0;overflow-y:auto;overscroll-behavior:contain}
 .extension-modal>*{flex-shrink:0;min-width:0}
 .extension-modal p{overflow-wrap:anywhere}
+.chat-game-activity{position:fixed;z-index:40;right:80px;top:20px;box-sizing:border-box;width:min(360px,calc(100vw - 100px));max-height:calc(100vh - 24px);overflow-y:auto;overscroll-behavior:contain;padding:14px;background:var(--panel-solid);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 32px #0004;outline:none;scrollbar-width:thin;font-size:13px}
+.chat-game-activity .extension-detail{gap:12px}
+.chat-game-activity .extension-detail-header h3{font-size:15px}
+.chat-game-activity .extension-detail-section{padding-top:12px}
+.chat-game-activity .extension-detail-actions{gap:8px}
+.chat-game-activity .opt-row{grid-template-columns:1fr;gap:8px}
+.chat-game-activity .icon-btn{display:grid;place-items:center;flex:none;width:28px;height:28px;padding:6px;border:none;border-radius:6px;background:transparent;color:var(--text-dim);cursor:pointer}
+.chat-game-activity .icon-btn:hover{color:var(--accent);background:var(--accent-soft)}
+.chat-game-activity .icon-btn svg{width:16px;height:16px}
 .extension-modal-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .extension-modal-heading h3{margin:0}
 .extension-modal .browser-preview{max-height:280px;object-fit:contain}
