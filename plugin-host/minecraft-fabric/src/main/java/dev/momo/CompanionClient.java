@@ -208,6 +208,7 @@ public final class CompanionClient implements ClientModInitializer {
   switch (type) {
    case "capabilities" -> {
     result.addProperty("protocol",1);result.addProperty("taskProtocol",1);result.addProperty("craftStationPreparation",true);
+    result.addProperty("craftStationPlacement",true);
     result.addProperty("decisionProtocol",1);
     result.addProperty("navigation",BaritoneNavigator.available());result.addProperty("navigationBackend","baritone-1.11.3");
     result.add("skills",gson.toJsonTree(GameSkills.NAMES));result.add("skillDefinitions",dev.momo.task.SkillArguments.contract());

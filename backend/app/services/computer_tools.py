@@ -200,6 +200,8 @@ def _minecraft_declaration(actions):
         fields=definition.get('parameters',{}).get('properties',{})
         signatures.append(name+'('+','.join(fields)+')')
     craft_hint=' craft auto-opens visible workbench; place if absent.' if minecraft.capabilities.get('craftStationPreparation') is True else ' 3x3 craft: interactBlock with a workbench first.'
+    if minecraft.capabilities.get('craftStationPreparation') is True and minecraft.capabilities.get('craftStationPlacement') is True:
+        craft_hint=' craft auto-opens visible or places owned workbench.'
     hint=' Skills: '+'; '.join(signatures)+'. gather gains stock; mine breaks one block, no pickup. Batch with plan. navigate height=surface|exact(feet y), terrain=preserve|adapt(owned digging/bridging), one target <=64 blocks. place xyz=support block, face=clicked side, slot=hotbar 0..8.'+craft_hint+' build: cells OR box{x,y,z,width,height,length,block,mode=solid|walls}, <=32 cells; minecraft:air clears. placeNearby finds a safe site.'+(' waitUntil: daylight|night, or health|food+minimum; ticks is a deadline, not success.' if 'waitUntil' in definitions else '') if signatures else ''
     wait_notice='wait is timed rest; '+('waitUntil checks conditions; ' if 'waitUntil' in definitions else '')+'cancel changes work. '
     return {'type':'function','function':{'name':'minecraft_action',

@@ -322,7 +322,7 @@
     }
   },
   "craft": {
-    "description": "Craft an unlocked real recipe using player 2x2 or open workbench. count is requested minimum newly gained output. Confirms inventory increase.",
+    "description": "Craft an unlocked real recipe using player 2x2 or workbench. Opens a nearby visible workbench; if absent, can safely place one owned workbench after reserving all recipe ingredients. Never fabricates a missing station. count is requested minimum newly gained output. Confirms inventory increase.",
     "parameters": {
       "type": "object",
       "properties": {

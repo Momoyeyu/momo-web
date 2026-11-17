@@ -8,9 +8,10 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.math.*;
 /** Prepare one block item, find a legal visible local face, then reuse normal placement proof. */
 final class NearbyPlacementSkill implements TaskRuntime.Work {
- private final MinecraftClient c=MinecraftClient.getInstance();private final JsonObject args;private TaskRuntime.Work work;
+ private final MinecraftClient c=MinecraftClient.getInstance();private final JsonObject args;private final Runnable beforePlacement;private TaskRuntime.Work work;
  private List<BlockPos> supports;private int index,phase;private Map<String,Object> prepared=Map.of();
- NearbyPlacementSkill(JsonObject args){this.args=args.deepCopy();}
+ NearbyPlacementSkill(JsonObject args){this(args,()->{});}
+ NearbyPlacementSkill(JsonObject args,Runnable beforePlacement){this.args=args.deepCopy();this.beforePlacement=beforePlacement;}
  public void start(){work=GameSkills.create("selectItem",args);work.start();}
  public TaskRuntime.Step tick(){
   if(work!=null){var result=work.tick();if(!result.state().equals("succeeded"))return result;
@@ -33,7 +34,7 @@ final class NearbyPlacementSkill implements TaskRuntime.Work {
     var block=((BlockItem)c.player.getMainHandStack().getItem()).getBlock();
     if(!c.world.canPlace(block.getDefaultState(),destination,ShapeContext.of(c.player)))continue;
     var place=new JsonObject();place.addProperty("x",support.getX());place.addProperty("y",support.getY());place.addProperty("z",support.getZ());place.addProperty("face",face.getName());place.addProperty("slot",c.player.getInventory().selectedSlot);
-    phase=2;work=GameSkills.create("place",place);work.start();return TaskRuntime.Step.running();
+    beforePlacement.run();phase=2;work=GameSkills.create("place",place);work.start();return TaskRuntime.Step.running();
    }
   }
   return index>=supports.size()?TaskRuntime.Step.failed("no_visible_placement_space"):TaskRuntime.Step.running();

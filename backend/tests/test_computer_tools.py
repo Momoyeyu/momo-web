@@ -377,13 +377,14 @@ def test_game_declaration_keeps_semantic_tasks_small_and_manual_controls_on_dema
  assert 'controls' in declaration['description'] and 'args' in declaration['description']
 
 @pytest.mark.parametrize("station_preparation",[False,True])
-def test_full_game_catalog_leaves_context_for_goal_and_current_pixels(station_preparation):
+@pytest.mark.parametrize("station_placement",[False,True])
+def test_full_game_catalog_leaves_context_for_goal_and_current_pixels(station_preparation,station_placement):
  from pathlib import Path
  from typing import get_args
  from app.api.minecraft import Action,TaskCommand
  from app.services.minecraft import minecraft
  definitions=json.loads((Path(__file__).parents[2]/'plugin-host/src/minecraft-skills.json').read_text())
- with patch.object(minecraft,'capabilities',{'skillDefinitions':definitions,'craftStationPreparation':station_preparation}):
+ with patch.object(minecraft,'capabilities',{'skillDefinitions':definitions,'craftStationPreparation':station_preparation,'craftStationPlacement':station_placement}):
   actions=sorted({'stop',*get_args(Action.model_fields['action'].annotation),*get_args(TaskCommand.model_fields['action'].annotation)})
   declaration=tools._minecraft_declaration(actions)
  assert len(json.dumps(declaration,ensure_ascii=False).encode())<=3000
@@ -440,3 +441,13 @@ def test_native_workbench_preparation_is_not_advertised_to_old_clients(supported
  with patch.object(minecraft,'capabilities',capabilities):
   declaration=tools._minecraft_declaration(['submit','capabilities'])['function']
  assert ('auto-opens' in declaration['description']) is (supported is True)
+
+@pytest.mark.parametrize('preparation',[False,True])
+@pytest.mark.parametrize('placement',[None,False,'true',True])
+def test_carried_station_is_only_advertised_when_the_body_supports_placement(preparation,placement):
+ from app.services.minecraft import minecraft
+ capabilities={'craftStationPreparation':preparation,'craftStationPlacement':placement,
+               'skillDefinitions':{'craft':{'parameters':{'properties':{'recipe':{},'count':{}}}}}}
+ with patch.object(minecraft,'capabilities',capabilities):
+  description=tools._minecraft_declaration(['submit','capabilities'])['function']['description']
+ assert ('places owned' in description) is (preparation is True and placement is True)

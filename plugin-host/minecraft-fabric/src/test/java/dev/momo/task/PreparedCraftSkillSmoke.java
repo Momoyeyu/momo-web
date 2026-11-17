@@ -4,6 +4,7 @@ public final class PreparedCraftSkillSmoke {
  static void check(boolean actual,String why){if(!actual)throw new AssertionError(why);}
  static class Work extends TaskRuntimeSmoke.Work {}
  public static void main(String[] args){
+  WorkbenchPreparationSmoke.main(args);
   int[] seen={0},prepared={0};var screen=new Object();
   var station=new Work(){
    public TaskRuntime.Step tick(){return ++seen[0]<2?TaskRuntime.Step.running():TaskRuntime.Step.done(Map.of("serverWindowSeq",11,"screen","minecraft:crafting"));}
