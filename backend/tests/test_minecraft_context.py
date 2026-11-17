@@ -6,6 +6,15 @@ from app.services import minecraft_journal as journal
 import json
 import copy
 
+def test_model_world_age_is_not_presented_as_a_daylight_clock():
+ from app.services.minecraft import Minecraft
+ raw={'gameTick':1222666,'dimension':'minecraft:overworld','screen':'world'}
+ for compact,query in ((False,''),(True,''),(True,'terrain'),(True,'details')):
+  view=Minecraft.model_observation(raw,compact=compact,query=query)
+  assert view['worldAgeTicks']==1222666
+  assert 'gameTick' not in view and 'dayTime' not in view and 'dayPhase' not in view
+ assert raw=={'gameTick':1222666,'dimension':'minecraft:overworld','screen':'world'}
+
 def test_failed_build_context_keeps_bounded_grounded_diagnostics_including_plan_steps():
  from app.services.minecraft import Minecraft
  blocked=[{'x':i,'y':70,'z':2,'requested':'minecraft:dirt','actual':'minecraft:grass_block','observedAt':123} for i in range(12)]
