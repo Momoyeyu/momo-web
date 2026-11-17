@@ -30,6 +30,15 @@ public final class BuildTaskSmoke {
  }
  static TaskRuntime.Step finish(BuildTask work){TaskRuntime.Step row=null;for(int i=0;i<30;i++){row=work.tick();if(!row.state().equals("running"))return row;}throw new AssertionError("Build did not finish");}
  public static void main(String[] args){
+  var empty=new SparseBuild.Cell(0,66,0,"minecraft:air");
+  var airScene=new Scene(){public TaskRuntime.Work build(List<SparseBuild.Cell> cells){
+   return new Work(TaskRuntime.Step.done(Map.of("confirmedCells",List.of(Map.of("x",0,"y",66,"z",0,"block","Block{minecraft:cave_air}","observedExisting",true))))){public TaskRuntime.Step tick(){placed.add(empty);return super.tick();}public boolean controlsMining(){return true;}};
+  }};
+  airScene.visible.add(empty);var clearance=new BuildTask(List.of(empty),airScene);clearance.start();clearance.tick();
+  check(clearance.controlsMining(),"Clearance mining must suppress duplicate vanilla breaking through the parent body");
+  clearance.pause();check(!clearance.controlsMining(),"A paused build must not claim a live mining body");clearance.resume();
+  check(finish(clearance).state().equals("succeeded"),"Explicit air clearance accepts observed cave air rather than falsely requiring a placed air item");
+  clearance.stop();check(!clearance.controlsMining(),"Stopped clearance cannot retain mining control");
   var scene=new Scene();scene.visible.add(A);var work=new BuildTask(List.of(A,B),scene);work.start();
   var row=finish(work);check(row.state().equals("succeeded"),"Visible subset then approach must finish the same task");
   check(scene.builds.size()==2&&scene.moves.size()==1,"Only missing cells need another observed batch");

@@ -26,7 +26,7 @@ final class BuildTask implements TaskRuntime.Work {
    if(!(entry instanceof Map<?,?> row))continue;
    for(var cell:batch){
     if(!coordinate(row.get("x"),cell.x())||!coordinate(row.get("y"),cell.y())||!coordinate(row.get("z"),cell.z()))continue;
-    if(!(row.get("block") instanceof String state)||!state.startsWith("Block{"+cell.block()+"}"))continue;
+    if(!(row.get("block") instanceof String state)||!cell.matchesState(state))continue;
     if(!Boolean.TRUE.equals(row.get("observedExisting"))&&!(row.get("serverBlockSeq") instanceof Number n&&n.longValue()>0))continue;
     var proof=new LinkedHashMap<String,Object>();row.forEach((k,v)->{if(k instanceof String key)proof.put(key,v);});confirmed.put(cell,Map.copyOf(proof));
    }
@@ -76,6 +76,7 @@ final class BuildTask implements TaskRuntime.Work {
  public void resume(){if(!closed){paused=false;if(child!=null)child.resume();}}
  public void stop(){closed=true;if(child!=null&&!moving)collect(child.partialEvidence(),false);releaseChild();}
  public boolean acceptsScreen(Object screen){return child!=null&&child.acceptsScreen(screen);}
+ public boolean controlsMining(){return !closed&&!paused&&child!=null&&child.controlsMining();}
  public Map<String,Object> progress(){return Map.of("skill","build","engine","baritone","phase",child==null?"planning":moving?"approach":"build","confirmed",confirmed.size(),"requested",cells.size(),"approaches",approaches,"ticks",ticks);}
  public Map<String,Object> partialEvidence(){if(child!=null&&!moving)collect(child.partialEvidence(),false);var result=new LinkedHashMap<String,Object>(diagnostics);result.putAll(Map.of("confirmedCells",List.copyOf(confirmed.values()),"remainingCells",pending().stream().map(c->Map.of("x",c.x(),"y",c.y(),"z",c.z(),"block",c.block())).toList(),"approaches",approaches,"materialInventory",scene.materials()));return Map.copyOf(result);}
 }

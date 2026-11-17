@@ -24,6 +24,7 @@ final class BuildScene implements BuildTask.Scene {
   for(var cell:plan.cells()){
    if(!world.isChunkLoaded(pos(cell))||pos(cell).getSquaredDistance(origin)>1024)throw new TaskRuntime.Rejected("outside_known_terrain");
    var id=Identifier.of(cell.block());if(!Registries.BLOCK.containsId(id))throw new TaskRuntime.Rejected("block_unknown");
+   if(cell.clearance())continue;
    var item=Registries.BLOCK.get(id).asItem();if(item==Items.AIR)throw new TaskRuntime.Rejected("block_not_placeable");
    String key=Registries.ITEM.getId(item).toString();before.computeIfAbsent(key,this::count);
   }
@@ -49,8 +50,16 @@ final class BuildScene implements BuildTask.Scene {
   }
   return result;
  }
- public boolean matches(SparseBuild.Cell known){return world.isChunkLoaded(pos(known))&&world.getBlockState(pos(known)).isOf(Registries.BLOCK.get(Identifier.of(known.block())));}
+ public boolean matches(SparseBuild.Cell known){return world.isChunkLoaded(pos(known))&&(known.clearance()?world.getBlockState(pos(known)).isAir():world.getBlockState(pos(known)).isOf(Registries.BLOCK.get(Identifier.of(known.block()))));}
  public TaskRuntime.Work build(List<SparseBuild.Cell> visible){
+  if(visible.stream().anyMatch(SparseBuild.Cell::clearance))return new BuildClearance(visible,new BuildClearance.Scene(){
+   public String observe(SparseBuild.Cell cell){
+    check();if(BuildScene.this.visible(List.of(cell)).isEmpty())throw new TaskRuntime.Rejected("build_cells_not_visible");
+    return world.getBlockState(pos(cell)).toString();
+   }
+   public TaskRuntime.Work clear(SparseBuild.Cell cell){var args=new JsonObject();args.addProperty("x",cell.x());args.addProperty("y",cell.y());args.addProperty("z",cell.z());return PreparedMineSkill.create(args,true);}
+   public TaskRuntime.Work place(List<SparseBuild.Cell> cells){return BuildScene.this.build(cells);}
+  });
   var args=new JsonObject();var cells=new JsonArray();for(var cell:visible){var value=new JsonObject();value.addProperty("x",cell.x());value.addProperty("y",cell.y());value.addProperty("z",cell.z());value.addProperty("block",cell.block());cells.add(value);}args.add("cells",cells);return new BuilderSkill(args);
  }
  public TaskRuntime.Work approach(int attempt){

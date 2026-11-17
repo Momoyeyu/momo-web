@@ -3,7 +3,11 @@ import com.google.gson.JsonObject;
 import java.util.*;
 /** A small immutable declarative blueprint. Unspecified cells are never included. */
 public final class SparseBuild {
- public record Cell(int x,int y,int z,String block){public Cell{if(x< -30000000||x>30000000||z< -30000000||z>30000000||y< -64||y>319||block==null||block.isBlank()||block.length()>128)throw new IllegalArgumentException("Invalid build cell");}}
+ public record Cell(int x,int y,int z,String block){
+  public Cell{if(x< -30000000||x>30000000||z< -30000000||z>30000000||y< -64||y>319||block==null||block.isBlank()||block.length()>128)throw new IllegalArgumentException("Invalid build cell");}
+  public boolean clearance(){return block.equals("minecraft:air");}
+  public boolean matchesState(String state){return state!=null&&(state.startsWith("Block{"+block+"}")||clearance()&&(state.startsWith("Block{minecraft:cave_air}")||state.startsWith("Block{minecraft:void_air}")));}
+ }
  private record Position(int x,int y,int z){}
  private final List<Cell> cells;private final Map<Position,Cell> positions=new HashMap<>();private final int x,y,z,width,height,length;
  public SparseBuild(List<Cell> cells){

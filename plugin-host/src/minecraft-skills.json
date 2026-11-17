@@ -703,7 +703,7 @@
     }
   },
   "build": {
-    "description": "Build up to 32 TARGET block cells, not clicked supports: extent at most 16 per axis, within 32 blocks. Uses observed batches and at most five nearby approaches with owned materials. New cells are checked only after first-hit sight. Accepts empty cells, replaceable dry plants/snow, or the requested block type; no solid terrain clearing, files/scripts or substitutions. May place owned supports; reports material inventory before/after. Confirms all requested block types by actual state/receipts, or bounded failure with partial results. Already correct cells consume no new blocks. Use precise place for special orientation/property control.",
+    "description": "Build up to 32 TARGET cells: extent <=16 per axis, within 32 blocks. Set block=minecraft:air to clear an exact named cell by normal mining; visible existing air is already satisfied. Explicit air cells clear before placement in each observed batch. Other cells accept empty space, replaceable dry plants/snow or the requested block type; occupied solid cells are not implicitly excavated. Uses first-hit sight and <=5 approaches, owned materials/tools, actual block receipts and final state checks. No hidden scanning, files/scripts or substitutions. May place owned supports; reports material inventory and partial results. Use precise place for special orientation/properties.",
     "parameters": {
       "type": "object",
       "properties": {
