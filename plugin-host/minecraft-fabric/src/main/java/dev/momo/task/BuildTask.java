@@ -39,7 +39,9 @@ final class BuildTask implements TaskRuntime.Work {
   if(paused)return TaskRuntime.Step.running();
   scene.check();if(++ticks>2400)return TaskRuntime.Step.failed("build_timeout");
   if(child!=null){
-   var result=child.tick();if(result.state().equals("running"))return result;
+   TaskRuntime.Step result;
+   try{result=child.tick();}catch(TaskRuntime.Rejected error){result=TaskRuntime.Step.failed(error.reason);}
+   if(result.state().equals("running"))return result;
    if(!moving){collect(child.partialEvidence(),false);if(result.state().equals("succeeded"))collect(result.evidence(),true);}
    boolean wasMoving=moving;releaseChild();
    if(result.state().equals("failed")){

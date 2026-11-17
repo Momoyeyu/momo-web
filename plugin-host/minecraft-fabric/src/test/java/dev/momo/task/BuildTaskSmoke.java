@@ -12,7 +12,7 @@ public final class BuildTaskSmoke {
   public boolean acceptsScreen(Object screen){return "owned".equals(screen);}
  }
  static class Scene implements BuildTask.Scene {
-  Set<SparseBuild.Cell> visible=new HashSet<>(),placed=new HashSet<>();List<Work> builds=new ArrayList<>(),moves=new ArrayList<>();boolean valid=true,reveal=true,ackOnly,removeOnMove,rejectFirstStart;
+  Set<SparseBuild.Cell> visible=new HashSet<>(),placed=new HashSet<>();List<Work> builds=new ArrayList<>(),moves=new ArrayList<>();boolean valid=true,reveal=true,ackOnly,removeOnMove,rejectFirstStart,rejectFirstTick;
   public void start(){}public void check(){if(!valid)throw new TaskRuntime.Rejected("world_unavailable");}
   public List<SparseBuild.Cell> visible(List<SparseBuild.Cell> cells){return cells.stream().filter(visible::contains).toList();}
   public boolean matches(SparseBuild.Cell cell){return placed.contains(cell);}
@@ -21,6 +21,7 @@ public final class BuildTaskSmoke {
    var proof=cells.stream().map(c->Map.<String,Object>of("x",c.x(),"y",c.y(),"z",c.z(),"block","Block{"+c.block()+"}",placed.contains(c)?"observedExisting":"serverBlockSeq",placed.contains(c)?Boolean.TRUE:1L)).toList();
    var work=new Work(TaskRuntime.Step.done(ackOnly?Map.of("accepted",true):Map.of("confirmedCells",proof)));
    if(rejectFirstStart&&builds.isEmpty())work=new Work(work.result){public void start(){super.start();throw new TaskRuntime.Rejected("build_cells_not_visible");}};
+   if(rejectFirstTick&&builds.isEmpty())work=new Work(work.result){public TaskRuntime.Step tick(){throw new TaskRuntime.Rejected("build_cells_not_visible");}};
    work.complete=()->{if(!ackOnly)placed.addAll(cells);};builds.add(work);return work;
   }
   public TaskRuntime.Work approach(int attempt){
@@ -46,6 +47,11 @@ public final class BuildTaskSmoke {
   check(((List<?>)row.evidence().get("confirmedCells")).size()==2,"All cells require actual completion evidence");
   scene=new Scene();scene.visible.add(A);scene.rejectFirstStart=true;work=new BuildTask(List.of(A),scene);work.start();
   check(finish(work).state().equals("succeeded")&&scene.moves.size()==1,"A changed sight preflight needs a bounded approach, not a terminal parent failure");
+  scene=new Scene();scene.visible.add(A);scene.rejectFirstTick=true;work=new BuildTask(List.of(A),scene);work.start();
+  check(finish(work).state().equals("succeeded")&&scene.moves.size()==1&&scene.builds.getFirst().stopped,"Sight lost during a child tick must use the same bounded approach and release as a returned visibility failure");
+  var uncertain=new Scene(){public TaskRuntime.Work build(List<SparseBuild.Cell> cells){return new Work(TaskRuntime.Step.running()){public TaskRuntime.Step tick(){throw new TaskRuntime.Rejected("server_confirmation_missing");}};}};
+  uncertain.visible.add(A);var uncertainWork=new BuildTask(List.of(A),uncertain);uncertainWork.start();
+  var uncertainResult=finish(uncertainWork);check(uncertainResult.state().equals("failed")&&uncertainResult.reason().equals("server_confirmation_missing")&&uncertain.moves.isEmpty(),"Uncertain mutations remain terminal; visibility recovery must not replay an unconfirmed world change");
   scene=new Scene();scene.visible.add(A);scene.placed.add(A);work=new BuildTask(List.of(A),scene);work.start();
   check(((Number)finish(work).evidence().get("observedExisting")).intValue()==1,"Existing blocks remain observations, not newly built receipts");
   scene=new Scene();scene.visible.add(A);scene.removeOnMove=true;work=new BuildTask(List.of(A,B),scene);work.start();
