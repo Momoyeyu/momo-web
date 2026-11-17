@@ -366,13 +366,14 @@ def test_game_declaration_keeps_semantic_tasks_small_and_manual_controls_on_dema
  assert set(declaration['parameters']['properties'])=={'action','query','taskId','activityId','skill','args','after'}
  assert 'controls' in declaration['description'] and 'args' in declaration['description']
 
-def test_full_game_catalog_leaves_context_for_goal_and_current_pixels():
+@pytest.mark.parametrize("station_preparation",[False,True])
+def test_full_game_catalog_leaves_context_for_goal_and_current_pixels(station_preparation):
  from pathlib import Path
  from typing import get_args
  from app.api.minecraft import Action,TaskCommand
  from app.services.minecraft import minecraft
  definitions=json.loads((Path(__file__).parents[2]/'plugin-host/src/minecraft-skills.json').read_text())
- with patch.object(minecraft,'capabilities',{'skillDefinitions':definitions}):
+ with patch.object(minecraft,'capabilities',{'skillDefinitions':definitions,'craftStationPreparation':station_preparation}):
   actions=sorted({'stop',*get_args(Action.model_fields['action'].annotation),*get_args(TaskCommand.model_fields['action'].annotation)})
   declaration=tools._minecraft_declaration(actions)
  assert len(json.dumps(declaration,ensure_ascii=False).encode())<=3000
@@ -419,3 +420,13 @@ def test_unfocused_game_observe_still_reserves_and_returns_a_real_image():
  assert execute.call_args.args[1]=={'frame':True}
  assert result['pixelsFollow'] is True
  stage.assert_called_once()
+
+
+@pytest.mark.parametrize('supported',[None,False,'true',True])
+def test_native_workbench_preparation_is_not_advertised_to_old_clients(supported):
+ from app.services.minecraft import minecraft
+ capabilities={'skillDefinitions':{'craft':{'parameters':{'properties':{'recipe':{},'count':{}}}}}}
+ if supported is not None:capabilities['craftStationPreparation']=supported
+ with patch.object(minecraft,'capabilities',capabilities):
+  declaration=tools._minecraft_declaration(['submit','capabilities'])['function']
+ assert ('auto-opens' in declaration['description']) is (supported is True)

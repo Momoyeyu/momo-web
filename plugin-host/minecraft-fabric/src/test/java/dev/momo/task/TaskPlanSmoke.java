@@ -10,6 +10,7 @@ public final class TaskPlanSmoke {
   public boolean retrySafe(String reason){return true;}
  }
  public static void main(String[] args){
+  PreparedCraftSkillSmoke.main(args);
   Work meal=new Work(){public boolean handlesEating(){return true;}public TaskRuntime.Step tick(){return TaskRuntime.Step.running();}};
   Work restore=new Work();
   TaskPlan eating=new TaskPlan(List.of(new TaskPlan.Node(meal,()->true,0,false),new TaskPlan.Node(restore,()->true,0,false)));

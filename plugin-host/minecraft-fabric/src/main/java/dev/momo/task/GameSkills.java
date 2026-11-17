@@ -20,6 +20,7 @@ import net.minecraft.world.RaycastContext;
 public final class GameSkills {
  public static final List<String> NAMES=List.copyOf(SkillArguments.contract().keySet());
  private GameSkills(){}
+ static TaskRuntime.Work rawCraft(JsonObject args){return new Skill("craft",args.deepCopy());}
  static TaskRuntime.Work consumeFood(){return new Skill("eat",new JsonObject());}
  static TaskRuntime.Work rawMine(JsonObject args,boolean protectedSupport,Vec3d observedPoint){var work=new Skill("mine",args.deepCopy());work.protectSupport=protectedSupport;work.observedPoint=observedPoint;return work;}
  static TaskRuntime.Work gatherMine(JsonObject args,Vec3d observedPoint){SkillArguments.validate("mine",args);return PreparedMineSkill.create(args,true,observedPoint);}
@@ -28,6 +29,7 @@ public final class GameSkills {
   if(skill.equals("gather"))return new GatherSkill(args);
   if(skill.equals("mine"))return PreparedMineSkill.create(args,false);
   if(skill.equals("eat"))return new EatSkill();
+  if(skill.equals("craft"))return GameCraftPreparation.create(args);
   if(skill.equals("selectItem"))return new SelectItemSkill(args);
   if(skill.equals("placeNearby"))return new NearbyPlacementSkill(args);
   if(skill.equals("build"))return BuildScene.create(args);
