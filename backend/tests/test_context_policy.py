@@ -320,7 +320,8 @@ def test_empty_summary_only_result_falls_back_only_for_unchanged_inputs(monkeypa
     from conftest import add_turn
 
     cfg = state.load()
-    cfg['settings']['llm'].update(contextWindow=16000, maxOutputTokens=2000)
+    cfg['settings']['llm'].update(contextWindow=16000, maxOutputTokens=2000,
+                                  url='https://api.deepseek.com', thinking=True)
     old = 'Previous shared experiences and agreements. ' * 160
     for index in range(8):
         add_turn(f'Player request {index} ' + 'x' * 180, 'Response ' + 'y' * 180, at=str(index))
@@ -339,6 +340,7 @@ def test_empty_summary_only_result_falls_back_only_for_unchanged_inputs(monkeypa
     def summarize(config, prompt, **kwargs):
         calls.append(prompt)
         assert 'momo-observation:' not in str(prompt) and kwargs['tools'] == []
+        assert config['thinking'] is False and cfg['settings']['llm']['thinking'] is True
         if len(calls) == 1:
             assert 'Player request 0' not in str(prompt)
             if stale:

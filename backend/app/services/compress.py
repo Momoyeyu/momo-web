@@ -255,7 +255,12 @@ def _recompress_summary(llm_cfg, request, tools, snapshot, policy):
 
 def _generate_and_publish(llm_cfg, messages, usage, seg, snapshot, gen_n, tools, *, max_summary_bytes=None):
     from . import checkpoint
-    msg = llm.chat_completion(llm_cfg, messages, tools=tools, usage_out=usage, tool_choice="none")
+    request_cfg = llm_cfg
+    if max_summary_bytes is not None and llm_cfg.get('thinking') is True:
+        # Emergency summaries have a strict text target. Keep provider reasoning
+        # from consuming the output allowance needed to return that text.
+        request_cfg = {**llm_cfg, 'thinking': False}
+    msg = llm.chat_completion(request_cfg, messages, tools=tools, usage_out=usage, tool_choice="none")
     new_summary = str(msg.get('content') or '').strip()
     old_size = len(str(snapshot['summary']).encode()) + sum(len(r['text'].encode()) for r in seg)
     if (msg.get('tool_calls') or not new_summary or len(new_summary) > 6000
