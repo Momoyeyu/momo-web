@@ -514,6 +514,7 @@ class Minecraft:
     def repeated_failures(tasks):
         """Bounded historical blockage facts, never a retry gate or a world fact."""
         import re
+        from .minecraft_journal import plan_world_point
         groups={};seen=set()
         def target(request):
             if not isinstance(request,dict):return None
@@ -556,6 +557,11 @@ class Minecraft:
                 continue
             args=request.get('args',{});steps=args.get('steps') if isinstance(args,dict) else None
             if not isinstance(steps,list) or not 0<len(steps)<=24:continue
+            if args.get('mode')=='preview':continue
+            if 'origin' in args:
+                if plan_world_point({},args['origin']) is None:continue
+                steps=[{**step,'args':plan_world_point(step.get('args'),args['origin'])}
+                       if isinstance(step,dict) and step.get('skill') in {'mine','navigate'} else step for step in steps]
             outcomes=evidence.get('steps',[]) if isinstance(evidence,dict) else []
             for outcome in outcomes[:24] if isinstance(outcomes,list) else []:
                 if not isinstance(outcome,dict):continue

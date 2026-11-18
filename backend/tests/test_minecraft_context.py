@@ -353,3 +353,26 @@ def test_preview_layout_reaches_the_decision_context_without_becoming_world_evid
  assert projected['detailsAvailable'] is True
  assert len(Minecraft._context_facts({'layoutPreview':'x'*2000})['layoutPreview'])<1900
  assert len(Minecraft._context_facts({'other':'x'*2000})['other'])<300
+
+def test_relative_failure_projection_uses_world_targets_and_success_clears_only_that_target():
+ from app.services.minecraft import Minecraft
+ def plan(identity,x,*,offset=0,state='failed'):
+  return {'taskId':identity,'activityId':'layout','skill':'plan','state':state,'dimension':'minecraft:overworld',
+   'reason':'step_0:outside_known_terrain' if state=='failed' else '',
+   'request':{'skill':'plan','args':{'origin':{'x':x,'y':64,'z':100},'steps':[{'skill':'mine','args':{'x':offset,'y':0,'z':0}}]}},
+   'evidence':{'steps':[{'step':0,'result':{'serverBlockSeq':1}}]} if state=='succeeded' else {}}
+ a=plan('a',100);b=plan('b',200)
+ assert Minecraft.repeated_failures([a,b])==[], 'Equal local offsets in different locations are distinct targets'
+ c=plan('c',99,offset=1);original=copy.deepcopy([a,b,c])
+ result=Minecraft.repeated_failures([a,b,c]);assert len(result)==1 and result[0]['args']=={'x':100,'y':64,'z':100}
+ assert result[0]['attempts']==2 and [a,b,c]==original
+ assert Minecraft.repeated_failures([a,c,plan('elsewhere',200,state='succeeded')])==result
+ assert Minecraft.repeated_failures([a,c,plan('same-world',99,offset=1,state='succeeded')])==[]
+ invalid=plan('invalid',100);invalid['request']['args']['origin']=None
+ assert Minecraft.repeated_failures([a,invalid])==[]
+ preview=plan('preview',100);preview['request']['args']['mode']='preview'
+ assert Minecraft.repeated_failures([a,preview])==[]
+ navigation=copy.deepcopy([a,c])
+ for row in navigation:
+  step=row['request']['args']['steps'][0];step['skill']='navigate';step['args'].pop('y');step['args']['height']='surface'
+ assert Minecraft.repeated_failures(navigation)[0]['args']=={'x':100,'z':100,'height':'surface','terrain':'preserve'}

@@ -75,18 +75,31 @@ def history(binding, *, activity=None, task_id=None, limit=12):
     rows=db.query('SELECT t.activity,t.data,d.request,d.disposition FROM minecraft_tasks t LEFT JOIN minecraft_dispatches d ON d.scope=t.scope AND d.activity=t.activity AND d.task_id=t.task_id WHERE '+where+' ORDER BY t.updated_at DESC,t.rowid DESC LIMIT ?',(*params,min(64,max(1,limit))))
     return [{**json.loads(row['data']),'activityId':row['activity'],**({'dispatch':row['disposition'],'request':json.loads(row['request'])} if row['request'] else {})} for row in reversed(rows)]
 
+def plan_world_point(point, origin):
+    """Project saved local coordinates only; no world read or request mutation."""
+    if not isinstance(point,dict) or not isinstance(origin,dict) or set(origin)!={'x','y','z'} or any(type(origin[k]) is not int for k in origin):return None
+    if not (-30000000<=origin['x']<=30000000 and -64<=origin['y']<=319 and -30000000<=origin['z']<=30000000):return None
+    result=dict(point)
+    for axis in origin:
+        if axis not in point:continue
+        if type(point[axis]) is not int:return None
+        value=point[axis]+origin[axis]
+        if not (-64<=value<=319 if axis=='y' else -30000000<=value<=30000000):return None
+        result[axis]=value
+    return result
+
 def _planned_build_cells(arguments, origin=None, *, relative=False):
     if not isinstance(arguments,dict) or ('cells' in arguments)==('box' in arguments):return []
     if relative:
-        if not isinstance(origin,dict) or set(origin)!={'x','y','z'} or any(type(origin[k]) is not int for k in origin):return []
-        if not (-30000000<=origin['x']<=30000000 and -64<=origin['y']<=319 and -30000000<=origin['z']<=30000000):return []
-        arguments=json.loads(json.dumps(arguments))
         points=arguments['cells'] if 'cells' in arguments else [arguments['box']]
         if not isinstance(points,list):return []
+        translated=[]
         for point in points:
-            if not isinstance(point,dict) or any(type(point.get(axis)) is not int for axis in origin):return []
-            for axis in origin:point[axis]+=origin[axis]
-            if not (-30000000<=point['x']<=30000000 and -64<=point['y']<=319 and -30000000<=point['z']<=30000000):return []
+            world=plan_world_point(point,origin)
+            if world is None or not {'x','y','z'}<=world.keys():return []
+            translated.append(world)
+        if not translated:return []
+        arguments={**arguments,**({'cells':translated} if 'cells' in arguments else {'box':translated[0]})}
     if 'cells' in arguments:return arguments['cells'] if isinstance(arguments['cells'],list) else []
     box=arguments['box']
     if not isinstance(box,dict) or set(box)-{'x','y','z','width','height','length','block','mode'}:return []
