@@ -10,6 +10,24 @@ GOAL={'title':'休息处','reason':'想歇脚','source':'rest','expected':'有�
 CELLS=[{'x':10,'y':64,'z':20,'block':'minecraft:dirt'},
        {'x':12,'y':66,'z':23,'block':'minecraft:oak_planks'}]
 
+def test_shared_origin_history_indexes_world_layout_without_rewriting_or_claiming_preview_effects():
+ sample=json.loads((Path(__file__).parents[2]/'plugin-host/test/fixtures/minecraft-plan-origin.json').read_text())[0]
+ journal.set_goal(BINDING,GOAL)
+ journal.prepare_dispatch(BINDING,'layout',{'taskId':'preview','skill':'plan','args':sample['args']})
+ entry=journal.build_plans(BINDING)['buildPlans'][0]
+ assert entry['bounds']=={'min':{'x':-10,'y':63,'z':20},'max':{'x':-8,'y':66,'z':22}}
+ assert entry['requestedCells']==35 and entry['partCount']==4 and entry['previewOnly'] is True
+ assert journal.history(BINDING,activity='layout',task_id='preview')[0]['request']['args']==sample['args']
+ preview={'taskId':'preview','skill':'plan','state':'succeeded','evidence':{'plannedOnly':True,'worldStateChecked':False,'plannedBuildOperations':35,'targetCounts':{'minecraft:dirt':33,'minecraft:air':2}}}
+ journal.record(BINDING,'layout',[preview]);assert journal.progress(BINDING)==[]
+
+@pytest.mark.parametrize('origin',[{'x':30000000,'y':64,'z':0}, {'x':0,'y':'64','z':0},None])
+def test_invalid_or_overflowing_relative_history_does_not_invent_world_layout(origin):
+ journal.set_goal(BINDING,GOAL)
+ journal.prepare_dispatch(BINDING,'bad-layout',{'taskId':'invalid','skill':'plan','args':{'origin':origin,'steps':[{'skill':'build','args':{'box':{'x':1,'y':0,'z':0,'width':3,'height':1,'length':3,'block':'minecraft:dirt'}}}]}})
+ entry=journal.build_plans(BINDING)['buildPlans'][0]
+ assert entry['bounds'] is None and entry['requestedCells']==0
+
 def test_box_intent_uses_the_shared_bounded_geometry_without_faking_world_facts():
  cases=json.loads((Path(__file__).parents[2]/'plugin-host/test/fixtures/minecraft-build-box.json').read_text())
  journal.set_goal(BINDING,GOAL)

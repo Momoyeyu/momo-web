@@ -75,8 +75,18 @@ def history(binding, *, activity=None, task_id=None, limit=12):
     rows=db.query('SELECT t.activity,t.data,d.request,d.disposition FROM minecraft_tasks t LEFT JOIN minecraft_dispatches d ON d.scope=t.scope AND d.activity=t.activity AND d.task_id=t.task_id WHERE '+where+' ORDER BY t.updated_at DESC,t.rowid DESC LIMIT ?',(*params,min(64,max(1,limit))))
     return [{**json.loads(row['data']),'activityId':row['activity'],**({'dispatch':row['disposition'],'request':json.loads(row['request'])} if row['request'] else {})} for row in reversed(rows)]
 
-def _planned_build_cells(arguments):
+def _planned_build_cells(arguments, origin=None, *, relative=False):
     if not isinstance(arguments,dict) or ('cells' in arguments)==('box' in arguments):return []
+    if relative:
+        if not isinstance(origin,dict) or set(origin)!={'x','y','z'} or any(type(origin[k]) is not int for k in origin):return []
+        if not (-30000000<=origin['x']<=30000000 and -64<=origin['y']<=319 and -30000000<=origin['z']<=30000000):return []
+        arguments=json.loads(json.dumps(arguments))
+        points=arguments['cells'] if 'cells' in arguments else [arguments['box']]
+        if not isinstance(points,list):return []
+        for point in points:
+            if not isinstance(point,dict) or any(type(point.get(axis)) is not int for axis in origin):return []
+            for axis in origin:point[axis]+=origin[axis]
+            if not (-30000000<=point['x']<=30000000 and -64<=point['y']<=319 and -30000000<=point['z']<=30000000):return []
     if 'cells' in arguments:return arguments['cells'] if isinstance(arguments['cells'],list) else []
     box=arguments['box']
     if not isinstance(box,dict) or set(box)-{'x','y','z','width','height','length','block','mode'}:return []
@@ -111,9 +121,10 @@ def build_plans(binding, before=None):
                     or isinstance(steps,dict) and steps.get('skill')=='build'))
         if not has_build:continue
         parts=[]
+        relative=request.get('skill')=='plan' and isinstance(arguments,dict) and 'origin' in arguments
         for part in candidates:
             if isinstance(part,dict) and part.get('skill')=='build':
-                parts.append(_planned_build_cells(part.get('args')))
+                parts.append(_planned_build_cells(part.get('args'),arguments.get('origin') if relative else None,relative=relative))
         cells=[cell for part in parts if isinstance(part,list) for cell in part[:32]
                if isinstance(cell,dict) and all(type(cell.get(axis)) is int for axis in ('x','y','z'))]
         entry={'activityId':row['activity'],'taskId':row['task_id'],'state':task['state'],'dispatch':row['disposition'],
@@ -121,6 +132,7 @@ def build_plans(binding, before=None):
                'bounds':{'min':{axis:min(cell[axis] for cell in cells) for axis in ('x','y','z')},
                          'max':{axis:max(cell[axis] for cell in cells) for axis in ('x','y','z')}} if cells else None}
         if task.get('dimension'):entry['dimension']=task['dimension']
+        if request.get('skill')=='plan' and isinstance(arguments,dict) and arguments.get('mode')=='preview':entry['previewOnly']=True
         plans.append(entry)
         if len(plans)==6:break
     return {'buildPlans':plans,'nextCursor':last-1 if last and last>1 and len(rows)>scanned else None}

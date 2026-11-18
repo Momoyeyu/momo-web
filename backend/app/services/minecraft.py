@@ -624,7 +624,8 @@ class Minecraft:
         # Durable evidence remains intact; the live prompt contains a bounded projection.
         if isinstance(value,dict):return {key:Minecraft._context_facts(item,key) for key,item in list(value.items())[:12]}
         if isinstance(value,list):return [Minecraft._context_facts(item) for item in (value[:4] if field=='landmarks' else value[-4:])]
-        if isinstance(value,str) and len(value)>240:return value[:240]+'… [details available through task]'
+        limit=1800 if field=='layoutPreview' else 240
+        if isinstance(value,str) and len(value)>limit:return value[:limit]+'… [details available through task]'
         return value
 
     def _background_valid(self, generation):

@@ -34,20 +34,13 @@ public final class GameSkills {
   if(skill.equals("placeNearby"))return new NearbyPlacementSkill(args);
   if(skill.equals("build"))return BuildScene.create(args);
   if(skill.equals("waitUntil"))return GameConditionWait.create(args);
-  if(skill.equals("plan")){
-   var work=new ArrayList<TaskPlan.Node>();
-   for(var value:args.getAsJsonArray("steps")){
-    var step=value.getAsJsonObject();var condition=step.has("when")?step.getAsJsonObject("when"):null;
-    work.add(new TaskPlan.Node(create(step.get("skill").getAsString(),step.getAsJsonObject("args")),()->{
-     if(condition==null)return true;var client=MinecraftClient.getInstance();int count=0;
+  if(skill.equals("plan"))return PlanAssembly.create(args,GameSkills::create,condition->{
+     var client=MinecraftClient.getInstance();int count=0;
      if(client.player==null)return false;
      String expected=SkillArguments.resourceId(condition.get("item").getAsString());
      for(int i=0;i<client.player.getInventory().size();i++){var stack=client.player.getInventory().getStack(i);if(Registries.ITEM.getId(stack.getItem()).toString().equals(expected))count+=stack.getCount();}
      return condition.get("test").getAsString().equals("atLeast")?count>=condition.get("count").getAsInt():count<condition.get("count").getAsInt();
-    },step.has("retries")?step.get("retries").getAsInt():0,step.has("onFailure")&&step.get("onFailure").getAsString().equals("skip")));
-   }
-   return new TaskPlan(work);
-  }
+    });
   return new Skill(skill,args.deepCopy());
  }
  private static void keys(JsonObject a,String names){

@@ -451,3 +451,13 @@ def test_carried_station_is_only_advertised_when_the_body_supports_placement(pre
  with patch.object(minecraft,'capabilities',capabilities):
   description=tools._minecraft_declaration(['submit','capabilities'])['function']['description']
  assert ('places owned' in description) is (preparation is True and placement is True)
+
+@pytest.mark.parametrize('relative',[False,True])
+def test_plan_coordinate_guidance_only_describes_a_body_with_the_new_fields(relative):
+ from app.services.minecraft import minecraft
+ properties={'steps':{}}
+ if relative:properties.update(origin={},mode={})
+ with patch.object(minecraft,'capabilities',{'skillDefinitions':{'plan':{'parameters':{'properties':properties}}}}):
+  description=tools._minecraft_declaration(['submit','capabilities'])['function']['description']
+ assert ('steps=offsets' in description) is relative
+ assert ('preview is intent' in description) is relative

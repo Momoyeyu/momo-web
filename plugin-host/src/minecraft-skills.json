@@ -503,10 +503,21 @@
     }
   },
   "plan": {
-    "description": "Run up to 24 bounded steps locally without model round trips. Optional when checks current inventory; retries max2; onFailure stop by default. No scripts or nested plans.",
+    "description": "Run up to 24 bounded steps locally. Optional origin{x,y,z} makes every build/mine/place/interactBlock/navigate position a local offset from ONE fixed world anchor; omitted navigate Y stays surface-based. Without origin positions stay absolute. mode=preview validates and sketches intended build parts ONLY, never checks world state or executes steps; default execute uses normal skills and receipts. Review alignment before construction. Optional when checks inventory only during execution; retries max2; onFailure stop by default. No scripts or nested plans.",
     "parameters": {
       "type": "object",
       "properties": {
+        "origin": {
+          "type": "object",
+          "properties": {
+            "x": {"type": "integer", "minimum": -30000000, "maximum": 30000000},
+            "y": {"type": "integer", "minimum": -64, "maximum": 319},
+            "z": {"type": "integer", "minimum": -30000000, "maximum": 30000000}
+          },
+          "required": ["x", "y", "z"],
+          "additionalProperties": false
+        },
+        "mode": {"type": "string", "enum": ["preview", "execute"], "minLength": 7, "maxLength": 7},
         "steps": {
           "type": "array",
           "items": {

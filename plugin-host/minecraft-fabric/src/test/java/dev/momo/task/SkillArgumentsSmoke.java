@@ -9,6 +9,8 @@ public final class SkillArgumentsSmoke {
   BuildTaskSmoke.main(args);
   BuildClearanceSmoke.main(args);
   ConditionWaitSmoke.main(args);
+  PlanCoordinatesSmoke.run();
+  validate("plan","{\"origin\":{\"x\":-10,\"y\":64,\"z\":20},\"mode\":\"preview\",\"steps\":[{\"skill\":\"mine\",\"args\":{\"x\":1,\"y\":0,\"z\":1}}]}");
   validate("waitUntil","{\"condition\":\"daylight\",\"ticks\":12000}");
   validate("waitUntil","{\"condition\":\"health\",\"minimum\":18,\"ticks\":400}");
   validate("plan","{\"steps\":[{\"skill\":\"waitUntil\",\"args\":{\"condition\":\"night\",\"ticks\":400}}]}");

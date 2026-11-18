@@ -343,3 +343,13 @@ def test_rejected_malformed_navigation_does_not_break_later_goal_decisions():
  assert facts['repeatedFailures']==[]
  assert journal.history(m.binding)[0]['state']=='failed'
  assert not m.autonomous and m.tasks=={}
+def test_preview_layout_reaches_the_decision_context_without_becoming_world_evidence():
+ from app.services.minecraft import Minecraft
+ sketch='INTENT ONLY; world NOT checked.\n'+'step 0 build range only\n'*12+'Y=82\n???\nAAA\nY=84\nAAA\n???\n'
+ task={'taskId':'preview','skill':'plan','state':'succeeded','evidence':{'plannedOnly':True,'worldStateChecked':False,'layoutPreview':sketch,'parts':[{'min':{'x':46,'y':82,'z':-146}}]}}
+ projected=Minecraft._context_facts(Minecraft._task_context(task))
+ assert projected['evidence']['layoutPreview']==sketch
+ assert projected['evidence']['worldStateChecked'] is False and projected['evidence']['plannedOnly'] is True
+ assert projected['detailsAvailable'] is True
+ assert len(Minecraft._context_facts({'layoutPreview':'x'*2000})['layoutPreview'])<1900
+ assert len(Minecraft._context_facts({'other':'x'*2000})['other'])<300

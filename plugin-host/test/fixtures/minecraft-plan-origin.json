@@ -1,0 +1,41 @@
+[
+  {
+    "name": "same-anchor floor wall roof and ordinary interactions",
+    "args": {
+      "origin": {"x": -10, "y": 64, "z": 20},
+      "mode": "preview",
+      "steps": [
+        {"skill": "build", "args": {"box": {"x": 0, "y": -1, "z": 0, "width": 3, "height": 1, "length": 3, "block": "minecraft:dirt"}}},
+        {"skill": "build", "args": {"box": {"x": 0, "y": 0, "z": 0, "width": 3, "height": 2, "length": 3, "block": "minecraft:dirt", "mode": "walls"}}},
+        {"skill": "build", "args": {"box": {"x": 0, "y": 2, "z": 0, "width": 3, "height": 1, "length": 3, "block": "minecraft:dirt"}}},
+        {"skill": "build", "args": {"cells": [{"x": 1, "y": 0, "z": 0, "block": "minecraft:air"}]}},
+        {"skill": "mine", "args": {"x": 1, "y": 0, "z": 1}},
+        {"skill": "navigate", "args": {"x": 4, "z": 5, "height": "surface"}},
+        {"skill": "interactBlock", "args": {"x": 1, "y": -1, "z": 2}},
+        {"skill": "place", "args": {"x": 2, "y": 0, "z": 3, "face": "up", "slot": 0}},
+        {"skill": "craft", "args": {"recipe": "minecraft:oak_planks", "count": 4}, "retries": 1, "when": {"item": "minecraft:oak_log", "count": 1, "test": "atLeast"}}
+      ]
+    },
+    "steps": [
+      {"skill": "build", "args": {"box": {"x": -10, "y": 63, "z": 20, "width": 3, "height": 1, "length": 3, "block": "minecraft:dirt"}}},
+      {"skill": "build", "args": {"box": {"x": -10, "y": 64, "z": 20, "width": 3, "height": 2, "length": 3, "block": "minecraft:dirt", "mode": "walls"}}},
+      {"skill": "build", "args": {"box": {"x": -10, "y": 66, "z": 20, "width": 3, "height": 1, "length": 3, "block": "minecraft:dirt"}}},
+      {"skill": "build", "args": {"cells": [{"x": -9, "y": 64, "z": 20, "block": "minecraft:air"}]}},
+      {"skill": "mine", "args": {"x": -9, "y": 64, "z": 21}},
+      {"skill": "navigate", "args": {"x": -6, "z": 25, "height": "surface"}},
+      {"skill": "interactBlock", "args": {"x": -9, "y": 63, "z": 22}},
+      {"skill": "place", "args": {"x": -8, "y": 64, "z": 23, "face": "up", "slot": 0}},
+      {"skill": "craft", "args": {"recipe": "minecraft:oak_planks", "count": 4}, "retries": 1, "when": {"item": "minecraft:oak_log", "count": 1, "test": "atLeast"}}
+    ]
+  },
+  {
+    "name": "local Y is checked after translation",
+    "args": {"origin": {"x": 0, "y": 255, "z": 0}, "steps": [{"skill": "mine", "args": {"x": 0, "y": -128, "z": 0}}]},
+    "steps": [{"skill": "mine", "args": {"x": 0, "y": 127, "z": 0}}]
+  },
+  {
+    "name": "old absolute plan stays absolute",
+    "args": {"steps": [{"skill": "navigate", "args": {"x": 2, "y": 64, "z": 3}}, {"skill": "eat", "args": {}}]},
+    "steps": [{"skill": "navigate", "args": {"x": 2, "y": 64, "z": 3}}, {"skill": "eat", "args": {}}]
+  }
+]

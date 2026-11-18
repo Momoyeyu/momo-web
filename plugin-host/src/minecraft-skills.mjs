@@ -42,6 +42,27 @@ export function buildCells(args,path='args'){
  }
  validate(skills.build.parameters.properties.cells,cells,`${path}.box`);return cells;
 }
+/** Expand a fixed coordinate frame; never rewrite its original request or inspect a world. */
+export function planSteps(args,path='args'){
+ const steps=structuredClone(args.steps),origin=args.origin;
+ if(!origin)return steps;
+ const point=(value,where)=>{
+  if(!value||Object.getPrototypeOf(value)!==Object.prototype)return;
+  for(const axis of ['x','y','z'])if(Object.hasOwn(value,axis)){
+   if(!Number.isSafeInteger(value[axis])||!Number.isSafeInteger(value[axis]+origin[axis]))invalid(`${where}.${axis}`,'integer');
+   value[axis]+=origin[axis];
+  }
+ };
+ for(const [index,step] of steps.entries()){
+  const a=step.args,where=`${path}.steps[${index}].args`;
+  if(['navigate','mine','place','interactBlock'].includes(step.skill))point(a,where);
+  if(step.skill==='build'){
+   if(Array.isArray(a.cells))a.cells.forEach((cell,i)=>point(cell,`${where}.cells[${i}]`));
+   if(Object.hasOwn(a,'box'))point(a.box,`${where}.box`);
+  }
+ }
+ return steps;
+}
 export function validateSkill(name,args,path='args'){
  if(!Object.hasOwn(skills,name))invalid('skill','supported_skill');
  validate(skills[name].parameters,args,path);
@@ -50,7 +71,7 @@ export function validateSkill(name,args,path='args'){
   if(new Set(cells.map(c=>`${c.x},${c.y},${c.z}`)).size!==cells.length)invalid(`${path}.cells`,'duplicate_cell');
   for(const axis of ['x','y','z'])if(Math.max(...cells.map(c=>c[axis]))-Math.min(...cells.map(c=>c[axis]))>=16)invalid(`${path}.cells`,'build_extent',{maximum:16});
  }
- if(name==='plan')for(const [index,step] of args.steps.entries())validateSkill(step.skill,step.args,`${path}.steps[${index}].args`);
+ if(name==='plan')for(const [index,step] of planSteps(args,path).entries())validateSkill(step.skill,step.args,`${path}.steps[${index}].args`);
  if(Buffer.byteLength(JSON.stringify(args),'utf8')>3500)invalid(path,'bytes',{maximum:3500});
  return args;
 }
