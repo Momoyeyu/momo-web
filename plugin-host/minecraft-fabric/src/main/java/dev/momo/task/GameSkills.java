@@ -19,7 +19,9 @@ import net.minecraft.world.RaycastContext;
 /** Typed, bounded vanilla skills. Uses the current player's normal interactions only. */
 public final class GameSkills {
  public static final List<String> NAMES=List.copyOf(SkillArguments.contract().keySet());
+ private static Skill placementSneakOwner;
  private GameSkills(){}
+ public static boolean sneaksForPlacement(){return placementSneakOwner!=null;}
  static TaskRuntime.Work rawCraft(JsonObject args){return new Skill("craft",args.deepCopy());}
  static TaskRuntime.Work consumeFood(){return new Skill("eat",new JsonObject());}
  static TaskRuntime.Work rawMine(JsonObject args,boolean protectedSupport,Vec3d observedPoint){var work=new Skill("mine",args.deepCopy());work.protectSupport=protectedSupport;work.observedPoint=observedPoint;return work;}
@@ -196,9 +198,13 @@ public final class GameSkills {
        return done(Map.of("x",placed.getX(),"y",placed.getY(),"z",placed.getZ(),"block",built.state(),"serverBlockSeq",built.seq()));
       }
      }
-     if(placementWindow(c.currentScreen)){if(ticks-mutationTick>100)return TaskRuntime.Step.failed("server_confirmation_missing");break;}
-     if(!reachable(pos)){approach(pos,20);break;}haltNavigation();
+     if(placementWindow(c.currentScreen)){releasePlacementSneak();if(ticks-mutationTick>100)return TaskRuntime.Step.failed("server_confirmation_missing");break;}
+     if(!reachable(pos)){releasePlacementSneak();approach(pos,20);break;}haltNavigation();
      if(++phase>100)return TaskRuntime.Step.failed(built==null&&placeSent?"server_confirmation_missing":"placement_blocked_or_material_missing");
+     // Let vanilla publish the crouch transition before clicking a support
+     // that could otherwise consume the interaction itself.
+     placementSneakOwner=this;
+     if(!c.player.shouldCancelInteraction())break;
      if(ticks%6==1){var hit=BlockSight.hit(c,pos,direction(args));if(hit==null)return TaskRuntime.Step.failed("target_not_visible");if(!new ItemPlacementContext(c.player,Hand.MAIN_HAND,c.player.getMainHandStack(),hit).getBlockPos().equals(placed))return TaskRuntime.Step.failed(placeSent?"server_confirmation_missing":"placement_blocked_or_material_missing");look(hit.getPos());if(!placeSent){blockBoundary=BlockReceipts.CURRENT.cursor();slotBoundary=InventoryReceipts.CURRENT.cursor();mutationTick=ticks;placeSent=true;}c.interactionManager.interactBlock(c.player,Hand.MAIN_HAND,hit);c.player.swingHand(Hand.MAIN_HAND);}break;
     case "interactBlock":
      if(phase==0){
@@ -546,7 +552,8 @@ public final class GameSkills {
   }
   public void resume(){if(Set.of("inventory","workstation","craft","trade","waitFor","rename").contains(skill)&&c.currentScreen!=ownedScreen)throw new IllegalStateException("station_screen_changed");if(skill.equals("navigate"))go(pos);}
   public void stop(){haltNavigation();release();}
-  private void release(){escape.reset();if(c.interactionManager!=null){c.interactionManager.cancelBlockBreaking();if(c.player!=null&&c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);}c.options.forwardKey.setPressed(false);c.options.backKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sneakKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.attackKey.setPressed(false);c.options.useKey.setPressed(false);}
+  private void releasePlacementSneak(){if(placementSneakOwner==this)placementSneakOwner=null;}
+  private void release(){releasePlacementSneak();escape.reset();if(c.interactionManager!=null){c.interactionManager.cancelBlockBreaking();if(c.player!=null&&c.player.isUsingItem())c.interactionManager.stopUsingItem(c.player);}c.options.forwardKey.setPressed(false);c.options.backKey.setPressed(false);c.options.jumpKey.setPressed(false);c.options.sneakKey.setPressed(false);c.options.sprintKey.setPressed(false);c.options.attackKey.setPressed(false);c.options.useKey.setPressed(false);}
   public Map<String,Object> progress(){return Map.of("skill",skill,"ticks",ticks,"phase",craftPhase);}
   public boolean acceptsScreen(Object screen){return screen==ownedScreen||placementWindow(screen)||interaction!=null&&c.player!=null&&interaction.ownsWindow(screen,c.player.currentScreenHandler.syncId,interactionServerContainer(screen),screen instanceof net.minecraft.client.gui.screen.SleepingChatScreen,sleepingAtTarget());}
  }
