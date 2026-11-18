@@ -495,6 +495,7 @@ class Minecraft:
             result={key:item for key,item in proof.items()
                     if key not in {'beforeDigest','afterDigest'} and (item is None or isinstance(item,(str,int,float,bool)))}
             fields={'blockedCells':('x','y','z','requested','actual','observedAt'),
+                    'observedEmptyCells':('x','y','z','observedAt'),
                     'missingMaterials':('item','required','available','missing')}
             for field,keys in fields.items():
                 if isinstance(proof.get(field),list) and proof[field]:

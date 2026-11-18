@@ -16,14 +16,16 @@ final class BuilderSkill implements TaskRuntime.Work {
  private final Map<SparseBuild.Cell,BlockState> wanted=new LinkedHashMap<>();private final Map<SparseBuild.Cell,Map<String,Object>> verified=new LinkedHashMap<>();
  private final Map<Settings.Setting<?>,Runnable> settings=new LinkedHashMap<>();private IBaritone baritone;private net.minecraft.client.world.ClientWorld world;
  private long boundary;private int ticks,existing;private boolean started;private final BuildSettlement settlement=new BuildSettlement(20);private final BuildProgress movement=new BuildProgress(200,600);
- private List<Map<String,Object>> blockedCells=List.of(),missingMaterials=List.of();
+ private List<Map<String,Object>> blockedCells=List.of(),observedEmptyCells=List.of(),missingMaterials=List.of();
  BuilderSkill(JsonObject args){plan=SparseBuild.from(args);}
  private <T> void borrow(Settings.Setting<T> setting,T value){T previous=setting.value;settings.putIfAbsent(setting,()->setting.value=previous);setting.value=value;}
  private BlockPos position(SparseBuild.Cell cell){return new BlockPos(cell.x(),cell.y(),cell.z());}
  public void start(){
-  blockedCells=missingMaterials=List.of();
+  blockedCells=observedEmptyCells=missingMaterials=List.of();
   if(c.player==null||c.world==null)throw new TaskRuntime.Rejected("world_unavailable");if(c.currentScreen!=null)throw new TaskRuntime.Rejected("close_station_first");world=c.world;boundary=BlockReceipts.CURRENT.cursor();
   var needed=new HashMap<net.minecraft.item.Item,Integer>();var clearing=new LinkedHashSet<net.minecraft.block.Block>();
+  var blocked=new ArrayList<Map<String,Object>>();var empty=new ArrayList<SparseBuild.Cell>();
+  long observedAt=System.currentTimeMillis();
   for(var cell:plan.cells()){
    var pos=position(cell);if(!world.isChunkLoaded(pos)||pos.getSquaredDistance(c.player.getPos())>1024)throw new TaskRuntime.Rejected("outside_known_terrain");
    var id=Identifier.of(cell.block());if(!Registries.BLOCK.containsId(id))throw new TaskRuntime.Rejected("block_unknown");var desired=Registries.BLOCK.get(id).getDefaultState();
@@ -31,11 +33,21 @@ final class BuilderSkill implements TaskRuntime.Work {
    if(!BlockSight.visibleBuildCell(c,pos))throw new TaskRuntime.Rejected("build_cells_not_visible");
    wanted.put(cell,desired);var actual=world.getBlockState(pos);
    if(actual.isOf(desired.getBlock())){verified.put(cell,proof(cell,actual.toString(),0));existing++;}
-   else {if(!actual.isAir()){if(!actual.isReplaceable()||!actual.getFluidState().isEmpty()){
-    // This state is disclosed only after the preceding normal sight check.
-    blockedCells=List.of(Map.of("x",cell.x(),"y",cell.y(),"z",cell.z(),"requested",cell.block(),"actual",Registries.BLOCK.getId(actual.getBlock()).toString(),"observedAt",System.currentTimeMillis()));
-    throw new TaskRuntime.Rejected("build_target_occupied");
-   }clearing.add(actual.getBlock());}needed.merge(desired.getBlock().asItem(),1,Integer::sum);}
+   else {
+    if(actual.isAir())empty.add(cell);
+    else if(!actual.isReplaceable()||!actual.getFluidState().isEmpty()){
+     // Collect visible obstructions for the whole batch before rejecting,
+     // so mixed-material repairs do not need a retry for each blocker.
+     blocked.add(Map.of("x",cell.x(),"y",cell.y(),"z",cell.z(),"requested",cell.block(),"actual",Registries.BLOCK.getId(actual.getBlock()).toString(),"observedAt",observedAt));
+     continue;
+    }else clearing.add(actual.getBlock());
+    needed.merge(desired.getBlock().asItem(),1,Integer::sum);
+   }
+  }
+  if(!blocked.isEmpty()){
+   blockedCells=List.copyOf(blocked);
+   observedEmptyCells=empty.stream().map(cell->Map.<String,Object>of("x",cell.x(),"y",cell.y(),"z",cell.z(),"observedAt",observedAt)).toList();
+   throw new TaskRuntime.Rejected("build_target_occupied");
   }
   var shortages=new ArrayList<Map<String,Object>>();
   for(var entry:needed.entrySet()){int count=0;for(int i=0;i<36;i++)if(c.player.getInventory().getStack(i).isOf(entry.getKey()))count+=c.player.getInventory().getStack(i).getCount();if(count<entry.getValue())shortages.add(Map.of("item",Registries.ITEM.getId(entry.getKey()).toString(),"required",entry.getValue(),"available",count,"missing",entry.getValue()-count));}
@@ -84,5 +96,5 @@ final class BuilderSkill implements TaskRuntime.Work {
  public void stop(){try{if(started){baritone.getBuilderProcess().onLostControl();baritone.getPathingBehavior().cancelEverything();baritone.getInputOverrideHandler().clearAllKeys();releaseKeys();if(baritone.getBuilderProcess().isActive())throw new IllegalStateException("Builder stop unconfirmed");started=false;}}finally{settings.values().forEach(Runnable::run);settings.clear();}}
  public boolean acceptsScreen(Object screen){return started&&screen instanceof InventoryScreen;}
  public Map<String,Object> progress(){return Map.of("skill","build","engine","baritone","confirmed",verified.size(),"requested",wanted.size(),"ticks",ticks);}
- public Map<String,Object> partialEvidence(){return Map.of("confirmedCells",List.copyOf(verified.values()),"remainingCells",plan.cells().stream().filter(cell->!verified.containsKey(cell)).map(cell->Map.of("x",cell.x(),"y",cell.y(),"z",cell.z(),"block",cell.block())).toList(),"blockedCells",blockedCells,"missingMaterials",missingMaterials);}
+ public Map<String,Object> partialEvidence(){return Map.of("confirmedCells",List.copyOf(verified.values()),"remainingCells",plan.cells().stream().filter(cell->!verified.containsKey(cell)).map(cell->Map.of("x",cell.x(),"y",cell.y(),"z",cell.z(),"block",cell.block())).toList(),"blockedCells",blockedCells,"observedEmptyCells",observedEmptyCells,"missingMaterials",missingMaterials);}
 }

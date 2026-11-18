@@ -33,5 +33,22 @@ final class BuildRecoverySmoke {
    terminal.visible.add(a);var denied=new BuildTask(List.of(a),terminal);denied.start();var failure=BuildTaskSmoke.finish(denied);
    BuildTaskSmoke.check(failure.state().equals("failed")&&failure.reason().equals(reason)&&terminal.moves.isEmpty(),"Recovery must not retry uncertain, missing-material or occupied-target failure: "+reason);
   }
+  var occupied=new BuildTaskSmoke.Scene(){
+   public TaskRuntime.Work build(List<SparseBuild.Cell> cells){
+    return new BuildTaskSmoke.Work(TaskRuntime.Step.failed("build_target_occupied")){
+     public Map<String,Object> partialEvidence(){
+      return Map.of("blockedCells",List.of(Map.of("x",0,"y",66,"z",0,"actual","minecraft:oak_planks")),
+        "observedEmptyCells",List.of(Map.of("x",1,"y",66,"z",0,"observedAt",20L)));
+     }
+    };
+   }
+  };
+  occupied.visible.addAll(List.of(a,b));
+  var mixed=new BuildTask(List.of(a,b),occupied);mixed.start();
+  BuildTaskSmoke.check(BuildTaskSmoke.finish(mixed).reason().equals("build_target_occupied"),"An occupied solid makes the build reject");
+  var proof=mixed.partialEvidence();
+  BuildTaskSmoke.check(((List<?>)proof.get("blockedCells")).size()==1&&((List<?>)proof.get("observedEmptyCells")).size()==1,
+    "A mixed layout rejection retains both the observed obstruction and the actual empty repair cell");
+  BuildTaskSmoke.check(((List<?>)proof.get("confirmedCells")).isEmpty(),"Observed empty cells are not successful placements");
  }
 }

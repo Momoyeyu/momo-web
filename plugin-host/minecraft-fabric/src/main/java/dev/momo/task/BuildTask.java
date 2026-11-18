@@ -21,7 +21,7 @@ final class BuildTask implements TaskRuntime.Work {
  private List<SparseBuild.Cell> pending(){return cells.stream().filter(c->!confirmed.containsKey(c)).toList();}
  private boolean coordinate(Object value,int expected){return value instanceof Number n&&n.doubleValue()==expected;}
  private void collect(Map<String,Object> evidence,boolean required){
-  for(String field:List.of("blockedCells","missingMaterials"))if(evidence.get(field) instanceof List<?> rows&&!rows.isEmpty())diagnostics.put(field,List.copyOf(rows));
+  for(String field:List.of("blockedCells","observedEmptyCells","missingMaterials"))if(evidence.get(field) instanceof List<?> rows&&!rows.isEmpty())diagnostics.put(field,List.copyOf(rows));
   Object value=evidence.get("confirmedCells");
   if(value instanceof List<?> rows)for(Object entry:rows){
    if(!(entry instanceof Map<?,?> row))continue;
