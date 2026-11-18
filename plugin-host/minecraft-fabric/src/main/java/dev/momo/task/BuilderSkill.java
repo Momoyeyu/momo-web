@@ -63,10 +63,15 @@ final class BuilderSkill implements TaskRuntime.Work {
  private Map<String,Object> proof(SparseBuild.Cell cell,String state,long seq){var value=new LinkedHashMap<String,Object>();value.put("x",cell.x());value.put("y",cell.y());value.put("z",cell.z());value.put("block",state);if(seq>0)value.put("serverBlockSeq",seq);else value.put("observedExisting",true);return Map.copyOf(value);}
  public TaskRuntime.Step tick(){
   if(c.world!=world||c.player==null||!c.player.isAlive())return TaskRuntime.Step.failed("world_unavailable");ticks++;
+  String account=c.player.getUuidAsString();
   for(var entry:wanted.entrySet()){
    var cell=entry.getKey();var actual=world.getBlockState(position(cell));if(!actual.isOf(entry.getValue().getBlock())){verified.remove(cell);continue;}
+   var previous=verified.get(cell);if(previous!=null&&previous.containsKey("observedExisting"))continue;
    var receipt=BlockReceipts.CURRENT.after(world,cell.x(),cell.y(),cell.z(),boundary);
-   if(receipt!=null&&Registries.BLOCK.get(Identifier.of(receipt.block()))==entry.getValue().getBlock())verified.put(cell,proof(cell,receipt.state(),receipt.seq()));
+   if(receipt!=null&&Registries.BLOCK.get(Identifier.of(receipt.block()))==entry.getValue().getBlock()){
+    if(previous==null)BlockReceipts.CURRENT.claimPlacement(world,account,cell.x(),cell.y(),cell.z(),receipt);
+    verified.put(cell,proof(cell,receipt.state(),receipt.seq()));
+   }
   }
   if(verified.size()==wanted.size())return TaskRuntime.Step.done(Map.of("engine","baritone","confirmedCells",List.copyOf(verified.values()),"observedExisting",existing));
   if(baritone==null)return TaskRuntime.Step.failed("build_state_changed");

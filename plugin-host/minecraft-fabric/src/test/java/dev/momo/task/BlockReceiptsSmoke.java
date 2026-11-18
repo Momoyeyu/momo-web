@@ -29,6 +29,24 @@ public final class BlockReceiptsSmoke {
   if(own.facts(a,"player").size()!=128)throw new AssertionError("Fact snapshots must be bounded");
   if(!own.facts(b,"player").isEmpty())throw new AssertionError("Another world must not read old facts");
   own.changeWorld(b);if(!own.facts(a,"player").isEmpty()||!own.facts(b,"player").isEmpty())throw new AssertionError("World changes clear the projection");
+  var building=new BlockReceipts();
+  building.record(a,4,81,-5,"minecraft:dirt","dirt");
+  var floor=building.after(a,4,81,-5,0);
+  if(building.protectsPlacement(a,"player",4,81,-5,"minecraft:dirt"))throw new AssertionError("Unclaimed terrain remains a gather source");
+  building.claimPlacement(a,"player",4,81,-5,floor);
+  if(!building.protectsPlacement(a,"player",4,81,-5,"minecraft:dirt"))throw new AssertionError("Gather must skip recently placed floor");
+  if(building.protectsPlacement(a,"different-player",4,81,-5,"minecraft:dirt")
+     ||building.protectsPlacement(b,"player",4,81,-5,"minecraft:dirt")
+     ||building.protectsPlacement(a,"player",4,81,-6,"minecraft:dirt"))throw new AssertionError("Placement protection is scoped to the exact actor, world and position");
+  building.record(a,4,81,-5,"minecraft:dirt","dirt");
+  if(!building.protectsPlacement(a,"player",4,81,-5,"minecraft:dirt"))throw new AssertionError("Duplicate base block updates retain protection");
+  building.record(a,4,81,-5,"minecraft:air","air");
+  building.record(a,4,81,-5,"minecraft:dirt","dirt");
+  building.claimPlacement(a,"player",4,81,-5,floor);
+  if(building.protectsPlacement(a,"player",4,81,-5,"minecraft:dirt"))throw new AssertionError("Removed/replaced blocks cannot inherit an old placement");
+  building.claimPlacement(a,"player",4,81,-5,building.after(a,4,81,-5,0));
+  building.changeWorld(b);
+  if(building.protectsPlacement(a,"player",4,81,-5,"minecraft:dirt"))throw new AssertionError("Leaving the world drops local protection");
   System.out.println("PASS server block receipt position, world and action boundary");
  }
 }

@@ -192,6 +192,7 @@ public final class GameSkills {
       var actual=Registries.BLOCK.get(Identifier.of(built.block()));
       if(PlacementEvidence.matches(placedItem,Registries.ITEM.getId(actual.asItem()).toString(),actual.getDefaultState().isAir(),built.seq(),blockBoundary)){
        if(actual instanceof net.minecraft.block.AbstractSignBlock&&ticks-mutationTick<4)break;
+       BlockReceipts.CURRENT.claimPlacement(c.world,c.player.getUuidAsString(),placed.getX(),placed.getY(),placed.getZ(),built);
        return done(Map.of("x",placed.getX(),"y",placed.getY(),"z",placed.getZ(),"block",built.state(),"serverBlockSeq",built.seq()));
       }
      }

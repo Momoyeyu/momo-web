@@ -45,6 +45,7 @@ public final class GatherSkill implements TaskRuntime.Work {
   if(++idle<12)return TaskRuntime.Step.running(); // Allow normal drops/server inventory updates to arrive.
   // At most sixteen sight rays per tick; read only the first visible hit of each.
   BlockHitResult nearest=null;double nearestDistance=Double.POSITIVE_INFINITY;
+  String account=c.player.getUuidAsString();
   for(int n=0;n<16&&scan<512;n++,scan++){
    totalRays++;
    double[] direction=GatherSight.direction(scan);var eye=c.player.getEyePos();var end=eye.add(direction[0]*16,direction[1]*16,direction[2]*16);
@@ -57,6 +58,7 @@ public final class GatherSkill implements TaskRuntime.Work {
    var pos=hit.getBlockPos();if(!c.world.isChunkLoaded(pos)||blocked.getOrDefault(pos,0)>ticks)continue;
    var box=c.player.getBoundingBox();if(GatherSight.belowFeet(pos.getX(),pos.getY(),pos.getZ(),box.minX,box.minZ,box.maxX,box.maxZ,c.player.getY()))continue;
    var state=c.world.getBlockState(pos);String block=Registries.BLOCK.getId(state.getBlock()).toString();
+   if(BlockReceipts.CURRENT.protectsPlacement(c.world,account,pos.getX(),pos.getY(),pos.getZ(),block))continue;
    if(!Registries.ITEM.getId(state.getBlock().asItem()).toString().equals(item)&&!GatherSight.normalDrop(block,item)){
     // A visible canopy is a normal cue for wood, not knowledge of a hidden log.
     // Clear only a few reachable leaves if a full sight pass finds no exposed source.
