@@ -31,7 +31,7 @@ Goals survive compaction and restart as intentions, never restored permission. E
 
 ## Verification status
 
-The current contract, full vanilla capability matrix, final installed acceptance gates and known remaining work are in [007](007-flowing-minecraft.md). Actual tests, failures and scope limits are in [the evidence record](evidence/007-minecraft.md). Source tests and isolated fixtures do not establish complete autonomous play, physical takeover, or installed product parity. Keep 007 active until those full-scope gates pass.
+The approved contract and accepted vanilla capability matrix are in [007](done/007-flowing-minecraft.md). The [evidence record](evidence/007-minecraft.md) includes the installed macOS tests, original physical takeover trace, and known scope limits.
 
 ## Additional building reference
 
