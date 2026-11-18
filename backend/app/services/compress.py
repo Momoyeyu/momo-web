@@ -255,13 +255,34 @@ def _recompress_summary(llm_cfg, request, tools, snapshot, policy):
 
 def _generate_and_publish(llm_cfg, messages, usage, seg, snapshot, gen_n, tools, *, max_summary_bytes=None):
     from . import checkpoint
-    request_cfg = llm_cfg
-    if max_summary_bytes is not None and llm_cfg.get('thinking') is True:
-        # Emergency summaries have a strict text target. Keep provider reasoning
-        # from consuming the output allowance needed to return that text.
-        request_cfg = {**llm_cfg, 'thinking': False}
-    msg = llm.chat_completion(request_cfg, messages, tools=tools, usage_out=usage, tool_choice="none")
+    # Keep emergency summary text within its output allowance, after the normal
+    # provider validation. The stored reasoning configuration still applies to chat.
+    msg = llm.chat_completion(llm_cfg, messages, tools=tools, usage_out=usage,
+                              tool_choice="none", skip_reasoning=max_summary_bytes is not None)
     new_summary = str(msg.get('content') or '').strip()
+    if (seg and max_summary_bytes is not None and not msg.get('tool_calls')
+            and len(new_summary.encode()) > max_summary_bytes):
+        # Keep the frozen source. Ask for fewer facts instead of truncating the
+        # first answer or loosening the foreground capacity guard.
+        retry_prompt = [
+            {**messages[0], 'content': messages[0]['content']
+             + f' The previous attempt exceeded the byte limit. Use terse phrases. '
+               f'Aim for at most {max_summary_bytes // 8} characters, prioritizing agreements '
+               'and unfinished topics. Omit lower-priority details.'},
+            *messages[1:],
+        ]
+        if (checkpoint.summary_state() != snapshot
+                or fingerprint(load_state()['settings']['llm']) != fingerprint(llm_cfg)
+                or estimate(retry_prompt, tools) > Budget.from_config(llm_cfg).safe):
+            return False
+        retry_usage = {}
+        msg = llm.chat_completion(llm_cfg, retry_prompt, tools=tools, usage_out=retry_usage,
+                                  tool_choice="none", skip_reasoning=True)
+        for key in ('prompt_tokens', 'completion_tokens', 'total_tokens',
+                    'prompt_cache_hit_tokens', 'prompt_cache_miss_tokens'):
+            if key in retry_usage:
+                usage[key] = int(usage.get(key) or 0) + int(retry_usage[key] or 0)
+        new_summary = str(msg.get('content') or '').strip()
     old_size = len(str(snapshot['summary']).encode()) + sum(len(r['text'].encode()) for r in seg)
     if (msg.get('tool_calls') or not new_summary or len(new_summary) > 6000
         or (max_summary_bytes is not None and len(new_summary.encode()) > max_summary_bytes)

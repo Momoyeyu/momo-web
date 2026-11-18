@@ -313,7 +313,7 @@ def test_summary_only_recompression_discards_invalid_candidates(monkeypatch,inva
     assert calls and checkpoint.live_summary()==old
 
 
-@pytest.mark.parametrize('stale', [False, True])
+@pytest.mark.parametrize('stale', [None, 'summary_only', 'complete_turn_fold'])
 def test_empty_summary_only_result_falls_back_only_for_unchanged_inputs(monkeypatch, stale):
     from app.core import state, db, llm
     from app.services import compress, checkpoint, turn
@@ -337,26 +337,37 @@ def test_empty_summary_only_result_falls_back_only_for_unchanged_inputs(monkeypa
     assert estimate(request) > Budget.from_config(cfg['settings']['llm']).safe
     calls = []
 
+    def change_generation():
+        with db.tx() as c:
+            c.execute('UPDATE sessions SET generation=generation+1 WHERE id=?', (db.LIVE_ID,))
+
     def summarize(config, prompt, **kwargs):
         calls.append(prompt)
         assert 'momo-observation:' not in str(prompt) and kwargs['tools'] == []
-        assert config['thinking'] is False and cfg['settings']['llm']['thinking'] is True
+        assert kwargs['skip_reasoning'] is True and config['thinking'] is True
         if len(calls) == 1:
             assert 'Player request 0' not in str(prompt)
-            if stale:
-                with db.tx() as c:
-                    c.execute('UPDATE sessions SET generation=generation+1 WHERE id=?', (db.LIVE_ID,))
+            if stale == 'summary_only':
+                change_generation()
             return {'content': '', 'finish_reason': 'length'}
         assert 'Player request 0' in str(prompt) and 'Player request 7' not in str(prompt)
+        if len(calls) == 2:
+            if stale == 'complete_turn_fold':
+                change_generation()
+            kwargs['usage_out']['completion_tokens'] = 100
+            return {'content': 'Over budget. ' * 500}
+        assert 'previous attempt exceeded' in prompt[0]['content']
+        assert prompt[1:] == calls[1][1:]
+        kwargs['usage_out']['completion_tokens'] = 20
         return {'content': 'The prior agreement and the earliest conversation remain recorded.'}
 
     monkeypatch.setattr(llm, 'chat_completion', summarize)
-    assert compress.compress_once(request=request, tools=[], hard=True) is not stale
+    assert compress.compress_once(request=request, tools=[], hard=True) is (stale is None)
     if stale:
-        assert len(calls) == 1
+        assert len(calls) == (1 if stale == 'summary_only' else 2)
         assert checkpoint.live_summary() == old
         return
-    assert len(calls) == 2
+    assert len(calls) == 3
     assert checkpoint.summary_state()['cursor'] > before['cursor']
     assert checkpoint.live_messages() == original
     rebuilt = turn.build_messages(cfg, 'Continue the authorized game.')

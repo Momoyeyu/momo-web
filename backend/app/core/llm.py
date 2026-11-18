@@ -26,7 +26,7 @@ class LlmError(Exception):
     """LLM 调用失败；str(e) 直接作为 SSE error 事件的 message。"""
 
 
-def _thinking_payload(llm_cfg: dict[str, Any], payload: dict[str, Any]) -> None:
+def _thinking_payload(llm_cfg: dict[str, Any], payload: dict[str, Any], *, skip_reasoning: bool = False) -> None:
     """Apply the trusted DeepSeek protocol to a private request copy.
 
     Persisted dialogue lacks reasoning by design. Missing historical fields use
@@ -42,6 +42,7 @@ def _thinking_payload(llm_cfg: dict[str, Any], payload: dict[str, Any]) -> None:
         if enabled:
             raise LlmError("native thinking is not supported for this provider")
         return
+    enabled = enabled and not skip_reasoning
     payload["thinking"] = {"type": "enabled" if enabled else "disabled"}
     if enabled and payload.get("tools"):
         payload["messages"] = [
@@ -58,6 +59,8 @@ def chat_completion(
     usage_out: dict[str, Any] | None = None,
     reasoning_out: dict[str, Any] | None = None,
     tool_choice: str = "auto",
+    *,
+    skip_reasoning: bool = False,
 ) -> ChatMessage:
     """POST {url}/v1/chat/completions → choices[0].message（形状见 models.ChatMessage）。
 
@@ -80,7 +83,7 @@ def chat_completion(
 
     from ..services.context_policy import Budget
     payload['max_tokens'] = Budget.from_config(llm_cfg).output
-    _thinking_payload(llm_cfg, payload)
+    _thinking_payload(llm_cfg, payload, skip_reasoning=skip_reasoning)
     if usage_out is not None:
         usage_out.clear()
     if reasoning_out is not None:

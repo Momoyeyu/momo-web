@@ -298,3 +298,21 @@ def test_nonstream_tools_roundtrip_preserves_private_protocol_only_when_requeste
     llm.chat_completion({**DS, "thinking": True}, [{**reply, **reasoning}], tools)
     assert payloads[-1]["messages"][0]["reasoning_content"] == ""
     assert payloads[-1]["messages"][0]["tool_calls"][0]["id"] == "c1"
+
+
+def test_direct_summary_preserves_the_configured_provider_check(monkeypatch):
+    payloads = []
+
+    def post(*args, **kwargs):
+        payloads.append(kwargs["json"])
+        return llm.httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": "Summary."}}]})
+
+    monkeypatch.setattr(llm.httpx, "post", post)
+    config = {**DS, "thinking": True}
+    messages = [{"role": "user", "content": "Summarize the earlier conversation."}]
+    llm.chat_completion(config, messages, skip_reasoning=True)
+    assert payloads[0]["thinking"] == {"type": "disabled"}
+    assert config["thinking"] is True
+    with pytest.raises(llm.LlmError, match="thinking.*not supported"):
+        llm.chat_completion({**config, "url": "https://compatible.test"}, messages, skip_reasoning=True)
+    assert len(payloads) == 1
