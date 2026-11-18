@@ -135,6 +135,27 @@ def test_build_air_receipts_are_clearance_not_placed_material_and_old_projection
  assert journal.progress(b)==facts
  assert journal.recent(b)[0]['evidence']==task['evidence']
 
+def test_verified_placement_extent_survives_the_four_position_preview_without_including_intent_or_air():
+ b={'world':'layout-memory','account':'p'};journal.set_goal(b,intent());journal.bind_task(b,'a','wall')
+ cells=[{'x':x,'y':64,'z':10,'block':'Block{minecraft:dirt}','serverBlockSeq':x+1} for x in range(6)]
+ raw={'taskId':'wall','skill':'build','state':'failed','reason':'build_blocked','evidence':{
+  'confirmedCells':cells+[{'x':1000,'y':70,'z':1000,'block':'minecraft:dirt','observedExisting':True},
+                          {'x':1001,'y':70,'z':1001,'block':'minecraft:air','serverBlockSeq':7}],
+  'remainingCells':[{'x':1002,'y':70,'z':1002,'block':'minecraft:dirt'}]}}
+ journal.record(b,'a',[raw]);fact=journal.progress(b)[0]
+ assert len(fact['positions'])==4
+ assert fact['placementBounds']=={'min':{'x':0,'y':64,'z':10},'max':{'x':5,'y':64,'z':10}}
+ assert fact['partial'] is True and fact['placed']==[{'block':'minecraft:dirt','count':6}]
+ assert journal.recent(b)[0]==raw
+
+def test_placement_extent_marks_a_bounded_receipt_scan_without_promising_a_complete_layout():
+ receipt={'taskId':'large-proof','skill':'build','state':'succeeded','evidence':{
+  'unrelated':[{} for _ in range(520)],
+  'confirmedCells':[{'x':1,'y':64,'z':2,'block':'minecraft:dirt','serverBlockSeq':3}]}}
+ fact=journal._progress(receipt)
+ assert fact['placementBounds']=={'min':{'x':1,'y':64,'z':2},'max':{'x':1,'y':64,'z':2}}
+ assert fact['placementBoundsTruncated'] is True
+
 
 def test_verified_progress_keeps_original_task_dimension_and_never_invents_one_for_legacy_facts():
  b={'world':'home','account':'p'};journal.set_goal(b,intent())

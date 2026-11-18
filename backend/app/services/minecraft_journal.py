@@ -113,9 +113,11 @@ def _planned_build_cells(arguments, origin=None, *, relative=False):
     return [{'x':x+dx,'y':y+dy,'z':z+dz,'block':block} for dx in range(w) for dy in range(h) for dz in range(l)
             if mode!='walls' or dx in (0,w-1) or dz in (0,l-1)]
 
-def build_plans(binding, before=None):
+def build_plans(binding, before=None, *, limit=6, max_bytes=None):
     """Index this goal's immutable intentions, not newly observed world cells."""
     if before is not None and (type(before) is not int or not 0<before<=2**63-1):raise ValueError('Invalid build history cursor')
+    if type(limit) is not int or not 1<=limit<=6:raise ValueError('Invalid build history limit')
+    if max_bytes is not None and (type(max_bytes) is not int or not 1<=max_bytes<=64000):raise ValueError('Invalid build history budget')
     schema();key=scope(binding)
     rows=db.query('''SELECT a.rowid AS cursor,d.activity,d.task_id,d.request,d.disposition,t.data
         FROM minecraft_task_goals a INDEXED BY minecraft_goal_intents
@@ -123,7 +125,7 @@ def build_plans(binding, before=None):
         JOIN minecraft_tasks t ON t.scope=d.scope AND t.activity=d.activity AND t.task_id=d.task_id
         WHERE a.scope=? AND a.goal_id=(SELECT goal_id FROM minecraft_goal_instances WHERE scope=?) AND a.rowid<=?
         ORDER BY a.rowid DESC LIMIT 129''',(key,key,before if before is not None else 2**63-1))
-    plans=[];scanned=0;last=None
+    plans=[];scanned=0;last=None;resume=None
     for row in rows[:128]:
         scanned+=1;last=row['cursor']
         request=json.loads(row['request']);task=json.loads(row['data'])
@@ -146,9 +148,18 @@ def build_plans(binding, before=None):
                          'max':{axis:max(cell[axis] for cell in cells) for axis in ('x','y','z')}} if cells else None}
         if task.get('dimension'):entry['dimension']=task['dimension']
         if request.get('skill')=='plan' and isinstance(arguments,dict) and arguments.get('mode')=='preview':entry['previewOnly']=True
+        if max_bytes is not None and len(json.dumps([*plans,entry],ensure_ascii=False).encode())>max_bytes:
+            resume=row['cursor'];break
         plans.append(entry)
-        if len(plans)==6:break
-    return {'buildPlans':plans,'nextCursor':last-1 if last and last>1 and len(rows)>scanned else None}
+        if len(plans)==limit:break
+    return {'buildPlans':plans,'nextCursor':resume if resume is not None else last-1 if last and last>1 and len(rows)>scanned else None}
+
+def build_plan_context(binding):
+    """Recent immutable layout intents, bounded independently of raw history."""
+    index=build_plans(binding,limit=3,max_bytes=1100)
+    result={'buildPlans':list(reversed(index['buildPlans']))}
+    if index['nextCursor'] is not None:result['buildPlanCursor']=index['nextCursor']
+    return result
 
 def goal(binding):
     return goal_snapshot(binding)['goal']
@@ -196,14 +207,14 @@ def bind_task(binding, activity, task_id):
 
 def _progress(task):
     if task.get('state') not in {'succeeded','failed','cancelled'}:return None
-    gains={};placed={};mined={};cleared={};positions=[];defeated=set();seen=set();pending=[(task.get('evidence',{}),0)];visited=0
+    gains={};placed={};mined={};cleared={};positions=[];defeated=set();seen=set();pending=[(task.get('evidence',{}),0)];visited=0;truncated=False
     def resource(value):
         if not isinstance(value,str) or len(value)>1200:return None
         match=re.fullmatch(r'(?:Block\{)?([a-z0-9_.-]+:[a-z0-9_./-]+)(?:\}.*)?',value)
         return match[1] if match and len(match[1])<=128 else None
     while pending and visited<512:
         row,depth=pending.pop();visited+=1
-        if depth>8:continue
+        if depth>8:truncated=True;continue
         if isinstance(row,list):pending.extend((r,depth+1) for r in row);continue
         if not isinstance(row,dict):continue
         item=resource(row.get('item'));before,after=row.get('countBefore'),row.get('countAfter')
@@ -225,7 +236,11 @@ def _progress(task):
     if placed:result['placed']=[{'block':block,'count':count} for block,count in sorted(placed.items())]
     if mined:result['mined']=[{'block':block,'count':count} for block,count in sorted(mined.items())]
     if cleared:result['cleared']=[{'block':block,'count':count} for block,count in sorted(cleared.items())]
-    if positions:result['positions']=positions[-4:]
+    if positions:
+        result['positions']=positions[-4:]
+        result['placementBounds']={side:{axis:reduce(point[axis] for point in positions) for axis in ('x','y','z')}
+                                   for side,reduce in (('min',min),('max',max))}
+        if pending or truncated:result['placementBoundsTruncated']=True
     if defeated:result['defeated']=len(defeated)
     return result
 

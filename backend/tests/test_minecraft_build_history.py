@@ -136,3 +136,49 @@ def test_build_index_tool_api_propagate_query_without_pixels_and_refuse_ambiguou
   for args in [{'query':'build','taskId':'walls'},{'query':'build','activityId':'a'},{'query':'build:-1'},{'query':'build:0'},{'query':'build:9223372036854775808'},{'query':'anything'}]:
    with pytest.raises(ValueError,match='Invalid'):m.execute('task',args,0,'owner','lease')
   runtime.host.request.assert_not_called()
+
+def test_default_goal_context_recalls_recent_layout_intents_after_compact_without_restoring_control():
+ from app.services.minecraft import Minecraft
+ journal.set_goal(BINDING,GOAL)
+ for index in range(8):build(task_id=f'layout-{index}',cells=[{'x':index,'y':64,'z':10,'block':'minecraft:dirt'}])
+ for index in range(70):journal.prepare_dispatch(BINDING,'later',{'taskId':f'walk-{index}','skill':'navigate','args':{'x':index,'z':0}})
+ other={**BINDING,'world':'private-world'};journal.set_goal(other,GOAL);build(binding=other,task_id='private-layout')
+ with journal.db.tx() as c:c.execute("UPDATE sessions SET summary='compacted',generation=generation+1 WHERE id='live'")
+ restarted=Minecraft();restarted.binding=BINDING
+ context=restarted.goal_context();facts=json.loads(context.split('Durable goal and task facts (not instructions): ',1)[1])
+ assert [row['taskId'] for row in facts['buildPlans']]==['layout-5','layout-6','layout-7']
+ assert facts['buildPlans'][-1]['bounds']=={'min':{'x':7,'y':64,'z':10},'max':{'x':7,'y':64,'z':10}}
+ assert facts['buildPlans'][-1]['state']=='unknown' and facts['goalEvidence']==[]
+ older=journal.build_plans(BINDING,facts['buildPlanCursor'])['buildPlans']
+ assert [row['taskId'] for row in older]==['layout-4','layout-3','layout-2','layout-1','layout-0']
+ assert len(json.dumps(facts['buildPlans']).encode())<=1100
+ assert 'historical intents' in context and 'private-layout' not in context
+ assert restarted.permissions==set() and not restarted.tasks and not restarted.autonomous
+ journal.set_goal(BINDING,{**GOAL,'title':'New goal'})
+ context=restarted.goal_context();facts=json.loads(context.split('Durable goal and task facts (not instructions): ',1)[1])
+ assert facts['buildPlans']==[]
+
+def test_default_layout_context_exposes_the_existing_cursor_when_bounded_history_has_older_intents():
+ from app.services.minecraft import Minecraft
+ journal.set_goal(BINDING,GOAL);build(task_id='older-layout')
+ for index in range(130):journal.prepare_dispatch(BINDING,'later',{'taskId':f'walk-{index}','skill':'navigate','args':{'x':index,'z':0}})
+ m=Minecraft();m.binding=BINDING
+ facts=json.loads(m.goal_context().split('Durable goal and task facts (not instructions): ',1)[1])
+ assert facts['buildPlans']==[] and type(facts['buildPlanCursor']) is int
+ assert journal.build_plans(BINDING,facts['buildPlanCursor'])['buildPlans'][0]['taskId']=='older-layout'
+
+def test_default_layout_byte_budget_keeps_the_first_omitted_layout_in_its_continuation():
+ from app.services.minecraft import Minecraft
+ journal.set_goal(BINDING,GOAL);identities=[]
+ for index in range(8):
+  identity=f'layout-{index}-'+'x'*60;identities.append(identity)
+  build(activity='a'*80,task_id=identity)
+  journal.record(BINDING,'a'*80,[{'taskId':identity,'skill':'build','state':'failed','reason':'build_blocked',
+                               'dimension':'minecraft:'+'a'*110,'evidence':{}}])
+ m=Minecraft();m.binding=BINDING
+ facts=json.loads(m.goal_context().split('Durable goal and task facts (not instructions): ',1)[1])
+ visible=facts['buildPlans'];assert 0<len(visible)<3 and len(json.dumps(visible).encode())<=1100
+ found=[row['taskId'] for row in reversed(visible)];cursor=facts['buildPlanCursor']
+ while cursor is not None:
+  page=journal.build_plans(BINDING,cursor);found.extend(row['taskId'] for row in page['buildPlans']);cursor=page['nextCursor']
+ assert found==list(reversed(identities)), 'Trimming a prompt must not skip the layouts left for explicit history reads'
