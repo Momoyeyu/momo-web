@@ -193,6 +193,8 @@ flowchart LR
 
 ## Goals and presentation
 
+- 桌面版接受 Minecraft 角色操作许可后，将现有对话窗口切成桌宠。每次游戏连接只自动切换一次，保持同一会议、全身／半身、对话框折叠和鼠标穿透偏好。桌宠工具栏的游戏入口直接提供暂停、继续和停止。仅观察的连接保持当前窗口；手动返回对话后，本次连接保持窗口选择。macOS 桌宠可进入全屏空间，窗口切换不主动聚焦。
+
 Chat 的右侧工具栏在 Minecraft 插件启用后直接提供游戏手柄入口，不依赖另行开启桌面插件或桌宠窗口。侧边小面板复用游戏连接／权限／暂停继续／停止组件，不遮罩整个场景；窄窗口允许内部滚动，返回设置、进入桌宠或回标题时关闭展示层，不因关面板而停止游戏。连接状态仅用当前临时客户端句柄匹配已发现游戏；重开面板不遗忘当前连接，也不恢复历史许可。桌宠仍使用既有活动入口，QQ 继续由手机承载。
 
 Completed waits prove elapsed game ticks, not a change in an unseen condition. The bounded goal context carries consecutive verified wait counts/ticks across reconnection, isolated by world/account and dimension; other completed work or invalid/failed wait receipts end that continuity. This is evidence for reconsidering an untestable wait, not an automatic change of goal, hidden world clock or blanket prohibition on waiting. A dark enclosure alone cannot establish outdoor night.

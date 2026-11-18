@@ -12,26 +12,29 @@ import Icon from '../ui/Icon';
 import '../styles/plugin-library.css';
 
 /** Looking is a sense; application input is a separately authorized activity. */
-export default function DesktopObservation(){
+export default function DesktopObservation({playing=false}:{playing?:boolean}){
  const t=useT(),enabled=useActivities(),windowState=useDesktopWindow();
  const view=useSyncExternalStore(subscribeComputer,computerSnapshot);
  const [open,setOpen]=useState(false),[selected,setSelected]=useState<ActivityId>('computer'),[working,setWorking]=useState(false);
- const panel=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
+ const panel=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),gameTrigger=useRef<HTMLButtonElement>(null);
  const allowed=view.status?.desktopAllowed!==false;
  const problem=view.status?.desktopError;
  const observationState=!view.status?'loading':!allowed?'off':problem?'error':'on';
  const observationTip=t(observationState==='on'?'desktop.observing':observationState==='off'?'desktop.observationPaused':observationState==='error'?'desktop.observationUnavailable':'desktop.observationLoading');
  useEffect(()=>()=>{void setDesktopPanel(false).catch(()=>{});},[]);
- const close=()=>{setOpen(false);void setDesktopPanel(false).catch(()=>{});trigger.current?.focus();};
+ const close=()=>{setOpen(false);void setDesktopPanel(false).catch(()=>{});(selected==='minecraft'?gameTrigger.current??trigger.current:trigger.current)?.focus();};
  useEffect(()=>{if(open)panel.current?.focus();},[open,windowState.panel]);
- const show=async()=>{if(open){close();return;}try{await setDesktopPanel(true);setOpen(true);}catch{/* Keep the trigger available for retry. */}};
+ const show=async(id:ActivityId)=>{if(open&&(selected==='minecraft')===(id==='minecraft')){close();return;}try{await setDesktopPanel(true);setSelected(id);setOpen(true);}catch{/* Keep the trigger available for retry. */}};
  const toggle=async()=>{if(working)return;setWorking(true);try{await setDesktopObservation(problem?true:!allowed);if(problem)await captureDesktop();}catch{/* The status store exposes capture/permission failure. */}finally{setWorking(false);}};
  const title=selected==='computer'?t('desktop.operate'):t(selected+'.title');
  return <>
-  <Button className="tb tip tb-observation" data-observation-state={observationState} aria-label={t('desktop.observe')} aria-pressed={allowed} aria-description={observationTip} data-tip={observationTip} data-tip-detail={t(problem==='screen-permission'?'desktop.screenPermissionHint':observationState==='off'?'desktop.resumeObservationHint':observationState==='error'?'desktop.retryObservationHint':'desktop.pauseObservationHint')} disabled={working||view.busy||!view.status} onClick={()=>void toggle()}><Icon name={observationState==='off'?'desktop-off':observationState==='error'?'desktop-alert':'desktop'}/></Button>
-  <ProactiveResponseToggle/>
-  <button ref={trigger} type="button" className={`tb tip${open?' is-active':''}`} aria-label={t('desktop.operate')} aria-expanded={open} data-tip={t('desktop.operate')} onClick={()=>void show()}><Icon name="browser"/></button>
-  {open&&createPortal(<div ref={panel} tabIndex={-1} role="dialog" aria-label={t('desktop.operate')} className={`pet-utility${windowState.panel?.width&&windowState.panel.width>=220?' is-beside':''}`} data-pet-interactive onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();close();}}}>
+  {enabled.computer&&<>
+   <Button className="tb tip tb-observation" data-observation-state={observationState} aria-label={t('desktop.observe')} aria-pressed={allowed} aria-description={observationTip} data-tip={observationTip} data-tip-detail={t(problem==='screen-permission'?'desktop.screenPermissionHint':observationState==='off'?'desktop.resumeObservationHint':observationState==='error'?'desktop.retryObservationHint':'desktop.pauseObservationHint')} disabled={working||view.busy||!view.status} onClick={()=>void toggle()}><Icon name={observationState==='off'?'desktop-off':observationState==='error'?'desktop-alert':'desktop'}/></Button>
+   <ProactiveResponseToggle/>
+  </>}
+  {(enabled.computer||enabled.browser)&&<button ref={trigger} type="button" className={`tb tip${open&&selected!=='minecraft'?' is-active':''}`} aria-label={t('desktop.operate')} aria-expanded={open&&selected!=='minecraft'} data-tip={t('desktop.operate')} onClick={()=>void show(enabled.computer?'computer':'browser')}><Icon name="browser"/></button>}
+  {playing&&<button ref={gameTrigger} type="button" className="tb tip is-active" aria-label={t('minecraft.title')} aria-expanded={open&&selected==='minecraft'} data-tip={t('minecraft.title')} onClick={()=>void show('minecraft')}><Icon name="gamepad"/></button>}
+  {open&&createPortal(<div ref={panel} tabIndex={-1} role="dialog" aria-label={playing&&selected==='minecraft'?title:t('desktop.operate')} className={`pet-utility${windowState.panel?.width&&windowState.panel.width>=220?' is-beside':''}`} data-pet-interactive onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();close();}}}>
    <header className="pet-utility-header"><span>{title}</span><button type="button" className="pet-icon" aria-label={t('browser.dismiss')} onClick={close}><Icon name="close"/></button></header>
    <nav className="pet-utility-tabs" aria-label={t('desktop.otherActivities')}>
     {(['computer','browser','minecraft'] as const).filter(id=>enabled[id]).map(id=><button key={id} type="button" className="pet-icon tip" aria-label={id==='computer'?t('desktop.operate'):t(id+'.title')} data-tip={id==='computer'?t('desktop.operate'):t(id+'.title')} aria-pressed={selected===id} onClick={()=>setSelected(id)}><Icon name={id==='computer'?'pointer':id==='browser'?'browser':'gamepad'}/></button>)}

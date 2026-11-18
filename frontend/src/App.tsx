@@ -1,9 +1,10 @@
 import {getStage} from './live2d/stage';
-import {useDesktopWindowBridge,setDesktopMode} from './services/desktopWindow';
+import {desktopWindowAvailable,useDesktopWindowBridge,setDesktopMode} from './services/desktopWindow';
 import './styles/desktop-pet.css';
 import {musicDirector} from './audio/director';
 import {useIntro} from './services/introClient';
 import {useMinecraftDecisions} from './services/useMinecraftDecisions';
+import {useMinecraftControlGeneration} from './services/minecraftClient';
 import {useActivities} from './services/extensionActivities';
 import {ambient} from './audio/ambient';
 import AppPermissions from './components/AppPermissions';
@@ -98,6 +99,14 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     if(route!=='chat'||!ready||!meetingReady)getChatEngine().setSceneActive(false);
   },[route,ready,meetingReady]);
   const activities=useActivities();
+  const gameGeneration=useMinecraftControlGeneration();
+  const followedGame=useRef<number|null>(null);
+  useEffect(()=>{
+    if(route!=='chat'||!meetingReady||!activities.minecraft||!desktopWindowAvailable()||gameGeneration===null)return;
+    if(followedGame.current===gameGeneration)return;
+    followedGame.current=gameGeneration;
+    if(desktopWindow.mode==='chat')void setDesktopMode('pet').catch(()=>{});
+  },[route,meetingReady,activities.minecraft,gameGeneration,desktopWindow.mode]);
   useMinecraftDecisions(route!=='title'&&historyReady&&!attentionFault&&
     audioIntro==='completed'&&activities.minecraft);
   useEffect(()=>{

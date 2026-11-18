@@ -6,6 +6,8 @@ import {useT} from '../../i18n';
 import {apiJson,jsonInit} from '../../services/http';
 import {useActivities} from '../../services/extensionActivities';
 import {meetingIdentity,meetingSnapshot,subscribeMeeting} from '../../services/meetingClient';
+import {desktopWindowAvailable} from '../../services/desktopWindow';
+import {navigate} from '../../router';
 import ExtensionCard from './ExtensionCard';
 import Button from '../../ui/Button';
 import FieldRow from '../../ui/FieldRow';
@@ -50,6 +52,17 @@ export default function MinecraftCompanion({mode='settings',onDismiss}:{mode?:'s
   finally{operation.current=false;if(mounted.current)setBusy(false);}
  };
  const current=active&&game?.sessionId?sessions.find(s=>s.id===game.sessionId):sessions.find(s=>s.id===selected);
+ const start=async()=>{
+  if(!current?.ready)return;
+  await apiJson('/api/minecraft/attach',jsonInit('POST',{
+   ...meetingIdentity(),sessionId:current.id,world:current.world,account:current.account,
+   permissions:['game.observe',...(gameplay?['game.chat','game.move','game.modify']:[])],
+  }));
+  if(!gameplay||!desktopWindowAvailable()||!mounted.current)return;
+  await readMinecraftStatus(true);
+  onDismiss?.();
+  if(mode==='settings')navigate('chat');
+ };
  const evidence=game?.goalEvidence?.at(-1);
  const evidenceSkill=evidence?.placed?.length?'build':evidence?.gains?.length?(evidence.skill==='craft'?'craft':'gather'):evidence?.mined?.length?'mine':'attack';
  const evidenceRows=evidence?.placed?.length?evidence.placed:evidence?.gains?.length?evidence.gains:evidence?.mined||[];
@@ -69,7 +82,7 @@ export default function MinecraftCompanion({mode='settings',onDismiss}:{mode?:'s
    {(!active||mode==='settings')&&<><h4>{t('minecraft.permissions')} <Hint text={t('minecraft.permissionsHint')}/></h4>
    <FieldRow label={t('minecraft.play')}><Switch title={t('minecraft.play')} on={preferences.minecraftPlay===true} onChange={value=>updateGeneral({minecraftPlay:value})} disabled={busy||active}/></FieldRow></>}
    <div className="extension-detail-actions">
-    {(!active||mode==='settings')&&<Button disabled={!enabled||busy||active||!current?.ready||meeting.state!=='active'} onClick={()=>void run(()=>apiJson('/api/minecraft/attach',jsonInit('POST',{...meetingIdentity(),sessionId:current!.id,world:current!.world,account:current!.account,permissions:['game.observe',...(gameplay?['game.chat','game.move','game.modify']:[])]})))}>{t('minecraft.start')}</Button>}
+    {(!active||mode==='settings')&&<Button disabled={!enabled||busy||active||!current?.ready||meeting.state!=='active'} onClick={()=>void run(start)}>{t('minecraft.start')}</Button>}
     {active&&game?.permissions?.includes('game.modify')&&<Button variant="ghost" disabled={busy} onClick={()=>void run(()=>apiJson('/api/minecraft/tasks',jsonInit('POST',{...meetingIdentity(),generation:game!.generation,action:game?.paused?'resume':'pause'})))}>{t(game?.paused?'minecraft.resumePlay':'minecraft.pausePlay')}</Button>}
     {(active||mode==='settings')&&<Button variant="ghost" disabled={busy||!active} onClick={()=>void run(()=>apiJson('/api/minecraft/stop',jsonInit('POST',{})))}>{t('minecraft.stop')}</Button>}
    </div>

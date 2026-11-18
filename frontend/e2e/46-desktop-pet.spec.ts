@@ -4,6 +4,65 @@ import {zh} from '../src/i18n/zh';
 import {en} from '../src/i18n/en';
 import {ja} from '../src/i18n/ja';
 
+test('game control brings the same meeting into desktop pet once per connection',async({page,baseURL,request})=>{
+ const saved=await readState(request);
+ Object.assign((saved as any).settings.general,{lang:'zh',minecraftPlay:false,petDialogCollapsed:true});
+ await writeState(request,saved);
+ await page.addInitScript(base=>{
+  let state:{mode:'chat'|'pet';clickThrough:boolean}={mode:'chat',clickThrough:false};
+  const listeners=new Set<(value:typeof state)=>void>();
+  window.momoDesktop={
+   getRuntime:async()=>({baseUrl:base,token:'isolated-game-pet'}),getWindowState:async()=>state,
+   setWindowMode:async mode=>{state={mode,clickThrough:false};listeners.forEach(fn=>fn(state));return state;},
+   setPetClickThrough:async clickThrough=>{state={...state,clickThrough};return state;},
+   onWindowStateChanged:fn=>{listeners.add(fn);return()=>listeners.delete(fn);},
+  };
+ },baseURL!);
+ const session={id:'game-one',pid:8123,world:'local:test',account:'test',playerName:'Player',worldName:'Fixture',ready:true};
+ let permissions:string[]=[],generation=0,paused=false;
+ const status=()=>({active:!!permissions.length,sessionId:permissions.length?session.id:null,generation,permissions,paused,autonomous:false,decisionNeeded:false,tasks:[],goal:null});
+ await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:false,browser:false,minecraft:true}}}));
+ await page.route('**/api/minecraft/sessions',r=>r.fulfill({json:{sessions:[session]}}));
+ await page.route('**/api/minecraft/status',r=>r.fulfill({json:status()}));
+ await page.route('**/api/minecraft/attach',r=>{permissions=r.request().postDataJSON().permissions;generation++;paused=false;return r.fulfill({json:status()});});
+ await page.route('**/api/minecraft/tasks',r=>{paused=r.request().postDataJSON().action==='pause';return r.fulfill({json:status()});});
+ await page.route('**/api/minecraft/stop',r=>{permissions=[];return r.fulfill({json:status()});});
+ await bootChat(page);
+ const lease=()=>page.evaluate(()=>sessionStorage.getItem('momo.meeting-owner.v1'));
+ const owner=await lease();
+ const chatGame=page.locator('.chat-toolbar:not(.desktop-pet-controls)').getByRole('button',{name:zh.minecraft.title,exact:true});
+ const panel=page.locator('#chat-game-activity');
+ const start=async()=>{
+  await panel.locator('.sel-face').click();
+  await panel.getByRole('option',{name:'Player · Fixture'}).click();
+  await panel.getByRole('button',{name:zh.minecraft.start,exact:true}).click();
+ };
+ await chatGame.click();await start();
+ await expect(panel.getByText(zh.minecraft.running,{exact:true})).toBeVisible();
+ await expect(page.locator('html')).not.toHaveClass(/desktop-pet/);
+ await panel.getByRole('button',{name:zh.minecraft.stop,exact:true}).click();
+ await panel.getByRole('switch',{name:zh.minecraft.play,exact:true}).click();
+ await start();
+ await expect(page.locator('html')).toHaveClass(/desktop-pet/);
+ expect(await lease()).toBe(owner);
+ await expect(page.locator('.dialog-box')).toBeHidden();
+ const petGame=page.locator('.desktop-pet-controls').getByRole('button',{name:zh.minecraft.title,exact:true});
+ await petGame.click();
+ const petPanel=page.locator('.pet-utility');
+ await petPanel.getByRole('button',{name:zh.minecraft.pausePlay,exact:true}).click();
+ await expect(petPanel.getByRole('button',{name:zh.minecraft.resumePlay,exact:true})).toBeVisible();
+ await page.getByRole('button',{name:zh.desktop.return,exact:true}).click();
+ await chatGame.click();
+ await expect(panel.getByRole('button',{name:zh.minecraft.resumePlay,exact:true})).toBeVisible();
+ await panel.getByRole('button',{name:zh.minecraft.resumePlay,exact:true}).click();
+ await expect(panel.getByRole('button',{name:zh.minecraft.pausePlay,exact:true})).toBeVisible();
+ await expect(page.locator('html')).not.toHaveClass(/desktop-pet/);
+ await panel.getByRole('button',{name:zh.minecraft.stop,exact:true}).click();
+ await start();
+ await expect(page.locator('html')).toHaveClass(/desktop-pet/);
+ expect(await lease()).toBe(owner);
+});
+
 for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit regions and escape controls (${lang})`,async({page,baseURL,request},info)=>{
  const copy={zh,en,ja}[lang];
  const saved=await readState(request);(saved as any).settings.general.lang=lang;await writeState(request,saved);

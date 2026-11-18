@@ -1,4 +1,5 @@
 import {apiJson} from './http';
+import {useSyncExternalStore} from 'react';
 export type GameTask={taskId:string;skill:string;state:'queued'|'running'|'paused'|'succeeded'|'failed'|'cancelled';reason:string;progress?:{skill?:string;action?:{skill?:string}}};
 export type GoalEvidence={taskId:string;skill:string;partial:boolean;gains?:{item:string;count:number}[];placed?:{block:string;count:number}[];mined?:{block:string;count:number}[];defeated?:number};
 export type GameStatus={active:boolean;sessionId?:string|null;generation:number;permissions?:string[];paused:boolean;autonomous:boolean;decisionNeeded:boolean;tasks:GameTask[];goal:{title:string;status:string;next?:string}|null;goalEvidence?:GoalEvidence[]};
@@ -7,6 +8,8 @@ let sequence=0;
 const listeners=new Set<()=>void>();
 export const subscribeMinecraft=(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};};
 export const minecraftSnapshot=()=>snapshot;
+const controlGeneration=()=>snapshot?.active&&snapshot.permissions?.includes('game.modify')?snapshot.generation:null;
+export const useMinecraftControlGeneration=()=>useSyncExternalStore(subscribeMinecraft,controlGeneration,()=>null);
 export function readMinecraftStatus(force=false):Promise<GameStatus>{
  if(!force&&pending)return pending;
  if(!force&&snapshot&&Date.now()-last<750)return Promise.resolve(snapshot);
