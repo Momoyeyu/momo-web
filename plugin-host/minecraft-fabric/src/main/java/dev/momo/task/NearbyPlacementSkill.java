@@ -3,6 +3,7 @@ import com.google.gson.*;
 import java.util.*;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.item.*;
+import net.minecraft.block.BedBlock;
 import net.minecraft.block.ShapeContext;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.*;
@@ -33,6 +34,7 @@ final class NearbyPlacementSkill implements TaskRuntime.Work {
     if(!context.canPlace()||!c.world.getBlockState(destination).isAir()||new Box(destination).intersects(c.player.getBoundingBox()))continue;
     var block=((BlockItem)c.player.getMainHandStack().getItem()).getBlock();
     if(!c.world.canPlace(block.getDefaultState(),destination,ShapeContext.of(c.player)))continue;
+    if(block instanceof BedBlock&&GameSkills.availableBedHead(c,context,GameSkills.placementFacing(c,hit))==null)continue;
     var place=new JsonObject();place.addProperty("x",support.getX());place.addProperty("y",support.getY());place.addProperty("z",support.getZ());place.addProperty("face",face.getName());place.addProperty("slot",c.player.getInventory().selectedSlot);
     beforePlacement.run();phase=2;work=GameSkills.create("place",place);work.start();return TaskRuntime.Step.running();
    }

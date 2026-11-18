@@ -472,7 +472,7 @@ class Minecraft:
                   'repeatedFailures':self.repeated_failures(history),**journal.build_plan_context(self.binding)}
         return ('Same momo in playerName\'s avatar; injury/death are in-game. Keep personality/agreements; curiosity, beauty, companionship, helping and progress may all motivate goals. No fixed tech tree. '
             'Keep goals until user input, important change, blockage or completion; tasks continue during chat. '
-            'unconfirmedTasks may have happened: query activityId/taskId, never replay. goalNotes are dated intentions; goalEvidence is verified history, not inventory/current blocks. '
+            'unconfirmedTasks may have happened: query activityId/taskId, never replay. goalNotes are dated model claims; verify them before repeating them as facts. goalEvidence is verified history; observe to confirm current inventory or blocks. '
             'buildPlans are historical intents; task(activityId,taskId) recalls layout; buildPlanCursor continues older pages. placementBounds cover confirmed receipt positions, not enclosure; Truncated marks incomplete inspection. '
             'exploredPlaces are past sightings; places recalls older ones. Approach visibleLandmarks via surface navigation within 64 blocks; gather is local. '
             'repeatedWaits/worldAgeTicks are elapsed ticks, not daylight; roof darkness cannot prove night. '

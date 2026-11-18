@@ -24,6 +24,12 @@ public final class SlotProofSmoke {
   check(!PlacementEvidence.matches("minecraft:dirt","minecraft:air",true,10,1),"air correction is not placement");
   check(!PlacementEvidence.matches("minecraft:dirt","minecraft:dirt",false,1,1),"old packet cannot prove a new placement");
   check(PlacementEvidence.matches("minecraft:dirt","minecraft:dirt",false,2,1),"matching actual placed block");
+  var foot=new BlockReceipts.Receipt(3,"minecraft:white_bed","Block{minecraft:white_bed}[facing=east,occupied=false,part=foot]",20);
+  var head=new BlockReceipts.Receipt(4,"minecraft:white_bed","Block{minecraft:white_bed}[facing=east,occupied=false,part=head]",21);
+  check(!PlacementEvidence.bedParts(foot,null,2),"foot alone cannot prove usable bed placement");
+  check(!PlacementEvidence.bedParts(head,foot,2),"positions must hold the correct two parts");
+  check(!PlacementEvidence.bedParts(foot,head,3),"old foot receipt cannot complete a new placement");
+  check(PlacementEvidence.bedParts(foot,head,2),"fresh foot and head prove complete bed placement");
   System.out.println("PASS intended slot and actual placement proof");
  }
 }

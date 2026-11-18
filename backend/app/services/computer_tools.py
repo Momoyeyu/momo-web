@@ -254,7 +254,7 @@ def declarations(source='meeting'):
             if 'game.modify' in minecraft.permissions:actions+=['submit','pause','resume','cancel']
         rows.append(_minecraft_declaration(actions))
         if 'game.modify' in minecraft.permissions:
-            add('minecraft_goal','Maintain your durable Minecraft intention, separate from chat compact. Record why this goal fits your personality/player agreements, actual progress evidence and next step. Do not constantly replace a goal. Completed/paused/abandoned ends autonomous decisions; active/blocked permits re-evaluation. This does not change permissions.',
+            add('minecraft_goal','Maintain your durable Minecraft intention, separate from chat compact. Record why it fits your personality/player agreements and your next step. Before reporting progress or completion, check each material claim against a successful task receipt or a current observation. A submitted, paused, or failed task only supports outcomes explicitly confirmed in its receipt. Leave an unchecked goal active or blocked. Completed/paused/abandoned ends autonomous decisions; active/blocked permits re-evaluation. This does not change permissions.',
                 {'title':{'type':'string','maxLength':1000},'reason':{'type':'string','maxLength':1000},'source':{'type':'string','enum':['player','curiosity','aesthetic','help','social','survival','progress','rest']},'expected':{'type':'string','maxLength':1000},'constraints':{'type':'string','maxLength':1000},'status':{'type':'string','enum':['active','paused','completed','abandoned','blocked']},'progress':{'type':'string','maxLength':1000},'next':{'type':'string','maxLength':1000}},['title','reason','source','expected','status'])
     return rows
 
