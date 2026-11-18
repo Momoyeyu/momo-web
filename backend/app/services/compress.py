@@ -162,8 +162,16 @@ def compress_once(request=None, tools=None, *, hard=False) -> bool:
         # recent exchanges. Folding more history first may produce a larger
         # summary and repeatedly miss the new visual activity's capacity.
         shortened = _recompress_summary(llm_cfg, request, tools, snapshot, policy)
-        if shortened is not None:
-            return shortened
+        if shortened:
+            return True
+        if shortened is False:
+            # A provider may exhaust its output budget without producing text.
+            # Use the normal complete-turn fold once if its frozen inputs still match.
+            if checkpoint.summary_state() != snapshot:
+                return False
+            if fingerprint(load_state()['settings']['llm']) != fingerprint(llm_cfg):
+                return False
+            policy = Policy(llm_cfg, checkpoint.audience(), tools)
     header = _summary_messages(state, [], request, snapshot)
     header = [m for m in header if not str(m.get('content','')).startswith(turn.SUMMARY_PREFIX)]
     # The previous summary is replaced by the candidate, not retained beside it.

@@ -313,6 +313,54 @@ def test_summary_only_recompression_discards_invalid_candidates(monkeypatch,inva
     assert calls and checkpoint.live_summary()==old
 
 
+@pytest.mark.parametrize('stale', [False, True])
+def test_empty_summary_only_result_falls_back_only_for_unchanged_inputs(monkeypatch, stale):
+    from app.core import state, db, llm
+    from app.services import compress, checkpoint, turn
+    from conftest import add_turn
+
+    cfg = state.load()
+    cfg['settings']['llm'].update(contextWindow=16000, maxOutputTokens=2000)
+    old = 'Previous shared experiences and agreements. ' * 160
+    for index in range(8):
+        add_turn(f'Player request {index} ' + 'x' * 180, 'Response ' + 'y' * 180, at=str(index))
+    with db.tx() as c:
+        c.execute('UPDATE sessions SET summary=? WHERE id=?', (old, db.LIVE_ID))
+    before = checkpoint.summary_state()
+    original = checkpoint.live_messages()
+    monkeypatch.setattr(compress, 'load_state', lambda: cfg)
+    monkeypatch.setattr(turn, 'build_system_prompt', lambda *a, **k: 'H' * 4200)
+    messages = turn.build_messages(cfg, 'Continue the authorized game.')
+    frame = {'role': 'user', 'content': [{'type': 'image_url', 'image_url': {'url': 'momo-observation:pending'}, 'vision_tokens': 1024}]}
+    request = [*messages, frame]
+    assert estimate(request) > Budget.from_config(cfg['settings']['llm']).safe
+    calls = []
+
+    def summarize(config, prompt, **kwargs):
+        calls.append(prompt)
+        assert 'momo-observation:' not in str(prompt) and kwargs['tools'] == []
+        if len(calls) == 1:
+            assert 'Player request 0' not in str(prompt)
+            if stale:
+                with db.tx() as c:
+                    c.execute('UPDATE sessions SET generation=generation+1 WHERE id=?', (db.LIVE_ID,))
+            return {'content': '', 'finish_reason': 'length'}
+        assert 'Player request 0' in str(prompt) and 'Player request 7' not in str(prompt)
+        return {'content': 'The prior agreement and the earliest conversation remain recorded.'}
+
+    monkeypatch.setattr(llm, 'chat_completion', summarize)
+    assert compress.compress_once(request=request, tools=[], hard=True) is not stale
+    if stale:
+        assert len(calls) == 1
+        assert checkpoint.live_summary() == old
+        return
+    assert len(calls) == 2
+    assert checkpoint.summary_state()['cursor'] > before['cursor']
+    assert checkpoint.live_messages() == original
+    rebuilt = turn.build_messages(cfg, 'Continue the authorized game.')
+    assert estimate([*rebuilt, frame]) <= Budget.from_config(cfg['settings']['llm']).safe
+
+
 def test_summary_only_recompression_keeps_the_contact_audience_separate(monkeypatch):
     from app.core import state, db, llm
     from app.services import compress, checkpoint, turn
