@@ -15,6 +15,31 @@ final class BlockSight {
   // Only read the named cell after the entire sight segment is unobstructed.
   return eye.squaredDistanceTo(target.toCenterPos())<=1024&&cast.apply(target.toCenterPos()).getType()==HitResult.Type.MISS&&air.getAsBoolean();
  }
+ static boolean visibleBuildCell(MinecraftClient c,BlockPos target){
+  if(!c.world.isChunkLoaded(target))return false;
+  var eye=c.player.getEyePos();
+  return visibleBuildCell(eye,target,end->c.world.raycast(new RaycastContext(eye,end,RaycastContext.ShapeType.COLLIDER,RaycastContext.FluidHandling.ANY,c.player)),
+    ()->c.world.getBlockState(target).isAir()||hit(c,target)!=null);
+ }
+ static boolean visibleBuildCell(Vec3d eye,BlockPos target,java.util.function.Function<Vec3d,BlockHitResult> cast,java.util.function.BooleanSupplier seenInOpenCell){
+  var center=target.toCenterPos();
+  if(eye.squaredDistanceTo(center)>1024)return false;
+  var first=cast.apply(center);
+  boolean checkedOpenCell=first.getType()==HitResult.Type.MISS;
+  if(checkedOpenCell?seenInOpenCell.getAsBoolean():first.getBlockPos().equals(target))return true;
+  for(var side:Direction.values()){
+   var point=center.add(side.getOffsetX()*.499,side.getOffsetY()*.499,side.getOffsetZ()*.499);
+   var ray=cast.apply(point);
+   if(ray.getType()==HitResult.Type.BLOCK&&ray.getBlockPos().equals(target))return true;
+   if(ray.getType()==HitResult.Type.MISS&&!checkedOpenCell){
+    // Each endpoint is inside the target. A clear segment authorizes checking
+    // for air or a visible non-colliding outline, never behind an obstruction.
+    checkedOpenCell=true;
+    if(seenInOpenCell.getAsBoolean())return true;
+   }
+  }
+  return false;
+ }
  static BlockHitResult hit(MinecraftClient c,BlockPos target){return hit(c,target,null);}
  static BlockHitResult hit(MinecraftClient c,BlockPos target,Direction face){
   return hit(c,target,face,null);

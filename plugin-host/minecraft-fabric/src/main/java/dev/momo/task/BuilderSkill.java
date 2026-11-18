@@ -9,9 +9,7 @@ import net.minecraft.client.gui.screen.ingame.InventoryScreen;
 import net.minecraft.item.Items;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.*;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.*;
-import net.minecraft.world.RaycastContext;
 /** API-only Baritone builder. No file paths, schematic loading, commands or generated code. */
 final class BuilderSkill implements TaskRuntime.Work {
  private final MinecraftClient c=MinecraftClient.getInstance();private final SparseBuild plan;
@@ -29,9 +27,9 @@ final class BuilderSkill implements TaskRuntime.Work {
   for(var cell:plan.cells()){
    var pos=position(cell);if(!world.isChunkLoaded(pos)||pos.getSquaredDistance(c.player.getPos())>1024)throw new TaskRuntime.Rejected("outside_known_terrain");
    var id=Identifier.of(cell.block());if(!Registries.BLOCK.containsId(id))throw new TaskRuntime.Rejected("block_unknown");var desired=Registries.BLOCK.get(id).getDefaultState();
-   if(desired.getBlock().asItem()==Items.AIR)throw new TaskRuntime.Rejected("block_not_placeable");wanted.put(cell,desired);var actual=world.getBlockState(pos);
-   boolean visible=actual.isAir()?world.raycast(new RaycastContext(c.player.getEyePos(),pos.toCenterPos(),RaycastContext.ShapeType.COLLIDER,RaycastContext.FluidHandling.ANY,c.player)).getType()==HitResult.Type.MISS:BlockSight.hit(c,pos)!=null;
-   if(!visible)throw new TaskRuntime.Rejected("build_cells_not_visible");
+   if(desired.getBlock().asItem()==Items.AIR)throw new TaskRuntime.Rejected("block_not_placeable");
+   if(!BlockSight.visibleBuildCell(c,pos))throw new TaskRuntime.Rejected("build_cells_not_visible");
+   wanted.put(cell,desired);var actual=world.getBlockState(pos);
    if(actual.isOf(desired.getBlock())){verified.put(cell,proof(cell,actual.toString(),0));existing++;}
    else {if(!actual.isAir()){if(!actual.isReplaceable()||!actual.getFluidState().isEmpty()){
     // This state is disclosed only after the preceding normal sight check.

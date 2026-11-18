@@ -40,5 +40,18 @@ final class BlockSightSurfaceSmoke {
   if(BlockSight.hit(cornerEye,corner,boxes,null,closed,seen)!=null)throw new AssertionError("Past sight never bypasses new occlusion");
   if(BlockSight.hit(cornerEye,corner,boxes,Direction.UP,gap,seen)!=null)throw new AssertionError("A west-face discovery cannot authorize the top face");
 
+  var roofEye=new Vec3d(.5,1.5,-3);
+  var roofCell=new BlockPos(0,1,0);
+  var nearWall=new BlockPos(0,1,-1);
+  var partialWall=new Box(0,1,-1,.72,2,0);
+  java.util.function.Function<Vec3d,BlockHitResult> roof=end->partialWall.raycast(roofEye,end)
+    .map(point->new BlockHitResult(point,Direction.NORTH,nearWall,false))
+    .orElseGet(()->BlockHitResult.createMissed(end,Direction.NORTH,roofCell));
+  if(roof.apply(roofCell.toCenterPos()).getType()!=HitResult.Type.BLOCK)throw new AssertionError("Roof regression needs an occluded center");
+  if(!BlockSight.visibleBuildCell(roofEye,roofCell,roof,()->true))throw new AssertionError("An unobstructed face sample can prove the empty roof cell is visible");
+  if(BlockSight.visibleBuildCell(roofEye,roofCell,roof,()->false))throw new AssertionError("A clear path into a cell cannot prove an unseen solid");
+  if(BlockSight.visibleBuildCell(roofEye,roofCell,end->new BlockHitResult(end,Direction.NORTH,nearWall,false),()->{throw new AssertionError("Hidden state read");}))throw new AssertionError("A completely occluded roof remains ineligible");
+  if(!BlockSight.visibleBuildCell(roofEye,roofCell,end->new BlockHitResult(end,Direction.NORTH,roofCell,false),()->{throw new AssertionError("First hit already proves sight");}))throw new AssertionError("A visible solid can still be inspected");
+
  }
 }

@@ -115,6 +115,13 @@ tasks.register('sightLandmarksSmoke', JavaExec) {
 }
 check.dependsOn sightLandmarksSmoke
 
+tasks.register('blockSightSurfaceSmoke', JavaExec) {
+ dependsOn testClasses
+ classpath = sourceSets.test.runtimeClasspath
+ mainClass = 'dev.momo.task.BlockSightSurfaceSmoke'
+}
+check.dependsOn blockSightSurfaceSmoke
+
 // Opt-in development setup. These classes/resources never enter the companion
 // jar or the exact artifact staged by scripts/build-minecraft-component.py.
 sourceSets {

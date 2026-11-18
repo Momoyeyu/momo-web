@@ -5,9 +5,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.registry.Registries;
 import net.minecraft.item.Items;
 import net.minecraft.util.Identifier;
-import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.*;
-import net.minecraft.world.RaycastContext;
 /** Game-thread scene adapter. New targets are read only after an actual sight ray. */
 final class BuildScene implements BuildTask.Scene {
  private final MinecraftClient c=MinecraftClient.getInstance();private final SparseBuild plan;
@@ -39,14 +37,7 @@ final class BuildScene implements BuildTask.Scene {
   var result=new ArrayList<SparseBuild.Cell>();
   for(var cell:pending){var pos=pos(cell);
    if(!world.isChunkLoaded(pos)||pos.getSquaredDistance(c.player.getPos())>1024)continue;
-   var hit=world.raycast(new RaycastContext(c.player.getEyePos(),pos.toCenterPos(),RaycastContext.ShapeType.COLLIDER,RaycastContext.FluidHandling.ANY,c.player));
-   boolean seen=hit.getType()==HitResult.Type.MISS||hit instanceof net.minecraft.util.hit.BlockHitResult block&&block.getBlockPos().equals(pos);
-   if(!seen)for(var face:Direction.values()){
-    var point=pos.toCenterPos().add(face.getOffsetX()*.499,face.getOffsetY()*.499,face.getOffsetZ()*.499);
-    var sample=world.raycast(new RaycastContext(c.player.getEyePos(),point,RaycastContext.ShapeType.COLLIDER,RaycastContext.FluidHandling.ANY,c.player));
-    if(sample instanceof net.minecraft.util.hit.BlockHitResult block&&sample.getType()==HitResult.Type.BLOCK&&block.getBlockPos().equals(pos)){seen=true;break;}
-   }
-   if(seen)result.add(cell);
+   if(BlockSight.visibleBuildCell(c,pos))result.add(cell);
   }
   return result;
  }
