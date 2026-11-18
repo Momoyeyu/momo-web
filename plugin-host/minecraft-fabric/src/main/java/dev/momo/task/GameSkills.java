@@ -145,7 +145,7 @@ public final class GameSkills {
     var output=recipe.value().getResult(c.world.getRegistryManager());outputItem=Registries.ITEM.getId(output.getItem()).toString();beforeCount=count(outputItem);
     if(!c.player.currentScreenHandler.getCursorStack().isEmpty())throw new TaskRuntime.Rejected("cursor_not_empty");
     inventoryProof=new InventoryEvidence(beforeCount,c.player.currentScreenHandler.getRevision());
-    if(c.currentScreen==null)c.setScreen(new InventoryScreen(c.player));ownedScreen=c.currentScreen;
+    ownedScreen=c.currentScreen;
    }
    if(skill.equals("closeScreen"))c.player.closeHandledScreen();
    if(skill.equals("respawn")){if(c.player.isAlive())throw new TaskRuntime.Rejected("already_alive");c.player.requestRespawn();}
@@ -301,7 +301,18 @@ public final class GameSkills {
       if(gained>=args.get("count").getAsInt())return done(verifiedGain);
       craftPhase=0;
      }
-     if(craftPhase==0){c.interactionManager.clickRecipe(c.player.currentScreenHandler.syncId,c.world.getRecipeManager().get(identifier(args,"recipe")).orElseThrow(()->new TaskRuntime.Rejected("recipe_unknown")),false);mutationTick=ticks;craftPhase=1;}
+     if(craftPhase==0){
+      var recipe=c.world.getRecipeManager().get(identifier(args,"recipe")).orElseThrow(()->new TaskRuntime.Rejected("recipe_unknown"));
+      if(!(c.player.currentScreenHandler instanceof net.minecraft.screen.AbstractRecipeScreenHandler<?,?> grid))return TaskRuntime.Step.failed("station_screen_changed");
+      // Match the vanilla recipe book's inputs, including items already on
+      // the grid. Check one craft so a shortage preserves earlier receipts.
+      var matcher=new net.minecraft.recipe.RecipeMatcher();
+      c.player.getInventory().populateRecipeFinder(matcher);
+      grid.populateRecipeFinder(matcher);
+      if(!matcher.match(recipe.value(),null))return TaskRuntime.Step.failed("materials_missing");
+      if(c.currentScreen==null){c.setScreen(new InventoryScreen(c.player));ownedScreen=c.currentScreen;}
+      c.interactionManager.clickRecipe(grid.syncId,recipe,false);mutationTick=ticks;craftPhase=1;
+     }
      else takeOneOutput(0);
      if(ticks-mutationTick>100)return TaskRuntime.Step.failed("ingredients_station_or_server_ack_missing");break;
     case "closeScreen":if(c.currentScreen==null)return done(Map.of("screen","world"));break;
