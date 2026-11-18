@@ -19,6 +19,9 @@ export default function DesktopPetControls({closeUp,onFrame,collapsed,onDialog,m
  useEffect(()=>{const stop=()=>{dragging.current=false;drag('end');};window.addEventListener('blur',stop);return()=>{window.removeEventListener('blur',stop);stop();};},[]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(false);
  useEffect(()=>{if(state.mode==='pet'&&!enabled.computer&&!playing)void setDesktopMode('chat').catch(()=>setError(true));},[state.mode,enabled.computer,playing]);
+ useEffect(()=>{
+  if(state.mode==='pet')void window.momoDesktop?.setGameOverlay?.(playing).catch(()=>setError(true));
+ },[state.mode,playing]);
  useLayoutEffect(()=>{
   if(state.mode!=='pet')return;
   const rail=document.querySelector<HTMLElement>('.desktop-pet-controls'),dialog=document.querySelector<HTMLElement>('.dialog-box');

@@ -13,6 +13,7 @@ test('game control brings the same meeting into desktop pet once per connection'
   const listeners=new Set<(value:typeof state)=>void>();
   window.momoDesktop={
    getRuntime:async()=>({baseUrl:base,token:'isolated-game-pet'}),getWindowState:async()=>state,
+   setGameOverlay:async enabled=>{document.documentElement.dataset.gameOverlay=String(enabled);},
    setWindowMode:async mode=>{state={mode,clickThrough:false};listeners.forEach(fn=>fn(state));return state;},
    setPetClickThrough:async clickThrough=>{state={...state,clickThrough};return state;},
    onWindowStateChanged:fn=>{listeners.add(fn);return()=>listeners.delete(fn);},
@@ -45,6 +46,7 @@ test('game control brings the same meeting into desktop pet once per connection'
  await start();
  await expect(page.locator('html')).toHaveClass(/desktop-pet/);
  expect(await lease()).toBe(owner);
+ await expect(page.locator('html')).toHaveAttribute('data-game-overlay','true');
  await expect(page.locator('.dialog-box')).toBeHidden();
  const petGame=page.locator('.desktop-pet-controls').getByRole('button',{name:zh.minecraft.title,exact:true});
  await petGame.click();
