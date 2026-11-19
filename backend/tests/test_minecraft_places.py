@@ -76,7 +76,7 @@ def test_recall_does_not_look_up_or_scan_the_live_world():
         with pytest.raises(ValueError,match='denied'):m.execute('places',{'query':'oak'},0,'owner','lease')
 
 
-def test_places_tool_and_api_pass_the_query_without_staging_a_frame():
+def test_places_tool_and_api_pass_the_query_without_staging_a_frame(enabled_minecraft_mod):
     from app.services import computer_tools as tools
     from app.services.minecraft import minecraft
     from app.api.minecraft import TaskCommand,tasks

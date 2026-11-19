@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { PluginHost, HostError } from '../src/host.mjs';
+import { PluginHost, HostError } from './fixtures/installed-qq.mjs';
 import { QQRuntimeError } from '../src/qq-runtime.mjs';
 
 const token = 'managed-runtime-host-test-'.repeat(2);

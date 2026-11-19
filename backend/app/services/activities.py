@@ -5,6 +5,7 @@ import sys
 import tempfile
 import threading
 from ..core import state
+from . import mods
 
 IDS = ('computer', 'browser', 'minecraft')
 _lock = threading.RLock()
@@ -30,9 +31,10 @@ def snapshot():
     from .app_permissions import native_desktop, permissions
     with _lock:
         data = _preferences()
-        default_access = native_desktop() and permissions.granted()
+        core_access = not native_desktop() or permissions.granted()
         return {'enabled': {
-                    key: data.get(key, default_access and key in ('computer','browser')) is True and supported(key)
+                    key: (bool(mods.integration_root('momo.minecraft')) if key == 'minecraft'
+                          else core_access and data.get(key, True) is True) and supported(key)
                     for key in IDS
                 },
                 'supported': {key: supported(key) for key in IDS}}
@@ -48,6 +50,12 @@ def set_enabled(key, enabled):
         raise ValueError('Invalid activity plugin')
     if enabled and not supported(key):
         raise ValueError('Activity is not supported on this platform')
+    if key == 'minecraft':
+        try:
+            mods.set_enabled('momo.minecraft', enabled)
+        except KeyError:
+            raise ValueError('Install the Minecraft Mod first') from None
+        return snapshot()
     with _lock:
         data = _preferences()
         data[key] = enabled
@@ -65,10 +73,7 @@ def set_enabled(key, enabled):
         from .native_control import native_control
         if native_control.plugin == key:
             native_control.stop("disabled")
-        if key == 'minecraft':
-            from .minecraft import minecraft
-            minecraft.stop("disabled")
-        elif key == 'browser':
+        if key == 'browser':
             from .browser import browser
             browser.stop('disabled')
         else:

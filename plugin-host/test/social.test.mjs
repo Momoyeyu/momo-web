@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { PluginHost } from '../src/host.mjs';
+import { PluginHost } from './fixtures/installed-qq.mjs';
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(fn) { for (let i = 0; i < 100; i++) { if (fn()) return; await wait(10); } assert.ok(fn()); }

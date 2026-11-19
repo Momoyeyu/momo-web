@@ -247,7 +247,7 @@ def filter_action_result(store, authorization, result):
             output['receipt']={key:value[:160] for key,value in receipt.items() if key in {
                 'commandId','status','deliveryStatus','externalMessageId','runId'} and isinstance(value,str)}
         return output
-    auth=authorize_action(store,action,authorization['params'],
+    auth=store.authorize_action(action,authorization['params'],
         account_id=authorization['accountId'],revision=authorization['policyRevision'],
         audience='owner' if authorization['localOwner'] else authorization['audience'],local_owner=authorization['localOwner'])
     def page(key):

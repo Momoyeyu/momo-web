@@ -97,7 +97,7 @@ def test_deletion_is_durable_but_keeps_reference():
     assert 'image_url' not in json.dumps(turn.build_messages(state.load(),'what was it?'))
 
 
-def test_incoming_qq_images_do_not_require_history_but_match_exact_event(monkeypatch):
+def test_incoming_qq_images_do_not_require_history_but_match_exact_event(monkeypatch, enabled_qq_mod):
     from app.services.social import social,SocialError
     from app.services.coordinator import Coordinator,current_run
     from conftest import configured_native_social

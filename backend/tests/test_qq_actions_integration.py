@@ -21,6 +21,7 @@ def full_chain(tmp_path,monkeypatch):
     monkeypatch.setenv('MOMO_PLUGIN_HOST',str(ROOT/'plugin-host/test/fixtures/qq-full-host.mjs'))
     monkeypatch.delenv('MOMO_QQ_RUNTIME_CONFIG',raising=False)
     monkeypatch.setenv('QQ_FIXTURE_ROOT',str(tmp_path))
+    monkeypatch.setattr('app.services.mods.integration_root', lambda _: tmp_path)
     configured_native_social(social,permissions={key:True for key in ('receive','reply','proactive','contacts','history','media','friendRequests','groups','groupManagement')},proactivePolicy={'recipientIds':['20002'],'quietStart':0,'quietEnd':0,'maxPerHour':60,'minIntervalSeconds':0},groupAllowlist=[{'peerId':'30003'}])
     core=Coordinator();core.schema();core.started=True;core.mode='meeting';core.epoch=1
     core.owner={'clientId':'fixture-client','leaseId':'fixture-lease','expiresAt':time.monotonic()+120}

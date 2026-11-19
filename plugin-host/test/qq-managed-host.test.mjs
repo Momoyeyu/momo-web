@@ -4,7 +4,7 @@ import { EventEmitter } from 'node:events';
 import { PassThrough, Writable } from 'node:stream';
 import { randomUUID } from 'node:crypto';
 import { QQRuntimeManager } from '../src/qq-runtime.mjs';
-import { PluginHost } from '../src/host.mjs';
+import { PluginHost } from './fixtures/installed-qq.mjs';
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(check) { for (let i = 0; i < 100 && !check(); i++) await wait(5); assert.ok(check()); }

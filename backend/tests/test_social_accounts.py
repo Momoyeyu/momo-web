@@ -6,6 +6,8 @@ import pytest
 from app.services.social import SocialAccounts, SocialError
 from conftest import configured_native_social
 
+pytestmark = pytest.mark.usefixtures("enabled_qq_mod")
+
 
 def test_qq_defaults_to_native_without_bridge_configuration():
     store = SocialAccounts()

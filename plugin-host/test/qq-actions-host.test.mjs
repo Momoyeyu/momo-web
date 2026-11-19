@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {PluginHost} from '../src/host.mjs';
+import {PluginHost} from './fixtures/installed-qq.mjs';
 import {ChannelError} from '../src/channels.mjs';
 
 function setup(t,action){

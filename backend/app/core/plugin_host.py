@@ -137,11 +137,6 @@ class PluginHost:
         resources = Path(
             os.environ.get("MOMO_RESOURCES_DIR", root / "resources/models")
         ).parent
-        if sys.platform == "darwin" and getattr(sys, "frozen", False) and not os.environ.get("MOMO_QQ_RUNTIME_CONFIG"):
-            from .qq_install import prepare_installed_qq
-            from .state import DATA_DIR
-            prepare_installed_qq(resources, DATA_DIR)
-        qq_runtime = managed_qq_runtime_config()
         entry = Path(
             os.environ.get("MOMO_PLUGIN_HOST", resources / "plugin-host/src/index.mjs")
         )
@@ -176,7 +171,6 @@ class PluginHost:
                 "coreInstance": self.core_instance,
                 "token": self.token,
                 "heartbeatMs": 5000,
-                **({"qqRuntime": qq_runtime} if qq_runtime is not None else {}),
             },
         )
         self.host_instance = result["hostInstance"]

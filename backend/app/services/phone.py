@@ -3,7 +3,7 @@ import json
 
 from ..core import db
 from .social import social
-from . import dialogue_input, message_display
+from . import dialogue_input, message_display, mods
 from .coordinator import runtime
 
 PENDING = ('queued','held_focus','held_inactive','held_paused','held_interrupt','processing')
@@ -11,8 +11,8 @@ PENDING = ('queued','held_focus','held_inactive','held_paused','held_interrupt',
 
 def qq_snapshot(peer=None, before=None):
     runtime.schema()
-    account = social.get('qq')
-    if not account['enabled']:
+    account = social.get('qq') if mods.integration_root('momo.qq') else None
+    if not account or not account['enabled']:
         return {'apps':[], 'accountKey':'', 'pending':0, 'conversations':[], 'messages':[], 'operations':[], 'hasMore':False, 'nextBefore':None, 'activity':runtime.snapshot()['activity']}
     # Only the currently bound account; never merge a previous login's messages.
     identity = account.get('expectedSelfId') or ''

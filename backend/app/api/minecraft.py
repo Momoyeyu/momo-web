@@ -1,6 +1,7 @@
 from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from ..services import mods
 from ..services.minecraft import minecraft, MinecraftError
 from ..services.coordinator import CoordinationError
 from ..services.vision import VisionError
@@ -8,6 +9,10 @@ from ..core.plugin_host import HostError
 
 router = APIRouter(prefix='/api/minecraft')
 def invoke(fn, *args):
+    if not mods.integration_root('momo.minecraft'):
+        if fn == minecraft.status:
+            return {'available': False, 'active': False}
+        raise HTTPException(409, 'Enable the Minecraft Mod first')
     try: return fn(*args)
     except (MinecraftError, CoordinationError, VisionError, HostError) as error:
         raise HTTPException(409, str(error)) from error

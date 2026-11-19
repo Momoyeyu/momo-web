@@ -11,6 +11,8 @@ from app.services import checkpoint, memory, turn
 from app.services.coordinator import Coordinator, CoordinationError
 from conftest import configured_native_social
 
+pytestmark = pytest.mark.usefixtures("enabled_qq_mod")
+
 
 @pytest.mark.parametrize("source", ["wechat", "unrecognized"])
 def test_retired_or_unknown_ingress_is_rejected_before_persistence(source):

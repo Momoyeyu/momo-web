@@ -6,6 +6,8 @@ permissions and their revision are still checked here before inference or send.
 """
 from __future__ import annotations
 
+from . import mods
+
 import copy
 import hashlib
 import json
@@ -217,8 +219,17 @@ class SocialAccounts:
                                "auth": "personal_native", "oauthMessaging": False,
                                "capabilities": dict(CAPABILITIES)} for p in PROVIDERS]}
 
+    def invalidate_mod_authority(self):
+        with self.lock:
+            data = self._read()
+            if "qq" in data:
+                data["qq"]["policyRevision"] += 1
+                self._write(data)
+
     def native_restore_binding(self):
         """Restore only an eligible stored identity, never its previous grants."""
+        if not mods.integration_root("momo.qq"):
+            return None
         with self.lock:
             if not self._path().is_file():
                 return None
@@ -428,6 +439,8 @@ class SocialAccounts:
             json.dumps([account["provider"], account["accountId"], peer], separators=(",", ":")).encode()).hexdigest()
 
     def authorize_event(self, event):
+        if not mods.integration_root("momo.qq"):
+            return None
         with self.lock:
             provider = event.get("source")
             if provider not in PROVIDERS:
@@ -487,6 +500,8 @@ class SocialAccounts:
                     "pluginId": account["id"], "allowReply": account["permissions"]["reply"]}
 
     def authorize_send(self, account_id, peer_id, revision, *, audience):
+        if not mods.integration_root("momo.qq"):
+            raise SocialError("Enable the QQ Mod first")
         with self.lock:
             account = next((row for provider, row in self._read().items()
                             if provider in PROVIDERS and row.get("provider") == provider and row.get("accountId") == account_id), None)
@@ -499,6 +514,8 @@ class SocialAccounts:
 
     def authorize_action(self, action, params, *, account_id=None, revision=None,
                          audience="owner", local_owner=False, consume=False, command_id=None):
+        if not mods.integration_root("momo.qq"):
+            raise SocialError("Enable the QQ Mod first")
         from .social_actions import authorize_action
         return authorize_action(self, action, params, account_id=account_id, revision=revision,
                                 audience=audience, local_owner=local_owner, consume=consume, command_id=command_id)

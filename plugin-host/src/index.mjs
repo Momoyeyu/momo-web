@@ -1,7 +1,7 @@
 import { createInterface } from 'node:readline';
 import { PluginHost, HostError } from './host.mjs';
 import { nativeErrorCode } from './native-control.mjs';
-import { minecraftErrorCode, minecraftErrorValidation } from './minecraft-adapter.mjs';
+
 
 const write = message => process.stdout.write(`${JSON.stringify(message)}\n`);
 const host = new PluginHost({ emit: write });
@@ -29,8 +29,8 @@ input.on('line', line => {
     if (message.method === 'shutdown') void shutdown();
   }, error => {
     const method=typeof message.method==='string'?message.method:'';
-    const code=error instanceof HostError?error.code:method.startsWith('native.')?nativeErrorCode(error):method.startsWith('minecraft.')?minecraftErrorCode(error):'INTERNAL';
-    write({ v: 1, id: message.id, ok: false, error: { code, message: error instanceof HostError ? error.message : 'Host request failed', ...(method.startsWith('minecraft.')&&minecraftErrorValidation(error)?{validation:minecraftErrorValidation(error)}:{}) } });
+    const code=error instanceof HostError?error.code:method.startsWith('native.')?nativeErrorCode(error):method.startsWith('minecraft.')?(host.minecraftModule?.minecraftErrorCode(error) ?? 'MINECRAFT_UNKNOWN'):'INTERNAL';
+    write({ v: 1, id: message.id, ok: false, error: { code, message: error instanceof HostError ? error.message : 'Host request failed', ...(method.startsWith('minecraft.')&&host.minecraftModule?.minecraftErrorValidation(error)?{validation:host.minecraftModule?.minecraftErrorValidation(error)}:{}) } });
   });
 });
 input.on('close', () => { void shutdown(); });

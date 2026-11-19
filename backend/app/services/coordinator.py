@@ -104,6 +104,8 @@ class Coordinator:
                 c.execute("UPDATE outbox SET status='unknown' WHERE status IN ('pending','executing')")
             self.host = PluginHost(self.core_id, self.event, lambda: self.epoch)
             self.host.start()
+            from . import mods
+            mods.restore(self.host)
             if self._unresolved_commands():
                 self.mode = "paused"
             self.started = True
@@ -174,7 +176,8 @@ class Coordinator:
             # MCP and social configuration share one monotonic host revision.
             # Capturing under a lock prevents a delayed social refresh or stale
             # tool reconciliation from reviving withdrawn connections.
-            plugins = self.mcp_configs + social.host_configs()
+            from .mods import integration_root
+            plugins = self.mcp_configs + (social.host_configs() if integration_root("momo.qq") else [])
             self.host_config_revision += 1
             params = {"plugins": plugins, "tolerateErrors": tolerate_errors, "configurationRevision": self.host_config_revision}
             host = self.host

@@ -23,6 +23,7 @@ from .api import (
     checkpoints,
     extensions,
     memories,
+    mods,
     state,
     tts,
 )
@@ -73,6 +74,7 @@ app.add_middleware(
 
 app.include_router(state.router)
 app.include_router(memories.router)
+app.include_router(mods.router)
 app.include_router(checkpoints.router)
 app.include_router(extensions.router)
 app.include_router(chat.router)

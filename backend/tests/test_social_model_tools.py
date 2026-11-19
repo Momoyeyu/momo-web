@@ -4,6 +4,8 @@ from app.services import checkpoint
 from app.services.social import social
 from conftest import configured_native_social
 
+pytestmark = pytest.mark.usefixtures("enabled_qq_mod")
+
 
 def test_only_granted_qq_tools_are_projected_and_remote_cannot_get_admin(monkeypatch):
     from app.services import social_tools

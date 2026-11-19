@@ -7,6 +7,8 @@ from app.services.social import social, SocialError
 from app.services import social_media
 from conftest import configured_native_social
 
+pytestmark = pytest.mark.usefixtures("enabled_qq_mod")
+
 
 def test_unknown_reviewed_qq_mutation_is_selected_for_automatic_recovery():
     core=Coordinator();core.schema()

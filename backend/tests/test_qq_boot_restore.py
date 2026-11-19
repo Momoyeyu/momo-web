@@ -59,7 +59,7 @@ class CapturedHost:
 
 
 @pytest.fixture
-def boot_core(monkeypatch):
+def boot_core(monkeypatch, enabled_qq_mod):
     store = SocialAccounts()
     store.put("qq", {"expectedSelfId": "10001", "permissions": {"reply": False},
                      "allowlistEnabled": True, "allowlist": []})

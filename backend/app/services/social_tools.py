@@ -29,7 +29,9 @@ CATALOG = (
 NAMES = {row[0] for row in CATALOG}
 
 def declarations(*, source='meeting'):
-    from . import checkpoint
+    from . import checkpoint, mods
+    if not mods.integration_root("momo.qq"):
+        return []
     account=social._account('qq')
     if not account.get('enabled') or account.get('quarantined'):
         return []

@@ -1,15 +1,15 @@
 """Attach to the user's explicitly selected running Fabric client; never launch/login."""
-import json, os, stat, re, sys, tempfile, zipfile
+import hashlib, json, os, stat, re, tempfile, zipfile
 from pathlib import Path
 import httpx
 from .minecraft import minecraft, MinecraftError
 DIRECTORY = Path.home()/'.momo'/'minecraft-bridge'
-MOD = Path(__file__).resolve().parents[3]/'plugin-host/minecraft-fabric/build/libs/momo-fabric-companion-0.1.0.jar'
 def mod_resource():
-    if getattr(sys, 'frozen', False):
-        resources = Path(os.environ['MOMO_RESOURCES_DIR']).parent
-        return resources/'plugin-host/resources/minecraft/momo-fabric-companion-0.1.0.jar'
-    return MOD
+    from .mods import integration_root
+    root = integration_root('momo.minecraft')
+    if root is None:
+        raise MinecraftError('Enable the Minecraft Mod first')
+    return root/'resources/minecraft/momo-fabric-companion-0.1.0.jar'
 
 def read(session):
     if not re.fullmatch(r'[0-9]+',session): raise MinecraftError('Invalid session')
@@ -53,6 +53,19 @@ def attach(session,world,account,permissions,client,lease):
     if not world or not account or data.get('world')!=world or data.get('account')!=account or 'game.observe' not in permissions: raise MinecraftError('Selected game identity changed')
     return minecraft.connect(value['port'],value['token'],world,account,permissions,client,lease,value['pid'])
 
+def require_fabric_dependency(companion, directory):
+    dependency = json.loads(companion.with_name('dependency.json').read_bytes())['baritone']
+    for candidate in directory.glob('*.jar'):
+        if candidate.is_symlink() or not candidate.is_file() or candidate.stat().st_size > dependency['maxBytes']:
+            continue
+        with candidate.open('rb') as stream:
+            info = os.fstat(stream.fileno())
+            if (not candidate.is_symlink() and stat.S_ISREG(info.st_mode)
+                    and info.st_size <= dependency['maxBytes']
+                    and hashlib.file_digest(stream, 'sha256').hexdigest() == dependency['sha256']):
+                return
+    raise MinecraftError(f"Install {dependency['file']} in the selected instance first")
+
 def install(instance_path):
     root=Path(instance_path).expanduser()
     if not root.is_dir() or root.is_symlink() or any(p.is_symlink() for p in root.parents): raise MinecraftError('Select an existing game instance')
@@ -60,6 +73,7 @@ def install(instance_path):
     if not mod.is_file(): raise MinecraftError('Companion mod resource unavailable')
     dest=root/'mods'
     if dest.is_symlink(): raise MinecraftError('Symlink mod directory forbidden')
+    require_fabric_dependency(mod, dest)
     dest.mkdir(exist_ok=True)
     target=dest/mod.name
     updated=False

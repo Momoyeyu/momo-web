@@ -1,6 +1,12 @@
+import pytest
 from app.core import db
 from app.services.coordinator import runtime
 from app.services import phone
+
+
+@pytest.fixture(autouse=True)
+def active_qq_mod(monkeypatch, tmp_path):
+    monkeypatch.setattr(phone.mods, "integration_root", lambda _: tmp_path)
 
 
 def test_empty_phone_and_account_isolation(monkeypatch):

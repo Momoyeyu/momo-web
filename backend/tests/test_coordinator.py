@@ -152,6 +152,7 @@ def test_second_core_is_refused(core):
 def test_delayed_mcp_configuration_cannot_replace_newer_combined_state(monkeypatch):
     from app.services.social import social
 
+    monkeypatch.setattr("app.services.mods.integration_root", lambda _: Path("fixture"))
     instance = Coordinator()
     entered = threading.Event()
     release = threading.Event()

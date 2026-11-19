@@ -45,3 +45,18 @@ def configured_native_social(store, **changes):
     data["qq"]["enabled"] = enabled
     store._write(data)
     return store.get("qq")
+
+
+@pytest.fixture
+def enabled_qq_mod(monkeypatch, tmp_path):
+    """The account/transport fixtures exercise an already enabled QQ integration."""
+    from app.services import mods
+    existing = mods.integration_root
+    monkeypatch.setattr(mods, "integration_root", lambda ident: tmp_path if ident == "momo.qq" else existing(ident))
+
+
+@pytest.fixture
+def enabled_minecraft_mod(monkeypatch, tmp_path):
+    from app.services import mods
+    existing = mods.integration_root
+    monkeypatch.setattr(mods, "integration_root", lambda ident: tmp_path if ident == "momo.minecraft" else existing(ident))

@@ -6,9 +6,9 @@ from app.services import activities
 def isolated(tmp_path,monkeypatch):
     monkeypatch.setattr(activities.state,'DATA_DIR',tmp_path)
 
-def test_default_denied_and_enable_does_not_start_activity():
-    assert not any(activities.snapshot()['enabled'].values())
-    with pytest.raises(ValueError): activities.require_enabled('browser')
+def test_core_tools_available_without_starting_activity():
+    assert activities.snapshot()['enabled'] == {'computer': True, 'browser': True, 'minecraft': False}
+    activities.require_enabled('browser')
     with patch('app.services.browser.browser.start') as start:
         activities.set_enabled('browser',True)
         activities.require_enabled('browser')
@@ -26,9 +26,9 @@ def test_disable_publishes_before_cleanup_and_failed_stop_can_retry():
         activities.set_enabled('browser',False)
         stop.assert_called_once()
 
-def test_invalid_and_corrupt_state_fail_closed(tmp_path):
+def test_invalid_and_corrupt_state_use_core_availability(tmp_path):
     (tmp_path/'activity-plugins.json').write_text('{broken')
-    assert not any(activities.snapshot()['enabled'].values())
+    assert activities.snapshot()['enabled'] == {'computer':True,'browser':True,'minecraft':False}
     with pytest.raises(ValueError): activities.set_enabled('shell',True)
     with pytest.raises(ValueError): activities.set_enabled('computer','true')
 
@@ -39,9 +39,12 @@ def test_desktop_consent_supplies_defaults_without_overwriting_plugin_choices(tm
     monkeypatch.setattr(app_permissions, 'permissions', policy)
     monkeypatch.setattr(app_permissions, 'native_desktop', lambda: True)
     monkeypatch.setattr(activities, 'supported', lambda _: True)
-    activities.set_enabled('minecraft', True)
+    monkeypatch.setattr(activities.mods, 'integration_root', lambda _: tmp_path)
     assert not activities.snapshot()['enabled']['computer']
     policy.consent(True)
     assert activities.snapshot()['enabled'] == {'computer':True,'browser':True,'minecraft':True}
     (tmp_path/'activity-plugins.json').write_text('{"computer":false,"minecraft":true}')
     assert activities.snapshot()['enabled'] == {'computer':False,'browser':True,'minecraft':True}
+
+    policy.consent(False)
+    assert not activities.snapshot()['enabled']['browser']

@@ -119,7 +119,7 @@ def test_rejected_malformed_intent_remains_inspectable_without_breaking_the_buil
  assert result['requestedCells']==0 and result['bounds'] is None
  assert journal.history(BINDING,activity='bad',task_id='bad')[0]['request']==intent
 
-def test_build_index_tool_api_propagate_query_without_pixels_and_refuse_ambiguous_selector():
+def test_build_index_tool_api_propagate_query_without_pixels_and_refuse_ambiguous_selector(enabled_minecraft_mod):
  from app.services import computer_tools as tools
  from app.services.minecraft import minecraft
  from app.api.minecraft import TaskCommand,tasks

@@ -3,6 +3,8 @@ import pytest
 from app.services.social import SocialAccounts, SocialError
 from conftest import configured_native_social
 
+pytestmark = pytest.mark.usefixtures("enabled_qq_mod")
+
 
 def account(store, **changes):
     return configured_native_social(store, **changes)

@@ -69,9 +69,17 @@ test('native resource failures retain a bounded code over the pipe', async t => 
   await req('shutdown');
 });
 
+async function enableMinecraft(req) {
+  const modRoot = fileURLToPath(new URL('../src/', import.meta.url));
+  const modEntrypoint = fileURLToPath(new URL('../src/minecraft-adapter.mjs', import.meta.url));
+  await req('mods.configure', { id: 'momo.minecraft', binding: { modRoot, modEntrypoint } });
+}
+
 test('Minecraft argument rejections keep their known outcome over the real pipe', async t => {
   const {req,token} = child(t);
   await req('hello', {coreInstance:'minecraft-diagnostics',token});
+  await assert.rejects(req('minecraft.submit'), { code: 'MOD_DISABLED' });
+  await enableMinecraft(req);
   await assert.rejects(req('minecraft.submit', {taskId:'bad-input',skill:'plan',args:{steps:[]},permission:{world:'w',account:'a'}}), error => error.code === 'MINECRAFT_INPUT');
   await req('shutdown');
 });
@@ -90,6 +98,7 @@ test('concurrent Minecraft dispatch preserves no-effect busy rejection over stdi
   t.after(()=>{release();server.close();});
   const {req,token}=child(t);
   await req('hello',{coreInstance:'busy-game',token});await req('heartbeat',{activityEpoch:1});
+  await enableMinecraft(req);
   await req('minecraft.configure',{port:server.address().port,token:'fixture-token-'.repeat(3)});
   const permission={world:'w',account:'a',activityEpoch:1};
   await req('minecraft.capabilities',{permission});
@@ -107,7 +116,8 @@ test('Minecraft schema detail survives the real pipe before any task dispatch',a
  });
  server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>server.close());
  const {req,token}=child(t);await req('hello',{coreInstance:'schema-detail',token});await req('heartbeat',{activityEpoch:1});
- await req('minecraft.configure',{port:server.address().port,token:'fixture-token-'.repeat(3)});
+ await enableMinecraft(req);
+  await req('minecraft.configure',{port:server.address().port,token:'fixture-token-'.repeat(3)});
  const permission={world:'w',account:'a',activityEpoch:1};await req('minecraft.capabilities',{permission});
  await assert.rejects(req('minecraft.submit',{permission,taskId:'invalid-slot',skill:'selectItem',args:{item:'minecraft:stone',hotbar:36}}),error=>{
   assert.equal(error.code,'MINECRAFT_INPUT');assert.deepEqual(error.validation,{path:'args.hotbar',rule:'integer',minimum:0,maximum:8});return true;

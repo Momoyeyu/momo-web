@@ -224,7 +224,14 @@ def import_data(raw):
                 if moved_previous:
                     os.replace(backup, root)
                 raise
+        kept = []
         try:
+            # The life archive does not distribute installed code or replace private Mod accounts.
+            for name in ("mods", "mod-data"):
+                source = backup / name
+                if moved_previous and source.is_dir() and not source.is_symlink():
+                    os.replace(source, root / name)
+                    kept.append(name)
             _reconcile_restored_extensions()
         except BaseException:
             # The API reports failure, so restore the prior profile as well as
@@ -232,6 +239,8 @@ def import_data(raw):
             # then agree that this replacement did not commit.
             with db._lock:
                 db.reset()
+                for name in kept:
+                    os.replace(root / name, backup / name)
                 if installed and root.exists():
                     shutil.rmtree(root)
                 if moved_previous:

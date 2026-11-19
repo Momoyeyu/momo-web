@@ -1,15 +1,12 @@
 import { NativeControl } from './native-control.mjs';
-import { createMinecraftAdapter, createMinecraftTransport } from './minecraft-adapter.mjs';
+import { isAbsolute, relative, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema, ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
-
-import { QQChannel, ChannelError } from './channels.mjs';
-import { QQRuntimeManager, QQRuntimeError } from './qq-runtime.mjs';
-import { createManagedQQRuntime } from './qq-invocation.mjs';
 
 export class HostError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -19,8 +16,12 @@ const opaque = value => typeof value === 'string' && value.length > 0 && value.l
 
 /** Owns the reviewed adapters and MCP connections for one Python coordinator. */
 export class PluginHost {
-  constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000, qqRuntime } = {}) {
-    this.minecraft = createMinecraftAdapter();
+  constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000, qqRuntime, qqModule, minecraftModule } = {}) {
+    this.qqModule = qqModule;
+    this.minecraftModule = minecraftModule;
+    this.minecraft = minecraftModule?.createMinecraftAdapter();
+    this.retiringMods = new Set();
+    this.configuringMods = new Set();
     this.computer = { observing: false, source: null, generation: 0 };
     this.hostInstance = randomUUID();
     this.emit = emit;
@@ -48,7 +49,7 @@ export class PluginHost {
     // Authentication owns an engine independently of the business adapters.
     // Only trusted host startup code supplies this facade; plugin settings and
     // model tool arguments cannot replace a process factory or its resources.
-    this.qqRuntime = qqRuntime ?? new QQRuntimeManager({ now });
+    this.qqRuntime = qqRuntime ?? (qqModule && new qqModule.QQRuntimeManager({ now }));
     this.watchdog = setInterval(() => {
       if (this.coreInstance && !this.paused && this.now() - this.lastHeartbeat > this.heartbeatMs) {
         this.paused = true;
@@ -76,7 +77,7 @@ export class PluginHost {
       if (this.coreInstance) fail('ALREADY_BOUND', 'Host already belongs to a coordinator');
       if (!opaque(params.coreInstance) || typeof params.token !== 'string' || params.token.length < 32 || params.token.length > 512) fail('PROTOCOL', 'Invalid coordinator binding');
       if (params.qqRuntime !== undefined) {
-        try { this.qqRuntime = createManagedQQRuntime(params.qqRuntime); }
+        try { this.qqRuntime = this.qqModule.createManagedQQRuntime(params.qqRuntime); }
         catch { fail('RESOURCE_INVALID', 'Managed QQ resources are not qualified'); }
       }
       this.coreInstance = params.coreInstance;
@@ -87,6 +88,19 @@ export class PluginHost {
     }
     this.authenticate(message.token);
     this.nativeControl ??= new NativeControl(permit => this.checkPermit(permit));
+    if (message.method === 'mods.configure') {
+      if (!['momo.qq', 'momo.minecraft'].includes(params.id)) fail('CONFIG', 'Unknown official Mod');
+      if (this.configuringMods.has(params.id)) fail('BUSY', 'Mod lifecycle change in progress');
+      this.configuringMods.add(params.id);
+      this.retiringMods.add(params.id);
+      if (params.id === 'momo.qq' && this.plugins.has('momo-qq'))
+        this.plugins.get('momo-qq').enabled = false;
+      return this.mutate(() => this.configureMod(params)).finally(() => this.configuringMods.delete(params.id));
+    }
+    if (message.method.startsWith('minecraft.') && (!this.minecraft || this.retiringMods.has('momo.minecraft')))
+      fail('MOD_DISABLED', 'Enable the Minecraft Mod first');
+    if (message.method.startsWith('qq.runtime.') && (!this.qqRuntime || this.retiringMods.has('momo.qq')))
+      fail('MOD_DISABLED', 'Enable the QQ Mod first');
     switch (message.method) {
       case 'native.screen': return this.nativeControl.screen(params.permit,params.blocked);
       case 'native.permissions': return this.nativeControl.permissionStatus(params.kind);
@@ -100,9 +114,12 @@ export class PluginHost {
       case 'browser.start':
       case 'browser.action': fail('RETIRED', 'Select an existing browser window through native control');
       case 'minecraft.configure': {
-        await this.minecraft.stop();
-        this.minecraft = createMinecraftAdapter({ now: this.now,
-          transport: createMinecraftTransport({ port: params.port, token: params.token, pid: params.pid ?? null }),
+        const current = this.minecraft;
+        await current.stop();
+        if (this.minecraft !== current || this.retiringMods.has('momo.minecraft') || this.closed)
+          fail('MOD_DISABLED', 'Minecraft binding changed');
+        this.minecraft = this.minecraftModule.createMinecraftAdapter({ now: this.now,
+          transport: this.minecraftModule.createMinecraftTransport({ port: params.port, token: params.token, pid: params.pid ?? null }),
           authorize: ({ permission }) => !this.paused && !this.closed && permission?.activityEpoch === this.epoch,
         });
         return this.minecraft.status();
@@ -205,6 +222,46 @@ export class PluginHost {
     }
   }
 
+  async configureMod({ id, binding }) {
+    let entry;
+    if (binding !== null) {
+      if (!binding || typeof binding.modRoot !== 'string' || typeof binding.modEntrypoint !== 'string' ||
+          !isAbsolute(binding.modRoot) || !isAbsolute(binding.modEntrypoint))
+        fail('CONFIG', 'Expected a verified installation path');
+      const inside = relative(binding.modRoot, binding.modEntrypoint);
+      if (!inside || inside === '..' || inside.startsWith('..' + sep) || isAbsolute(inside))
+        fail('CONFIG', 'Mod entrypoint is outside the installation');
+      entry = await import(pathToFileURL(binding.modEntrypoint).href);
+    }
+    if (id === 'momo.minecraft') {
+      await this.minecraft?.stop();
+      this.minecraft = entry?.createMinecraftAdapter();
+      this.minecraftModule = entry;
+    } else {
+      const plugin = this.plugins.get('momo-qq');
+      if (plugin) {
+        plugin.enabled = false;
+        await this.disposePlugin(plugin);
+        this.plugins.delete(plugin.id);
+        this.toolVersion++;
+      }
+      if (this.qqRuntime) {
+        const stopped = await this.qqRuntimeAction('stop');
+        if (stopped.executorQuiescent !== true) fail('PLUGIN_STOP', 'QQ stop could not be confirmed');
+        await Promise.allSettled([...this.inflight.values()]
+          .filter(item => item.command.pluginId === 'momo-qq').map(item => item.promise));
+        for (const command of this.unresolved.values()) {
+          if (command.pluginId === 'momo-qq')
+            await this.settleUnknownQQ({ commandId: command.commandId, accountId: command.accountId });
+        }
+      }
+      this.qqRuntime = entry && await entry.openQQ(binding);
+      this.qqModule = entry;
+    }
+    this.retiringMods.delete(id);
+    return { id, enabled: Boolean(entry), stopped: !entry };
+  }
+
   mutate(fn) {
     const next = this.mutations.then(fn, fn);
     this.mutations = next.catch(() => {});
@@ -212,6 +269,7 @@ export class PluginHost {
   }
 
   async qqRuntimeAction(method, params) {
+    const { QQRuntimeError } = this.qqModule;
     try {
       if (method === 'forget') {
         if (params?.ownerAction !== true) throw new QQRuntimeError('OWNER_ACTION_REQUIRED');
@@ -307,7 +365,8 @@ export class PluginHost {
   }
 
   async connectChannel(plugin) {
-    plugin.channel = new QQChannel(plugin.config, {
+    if (!this.qqRuntime || this.retiringMods.has('momo.qq')) fail('MOD_DISABLED', 'Enable the QQ Mod first');
+    plugin.channel = new this.qqModule.QQChannel(plugin.config, {
       nativeRuntime: this.qqRuntime,
       now: this.now,
       active: () => plugin.enabled && this.plugins.get(plugin.id) === plugin,
@@ -364,6 +423,7 @@ export class PluginHost {
     if (!plugin?.channel || !plugin.enabled || !plugin.connected || plugin.channel.quarantined) fail('PLUGIN_UNAVAILABLE', 'Channel plugin is unavailable');
     if (accountId !== plugin.config.accountId || policyRevision !== plugin.config.policyRevision) fail('STALE_CONFIG', 'Channel account or permissions have changed');
     if (!opaque(peerId) || typeof text !== 'string' || !text.trim() || text.length > 32000) fail('INPUT', 'A private recipient and text are required');
+    const { ChannelError } = this.qqModule;
     try { plugin.channel.check(peerId, 'reply'); } catch (error) { throw new HostError(error.code ?? 'CHANNEL', error.message); }
     const command = { ...this.beginCommand(permit, 'channel.send'), pluginId, accountId, peerId, policyRevision, payloadHash: createHash('sha256').update(text).digest('hex') };
     this.commands.set(command.commandId, command);
@@ -699,7 +759,7 @@ export class PluginHost {
     const remoteUnknown = active.some(item => item.plugin.config.transport !== 'stdio');
     for (const item of active) item.controller.abort();
     const closing = [...new Set(active.map(item => item.plugin))].map(plugin => this.closePluginConnection(plugin));
-    const channelStops = [...(this.nativeControl ? [this.nativeControl.stop()] : []),...channels.map(plugin => plugin.channel.stop()), this.minecraft.stop()];
+    const channelStops = [...(this.nativeControl ? [this.nativeControl.stop()] : []),...channels.map(plugin => plugin.channel.stop()), this.minecraft?.stop()];
     const settled = Promise.allSettled([...closing, ...active.map(item => item.promise), ...channelStops]).then(results => results.every(result => result.status === 'fulfilled' && (result.value?.executorQuiescent !== false)));
     let stopTimer;
     const stopped = await Promise.race([settled, new Promise(resolve => { stopTimer = setTimeout(() => resolve(false), this.stopTimeoutMs); })]);
@@ -721,7 +781,7 @@ export class PluginHost {
     clearInterval(this.watchdog);
     // QQ owns a detached process group. Reclaim it immediately: an unrelated
     // provider's close() must not keep it alive until Python kills this host.
-    const nativeStopped = this.qqRuntimeAction('stop')
+    const nativeStopped = !this.qqRuntime ? Promise.resolve(true) : this.qqRuntimeAction('stop')
       .then(async result => {
         if (result.executorQuiescent !== true) return false;
         // Persist this old host's real ownership proof before its pipe exits.
