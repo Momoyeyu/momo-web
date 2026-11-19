@@ -1,6 +1,6 @@
 # Minecraft Fabric companion
 
-This is the game-specific component of momo's Cordis Minecraft plugin. It attaches to the player's existing Fabric client and account; momo neither provisions another client nor signs into Minecraft.
+This is the game-specific component of momo's Minecraft integration. It attaches to the player's existing Fabric client and account; momo neither provisions another client nor signs into Minecraft.
 
 Pinned build: Minecraft Java 1.21.1, Yarn 1.21.1+build.3, Fabric Loader 0.16.14, Fabric API 0.116.4+1.21.1, Java 21, Loom 1.7.4, Gradle 8.10.2. Run `gradle --no-daemon build`; `check` includes the bounded-path smoke test. The release JAR is `build/libs/momo-fabric-companion-0.1.0.jar`. Desktop packaging copies it to `plugin-host/resources/minecraft/` outside asar.
 

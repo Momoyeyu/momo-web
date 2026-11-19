@@ -1,4 +1,4 @@
-"""Lease-authorized offline browser commands in the shared Cordis host."""
+"""Lease-authorized offline browser commands in the shared Node host."""
 import threading
 from .coordinator import runtime
 from . import vision, browser_fetch

@@ -41,6 +41,25 @@ const config = () => ({ id: 'momo-qq', type: 'qq', transport: 'managed', account
 const incoming = extra => ({ post_type: 'message', message_type: 'private', self_id: '123456', user_id: '456789', message_id: 12, time: 1770000000, message: [{ type: 'text', data: { text: '你好' } }], ...extra });
 const promptScope = extra => ({ pluginId: 'momo-qq', source: 'qq', accountId: 'qq-main', peerId: '456789', policyRevision: 1, ...extra });
 
+test('a QQ cleanup failure keeps the old adapter disabled and owned until close succeeds', async t => {
+  const bot = await nativeQQ(t);
+  const { req, host } = await setup(t, { qqRuntime: bot.runtime });
+  await req('plugins.configure', { plugins: [config()] });
+  const plugin = host.plugins.get('momo-qq');
+  const close = plugin.channel.close.bind(plugin.channel);
+  plugin.channel.close = async () => { throw new Error('private transport details'); };
+  try {
+    await assert.rejects(req('plugins.configure', { plugins: [] }), { code: 'PLUGIN_STOP' });
+    assert.equal(host.plugins.get(plugin.id), plugin);
+    assert.equal(plugin.enabled, false);
+    await assert.rejects(req('plugins.promptContext', promptScope()), { code: 'PLUGIN_UNAVAILABLE' });
+  } finally {
+    plugin.channel.close = close;
+  }
+  await req('plugins.configure', { plugins: [] });
+  assert.equal(host.plugins.has(plugin.id), false);
+});
+
 test('QQ contributes static current-turn context without exposing account or message data, including after fresh-host recovery', async t => {
   const bot = await nativeQQ(t), { req, events, host } = await setup(t, { qqRuntime: bot.runtime });
   await req('plugins.configure', { plugins: [{ ...config(), prompt: 'UNTRUSTED_CONFIG_PROMPT' }] });

@@ -1,8 +1,8 @@
-# Cordis 插件宿主
+# Node 执行宿主
 
 Python 是唯一内核：生活记录、推理、记忆、队列和活动决策均由它负责。这个 Node 子进程只管理审核过的插件、常驻 MCP 连接和可取消的活动，不自行生成回答。`npm ci --ignore-scripts` 后执行 `npm test`；开发入口为 `node src/index.mjs`，由内核通过私有 stdin/stdout 启动。
 
-依赖锁定为 Cordis `4.0.0-rc.12` 与 MCP TypeScript SDK `1.32.2`。Cordis 的服务注入和 `ctx.effect` 回收管理每个插件的连接；禁用时先撤下工具与执行入口，再等待 scope 释放。没有加载任意 JavaScript 插件的接口；Cordis scope 也不构成权限沙箱。
+MCP TypeScript SDK 锁定为 `1.32.2`。宿主显式启动 MCP 和内置 QQ 适配器。禁用时立即撤下工具和执行入口，随后关闭对应的连接。关闭失败会保留已禁用的记录，方便重试回收。Python 持有推理、权限与凭据。
 
 ## 本机协议 v1
 
@@ -27,7 +27,7 @@ Python 是唯一内核：生活记录、推理、记忆、队列和活动决策�
 | `heartbeat` | `{activityEpoch}` → `{hostInstance,activityEpoch,paused}`。首个心跳初始化许可，之后只续租，不解除暂停。 |
 | `revoke` | `{activityEpoch:更大代际}` → `{stopped,unknownExternal,reason,activityEpoch}`。立即关执行 gate，取消活动和在途 MCP 调用，关闭涉及的连接，之后才 ACK。 |
 | `grant` | `{activityEpoch}`。仅成功 revoke 且 `stopped:true`、无未核对命令后允许显式恢复；失联心跳不会自动恢复。 |
-| `plugins.configure` | `{plugins:[config],configurationRevision?,tolerateErrors?}`。完整期望集合；相同、健康的配置保留连接；缺失、变更或禁用立即撤下 gate，再释放自己的 scope。较旧配置版本不覆盖新版本；容错模式返回 `failures:[{id,code}]` 并继续启动其他插件。 |
+| `plugins.configure` | `{plugins:[config],configurationRevision?,tolerateErrors?}`。完整期望集合；相同、健康的配置保留连接；缺失、变更或禁用立即撤下 gate，再关闭自己的连接。较旧配置版本不覆盖新版本；容错模式返回 `failures:[{id,code}]` 并继续启动其他插件。 |
 | `plugins.listTools` | 返回 `{version,tools}`；名称为 `pluginId__originalName`，附原始名称和 JSON schema。服务的 catalog 变更通知会更新版本。 |
 | `plugins.callTool` | `{name,arguments,permit}` → `{result,receipt}`。已派发后的取消、超时与传输故障记录 `unknown,requiresReconciliation:true` 并暂停；收到明确 `isError` 结果才记为已知 `failed`。 |
 | `commands.reconcile` | `{commandId,status:"completed"或"failed"}`。仅受信任内核在核对外部事实后调用；结清原命令并返回 `{reconciled,receipt?}`，不重发、不解除暂停。在途命令返回 `BUSY`；旧宿主的命令返回 `reconciled:false`，由内核结清持久 outbox。 |
@@ -38,7 +38,7 @@ Python 是唯一内核：生活记录、推理、记忆、队列和活动决策�
 | `virtual.activityStop` | `{commandId?}` → `{stopped,ticks}`，停止完成后返回。 |
 | `receipts.list` | `{after:seq}` → `{receipts,oldest,latest}`；发现序号缺口应核对事实，不能盲目重放。 |
 | `status` | 实例、代际、暂停状态、活动、在途数量、`unresolvedCommands` 命令 ID 列表和插件连通状态；不包含凭据和配置。 |
-| `shutdown` | 关闭 scopes 与自有连接；stdin EOF / SIGTERM 同样触发退出。 |
+| `shutdown` | 停止活动与自有连接；stdin EOF / SIGTERM 同样触发退出。 |
 
 成功为 `{v,id,ok:true,result}`，失败为 `{v,id,ok:false,error:{code,message}}`。事件为 `{v,event,data}`，包括 `inbox`、`receipt`、`activity.tick`、`activity.stopped`、`tools.changed`、`host.paused`。回执固定携带原来的 `coreInstance / hostInstance / activityEpoch / runId / commandId`；过时代际的已知执行结果仍记录 `stale:true` 的事实，不能据此继续规划或改写当前对话。
 
@@ -58,7 +58,7 @@ MCP 连接关闭会立即撤下工具目录并推进版本；下一次配置协�
 
 独立 watchdog 默认 5 秒未收到内核心跳就暂停、撤销代际、停止活动。stdio MCP 的自有进程会关闭；网络 MCP 取消无法保证远端副作用停止，存在在途请求时 `revoke` 返回 `stopped:false,unknownExternal:true`，要求内核进入故障暂停并核对外部事实。不要将传输取消视为跨平台事务回滚。
 
-`momoCapabilities / momoChannels / momoCredentials` 是 scope 依赖边界。首版凭据门面仅接受“不存在授权就失败”的默认行为，不伪造 OAuth 提供方；用户授权、账号绑定和安全存储由内核和后续渠道计划实现。LLM、记忆门面暂不向内置插件开放，没有第二套推理路径。
+适配器通过受信任的管道接口接收明确的操作和许可。用户授权、账号绑定、凭据、推理和记忆由 Python 内核持有。
 
 Python 的 `core/mcp.py` 只投影目录并通过唯一协调器发出命令。设置更新是权威来源，旧回合快照不能重新启用已经禁用的插件；跨线程配置重排通过 `configurationRevision` 拦截。探测使用独立、短期宿主，不关闭真实对话的连接。
 
@@ -70,7 +70,5 @@ Python 的 `core/mcp.py` 只投影目录并通过唯一协调器发出命令。�
 
 ## 已验证的上游契约
 
-- [Cordis Fiber](https://github.com/cordiverse/cordis/blob/main/packages/core/src/fiber.ts)：`ctx.effect()` 归属 scope；异步 effect 的启动需要等待，`fiber.dispose()` 等待释放。实际安装包的 `lib/fiber.d.ts` 与生命周期测试共同校验锁定版本。
-- [Cordis Registry](https://github.com/cordiverse/cordis/blob/main/packages/core/src/registry.ts)：插件 `inject`、服务依赖和 `fiber.await()`。
 - [MCP SDK 1.32.2 Client](https://github.com/modelcontextprotocol/typescript-sdk/blob/1.32.2/docs/client.md)：stdio / Streamable HTTP / SSE 常驻连接和关闭。
 - [MCP SDK 1.32.2 Protocol](https://github.com/modelcontextprotocol/typescript-sdk/blob/1.32.2/docs/protocol.md)：`callTool` 的 AbortSignal 取消；取消不意味着远端动作未发生。

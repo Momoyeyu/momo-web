@@ -9,7 +9,7 @@ function blockedPlugin() {
     release,
     plugin: { id: 'inert-mcp', config: { type: 'mcp', transport: 'stdio' }, enabled: true,
       connected: true, controllers: new Set(), client: { close: () => blocked },
-      transport: null, fiber: null },
+      transport: null },
   };
 }
 

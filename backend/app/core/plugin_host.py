@@ -1,4 +1,4 @@
-"""Private, versioned pipe to the single Cordis host. No listening management port."""
+"""Private, versioned pipe to the single Node host. No listening management port."""
 
 from __future__ import annotations
 

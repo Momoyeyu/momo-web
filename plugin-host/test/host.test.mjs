@@ -23,28 +23,14 @@ test('coordinator binding authenticates every request and cannot be rebound', as
   await assert.rejects(req('hello', { coreInstance: 'other', token }), { code: 'ALREADY_BOUND' });
 });
 
-test('Cordis scopes require provided facades and release effects on disposal', async t => {
+test('repeated configuration releases disabled virtual connections', async t => {
   const { host, req } = await setup(t);
-  let entered = 0, disposed = 0;
-  const plugin = {
-    name: 'facade-dependent-test', inject: ['momoCapabilities'],
-    apply: ctx => ctx.effect(() => { entered++; assert.equal(typeof ctx.momoCapabilities.checkPermit, 'function'); return () => { disposed++; }; }),
-  };
-  const fork = host.ctx.plugin(plugin);
-  await fork.await();
-  assert.equal(entered, 1);
-  await fork.dispose();
-  assert.equal(disposed, 1);
-  let unavailableEntered = false;
-  const missing = host.ctx.plugin({ inject: ['missingService'], apply: () => { unavailableEntered = true; } });
-  await wait(10);
-  assert.equal(unavailableEntered, false);
-  await missing.dispose();
   for (let i = 0; i < 12; i++) {
     await req('plugins.configure', { plugins: [{ id: 'virtual', type: 'virtual' }] });
+    assert.equal(host.plugins.get('virtual').connected, true);
     await req('plugins.configure', { plugins: [] });
+    assert.equal(host.plugins.size, 0);
   }
-  assert.equal(host.plugins.size, 0);
   assert.equal(host.activity, null);
 });
 

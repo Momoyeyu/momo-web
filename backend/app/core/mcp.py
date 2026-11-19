@@ -1,4 +1,4 @@
-"""MCP façade: Cordis owns connections; Python owns permissions and execution order.
+"""MCP façade: The Node host owns connections; Python owns permissions and execution order.
 
 There is no Python MCP event loop or transport in the active path. A turn gets a
 catalog projection; leaving the turn never closes another turn's connection.
@@ -249,7 +249,7 @@ def _entries(extensions):
 
 
 class McpHub:
-    """Catalog/permission bridge to the coordinator's sole Cordis child."""
+    """Catalog/permission bridge to the coordinator's sole Node child."""
 
     def __init__(self):
         self._lock = threading.RLock()

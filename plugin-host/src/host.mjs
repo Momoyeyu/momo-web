@@ -1,7 +1,6 @@
 import { NativeControl } from './native-control.mjs';
 import { createMinecraftAdapter, createMinecraftTransport } from './minecraft-adapter.mjs';
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
-import { Context } from 'cordis';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -18,15 +17,11 @@ export class HostError extends Error {
 const fail = (code, message) => { throw new HostError(code, message); };
 const opaque = value => typeof value === 'string' && value.length > 0 && value.length <= 200;
 
-/** Only reviewed built-ins run here. Cordis scopes are lifecycle ownership, not a sandbox. */
+/** Owns the reviewed adapters and MCP connections for one Python coordinator. */
 export class PluginHost {
   constructor({ emit = () => {}, now = Date.now, stopTimeoutMs = 5000, qqRuntime } = {}) {
-    this.ctx = new Context();
-    this.ctx.plugin(ctx => { ctx.on('dispose', () => this.nativeControl?.stop()); });
     this.minecraft = createMinecraftAdapter();
-    this.ctx.plugin(ctx => { ctx.on('dispose', () => this.minecraft.stop()); });
     this.computer = { observing: false, source: null, generation: 0 };
-    this.ctx.plugin(ctx => { ctx.on('dispose', () => { this.computer.observing = false; this.computer.generation++; }); });
     this.hostInstance = randomUUID();
     this.emit = emit;
     this.now = now;
@@ -50,15 +45,10 @@ export class PluginHost {
     this.mutations = Promise.resolve();
     this.configRevision = 0;
     this.callerConfigRevision = -1;
-    // Authentication owns an engine independently of business adapter scopes.
+    // Authentication owns an engine independently of the business adapters.
     // Only trusted host startup code supplies this facade; plugin settings and
     // model tool arguments cannot replace a process factory or its resources.
     this.qqRuntime = qqRuntime ?? new QQRuntimeManager({ now });
-    this.ctx.provide('momoCapabilities', Object.freeze({ checkPermit: permit => this.checkPermit(permit) }));
-    this.ctx.provide('momoChannels', Object.freeze({ receive: data => this.receive(data) }));
-    // Brain services are deliberately unavailable to host plugins in this first slice.
-    // Their public boundaries remain explicit; no provider tokens enter a model-facing tool.
-    this.ctx.provide('momoCredentials', Object.freeze({ resolve: () => fail('CREDENTIAL_UNAVAILABLE', 'Credential reference is unavailable') }));
     this.watchdog = setInterval(() => {
       if (this.coreInstance && !this.paused && this.now() - this.lastHeartbeat > this.heartbeatMs) {
         this.paused = true;
@@ -231,7 +221,7 @@ export class PluginHost {
           this.plugins.delete(plugin.id); this.toolVersion++;
           for (const controller of plugin.controllers) controller.abort();
           // Retire only this adapter. Native logout must not wait behind an
-          // unrelated MCP mutation or a blocked Cordis disposal. QQ close keeps
+          // unrelated MCP mutation or a blocked adapter cleanup. QQ close keeps
           // submitted echoes correlated until their original late receipt.
           void this.disposePlugin(plugin).catch(() => {});
         }
@@ -297,29 +287,18 @@ export class PluginHost {
       if (revision !== this.configRevision) break;
       if (this.closed) fail('CLOSED', 'Host is closed');
       if (this.plugins.has(id)) continue;
-      const plugin = { id, config, fingerprint: JSON.stringify(config), enabled: true, connected: false, tools: [], client: null, transport: null, controllers: new Set(), fiber: null };
+      const plugin = { id, config, fingerprint: JSON.stringify(config), enabled: true, connected: false, tools: [], client: null, transport: null, controllers: new Set() };
       this.plugins.set(id, plugin);
       try {
-        plugin.fiber = this.ctx.plugin({
-          name: `momo-${id}`,
-          inject: ['momoCapabilities', 'momoChannels', 'momoCredentials'],
-          apply: async ctx => {
-            await ctx.effect(async () => {
-              if (config.type === 'mcp') await this.connectMcp(plugin);
-              if (config.type === 'qq') await this.connectChannel(plugin);
-              if (this.closed || !plugin.enabled) { await this.closePluginConnection(plugin); fail('CLOSED', 'Plugin was stopped during startup'); }
-              plugin.connected = true;
-              return () => this.closePluginConnection(plugin);
-            }, 'momo persistent plugin connection');
-          },
-        });
-        await plugin.fiber.await();
-        if (!plugin.connected) fail('PLUGIN_START', 'Plugin could not start');
+        if (config.type === 'mcp') await this.connectMcp(plugin);
+        if (config.type === 'qq') await this.connectChannel(plugin);
+        if (this.closed || !plugin.enabled) fail('CLOSED', 'Plugin was stopped during startup');
+        plugin.connected = true;
         this.toolVersion++;
       } catch {
         plugin.enabled = false;
         await this.disposePlugin(plugin);
-        this.plugins.delete(id);
+        if (this.plugins.get(id) === plugin) this.plugins.delete(id);
         if (!tolerateErrors) fail('PLUGIN_START', `Plugin ${id} could not start`);
         failures.push({ id, code: 'PLUGIN_START' });
       }
@@ -484,13 +463,8 @@ export class PluginHost {
       else if (config.transport === 'streamable-http') plugin.transport = new StreamableHTTPClientTransport(url, options);
       else fail('CONFIG', 'Unsupported MCP transport');
     }
-    try {
-      await plugin.client.connect(plugin.transport, { timeout: Math.min(Number(config.connectTimeoutMs ?? config.timeoutMs) || 15000, 60000) });
-      plugin.tools = await this.fetchTools(plugin.client, config);
-    } catch {
-      await this.closePluginConnection(plugin);
-      fail('MCP_CONNECT', 'MCP connection failed');
-    }
+    await client.connect(plugin.transport, { timeout: Math.min(Number(config.connectTimeoutMs ?? config.timeoutMs) || 15000, 60000) });
+    plugin.tools = await this.fetchTools(client, config);
   }
 
   async fetchTools(client, config) {
@@ -678,10 +652,11 @@ export class PluginHost {
   }
 
   async closePluginConnectionOwned(plugin) {
-    for (const controller of plugin.controllers) controller.abort();
-    await plugin.channel?.close();
     plugin.connected = false;
     plugin.tools = [];
+    for (const controller of plugin.controllers) controller.abort();
+    try { await plugin.channel?.close(); }
+    catch { fail('PLUGIN_STOP', 'Plugin channel stop could not be confirmed'); }
     const client = plugin.client;
     const transport = plugin.transport;
     // Keep ownership and the original pid until exit is confirmed. A retry must
@@ -711,17 +686,8 @@ export class PluginHost {
   }
 
   async disposePlugin(plugin) {
-    // QQ owns native cleanup independently of Cordis and has its own stop ACK.
-    if (plugin.config.type === 'qq') {
-      if (plugin.fiber) await plugin.fiber.dispose();
-      else await this.closePluginConnection(plugin);
-      return;
-    }
     if (plugin.config.type === 'virtual') await this.stopActivity(undefined, 'plugin_disabled');
-    // Cordis logs and swallows effect cleanup failures. Confirm directly first,
-    // so configure can retain a disabled record and the caller can retry.
     await this.closePluginConnection(plugin);
-    if (plugin.fiber) await plugin.fiber.dispose();
   }
 
   async stopAll(reason) {
@@ -774,7 +740,6 @@ export class PluginHost {
       const plugins = [...this.plugins.values()];
       this.plugins.clear();
       const disposed = await Promise.allSettled(plugins.map(plugin => this.disposePlugin(plugin)));
-      await this.ctx.fiber.dispose();
       return operations.stopped && disposed.every(result => result.status === 'fulfilled');
     })().catch(() => false);
     this.closePromise = (async () => {

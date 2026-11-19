@@ -115,7 +115,7 @@ test('forget withdraws only QQ and starts native cleanup without waiting for blo
   let release, disposals = 0, mcpClosed = 0, nativeCalls = 0;
   const blocked = new Promise(resolve => { release = resolve; });
   const controller = new AbortController();
-  const plugin = { id: 'momo-qq', config: { type: 'qq' }, enabled: true, connected: true, controllers: new Set([controller]), fiber: { dispose: () => { disposals++; return blocked; } } };
+  const plugin = { id: 'momo-qq', config: { type: 'qq' }, enabled: true, connected: true, controllers: new Set([controller]), channel: { close: () => { disposals++; return blocked; } } };
   const mcp = { id: 'slow-mcp', config: { type: 'mcp' }, enabled: true, connected: true, controllers: new Set(), client: { close: async () => { mcpClosed++; await blocked; } } };
   host.plugins.set(plugin.id, plugin); host.plugins.set(mcp.id, mcp);
   const pendingMutation = host.mutate(() => blocked);

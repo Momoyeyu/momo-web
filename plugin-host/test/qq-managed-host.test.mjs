@@ -42,7 +42,7 @@ async function setup(t, { reply = true } = {}) {
   return { host, runtime, request, sent, events, complete, ipc, permit };
 }
 
-test('native engine, Cordis channel and permit gates integrate without any OneBot listening port', async t => {
+test('native engine, managed channel and permit gates integrate without any OneBot listening port', async t => {
   const { host, request, sent, events, ipc, permit } = await setup(t);
   assert.equal((await request('channels.health', { pluginId: 'momo-qq' })).status, 'connected');
   ipc({ event: 'onebot', data: { post_type: 'message', message_type: 'private', sub_type: 'friend', self_id: '123456', user_id: '456789', message_id: 'incoming-native', time: 1770000000, message: [{ type: 'text', data: { text: 'Hello over native QQ' } }] } });

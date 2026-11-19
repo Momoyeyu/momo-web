@@ -33,7 +33,7 @@ jobs:
       - name: Install the locked plugin host
         run: npm ci --ignore-scripts --no-audit --no-fund
         working-directory: plugin-host
-      - name: Check the Cordis host
+      - name: Check the Node execution host
         run: npm test
         working-directory: plugin-host
       - name: Install the locked backend

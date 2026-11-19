@@ -23,8 +23,8 @@ Node filesystem, process, or network access. Only enable authors you trust.
 
 The entry must implement the MCP stdio JSON-RPC protocol (initialize, tools/list,
 tools/call); stdout is reserved for protocol messages. Bundle dependencies into
-ES modules before export. No npm installation, scripts, archives, arbitrary host
-Cordis imports, or automatic dependency downloads occur. Node must be installed.
+ES modules before export. No npm installation, scripts, archives, in-process host
+extensions, or automatic dependency downloads occur. Node must be installed.
 The host's existing MCP adapter owns transport lifecycle and tool projection;
 Python remains the only reasoning coordinator. Ordinary tool execution still
 passes existing MCP permissions. Those permissions do not restrict startup code.

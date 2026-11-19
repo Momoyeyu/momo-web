@@ -1,7 +1,7 @@
 """拓展服务：MCP server 的注册与连通性探测。
 
 分层约定：HTTP 层只与本层交互，不直接 import client/。
-连接由 Cordis 宿主持有，Python 门面只做工具投影与权限校验。
+连接由 Node 宿主持有，Python 门面只做工具投影与权限校验。
 """
 
 from __future__ import annotations
