@@ -1,13 +1,11 @@
 """Prevent data replacement while a turn, upload, or live ASR session owns state."""
 
 import threading
-import asyncio
 
 
 class DataMaintenance:
-    def __init__(self, app, barrier_factory=None):
+    def __init__(self, app):
         self.app = app
-        self.barrier_factory = barrier_factory
         self._lock = threading.Lock()
         self._active = 0
         self._maintenance = False
@@ -16,10 +14,10 @@ class DataMaintenance:
         kind = scope["type"]
         if kind not in ("http", "websocket"):
             return await self.app(scope, receive, send)
-        maintenance = scope.get("path") in {
-            "/api/data/export",
-            "/api/data/import",
-            "/api/data/validate",
+        maintenance = (scope.get("method"), scope.get("path")) in {
+            ("GET", "/api/data/export"),
+            ("POST", "/api/data/import"),
+            ("POST", "/api/data/validate"),
         }
         # Lease renewal changes only coordinator memory. Treating it as a data
         # writer makes chat-page transfers race their background heartbeat.
@@ -58,34 +56,7 @@ class DataMaintenance:
                 )
             return
         try:
-            barrier = (
-                self.barrier_factory()
-                if self.barrier_factory and scope.get("path") == "/api/data/import"
-                else None
-            )
-            if barrier:
-                try:
-                    await asyncio.to_thread(barrier.__enter__)
-                except Exception:
-                    await send(
-                        {
-                            "type": "http.response.start",
-                            "status": 409,
-                            "headers": [(b"content-type", b"application/json")],
-                        }
-                    )
-                    await send(
-                        {
-                            "type": "http.response.body",
-                            "body": b'{"detail":"Could not safely pause runtime for restore"}',
-                        }
-                    )
-                    return
-            try:
-                await self.app(scope, receive, send)
-            finally:
-                if barrier:
-                    await asyncio.to_thread(barrier.__exit__, None, None, None)
+            await self.app(scope, receive, send)
         finally:
             with self._lock:
                 if maintenance:

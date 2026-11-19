@@ -58,20 +58,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="momo-web backend", lifespan=lifespan)
 
-# 本地开发：放行任意 localhost/127.0.0.1 端口（vite 默认 5173）
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=sorted(allowed_origins())
-    if os.environ.get("MOMO_DESKTOP_TOKEN")
-    else [],
-    allow_origin_regex=None
-    if os.environ.get("MOMO_DESKTOP_TOKEN")
-    else r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["X-Sample-Rate", "X-Momo-Generation"],
-)
-
 app.include_router(state.router)
 app.include_router(memories.router)
 app.include_router(mods.router)
@@ -109,9 +95,19 @@ app.include_router(social.router)
 
 from .core.maintenance import DataMaintenance
 
+app.add_middleware(DataMaintenance)
+# 本地开发：放行任意 localhost/127.0.0.1 端口（vite 默认 5173）
 app.add_middleware(
-    DataMaintenance,
-    barrier_factory=lambda: runtime.maintenance() if runtime.started else None,
+    CORSMiddleware,
+    allow_origins=sorted(allowed_origins())
+    if os.environ.get("MOMO_DESKTOP_TOKEN")
+    else [],
+    allow_origin_regex=None
+    if os.environ.get("MOMO_DESKTOP_TOKEN")
+    else r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Sample-Rate", "X-Momo-Generation"],
 )
 app.add_middleware(DesktopAuth)
 

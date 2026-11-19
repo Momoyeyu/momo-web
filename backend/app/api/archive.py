@@ -1,5 +1,8 @@
+import asyncio
+from contextlib import ExitStack
 from fastapi import APIRouter, Request, HTTPException, Response
 from ..services import archive
+from ..services.coordinator import runtime
 router = APIRouter()
 
 @router.get('/api/data/export')
@@ -16,10 +19,20 @@ async def import_data(request: Request):
         raw.extend(chunk)
         if len(raw) > archive.LIMIT:
             raise HTTPException(413, 'Archive exceeds size limit')
-    try:
-        archive.import_data(bytes(raw))
-    except Exception:
-        raise HTTPException(400, 'Invalid or incompatible data archive')
+    def restore():
+        # Release the runtime barrier before the renderer gets success and reloads.
+        with ExitStack() as stack:
+            if runtime.started:
+                try:
+                    stack.enter_context(runtime.maintenance())
+                except Exception:
+                    raise HTTPException(409, 'Could not safely pause runtime for restore') from None
+            try:
+                archive.import_data(bytes(raw))
+            except Exception:
+                raise HTTPException(400, 'Invalid or incompatible data archive') from None
+
+    await asyncio.to_thread(restore)
     return {'ok': True}
 
 @router.post('/api/data/validate')

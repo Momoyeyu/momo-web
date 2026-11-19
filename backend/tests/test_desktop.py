@@ -488,3 +488,30 @@ def test_heartbeat_does_not_race_backup_maintenance():
             release_transfer.set()
             assert (await transfer).status_code == 200
     asyncio.run(run())
+
+
+def test_cors_preflight_never_enters_restore_and_pause_failure_is_readable(monkeypatch):
+    from app.services.coordinator import runtime
+    from contextlib import contextmanager
+    calls = []
+
+    @contextmanager
+    def unavailable():
+        calls.append("pause")
+        raise RuntimeError("owned operation pending")
+        yield
+
+    monkeypatch.setattr(runtime, "started", True)
+    monkeypatch.setattr(runtime, "maintenance", unavailable)
+    origin = "http://localhost:5177"
+    client = TestClient(app)
+    preflight = client.options("/api/data/import", headers={
+        "Origin": origin, "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type",
+    })
+    assert calls == []
+    assert preflight.status_code == 200
+    denied = client.post("/api/data/import", content=b"test", headers={"Origin": origin})
+    assert calls == ["pause"]
+    assert denied.status_code == 409
+    assert denied.headers["access-control-allow-origin"] == origin
