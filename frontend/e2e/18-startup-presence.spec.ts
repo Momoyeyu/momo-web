@@ -10,6 +10,9 @@ async function fixture(page: Page, waitForState: Promise<void> = Promise.resolve
       body = {settings:{general:{lang:language,voiceInput:false},llm:{url:'',model:'',key:''},tts:{url:'',key:'',voice:'',prompt:''}}};
     }
     if (url.pathname === '/api/intro') body = {phase:firstLaunch?'setup':'completed',languageConfirmed:false,configurationValid:false};
+    if (url.pathname === '/api/extensions/activities') body = {enabled:{computer:false,browser:false,minecraft:false}};
+    if (url.pathname === '/api/computer/access') body = {available:false};
+    if (url.pathname === '/api/minecraft/sessions') body = {sessions:[]};
     if (url.pathname === '/api/life/history') body = {summary:'',messages:[],hasMore:false,nextBefore:null};
     if (url.pathname === '/api/onboarding') body = {stage:firstLaunch?'new':'completed',busy:false,generation:0,configured:false};
     if (url.pathname === '/api/checkpoints' || url.pathname === '/api/memories') body = [];

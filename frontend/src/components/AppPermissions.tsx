@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useState} from 'react';
+import {useCallback, useEffect, useLayoutEffect, useState} from 'react';
 import {useT} from '../i18n';
 import {apiJson, jsonInit} from '../services/http';
 import {refreshActivities} from '../services/extensionActivities';
@@ -15,7 +15,9 @@ const endpoint = '/api/computer/access';
 const guideEvent = 'momo:desktop-access-guide';
 export function openDesktopAccessGuide() { window.dispatchEvent(new Event(guideEvent)); }
 
-export default function AppPermissions({manage = false, ready = false}: {manage?: boolean; ready?: boolean}) {
+export default function AppPermissions({manage = false, ready = false, onGuideVisibility}: {
+  manage?: boolean; ready?: boolean; onGuideVisibility?: (visible: boolean) => void;
+}) {
   const t = useT();
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [system, setSystem] = useState<SystemAccess | null>(null);
@@ -23,6 +25,8 @@ export default function AppPermissions({manage = false, ready = false}: {manage?
   const [selected, setSelected] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const guideVisible = !manage && guide && policy?.available === true;
+  useLayoutEffect(() => { onGuideVisibility?.(guideVisible); }, [guideVisible, onGuideVisibility]);
   const refreshSystem = useCallback(async () => setSystem(await apiJson<SystemAccess>(endpoint + '/system')), []);
 
   useEffect(() => {

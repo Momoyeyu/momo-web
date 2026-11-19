@@ -81,6 +81,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   },[desktopWindow.panel,desktopWindow.mode]);
   useEffect(()=>{if(desktopWindow.mode==='pet'&&route!=='chat')void setDesktopMode('chat').catch(()=>{});},[desktopWindow.mode,route]);
   const audioIntro=useIntro().data?.phase;
+  const [desktopGuideVisible,setDesktopGuideVisible]=useState(false);
   useEffect(()=>ambient.install(),[]);
   useEffect(()=>{const sync=()=>ambient.configure(getSettings().general);sync();return subscribe(sync);},[]);
   useEffect(()=>{musicDirector.page(route,!!audioIntro&&['naming','memory','return_title','celebration'].includes(audioIntro));},[route,audioIntro]);
@@ -346,8 +347,8 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
       <div className="desktop-window-grip" aria-hidden="true"/>
       <div id="desktop-controls-host"/>
       <TooltipLayer />
-      <IntroGuide ready={ready} />
-      <AppPermissions ready={ready}/>
+      <IntroGuide ready={ready && !desktopGuideVisible} />
+      <AppPermissions ready={ready} onGuideVisibility={setDesktopGuideVisible}/>
 
       {/* 换场特效：落点 + 水面光晕（涟漪环已删——正圆光环盖过不规则边缘） */}
       <div className="tx-fx" aria-hidden="true">

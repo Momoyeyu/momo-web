@@ -11,6 +11,7 @@ test('desktop startup asks once, waits for system access, and saves the user dec
   let granted: boolean | null = null;
   const requests: string[] = [];
   const system = {screenPermission:false, inputPermission:false, applications:[]};
+  await page.route('**/api/intro', route => route.fulfill({json:{phase:'setup', languageConfirmed:false, configurationValid:false}}));
   await page.route('**/api/computer/access', route => route.fulfill({json:{available:true, granted, blocked:[]}}));
   await page.route('**/api/computer/access/system**', route => {
     if (route.request().method() === 'POST') {
@@ -28,6 +29,7 @@ test('desktop startup asks once, waits for system access, and saves the user dec
   await page.goto('/#/');
   const guide = page.getByRole('dialog', {name:'桌面访问', exact:true});
   await expect(guide).toBeVisible({timeout:20000});
+  await expect(page.locator('.intro-guide')).toHaveCount(0);
   const enable = guide.getByRole('button', {name:'启用桌面访问'});
   await expect(enable).toBeDisabled();
   expect(requests).toEqual([]);
@@ -37,9 +39,10 @@ test('desktop startup asks once, waits for system access, and saves the user dec
   await expect(enable).toBeEnabled();
   await enable.click();
   await expect(guide).toHaveCount(0);
+  await expect(page.locator('.intro-guide')).toBeVisible();
   expect(granted).toBe(true);
   expect(requests).toEqual(['screen','input']);
   await page.reload();
-  await expect(page.locator('.title-screen')).toBeVisible({timeout:20000});
+  await expect(page.locator('.intro-guide')).toBeVisible({timeout:20000});
   await expect(guide).toHaveCount(0);
 });
