@@ -42,9 +42,13 @@ export default function Title({active}: {active:boolean}) {
             onClick={m.onClick}
             disabled={starting}
           >
-            <span className="mi-orn" />
+            <span className="mi-orn" aria-hidden="true">
+              <svg viewBox="0 0 22 22" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d={m.key === "boot" ? "M4 5h14v12H4z M7 8l3 3-3 3m5 0h3" : "M4 7h14M4 15h14M8 4v6m7 2v6"}/>
+              </svg>
+            </span>
             <span className="mi-label">{t(m.labelKey)}</span>
-            <span className="mi-hint">{m.hint}</span>
+            <span className="mi-hint" lang="en">{m.hint}</span>
           </Button>
         ))}
       </nav>

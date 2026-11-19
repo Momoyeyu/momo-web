@@ -7,6 +7,7 @@ import {meetingIdentity,meetingSnapshot,subscribeMeeting} from '../../services/m
 import ExtensionCard from './ExtensionCard';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
+import ConfigAction from './ConfigAction';
 import Icon from '../../ui/Icon';
 import FieldRow from '../../ui/FieldRow';
 import Hint from '../../ui/Hint';
@@ -15,10 +16,11 @@ import NativeWindowNotice, {type NativeWindowDiagnostics} from './NativeWindowNo
 import AppPermissions from '../../components/AppPermissions';
 
 type Target={windowId:number;ownerPid:number;bundleId:string;path:string;name?:string;title?:string};
-export default function NativeCompanion({plugin,mode='settings'}:{plugin:'computer'|'browser';mode?:'settings'|'activity'|'pet'}){
+export default function NativeCompanion({plugin,mode='settings'}:{plugin:'computer'|'browser';mode?:'settings'|'activity'|'pet'|'entry'}){
  const computer=useSyncExternalStore(subscribeComputer,computerSnapshot);
  const t=useT(),enabled=useActivities()[plugin],meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
  const [open,setOpen]=useState(false),[targets,setTargets]=useState<Target[]>([]),[selected,setSelected]=useState(''),[busy,setBusy]=useState(false),[active,setActive]=useState(false),[error,setError]=useState(false);
+ const [statusKnown,setStatusKnown]=useState(false);
  const [activeTarget,setActiveTarget]=useState<Target|null>(null);
  const [diagnostics,setDiagnostics]=useState<NativeWindowDiagnostics|null>(null);
  const [stopUnconfirmed,setStopUnconfirmed]=useState(false);
@@ -29,6 +31,7 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
   try{
    const s=await apiJson<{active?:boolean;target?:Target;plugin?:string;stopUnconfirmed?:boolean;stopping?:boolean}>('/api/computer/native/status',{signal:controller.signal});
    if(controller.signal.aborted||!mounted.current)return;
+   setStatusKnown(true);
    setActive(Boolean(s.active&&s.plugin===plugin));
    setActiveTarget(s.active&&s.plugin===plugin?s.target??null:null);
    setStopUnconfirmed(Boolean(s.stopUnconfirmed||s.stopping));
@@ -38,7 +41,7 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
  },[plugin]);
  useEffect(()=>{
   mounted.current=true;
-  const poll=()=>{if(!request.current&&!operation.current)void read().catch(()=>{if(mounted.current)setError(true);});};
+  const poll=()=>{if(!request.current&&!operation.current)void read().catch(()=>{if(mounted.current){setError(true);setStatusKnown(false);}});};
   poll();const timer=setInterval(poll,2500);
   return()=>{mounted.current=false;clearInterval(timer);request.current?.abort();request.current=null;};
  },[read]);
@@ -92,6 +95,7 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
   {mode==='settings'&&<details className="extension-detail-section extension-detail-advanced"><summary>{t('desktopAccess.blocklist')}</summary><AppPermissions manage/></details>}
   {meeting.state!=='active'&&<p className="extension-detail-notice">{t('computer.requiresBoot')}</p>}{error&&<p role="alert" className="extension-detail-notice">{t('permissions.error')}</p>}
  </div>;
+ if(mode==='entry')return <ConfigAction label={t('config.window')} action={t('config.windowAction')} value={!statusKnown ? t(error ? 'config.unavailable' : 'config.loading') : activeTarget ? (activeTarget.name || activeTarget.bundleId) : status}>{body}</ConfigAction>;
  if(mode!=='settings')return body;
  return <ExtensionCard id={plugin} title={t(plugin+'.title')} status={status} running={active} onConfigure={()=>setOpen(true)}>{open&&<Modal className="extension-modal" label={t(plugin+'.title')} onClose={()=>setOpen(false)}>{body}</Modal>}</ExtensionCard>;
 }

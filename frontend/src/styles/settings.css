@@ -1,9 +1,3 @@
-/* ===== 设置页三段式（对照柚子社 config）=====
-   顶部 tab 条 | 中部滚动内容 | 底部操作条——三层各自是独立全宽容器，
-   tab 不与内容面板粘连。桌面横屏限定。
-   背景：与标题页同标尺的旋转网格（GridBackdrop），坐标系随 tab 旋转；
-   tab 高亮滑块与内容滑轨用同一个时间常数（0.35s, easeInOutCubic）滑动。 */
-
 .settings-page {
   position: relative;
   z-index: 1;
@@ -12,246 +6,12 @@
   flex-direction: column;
 }
 
-/* 网格背景样式在 base.css（.grid-backdrop，与存档页共用）。 */
-
-/* --- 顶部 tab 条（独立容器，铺满顶部） --- */
-
-.tabstrip {
-  position: relative;
-  z-index: 1;
-  flex: none;
-  border-bottom: 1px solid var(--line);
-  background: var(--chrome);
-  backdrop-filter: blur(12px);
-}
-
-.tabstrip-inner {
-  position: relative;
-  display: flex;
-  width: min(1200px, calc(100% - 64px));
-  margin: 0 auto;
-}
-
-/* 金色高亮滑块：宽度=1/4，随激活 tab 平移——不直接切换。 */
-.stab-thumb {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 25%;
-  height: 100%;
-  background: var(--accent-soft);
-  border-bottom: 2px solid var(--accent);
-  transition: transform 0.35s cubic-bezier(0.65, 0, 0.35, 1);
-  will-change: transform;
-  pointer-events: none;
-}
-
-.stab {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  padding: 11px 8px 10px;
-  border-radius: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--text-dim);
-  letter-spacing: 0.1em;
-  transition:
-    color 0.2s ease,
-    border-color 0.2s ease,
-    background 0.2s ease;
-}
-
-.stab:hover {
-  color: var(--accent-strong);
-  box-shadow: none;
-}
-
-/* base.css 的 button:hover（0,1,1）会盖掉 .stab 的透明底（0,1,0），
-   把 tab 整块涂成实心金——高亮只由滑块承担，这里显式压回透明。 */
-.stab:hover,
-.stab:active {
-  background: transparent;
-}
-
-.stab-label {
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.stab.active {
-  color: var(--accent-strong);
-}
-
-/* --- 中部滚动内容：滑轨式（手机多桌面横滑） --- */
-
-.settings-scroll {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  min-height: 0;
-  /* The horizontal track is transformed, never a scroll container. */
-  overflow: clip;
-}
-
-/* 四面板常驻横排，translateX 切换；时长/缓动与 stab-thumb 严格一致。 */
-.settings-track {
-  display: flex;
-  height: 100%;
-  transition: transform 0.35s cubic-bezier(0.65, 0, 0.35, 1);
-  will-change: transform;
-}
-
-.settings-pane {
-  flex: 0 0 100%;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-.settings-content {
-  width: min(1100px, calc(100% - 96px));
-  margin: 0 auto;
-  padding: 26px 0 36px;
-  /* min-height 撑满滚动区：单栏页（拓展）靠它拿到定高弹性区。 */
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.settings-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 拓展分类各占一整页；二级滑块沿用设置页的节奏与金色材质。 */
 .extension-settings {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-}
-
-.extension-tabs {
-  position: relative;
-  display: flex;
-  flex: none;
-  margin-bottom: 20px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md, 12px);
-  background: var(--chrome);
-  isolation: isolate;
-}
-
-.extension-tab-thumb {
-  position: absolute;
-  inset: 4px auto 4px 4px;
-  width: calc((100% - 8px) / 3);
-  border: 1px solid var(--line-strong);
-  border-radius: calc(var(--r-md, 12px) - 4px);
-  background: var(--accent-soft);
-  transition: transform 0.35s cubic-bezier(0.65, 0, 0.35, 1);
-  pointer-events: none;
-}
-
-.extension-tabs > button {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  padding: 11px 14px;
-  border: 0;
-  border-radius: calc(var(--r-md, 12px) - 4px);
-  background: transparent;
-  color: var(--text-dim);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.extension-tabs > button:hover,
-.extension-tabs > button:active {
-  background: transparent;
-  box-shadow: none;
-  color: var(--accent-strong);
-}
-
-.extension-tabs > button.active {
-  color: var(--accent-strong);
-}
-
-.extension-tabs > button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -3px;
-}
-
-.extension-viewport {
-  overflow: hidden;
-  flex: 1;
-  min-width: 0;
-}
-
-.extension-track {
-  display: flex;
-  align-items: stretch;
-  min-height: 100%;
-  transition: transform 0.35s cubic-bezier(0.65, 0, 0.35, 1);
-}
-
-.extension-pane {
-  display: flex;
-  flex: 0 0 100%;
-  flex-direction: column;
-  width: 100%;
-  min-width: 0;
-}
-
-.extension-panel {
-  flex: 1;
-  min-height: 360px;
-}
-
-.extension-pane .official-plugins {
-  margin-bottom: 0;
-}
-
-.extension-pane .social-cards {
-  grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
-}
-
-.extension-pane .social-card {
-  display: flex;
-  flex-direction: column;
-  min-height: 184px;
-}
-
-.extension-pane .social-card-bottom {
-  margin-top: auto;
-}
-
-/* --- 双栏内容区：两列等宽、面板拉伸等高 --- */
-/* 底边对齐约定：顶部固定排布，底部行为（[+] / 预览 / 保存行）
-   用 .col-foot 钉在面板底缘，中段 .col-grow 留白为弹性区。 */
-
-.settings-cols {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  align-items: stretch;
 }
 
 .settings-col {
@@ -286,28 +46,6 @@
 
 .opt-list {
   padding: 0;
-}
-
-/* 面板里若含自绘浮层（如下拉展开的选项列），要把**面板本身**抬到兄弟之上。
-   关键：z-index 加在 .sel-list 上没用 —— .panel 的 backdrop-filter 会生成层叠上下文，
-   把 z-index: 50 的选项列关在面板内部，后面的兄弟面板照样盖住它。 */
-.panel-raised {
-  position: relative;
-  z-index: 1;
-}
-
-/* 通用页左栏：语言设置 / 语音设置是两个**独立面板**，与右栏「对话框设置」同级
-   （原来它们套在一个外层 panel 里，视觉上比右栏低一级）。
-   末块吃掉剩余高度，两栏总高因此对齐。 */
-.settings-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
-}
-
-.settings-stack > .panel:last-child {
-  flex: 1;
 }
 
 /* 模型配置页内分块标题（LLM/ASR/TTS）。 */
@@ -571,38 +309,6 @@
 }
 
 
-/* 表单项统一走 controls.css 的 .opt-row / .opt-label（ui/FieldRow），
-   不再有「标签在上」的 .field 竖排形态。 */
-
-/* --- 底部操作条（独立全宽容器） --- */
-
-.footbar {
-  position: relative;
-  z-index: 1;
-  flex: none;
-  border-top: 1px solid var(--line);
-  background: var(--chrome);
-  backdrop-filter: blur(12px);
-}
-
-.footbar-inner {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  width: min(1100px, calc(100% - 96px));
-  margin: 0 auto;
-  padding: 12px 0;
-}
-
-.foot-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* --- 拓展 tab：唯一单栏页——整行通宽列表 + 居中配置弹窗 --- */
-
-/* 面板撑满内容区定高；中段列表弹性区内部滚动，UI 不随数据量抖动。 */
 .ext-panel {
   flex: 1;
   min-height: 0;
@@ -771,16 +477,6 @@
   font-size: 12px;
 }
 
-/* 动效弱化：滑块与滑轨瞬移落位（网格旋转在 GridBackdrop 内自行处理）。 */
-@media (prefers-reduced-motion: reduce) {
-  .stab-thumb,
-  .settings-track,
-  .extension-tab-thumb,
-  .extension-track {
-    transition: none;
-  }
-}
-
 /* URL 有问题时，测试按钮变成警示图标：禁用态默认会降到 45% 透明，
    那样图标几乎看不见——这里保持不透明并用警示色。 */
 .probe-btn.probe-warn,
@@ -815,17 +511,6 @@
   line-height: 1.5;
 }
 .builtin-resource-notice p { margin: 0; }
-
-/* Direct sound controls balance the language/dialogue column without nested modals. */
-.general-columns { align-items: stretch; }
-.general-columns .opt-row { padding-block: 10px; }
-.general-columns .col-foot { margin-top: 8px; padding-top: 0; }
-@media(max-width: 760px) { .general-columns { grid-template-columns: 1fr; } }
-.general-language .opt-list { display:grid; grid-template-columns:1fr 1fr; gap:32px; }
-.general-language .opt-row { padding-block:6px; border:0; }
-.general-language .opt-group { margin-top:0; }
-.general-language { padding-block:14px; }
-@media(max-width:760px) { .general-language .opt-list { grid-template-columns:1fr; gap:0; } }
 
 .game-progress{display:grid;gap:.65rem;}
 .game-goal{display:grid;gap:.3rem;min-width:0;}

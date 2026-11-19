@@ -10,7 +10,7 @@ const labels = {
   en: ['Data backup', 'Export backup', 'Restore backup', 'Backups contain chats, memories, models and service keys. Keep them private. Restoring replaces current data.', 'Restore this backup and replace current data?', 'Could not complete the operation. Check the backup and retry.', 'Working…'],
   ja: ['データのバックアップ', '書き出す', '復元する', 'バックアップには会話、記憶、モデル、サービスキーが含まれます。安全に保管してください。復元すると現在のデータが置き換わります。', '現在のデータをバックアップで置き換えますか？', '操作に失敗しました。ファイルを確認して再試行してください。', '処理中…'],
 };
-export default function DataTransfer() {
+export default function DataTransfer({mode}: {mode: 'export' | 'restore'}) {
   const lang = useSyncExternalStore(subscribe, getState).settings.general.lang;
   const text = labels[lang];
   const input = useRef<HTMLInputElement>(null);
@@ -39,12 +39,12 @@ export default function DataTransfer() {
   return <section className="panel data-transfer-panel">
     <div className="data-transfer-copy"><h3 className="opt-group">{text[0]}</h3><p>{text[3]}</p></div>
     <div className="data-transfer-actions">
-    <Button variant="ghost" size="sm" disabled={busy} onClick={() => void run(async () => {
+    {mode === "export" && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void run(async () => {
       const blob = await exportData(); const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = 'momo-backup.zip'; a.click();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-    })}>{text[1]}</Button>
-    <Button variant="ghost" size="sm" disabled={busy} onClick={() => input.current?.click()}>{text[2]}</Button>
+    })}>{text[1]}</Button>}
+    {mode === "restore" && <Button variant="ghost" size="sm" disabled={busy} onClick={() => input.current?.click()}>{text[2]}</Button>}
     </div>
     <input ref={input} hidden type="file" accept=".zip" onChange={event => {
       const file = event.target.files?.[0]; event.target.value = '';

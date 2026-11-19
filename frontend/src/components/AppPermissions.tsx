@@ -91,7 +91,10 @@ export default function AppPermissions({manage = false, ready = false, onGuideVi
     setSelected('');
   }
 
-  if (!policy?.available) return null;
+  if (!policy?.available) {
+    if (!manage) return null;
+    return <p role={error ? 'alert' : 'status'}>{t(error ? 'permissions.error' : policy ? 'activities.platformUnsupported' : 'config.loading')}</p>;
+  }
   if (manage) {
     const blocked = new Set(policy.blocked.map(app => app.bundleId.toLowerCase()));
     const candidates = [...new Map((system?.applications ?? []).filter(app => !blocked.has(app.bundleId.toLowerCase()))

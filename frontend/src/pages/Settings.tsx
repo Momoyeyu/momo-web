@@ -1,133 +1,103 @@
-// 设置页三段式（对照柚子社 config 结构）：
-//   顶部 tab 条——独立全宽容器，页签均分铺满；金色高亮滑块随 tab 平移；
-//   中部内容——四个 tab 的面板横排成滑轨（手机桌面式左右切换），各自内滚；
-//   底部操作条——返回按钮聚拢右下。
-// 背景是与标题页同一把标尺的网格（GridBackdrop），每个 tab 拥有自己的
-// 正交坐标系 θ_k = k · 15°（RoPE 式位置-旋转映射）：切换 tab 时网格旋转、
-// 高亮滑块平移、内容横滑三者同步完成——一次统一、快速的坐标系变换。
-// 即改即生效：各控件直接 update() 落盘（localStorage + 防抖 PUT /api/state），
-// 无草稿/保存概念——语言切换等立即生效。
-
-import {useIntro} from "../services/introClient";
-import { useState } from "react";
-
-import { useT } from "../i18n";
-import { fromRoute, navigate } from "../router";
+import {useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode} from 'react';
+import {useT} from '../i18n';
+import {getState, subscribe} from '../lib/store';
+import {fromRoute, navigate} from '../router';
 import {storedMeetingIdentity} from '../services/meetingClient';
-import Button from "../ui/Button";
-import BuiltinResourcesNotice from "../components/BuiltinResourcesNotice";
-import GridBackdrop from "../components/GridBackdrop";
-import { ropeFrom } from "../lib/ropeAngle";
-import MemoryPanel from "./panels/Memory";
-import ExtensionsTab from "./settings/ExtensionsTab";
-import GeneralTab from "./settings/GeneralTab";
-import ModelsTab from "./settings/ModelsTab";
-import "../styles/settings.css";
+import {useIntro} from '../services/introClient';
+import Button from '../ui/Button';
+import GridBackdrop, {type GridBackdropApi} from '../components/GridBackdrop';
+import BuiltinResourcesNotice from '../components/BuiltinResourcesNotice';
+import ArchivePanel from './settings/ArchivePanel';
+import AvatarPanel from './panels/Avatar';
+import MemoryPanel from './panels/Memory';
+import AsrStatus from './settings/AsrStatus';
+import ConfigAction from './settings/ConfigAction';
+import DataTransfer from './settings/DataTransfer';
+import DesktopSettings from './settings/DesktopSettings';
+import McpSettings from './settings/ExtensionsTab';
+import GeneralTab from './settings/GeneralTab';
+import ModelsTab from './settings/ModelsTab';
+import NativeCompanion from './settings/NativeCompanion';
+import ModsPanel from './settings/ModsPanel';
+import '../styles/settings.css';
+import '../styles/config-document.css';
 
-type Section = "general" | "models" | "memory" | "extend";
-
-const TABS: Section[] = ["general", "models", "memory", "extend"];
-// RoPE：位置 k → 旋转角 θ_k = 25° + k·70°。起点偏 25° 让「通用」与标题页
-//（0°）也明显不同；步长 70° 让每次切换都有大幅度的旋转张力，而任意两档
-// 直接切换的最大扫角 210° 不超过一圈。四个落角都不是 90° 的倍数——
-// 网格在 90° 整数倍上会与 0° 视觉重合，避开后每档坐标系都看得出来。
-// 画布 y 轴向下，正角即顺时针：向右切 tab 顺时针、向左切逆时针。
-const ROT_BASE = 25;
-const ROT_STEP = 70;
+const chapters = ['language', 'display', 'sound', 'models', 'memory', 'archive', 'desktop', 'browser', 'tools', 'mods'] as const;
+type Chapter = (typeof chapters)[number];
+const inset = 24;
 
 export default function Settings() {
   const t = useT();
-  const intro=useIntro();
-  const [tab, setTab] = useState<Section>("general");
-  const backRoute = intro.data?.phase==='return_title' ? ("title" as const) : fromRoute() === "chat" || storedMeetingIdentity() ? ("chat" as const) : ("title" as const);
-  const backLabel =
-    backRoute === "chat" ? t("common.backChat") : t("common.backTitle");
-  const idx = TABS.indexOf(tab);
+  const {data: intro} = useIntro();
+  const state = useSyncExternalStore(subscribe, getState);
+  const scroll = useRef<HTMLDivElement>(null);
+  const grid = useRef<GridBackdropApi>(null);
+  const [active, setActive] = useState<Chapter>('language');
+  const [source] = useState(() => storedMeetingIdentity() ? 'chat' : fromRoute());
+  const back = intro?.phase === 'return_title' || source !== 'chat' ? 'title' : 'chat';
+  const guided = !!intro && intro.phase !== 'completed';
 
-  return (
-    <div className="settings-page">
-      <GridBackdrop angle={ROT_BASE + idx * ROT_STEP} from={ropeFrom()} sweepMs={620} />
-      <nav className="tabstrip">
-        <div className="tabstrip-inner">
-          {/* 金色高亮滑块：宽度=1/4，translateX 按下标平移，随内容同节奏滑动 */}
-          <span
-            className="stab-thumb"
-            style={{ transform: `translateX(${idx * 100}%)` }}
-          />
-          {TABS.map((id) => (
-            <Button sound={tab===id?false:"confirm"}
-              key={id}
-              data-intro={`tab-${id}`}
-              className={`stab${tab === id ? " active" : ""}`}
-              onClick={() => setTab(id)}
-            >
-              <span className="stab-label">{t(`settings.tabs.${id}`)}</span>
-            </Button>
-          ))}
-        </div>
-      </nav>
-      {/* 滑轨：四个面板常驻横排，translateX 切换——像手机多桌面横滑 */}
-      <div className="settings-scroll">
-        <div
-          className="settings-track"
-          style={{ transform: `translateX(${-idx * 100}%)` }}
-        >
-          <section
-            className="settings-pane"
-            aria-hidden={tab !== "general" ? true : undefined}
-            inert={tab !== "general"}
-          >
-            <div className="settings-content">
-              <div className="settings-body">
-                <GeneralTab />
-              </div>
-            </div>
-          </section>
-          <section
-            className="settings-pane"
-            aria-hidden={tab !== "models" ? true : undefined}
-            inert={tab !== "models"}
-          >
-            <div className="settings-content">
-              <div className="settings-body">
-                <ModelsTab active={tab === "models"} />
-              </div>
-            </div>
-          </section>
-          <section
-            className="settings-pane"
-            aria-hidden={tab !== "memory" ? true : undefined}
-            inert={tab !== "memory"}
-          >
-            <div className="settings-content">
-              <MemoryPanel />
-            </div>
-          </section>
-          <section
-            className="settings-pane"
-            aria-hidden={tab !== "extend" ? true : undefined}
-            inert={tab !== "extend"}
-          >
-            <div className="settings-content">
-              <div className="settings-body">
-                <ExtensionsTab active={tab === "extend"} />
-              </div>
-            </div>
-          </section>
-        </div>
+  const track = useCallback(() => {
+    const el = scroll.current;
+    if (!el) return;
+    const readingLine = el.getBoundingClientRect().top + inset + 1;
+    const headings = Array.from(el.querySelectorAll<HTMLElement>('[data-chapter]'));
+    const last = headings.filter(section => section.getBoundingClientRect().top <= readingLine).at(-1);
+    setActive(last?.dataset.chapter as Chapter ?? 'language');
+    const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    grid.current?.setAngle(25 + (reduced ? 0 : el.scrollTop * 0.02));
+  }, []);
+  useEffect(() => {
+    const el = scroll.current;
+    if (!el) return;
+    const resize = new ResizeObserver(track);
+    resize.observe(el);
+    for (const section of el.querySelectorAll('[data-chapter]')) resize.observe(section);
+    const media = matchMedia('(prefers-reduced-motion: reduce)');
+    media.addEventListener('change', track);
+    return () => {resize.disconnect(); media.removeEventListener('change', track);};
+  }, [track]);
+  function jump(id: Chapter) {
+    const el = scroll.current;
+    const section = el?.querySelector<HTMLElement>('[data-chapter="'+id+'"]');
+    if (!el || !section) return;
+    const smooth = !guided && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+    el.scrollTo({top: section.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - inset, behavior: smooth ? 'smooth' : 'instant'});
+  }
+  const action = (id: string, children: ReactNode, value?: string) =>
+    <ConfigAction label={t('config.' + id)} action={t('config.' + id + 'Action')} value={value}>{children}</ConfigAction>;
+  const content: Record<Chapter, ReactNode> = {
+    language: <GeneralTab section="language"/>,
+    display: <><GeneralTab section="display"/>{action('avatar', <AvatarPanel/>, state.avatars.find(a => a.id === state.avatarId)?.name)}
+      <details className="config-preview"><summary>{t('config.preview')}</summary><GeneralTab section="preview"/></details></>,
+    sound: <><GeneralTab section="sound"/>
+      <ConfigAction label={t('config.sampleSound')} action={t('settings.soundPreview')}>
+        <GeneralTab section="sample"/>
+      </ConfigAction></>,
+    models: <>{guided ? <ModelsTab section={intro.phase === 'tts' && intro.configurationValid ? 'tts' : 'llm'}/> : <>
+      {action('llm', <ModelsTab section="llm"/>, state.settings.llm.model)}
+      {action('vision', <ModelsTab section="vision"/>, state.settings.llm.vision ? t('config.ready') : undefined)}
+      {action('asr', <AsrStatus/>, 'SenseVoice')}
+      {action('tts', <ModelsTab section="tts"/>, state.settings.tts.voice)}
+    </>}<BuiltinResourcesNotice/></>,
+    memory: guided ? <MemoryPanel/> : <>{action('memories', <MemoryPanel/>)}{action('pinned', <MemoryPanel pinnedOnly/>)}</>,
+    archive: <>{action('history', <ArchivePanel/>)}{action('backup', <DataTransfer mode="export"/>)}{action('restore', <DataTransfer mode="restore"/>)}</>,
+    desktop: <DesktopSettings/>,
+    browser: <NativeCompanion plugin="browser" mode="entry"/>,
+    tools: action('mcp', <McpSettings/>),
+    mods: <ModsPanel/>,
+  };
+  return <div className="settings-page config-document">
+    <GridBackdrop angle={25} api={grid}/>
+    <header className="config-header"><h1>{t('settings.title')}</h1><Button variant="ghost" className="config-action" data-intro="settings-back" onClick={() => navigate(back)}>{t(back === 'chat' ? 'common.backChat' : 'common.backTitle')}</Button></header>
+    <div className="config-layout">
+      <nav className="config-index" aria-label={t('settings.title')}>{chapters.map(id => <Button key={id} data-intro={'tab-' + id}
+        aria-controls={'config-' + id} aria-current={active === id ? 'location' : undefined} className={active === id ? 'active' : ''} onClick={() => jump(id)}>{t('config.' + id)}</Button>)}</nav>
+      <div className="config-scroll" ref={scroll} onScroll={track}>
+        {chapters.map(id => <section key={id} data-chapter={id} id={'config-' + id} aria-labelledby={'heading-' + id}>
+          <h2 id={'heading-' + id}>{t('config.' + id)}</h2><div className="config-card">{content[id]}</div>
+        </section>)}
       </div>
-
-      {/* 底部操作条：返回按钮聚拢右下 */}
-      <footer className="footbar">
-        <div className="footbar-inner">
-          <BuiltinResourcesNotice />
-          <div className="foot-right">
-            <Button data-intro="settings-back" variant="ghost" onClick={() => navigate(backRoute)}>
-              {backLabel}
-            </Button>
-          </div>
-        </div>
-      </footer>
     </div>
-  );
+  </div>;
 }

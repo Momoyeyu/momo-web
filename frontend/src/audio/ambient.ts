@@ -1,3 +1,4 @@
+import {runtimeFetch} from '../services/runtime';
 /** Environmental audio persists across routes. No inference or synthesis at runtime. */
 export type Sound = 'tap'|'confirm'|'cancel'|'on'|'off'|'phone-in'|'phone-out'|'boot'|'home'|'complete'|'notify';
 export type Music = 'title'|'connection'|'daily'|'night'|'uplift'|'comfort';
@@ -18,6 +19,7 @@ export class AmbientAudio {
  private musicSources=new Set<AudioBufferSourceNode>();
  private mics=new Set<object>();
  private config:Config={};
+ private customDaily:string|null=null;
  private desired:Music='title';
  private music:{id:Music;source:AudioBufferSourceNode;gain:GainNode;started:number}|null=null;
  private revision=0;
@@ -34,12 +36,19 @@ export class AmbientAudio {
  }
  microphone(key:object,active:boolean){if(active)this.mics.add(key);else this.mics.delete(key);this.mix();}
  scene(id:Music){if(this.desired===id)return;this.desired=id;this.revision++;for(const [name,request] of this.loadRequests)if(name in tempo&&name!==id)request.abort();void this.syncMusic();}
+ dailyTrack(url:string|null){
+  if(url===this.customDaily)return;
+  this.customDaily=url;
+  this.loadRequests.get('daily')?.abort();
+  this.cache.delete('daily');
+  if(this.desired==='daily'){this.revision++;this.stopMusic();void this.syncMusic();}
+ }
  private async load(name:string){
   const ready=this.cache.get(name);if(ready)return ready;
   const old=this.loads.get(name);if(old&&!this.loadRequests.get(name)?.signal.aborted)return old;
   const ctx=this.ctx;if(!ctx)throw Error('locked');
   const request=new AbortController();this.loadRequests.set(name,request);const timeout=setTimeout(()=>request.abort(),15000);
-  const job=(async()=>{const response=await fetch(`/audio/${name}.wav`,{signal:request.signal});if(!response.ok)throw Error('audio unavailable');const buffer=await ctx.decodeAudioData(await response.arrayBuffer());request.signal.throwIfAborted();this.cache.set(name,buffer);
+  const job=(async()=>{const response=await (name==='daily' && this.customDaily ? runtimeFetch(this.customDaily,{signal:request.signal}) : fetch(`/audio/${name}.wav`,{signal:request.signal}));if(!response.ok)throw Error('audio unavailable');const buffer=await ctx.decodeAudioData(await response.arrayBuffer());request.signal.throwIfAborted();this.cache.set(name,buffer);
   const musicKeys=[...this.cache.keys()].filter(k=>k in tempo);
   while(musicKeys.length>2){const victim=musicKeys.find(k=>k!==name&&k!==this.music?.id)??musicKeys[0];this.cache.delete(victim);musicKeys.splice(musicKeys.indexOf(victim),1);}
   while(this.cache.size>15)this.cache.delete(this.cache.keys().next().value!);return buffer;})();

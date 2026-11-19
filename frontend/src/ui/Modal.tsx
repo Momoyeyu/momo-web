@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 import { useEffect, useRef, type ReactNode, type KeyboardEvent } from "react";
 import "../styles/modal.css";
 
+const openOverlays: HTMLElement[] = [];
 export default function Modal({
   onClose,
   className,
@@ -22,9 +23,36 @@ export default function Modal({
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement;
+    const overlay = box.current?.parentElement;
+    if (!overlay) return;
+    const parent = openOverlays.at(-1);
+    if (parent) parent.inert = true;
+    openOverlays.push(overlay);
     box.current?.focus();
-    return () => { if (previous instanceof HTMLElement && previous.isConnected) previous.focus(); };
+    parent?.setAttribute("aria-hidden","true");
+    return () => {
+      const top = openOverlays.at(-1) === overlay;
+      openOverlays.splice(openOverlays.indexOf(overlay), 1);
+      if (!top) return;
+      const next = openOverlays.at(-1);
+      if (next) {next.inert = false;next.removeAttribute("aria-hidden");}
+      if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+    };
   }, []);
+  // A pending action may disable the focused button and move focus to body.
+  // Keep keyboard dismissal available to the frontmost modal in that case.
+  useEffect(() => {
+    const recoverFocus = (event: globalThis.KeyboardEvent) => {
+      const el = box.current;
+      if (!el || el.contains(document.activeElement) || document.querySelector('dialog[open]')) return;
+      const visible = document.querySelectorAll('.modal-overlay > [aria-modal="true"]');
+      if (visible[visible.length - 1] !== el) return;
+      if (event.key === 'Escape') {event.preventDefault(); onClose();}
+      if (event.key === 'Tab') {event.preventDefault(); el.focus();}
+    };
+    document.addEventListener('keydown', recoverFocus);
+    return () => document.removeEventListener('keydown', recoverFocus);
+  }, [onClose]);
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") { e.stopPropagation(); onClose(); return; }
     if (e.key !== "Tab") return;

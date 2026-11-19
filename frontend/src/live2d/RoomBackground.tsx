@@ -1,7 +1,36 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useState,useSyncExternalStore} from 'react';
 import {roomPhase,roomImages,type RoomPhase} from './roomTime';
+import {activeResource,refreshMods,subscribeMods} from '../services/mods';
+import {runtimeFetch} from '../services/runtime';
+import {ambient} from '../audio/ambient';
+
+const backgroundUrl=()=>activeResource('background');
+const musicUrl=()=>activeResource('bgm');
 /** Persistent room lighting; does not remount the avatar or follow page changes. */
 export default function RoomBackground(){
+ const url=useSyncExternalStore(subscribeMods,backgroundUrl);
+ const music=useSyncExternalStore(subscribeMods,musicUrl);
+ const [art,setArt]=useState<{url:string;objectUrl:string}|null>(null);
+ useEffect(()=>{void refreshMods().catch(()=>{});},[]);
+ useEffect(()=>{ambient.dailyTrack(music);},[music]);
+ useEffect(()=>{
+   if (!url) return;
+   const controller=new AbortController();
+   let objectUrl:string|undefined;
+   async function load(path:string){
+     const response=await runtimeFetch(path,{signal:controller.signal});
+     if (!response.ok) return;
+     const blob=await response.blob();
+     if (controller.signal.aborted) return;
+     objectUrl=URL.createObjectURL(blob);
+     const img=new Image();
+     img.src=objectUrl;
+     await img.decode();
+     if (!controller.signal.aborted) setArt({url:path,objectUrl});
+   }
+   void load(url).catch(()=>{});
+   return ()=>{controller.abort();if (objectUrl) URL.revokeObjectURL(objectUrl);};
+ },[url]);
  const [phase,setPhase]=useState<RoomPhase>('day');
  useEffect(()=>{
   let disposed=false,revision=0;
@@ -17,5 +46,6 @@ export default function RoomBackground(){
  },[]);
  return <div className="room-background" data-room-phase={phase} aria-hidden="true">
   {(Object.keys(roomImages) as RoomPhase[]).map(key=><div key={key} className="room-lighting" style={{backgroundImage:`url(${roomImages[key]})`,opacity:key===phase?1:0}}/>)}
+  {art && art.url===url && <div className="room-lighting" data-mod-background="" style={{backgroundImage:`url(${art.objectUrl})`}}/>}
  </div>;
 }

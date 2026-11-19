@@ -4,10 +4,12 @@
 import "../styles/controls.css";
 
 export default function Slider({
+  label,
   value,
   disabled,
   onChange,
 }: {
+  label?: string;
   value: number;
   disabled?: boolean;
   onChange: (v: number) => void;
@@ -18,6 +20,7 @@ export default function Slider({
   return (
     <>
       <input
+        aria-label={label}
         type="range"
         className="ux-range"
         min={0}

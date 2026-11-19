@@ -37,7 +37,7 @@ function urlError(sec: EndpointSection, url: string): boolean {
 }
 
 
-export default function ModelsTab({ active }: { active: boolean }) {
+export default function ModelsTab({ section }: { section: "llm" | "tts" | "vision" }) {
   const t = useT();
   const intro=useIntro();
   const settings = useSyncExternalStore(subscribe, getState).settings;
@@ -45,24 +45,36 @@ export default function ModelsTab({ active }: { active: boolean }) {
   const audition = useRef<AbortController | null>(null);
   const voiceEdited = useRef(false);
   const route = useRoute();
-  useEffect(() => () => audition.current?.abort(), [route, active]);
+  useEffect(() => () => audition.current?.abort(), [route, section]);
 
   const signature=JSON.stringify([settings.llm.url,settings.llm.key,settings.llm.model]);
   const [visionCheck,setVisionCheck]=useState({signature:'',verified:false,running:false,detail:''});
   useEffect(()=>{
+    if(section !== "vision") return;
     const abort=new AbortController();
     setVisionCheck({signature,verified:false,running:false,detail:''});
     void visionStatus(settings.llm,abort.signal).then(result=>{if(!abort.signal.aborted)setVisionCheck(value=>value.signature===signature?{...value,verified:result.verified}:value);}).catch(()=>{});
     return()=>abort.abort();
-  },[signature]);
+  },[signature,section]);
   const checkVision=async()=>{
     const captured=signature,cfg={...settings.llm};
     setVisionCheck(value=>({...value,running:true,detail:''}));
     try{
       const result=await probeVision(cfg);
-      setVisionCheck(value=>value.signature===captured?{...value,verified:result.ok,detail:result.ok?'vision.verified':result.detail==='not verified'?'vision.notVerified':'vision.checkFailed',running:false}:value);
-    }catch{setVisionCheck(value=>value.signature===captured?{...value,detail:'vision.checkFailed',running:false}:value);}
+      setVisionCheck(value=>value.signature===captured?{...value,verified:result.ok,detail:result.detail,running:false}:value);
+    }catch(error){
+      const detail = error instanceof Error && /^HTTP \d{3}$/.test(error.message) ? error.message : 'unreachable';
+      setVisionCheck(value=>value.signature===captured?{...value,detail,running:false}:value);
+    }
   };
+
+  const resultKey: Record<string,string> = {
+    verified: 'vision.verified', 'not verified': 'vision.notVerified', unconfigured: 'settings.testNeedUrl',
+    timeout: 'config.timeout', unreachable: 'config.unreachable', 'invalid response': 'config.invalidResponse',
+  };
+  const visionResult = /^HTTP \d{3}$/.test(visionCheck.detail)
+    ? visionCheck.detail + ' · ' + t('vision.checkFailed')
+    : t(resultKey[visionCheck.detail] ?? 'vision.checkFailed');
 
   const [showKey, setShowKey] = useState<Record<EndpointSection, boolean>>({
     llm: false,
@@ -247,9 +259,8 @@ export default function ModelsTab({ active }: { active: boolean }) {
     </FieldRow>
   );
   return (
-<div className="settings-cols">
-{/* 两张卡片均为四行，共用标签、控件和底部对齐线。 */}
-<section data-intro="llm" className="panel settings-col opt-list">
+<>
+{section === "llm" && <section data-intro="llm" className="panel settings-col opt-list">
   <h3 className="opt-group">
     {t("settings.groups.llm")}
     <Hint text={t("settings.llmHint")} side="down" />
@@ -277,17 +288,18 @@ export default function ModelsTab({ active }: { active: boolean }) {
     />
   </FieldRow>
 </div>
-  <div inert={!!intro.data && intro.data.phase!=="completed"}>
+</section>}
+{section === "vision" &&   <div inert={!!intro.data && intro.data.phase!=="completed"}>
     <FieldRow label={t('vision.label')} hint={t('vision.hint')}>
       <div className="vision-status">
         <Switch on={!!settings.llm.vision} disabled={!settings.llm.vision&&(!visionCheck.verified||visionCheck.running)} title={t('vision.label')} onChange={vision=>update({settings:{...settings,llm:{...settings.llm,vision}}})}/>
-        <Button variant="ghost" size="sm" disabled={visionCheck.running||!settings.llm.url.trim()||!settings.llm.model.trim()} onClick={()=>void checkVision()} title={visionCheck.detail?t(visionCheck.detail):t('vision.verify')} aria-label={t('vision.verify')}>{visionCheck.running?'…':visionCheck.verified?'✓':t('settings.test')}</Button>
-        {visionCheck.detail&&<Hint text={t(visionCheck.detail)} side="down"/>}
+        <Button variant="ghost" size="sm" disabled={visionCheck.running||!settings.llm.url.trim()||!settings.llm.model.trim()} onClick={()=>void checkVision()} title={visionCheck.detail?visionResult:t('vision.verify')} aria-label={t('vision.verify')}>{visionCheck.running?'…':visionCheck.verified?'✓':t('settings.test')}</Button>
+
       </div>
     </FieldRow>
-  </div>
-</section>
-<section onBlur={() => {
+    <p role="status">{visionCheck.detail ? visionResult : t("vision.hint")}</p>
+  </div>}
+{section === "tts" && <section onBlur={() => {
   if (voiceEdited.current) { voiceEdited.current = false; warmVoice(); }
 }} data-intro="tts" className="panel settings-col opt-list">
   <h3 className="opt-group">
@@ -331,7 +343,7 @@ export default function ModelsTab({ active }: { active: boolean }) {
   </FieldRow>
   {/* 合成语言不单独配置：跟随「通用」页的对话语言
       （见 i18n 的 resolveChatLang 与 services/ttsClient.ts）。 */}
-</section>
-</div>
+</section>}
+</>
   );
 }

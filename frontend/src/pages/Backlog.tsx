@@ -21,7 +21,7 @@ import MessageMedia from "../components/MessageMedia";
 import PageHeader from "../ui/PageHeader";
 import "../styles/backlog.css";
 
-export default function Backlog() {
+export default function Backlog({embedded = false}: {embedded?: boolean} = {}) {
   const t = useT();
   // 回放期间若有新消息落账/状态变化，刷新列表；store 订阅用于语言/角色名热更。
   const version = useSyncExternalStore(subscribeTranscript, transcriptVersion);
@@ -112,7 +112,7 @@ export default function Backlog() {
   return (
     <div className="backlog-page">
       <div className="backlog-panel">
-        <PageHeader
+        {!embedded && <PageHeader
           className="backlog-head"
           title={t("backlog.title")}
           actions={
@@ -120,7 +120,7 @@ export default function Backlog() {
               {t("common.backChat")}
             </Button>
           }
-        />
+        />}
 
         <div className="backlog-list" ref={listRef}>
           {replayError && <p role="alert" className="backlog-replay-error">{t('backlog.replayUnavailable')}</p>}

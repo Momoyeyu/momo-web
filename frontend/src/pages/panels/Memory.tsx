@@ -39,7 +39,7 @@ function formatTime(iso: string): string {
   });
 }
 
-export default function MemoryPanel() {
+export default function MemoryPanel({pinnedOnly = false}: {pinnedOnly?: boolean} = {}) {
   const t = useT();
   const intro=useIntro();
 
@@ -73,9 +73,9 @@ export default function MemoryPanel() {
   const shown = useMemo<Memory[]>(() => {
     const q = query.trim().toLowerCase();
     return memories
-      .filter((m) => !q || m.content.toLowerCase().includes(q))
+      .filter((m) => (!pinnedOnly || m.pinned) && (!q || m.content.toLowerCase().includes(q)))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [memories, query]);
+  }, [memories, query, pinnedOnly]);
   const pg = clampPage(page, shown.length, PAGE_SIZE);
   const shownSlice = shown.slice(
     pg.page * PAGE_SIZE,
@@ -211,7 +211,7 @@ onClick={(e) => {
         <IconButton
           icon="plus"
           label={t("memory.newTitle")}
-          onClick={() => setAdding(true)}
+          onClick={() => {setAddPinned(pinnedOnly); setAdding(true);}}
           disabled={editingId !== null}
         />
       </div>

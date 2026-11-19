@@ -12,10 +12,12 @@ export interface SelectOption {
 }
 
 export default function Select({
+  label,
   value,
   options,
   onChange,
 }: {
+  label?: string;
   value: string;
   options: SelectOption[];
   onChange: (v: string) => void;
@@ -123,6 +125,9 @@ export default function Select({
       <button
         type="button"
         className="sel-face"
+        aria-label={label ? label + ' · ' + (current?.label ?? value) : undefined}
+        aria-expanded={open}
+        aria-haspopup="listbox"
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onKey}
       >
