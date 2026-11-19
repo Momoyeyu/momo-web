@@ -1,0 +1,20 @@
+import {test,expect} from './fixtures';
+import {openTab} from './helpers';
+test.beforeEach(()=>test.skip(process.env.MOMO_OFFICIAL_MOD_SMOKE!=='1'||process.platform!=='darwin','Requires the official GitHub release and a disposable profile.'));
+for(const [name,id] of [['QQ','momo.qq'],['Minecraft','momo.minecraft']])test('real signed catalog '+name, async ({page,request})=>{
+ test.setTimeout(200000);
+ await openTab(page,'模组');
+ const b=page.locator('#config-mods .opt-row').filter({hasText:name}).getByRole('button',{name:'安装模组'});
+ await b.click();
+ const dialog=page.getByRole('dialog');
+ await dialog.getByRole('button',{name:'安装模组'}).click();
+ await expect(dialog.getByRole('button',{name:'启用模组'})).toBeVisible({timeout:120000});
+ await dialog.getByRole('button',{name:'启用模组'}).click();
+ await expect(dialog.getByRole('button',{name:'停用模组'})).toBeVisible({timeout:60000});
+ const cfg=dialog.getByRole('button',{name:'配置',exact:true});
+ await expect(cfg).toBeVisible({timeout:15000});
+ await dialog.getByRole('button',{name:'停用模组'}).click();
+ await expect(dialog.getByRole('button',{name:'启用模组'})).toBeVisible();
+ await dialog.getByRole('button',{name:'卸载模组'}).click();await dialog.getByRole('button',{name:'卸载模组'}).click();
+ await expect.poll(async()=> (await(await request.get('/api/mods')).json()).mods.some((m:{id:string})=>m.id===id)).toBe(false);
+});

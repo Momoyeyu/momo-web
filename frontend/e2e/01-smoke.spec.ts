@@ -42,7 +42,7 @@ test("标题页「设置」进设置页，「返回标题」回得去", async ({
   await page.locator(".menu-item", { hasText: "设置" }).click();
   await expect(page.locator(".settings-page")).toBeVisible();
 
-  await page.locator(".footbar button").click();
+  await page.getByRole("button",{name:"返回标题",exact:true}).click();
   await expect(page.locator(".title-screen")).toBeVisible();
 });
 

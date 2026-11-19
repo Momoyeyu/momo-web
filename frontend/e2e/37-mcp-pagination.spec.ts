@@ -11,7 +11,7 @@ test('many MCP entries page, search, and remove the original indexed record', as
   await writeState(request, seeded);
   try {
     await openExtensionTab(page, 'MCP');
-    const panel = page.locator('#extension-panel-mcp');
+    const panel = page.locator('.config-modal .ext-panel');
     const rows = panel.locator('.ext-row');
     const firstPageNames = await rows.locator('.ext-name').allTextContents();
     expect(firstPageNames.length).toBeGreaterThan(0);

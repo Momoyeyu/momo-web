@@ -1,8 +1,10 @@
+import {mockEnabledMod,openModManager} from './mod-fixtures';
 import {test,expect} from './fixtures';
-import {openExtensionTab} from './helpers';
 
 const keys=['receive','reply','proactive','contacts','history','media','friendRequests','groups','groupManagement'] as const;
 const labels=['收取私聊','回复文字','主动私信','读取联系人','读取历史','附件与媒体','处理好友申请','群聊','群管理'];
+
+test.beforeEach(async ({page}) => { await mockEnabledMod(page,'QQ'); });
 
 test('QQ full permissions autosave explicit scopes and limits; explanations stay in Hint',async({page,request},info)=>{
   await page.setViewportSize({width:1440,height:1000});
@@ -24,7 +26,7 @@ test('QQ full permissions autosave explicit scopes and limits; explanations stay
     }else await route.fulfill({json:{items:mediaItems}});
   });
   await page.route(/\/api\/social\/accounts\/qq\/media\/synthetic-media$/,async route=>{expect(route.request().method()).toBe('DELETE');removals++;mediaItems=[];await route.fulfill({json:{ok:true}});});
-  await openExtensionTab(page,'插件');await page.locator('.official-plugins').getByRole('button',{name:'配置',exact:true}).click();
+  await openModManager(page,'QQ');await page.locator('.official-plugins').getByRole('button',{name:'配置',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'QQ 账号设置'});await dialog.getByRole('tab',{name:'权限',exact:true}).click();
   for(const label of labels)await expect(dialog.getByRole('switch',{name:label,exact:true})).toBeEnabled();
   await expect(dialog.locator('.social-unsupported')).toHaveCount(0);
@@ -81,7 +83,7 @@ test('attachment library waits for the actual saved grant before its first autho
   });
   await page.route(/\/api\/social\/accounts\/qq\/media$/,async route=>{if(route.request().method()==='GET')mediaReads++;await route.continue();});
   try{
-    await openExtensionTab(page,'插件');await page.locator('.official-plugins').getByRole('button',{name:'配置',exact:true}).click();
+    await openModManager(page,'QQ');await page.locator('.official-plugins').getByRole('button',{name:'配置',exact:true}).click();
     const dialog=page.getByRole('dialog',{name:'QQ 账号设置'});await dialog.getByRole('tab',{name:'权限',exact:true}).click();
     await dialog.getByRole('switch',{name:'附件与媒体',exact:true}).click();
     await expect.poll(()=>pendingSave).toBe(true);
@@ -106,7 +108,7 @@ test('operation records show concise action labels while old and unknown actions
     {commandId:'old-command',peerId:'67890',status:'completed'},
     {commandId:'future-command',action:'future.technical.action',peerId:'98765',status:'completed'},
   ]}}));
-  await openExtensionTab(page,'插件');await page.locator('.official-plugins').getByRole('button',{name:'配置',exact:true}).click();
+  await openModManager(page,'QQ');await page.locator('.official-plugins').getByRole('button',{name:'配置',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'QQ 账号设置'});await dialog.getByRole('tab',{name:'记录',exact:true}).click();
   const records=dialog.locator('.social-record');await expect(records).toHaveCount(4);
   await expect(records.nth(0).locator('.social-record-top strong')).toHaveText('读取联系人');
@@ -123,15 +125,17 @@ for(const viewport of [{width:1280,height:720},{width:1100,height:700}])test(`QQ
   await page.route(/\/api\/social\/accounts$/,route=>route.fulfill({json:{accounts:[account],providers:[]}}));
   await page.route(/\/api\/social\/accounts\/qq\/media$/,route=>route.fulfill({json:{items:[]}}));
   await page.route(/\/api\/social\/accounts\/qq\/records$/,route=>route.fulfill({json:{records:Array.from({length:35},(_,i)=>({commandId:`scroll-record-${i}`,status:'completed',peerId:'12345',action:'history.list'}))}}));
-  await openExtensionTab(page,'插件');await page.locator('.official-plugins').getByRole('button',{name:'配置',exact:true}).click();
+  await openModManager(page,'QQ');await page.locator('.official-plugins').getByRole('button',{name:'配置',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'QQ 账号设置'});
   for(const tab of ['权限','记录']){
-    await dialog.getByRole('tab',{name:tab,exact:true}).click();await page.waitForTimeout(400);
+    await dialog.getByRole('tab',{name:tab,exact:true}).click();
     const panel=dialog.locator('.social-pane[aria-hidden="false"]');
-    const bounds=await panel.boundingBox();expect(bounds).not.toBeNull();
-    await page.mouse.move(bounds!.x+bounds!.width/2,bounds!.y+Math.min(60,bounds!.height/2));
-    await page.mouse.wheel(0,10000);
-    await expect.poll(()=>panel.evaluate(el=>Math.abs(el.scrollHeight-el.clientHeight-el.scrollTop))).toBeLessThan(2);
+    await expect.poll(()=>panel.evaluate(el=>Math.abs(el.getBoundingClientRect().left - el.closest('.social-viewport')!.getBoundingClientRect().left))).toBeLessThan(1);
+    await panel.hover({position:{x:60,y:60}});
+    await expect.poll(async()=>{
+      await page.mouse.wheel(0,10000);
+      return panel.evaluate(el=>Math.abs(el.scrollHeight-el.clientHeight-el.scrollTop));
+    }).toBeLessThan(2);
     const bottom=tab==='权限'?panel.locator('.social-group-policy'):panel.getByText('scroll-record-34',{exact:true});
     const target=await bottom.boundingBox();const clip=await dialog.locator('.social-viewport').boundingBox();
     expect(target!.y+target!.height).toBeLessThanOrEqual(clip!.y+clip!.height+1);

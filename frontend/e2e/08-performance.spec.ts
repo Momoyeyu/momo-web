@@ -21,7 +21,8 @@ async function face(page: import('@playwright/test').Page): Promise<string | nul
 
 test('default model previews all four expressions inside its resource editor', async ({ page }) => {
   await page.goto('/#/settings');
-  await page.getByRole('button', { name: '拓展', exact: true }).click();
+  await page.getByRole('button', { name: '显示', exact: true }).click();
+  await page.getByRole('button', { name: '管理形象', exact: true }).click();
   await page.locator('.avatar-row').first().click();
   const dialog = page.getByRole('dialog', { name: /表情与动作/ });
   for (const name of ['happy', 'curious', 'surprised', 'shy']) {

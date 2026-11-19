@@ -29,13 +29,14 @@ test.beforeEach(async ({page,request}) => {
   const builtin = state.avatars.find((a: {builtin?:boolean})=>a.builtin);
   builtin.resources = {expressions:[],motions:[{name:'Idle/4',desc:'我保留的动作说明',label:'自定义合掌',context:'我的使用语境',enabled:false}]};
   await page.route('**/api/state',r=>r.fulfill({json:state}));
-  await page.goto('/#/settings'); await page.getByRole('button',{name:'拓展',exact:true}).click();
+  await page.goto('/#/settings'); await page.getByRole('button',{name:'显示',exact:true}).click();
+  await page.getByRole('button',{name:'管理形象'}).click();
   await page.locator('.avatar-row').first().click();
   await expect(page.locator('[data-resource-id="happy"] .resource-play')).toBeEnabled();
 });
 
 test('migration preserves edits and disabled flags while exposing separate semantic fields', async ({page}) => {
-  const dialog=page.getByRole('dialog'); await dialog.getByRole('button',{name:/动作\s*10/}).click();
+  const dialog=page.getByRole('dialog').last(); await dialog.getByRole('button',{name:/动作\s*10/}).click();
   const row=dialog.locator('[data-resource-id="motions/Hiyori_m06.motion3.json"]');
   await expect(row.locator('input[type=checkbox]')).not.toBeChecked();
   await expect(row.getByRole('textbox',{name:/实际表现/})).toHaveValue('我保留的动作说明');
@@ -47,7 +48,7 @@ test('migration preserves edits and disabled flags while exposing separate seman
 });
 
 test('real parameters follow face previews, combined gestures, reset and speech ownership', async ({page}) => {
-  const dialog=page.getByRole('dialog');
+  const dialog=page.getByRole('dialog').last();
   await dialog.getByRole('button',{name:'恢复自然',exact:true}).click();
   const baseline=await runtime(page,'read');
   await expect.poll(()=>runtime(page,'read').then(v=>v.arm)).toBe(-10);

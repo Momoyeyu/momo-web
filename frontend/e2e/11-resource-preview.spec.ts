@@ -20,7 +20,8 @@ test('resource dialog owns the live canvas and returns it when closed', async ({
   await page.getByRole('button', { name: '全身', exact: true }).click();
   const originalCanvas = await page.locator('.live2d-home canvas').elementHandle();
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('button', { name: '拓展', exact: true }).click();
+  await page.getByRole('button', { name: '显示', exact: true }).click();
+  await page.getByRole('button', { name: '管理形象', exact: true }).click();
   await page.locator('.avatar-row').first().click();
   const dialog = page.getByRole('dialog', { name: /表情与动作/ });
   const canvas = dialog.locator('canvas');
@@ -55,6 +56,7 @@ test('resource dialog owns the live canvas and returns it when closed', async ({
   await dialog.getByRole('button', { name: '关闭', exact: true }).click();
   await expect(page.locator('.live2d-home canvas')).toHaveCount(1);
   expect(await originalCanvas!.evaluate(node => node.parentElement?.classList.contains('live2d-home'))).toBe(true);
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '返回对话', exact: true }).click();
   await expect(page.locator('.live2d-home canvas')).toBeVisible();
   await expect(page.locator('canvas.live2d-canvas')).toHaveCount(1);
@@ -89,7 +91,8 @@ test('previewing an imported model keeps the active avatar and restores it on cl
     const { putBlob } = await import(path);
     await putBlob('preview-import', await (await fetch(`data:application/zip;base64,${data}`)).blob());
   }, encoded);
-  await page.getByRole('button', { name: '拓展', exact: true }).click();
+  await page.getByRole('button', { name: '显示', exact: true }).click();
+  await page.getByRole('button', { name: '管理形象', exact: true }).click();
   await page.locator('.avatar-row', { hasText: 'Preview imported' }).click();
   const dialog = page.getByRole('dialog', { name: /Preview imported/ });
   await expect(dialog.locator('[data-resource-id="happy"] .resource-play')).toBeEnabled();

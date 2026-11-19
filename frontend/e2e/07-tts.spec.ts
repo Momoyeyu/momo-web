@@ -86,7 +86,8 @@ test("保存音色配置后静默预热，点击试听复用在途音频", async
     await route.fulfill({contentType:"audio/pcm",headers:{"X-Sample-Rate":"32000"},body:Buffer.alloc(6400)});
   });
   await gotoRoute(page,"settings");
-  await page.locator(".stab",{hasText:"模型"}).click();
+  await page.locator("[data-intro=tab-models]").click();
+  await page.getByRole('button',{name:'配置语音'}).click();
   const card = page.locator('[data-intro="tts"]');
   const prompt = card.locator("input").last();
   await prompt.fill("试听参考文本");

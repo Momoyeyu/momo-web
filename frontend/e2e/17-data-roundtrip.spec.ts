@@ -33,7 +33,8 @@ async function blobs(page: import('@playwright/test').Page) {
 test('backup round-trips imported model ZIP, YAML and SQLite through actual controls', async ({page,request}, info) => {
   test.setTimeout(120_000);
   const model = await publicModelZip();
-  await openTab(page,'拓展');
+  await openTab(page,'显示');
+  await page.getByRole('button',{name:'管理形象'}).click();
   await page.getByRole('button',{name:'导入模型',exact:true}).click();
   await page.locator('input[type=file][accept=".zip,application/zip"]').setInputFiles({name:'public-Hiyori.zip',mimeType:'application/zip',buffer:model});
   await expect.poll(async () => (await readState(request)).avatarId).not.toBe('builtin');
@@ -48,7 +49,9 @@ test('backup round-trips imported model ZIP, YAML and SQLite through actual cont
     store.update({settings:{...state.settings,llm:{...state.settings.llm,key:'synthetic-backup-marker'}}});
   });
   const savedMemory = await (await request.post('/api/memories',{data:{content:'three-store preserved memory'}})).json();
-  await page.getByRole('button',{name:'通用',exact:true}).click();
+  await page.keyboard.press('Escape');
+  await openTab(page,'存档');
+  await page.getByRole('button',{name:'导出文件'}).click();
   const download = page.waitForEvent('download');
   await page.getByRole('button',{name:'导出备份',exact:true}).click();
   const file = await download;
@@ -70,7 +73,7 @@ test('backup round-trips imported model ZIP, YAML and SQLite through actual cont
     await route.continue();
   });
   const pendingPut=page.waitForRequest(req=>new URL(req.url()).pathname==='/api/state' && req.method()==='PUT');
-  await page.reload(); await openTab(page,'通用'); await pendingPut;
+  await page.reload(); await openTab(page,'存档'); await page.getByRole('button',{name:'选择文件'}).click(); await pendingPut;
   page.once('dialog',dialog=>void dialog.accept());
   await page.locator('input[type=file][accept=".zip"]').setInputFiles(path);
   await expect.poll(async () => ((await readState(request)) as any).settings.llm.key).toBe('synthetic-backup-marker');

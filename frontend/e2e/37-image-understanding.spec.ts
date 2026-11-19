@@ -65,11 +65,16 @@ test('settings gates vision verification, resets on model edit, and stale upload
  try{
   const config=structuredClone(original);config.settings.llm={...config.settings.llm,model:'no-vision',vision:false};config.settings.general.lang='zh';
   await request.put('/api/state',{data:config});await page.goto('/#/settings');
-  await page.locator('.stab',{hasText:'模型'}).click();
+  await page.locator('[data-intro=tab-models]').click();
+  const openVision=()=>page.getByRole('button',{name:'验证能力',exact:true}).click();
+  const editModel=async(value:string)=>{await page.keyboard.press('Escape');await page.getByRole('button',{name:'配置模型'}).click();await page.locator('[data-intro=llm] input').nth(2).fill(value);await page.keyboard.press('Escape');await openVision();};
+  await openVision();
   const row=page.locator('.opt-row').filter({has:page.locator('.opt-label',{hasText:'识图'})});
   await expect(row.getByRole('switch')).toBeDisabled();
-  await row.getByRole('button',{name:'验证识图能力'}).click();await expect(row.getByRole('switch')).toBeDisabled();
-  await page.locator('[data-intro=llm] input').nth(2).fill('deterministic');
+  await row.getByRole('button',{name:'验证识图能力'}).click();
+  await expect(page.getByRole('dialog').getByRole('status')).toContainText('未能确认模型正确读取了图片');
+  await expect(row.getByRole('switch')).toBeDisabled();
+  await editModel('deterministic');
   await expect(row.getByRole('button',{name:'验证识图能力'})).toBeEnabled();
   await row.getByRole('button',{name:'验证识图能力'}).click();await expect(row.getByRole('switch')).toBeEnabled();
   await row.getByRole('switch').click();await expect(row.getByRole('switch')).toHaveAttribute('aria-checked','true');
@@ -77,11 +82,12 @@ test('settings gates vision verification, resets on model edit, and stale upload
   // A failed recheck must never pretend an enabled capability is off or trap it on.
   await page.route('**/api/vision/probe',route=>route.fulfill({status:503,json:{detail:'timeout'}}));
   await row.getByRole('button',{name:'验证识图能力'}).click();
+  await expect(page.getByRole('dialog').getByRole('status')).toContainText('HTTP 503');
   await expect(row.getByRole('switch')).toHaveAttribute('aria-checked','true');
   await expect(row.getByRole('switch')).toBeEnabled();
   await row.getByRole('switch').click();await expect(row.getByRole('switch')).toHaveAttribute('aria-checked','false');
   await page.unroute('**/api/vision/probe');
-  await page.locator('[data-intro=llm] input').nth(2).fill('other-model');await expect(row.getByRole('switch')).toBeDisabled();
+  await editModel('other-model');await expect(row.getByRole('switch')).toBeDisabled();
   // Prepare the same proven fixture through the actual backend admission gate.
   config.settings.llm={...original.settings.llm,vision:true};await request.put('/api/state',{data:config});
   await page.reload();await page.evaluate(()=>{location.hash='#/title';});await bootChat(page);await waitForChatReady(page);

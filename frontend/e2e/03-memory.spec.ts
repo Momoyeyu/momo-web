@@ -21,10 +21,10 @@ async function purgeMemories(request: APIRequestContext): Promise<void> {
 /** 造一条记忆（走 UI，顺便验证添加弹窗）。 */
 async function addViaUi(page: import("@playwright/test").Page, text: string): Promise<void> {
   await page.getByRole("button", {name: "添加记忆", exact: true}).click();
-  await expect(page.locator(".modal-overlay")).toBeVisible();
+  await expect(page.locator(".modal-box:not(.config-modal)")).toBeVisible();
   await page.locator(".add-field").fill(text);
   await page.locator(".modal-foot").getByText("保存").click();
-  await expect(page.locator(".modal-overlay")).toBeHidden();
+  await expect(page.locator(".modal-box:not(.config-modal)")).toBeHidden();
 }
 
 const card = (page: import("@playwright/test").Page, text: string) =>
@@ -39,6 +39,7 @@ test.afterEach(async ({ request }) => {
 
 test("空态 → 添加 → 出现在列表 → 删除", async ({ page }) => {
   await openTab(page, "记忆");
+  await page.getByRole("button", {name:"查看记忆"}).click();
   await expect(page.locator(".mem-panel")).toBeVisible();
 
   await addViaUi(page, `${PREFIX}喜欢吃草莓蛋糕`);
@@ -54,6 +55,7 @@ test("空态 → 添加 → 出现在列表 → 删除", async ({ page }) => {
 
 test("PIN 图钉：切换后后端 pinned 变化", async ({ page, request }) => {
   await openTab(page, "记忆");
+  await page.getByRole("button", {name:"查看记忆"}).click();
   await addViaUi(page, `${PREFIX}用户的名称是夜羽`);
 
   const item = card(page, `${PREFIX}用户的名称是夜羽`);
@@ -75,6 +77,7 @@ test("PIN 图钉：切换后后端 pinned 变化", async ({ page, request }) => 
 
 test("检索过滤命中集，空结果显示空态", async ({ page }) => {
   await openTab(page, "记忆");
+  await page.getByRole("button", {name:"查看记忆"}).click();
   // 用唯一 token 做内容与检索词：真实库里已有「夜羽喜欢吃拉面」这类数据，
   // 拿普通词做子串过滤会撞上（strict mode violation）。
   const alpha = `${PREFIX}ALPHA-检索目标`;
@@ -92,19 +95,21 @@ test("检索过滤命中集，空结果显示空态", async ({ page }) => {
 
 test("点卡片开详情弹窗（只读全文），关闭后回到列表", async ({ page }) => {
   await openTab(page, "记忆");
+  await page.getByRole("button", {name:"查看记忆"}).click();
   const text = `${PREFIX}上周末她提到想去河边散步，傍晚的风很舒服`;
   await addViaUi(page, text);
 
   await card(page, text).click();
-  await expect(page.locator(".modal-overlay")).toBeVisible();
+  await expect(page.locator(".modal-box:not(.config-modal)")).toBeVisible();
   await expect(page.locator(".modal-body")).toHaveText(text);
   await page.locator(".modal-foot").getByText("关闭").click();
-  await expect(page.locator(".modal-overlay")).toBeHidden();
+  await expect(page.locator(".modal-box:not(.config-modal)")).toBeHidden();
   await expect(card(page, text)).toBeVisible();
 });
 
 test("卡片内联编辑：改内容后列表与后端都更新", async ({ page, request }) => {
   await openTab(page, "记忆");
+  await page.getByRole("button", {name:"查看记忆"}).click();
   await addViaUi(page, `${PREFIX}旧事实`);
 
   await card(page, `${PREFIX}旧事实`).getByLabel("编辑").click();
@@ -124,5 +129,6 @@ test("卡片内联编辑：改内容后列表与后端都更新", async ({ page,
 
 test("分页器始终渲染（单页也显示 1/1）", async ({ page }) => {
   await openTab(page, "记忆");
+  await page.getByRole("button", {name:"查看记忆"}).click();
   await expect(page.locator(".mem-panel .list-pager .pager-text")).toHaveText("1 / 1");
 });

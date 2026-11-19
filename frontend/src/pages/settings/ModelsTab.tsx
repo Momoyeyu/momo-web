@@ -53,7 +53,7 @@ export default function ModelsTab({ section }: { section: "llm" | "tts" | "visio
     if(section !== "vision") return;
     const abort=new AbortController();
     setVisionCheck({signature,verified:false,running:false,detail:''});
-    void visionStatus(settings.llm,abort.signal).then(result=>{if(!abort.signal.aborted)setVisionCheck(value=>value.signature===signature?{...value,verified:result.verified}:value);}).catch(()=>{});
+    void visionStatus(settings.llm,abort.signal).then(result=>{if(!abort.signal.aborted)setVisionCheck(value=>value.signature===signature && !value.running && !value.detail ? {...value,verified:result.verified} : value);}).catch(()=>{});
     return()=>abort.abort();
   },[signature,section]);
   const checkVision=async()=>{
@@ -297,7 +297,7 @@ export default function ModelsTab({ section }: { section: "llm" | "tts" | "visio
 
       </div>
     </FieldRow>
-    <p role="status">{visionCheck.detail ? visionResult : t("vision.hint")}</p>
+    <p role="status">{visionCheck.detail ? visionResult : t(visionCheck.verified ? "vision.verified" : "vision.hint")}</p>
   </div>}
 {section === "tts" && <section onBlur={() => {
   if (voiceEdited.current) { voiceEdited.current = false; warmVoice(); }

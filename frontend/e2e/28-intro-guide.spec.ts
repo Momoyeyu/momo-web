@@ -158,7 +158,7 @@ test('small PC window keeps spotlight and language dropdown inside the stage',as
  await expect(page.locator('.intro-guide')).toContainText('言語');
  await page.locator('.intro-guide button').click();await page.locator('[data-intro=tab-models]').click();
  await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','llm');
- await expect.poll(()=>page.locator('.settings-scroll').evaluate(el=>el.scrollLeft)).toBe(0);
+ await expect.poll(()=>page.locator('.config-scroll').evaluate(el=>el.scrollLeft)).toBe(0);
  await expect(page.locator('[data-intro=llm] input').first()).toBeInViewport();
  await expect(page.locator('.intro-guide')).toHaveAttribute('data-ready','true');
  const ring=await page.locator('.intro-ring').boundingBox(),modelBox=await page.locator('[data-intro=llm]').boundingBox();

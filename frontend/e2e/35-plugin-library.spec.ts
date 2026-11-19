@@ -7,16 +7,17 @@ test('plugin library searches, pages, and requires trust before enabling importe
   if(route.request().method()==='PATCH'){enabled=true;await route.fulfill({json:{ok:true}});return;}
   await route.fulfill({json:{plugins}});
  });
- await openExtensionTab(page,'插件');
+ await openExtensionTab(page,'MCP');
+ await page.getByRole('button',{name:'导入管理',exact:true}).click();
  const library=page.locator('.plugin-library');
- await expect(library.locator('.plugin-library-card')).toHaveCount(3);
+ await expect(library.locator('.plugin-library-card')).toHaveCount(4);
  await library.locator('.pager-btn').last().click();
  await expect(library.locator('.plugin-library-card')).toHaveCount(4);
  await page.screenshot({path:testInfo.outputPath('plugin-library.png')});
  await library.locator('.list-search').fill('Sample 10');
  await expect(library.locator('.plugin-library-card')).toHaveCount(1);
  await library.locator('.plugin-library-card button').first().click();
- await expect(page.getByRole('dialog')).toContainText('权限声明不是沙箱');
+ await expect(page.getByRole('dialog',{name:'插件详情'})).toContainText('权限声明不是沙箱');
  expect(enabled).toBe(false);
  await page.getByRole('button',{name:'信任并启用'}).click();
  await expect.poll(()=>enabled).toBe(true);

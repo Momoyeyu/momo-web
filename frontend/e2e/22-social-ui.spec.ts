@@ -1,3 +1,4 @@
+import {mockEnabledMod,openModManager} from './mod-fixtures';
 import {test,expect} from './fixtures';
 import {bootChat,openExtensionTab,waitForChatReady} from './helpers';
 
@@ -6,7 +7,8 @@ test('cold routes stay dormant until Boot, including settings and a direct chat 
   await expect(page.locator('.title-screen')).toBeVisible();
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
   await openExtensionTab(page,'插件');
-  await expect(page.locator('.official-plugins .social-card')).toHaveCount(1);
+  await expect(page.locator('#config-mods').getByRole('button',{name:'安装模组',exact:true})).toHaveCount(2);
+  await expect(page.locator('.social-card')).toHaveCount(0);
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
   await page.getByRole('button',{name:'返回标题',exact:true}).click();
   await bootChat(page);
@@ -21,13 +23,14 @@ test('cold routes stay dormant until Boot, including settings and a direct chat 
 });
 
 test('QQ account settings offer managed sign-in only and enforce an empty allowlist',async({page,request},info)=>{
+  await mockEnabledMod(page,'QQ');
   const accountsResponse=await request.get('/api/social/accounts');
   expect(accountsResponse.ok(),await accountsResponse.text()).toBe(true);
   const original=(await accountsResponse.json()).accounts as Array<{provider:string;allowlistEnabled:boolean;allowlist:Array<{peerId:string}>}>;
   expect(original.map(account=>account.provider)).toEqual(['qq']);
   expect(original.every(account=>account.allowlistEnabled===false)).toBe(true);
   try{
-    await openExtensionTab(page,'插件');
+    await openModManager(page,'QQ');
     const cards=page.locator('.official-plugins .social-card');
     await expect(cards).toHaveCount(1);
     await expect(cards.getByRole('heading',{name:'QQ',exact:true})).toBeVisible();
@@ -80,8 +83,8 @@ test('QQ account settings offer managed sign-in only and enforce an empty allowl
     for(const key of ['endpoint','token','hasCredential'])expect(saved[0]).not.toHaveProperty(key);
     await cards.last().getByRole('button',{name:'配置'}).click();
     await expect(dialog).toBeVisible();
-    await page.getByRole('dialog').getByRole('tab',{name:'记录'}).click();
-    await expect(page.getByRole('dialog').getByText('还没有执行记录。')).toBeVisible();
+    await dialog.getByRole('tab',{name:'记录'}).click();
+    await expect(dialog.getByText('还没有执行记录。')).toBeVisible();
   }finally{
     for(const account of original){
       await request.put(`/api/social/accounts/${account.provider}`,{data:{allowlistEnabled:account.allowlistEnabled,allowlist:account.allowlist}});
@@ -103,6 +106,7 @@ test('chat focus can be changed while text input remains available',async({page,
 });
 
 test('retired unknown operations require confirming the old executor stopped before ending a wait',async({page},info)=>{
+  await mockEnabledMod(page,'QQ');
   const record={commandId:'retired-unknown-command',source:'wechat',accountId:'archived-account',peerId:'archived-peer',status:'unknown',createdAt:'2026-01-01T00:00:00Z',deliveryStatus:'unknown'};
   let records:typeof record[]=[];
   const closedBodies:unknown[]=[];
@@ -116,12 +120,12 @@ test('retired unknown operations require confirming the old executor stopped bef
     await route.fulfill({json:{ok:true,records,attention:{activation:'dormant',focus:false,phonePaused:false,busy:false,activity:null,presentation:null}}});
   });
   await page.route('**/api/social/accounts/wechat/**',route=>{retiredProviderRequests.push(route.request().url());return route.abort();});
-  await openExtensionTab(page,'插件');
+  await openModManager(page,'QQ');
   const archive=page.locator('.social-retired-records');
   await expect(archive).toHaveCount(0);
   records=[record];
   await page.reload();
-  await openExtensionTab(page,'插件');
+  await openModManager(page,'QQ');
   await expect(archive).toBeVisible();
   await archive.locator('summary').click();
   await expect(archive.getByText('archived-account',{exact:true})).toBeVisible();

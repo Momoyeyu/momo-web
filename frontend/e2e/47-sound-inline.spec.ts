@@ -1,14 +1,19 @@
 import {test,expect} from './fixtures';
-for(const lang of ['zh','en','ja'])test(`sound preview shares the style row ${lang}`,async({page,request},info)=>{
+for(const lang of ['zh','en','ja'])test(`sound preview is available from the sound chapter in ${lang}`,async({page,request},info)=>{
  await page.setViewportSize({width:1280,height:720});
- const state=await(await request.get('/api/state')).json();state.settings.general.lang=lang;
+ const state=await(await request.get('/api/state')).json();
+ Object.assign(state.settings.general,{lang,sfxVolume:35});
  await page.route('**/api/state',r=>r.fulfill({json:state}));
  await page.goto('/#/settings');
- const name={zh:'试听音效',en:'Preview sound',ja:'効果音を試聴'}[lang]!;
- const row=page.locator('.opt-row').filter({has:page.getByRole('button',{name,exact:true})});
- await expect(row).toHaveCount(1);
- const select=await row.locator('.sel-face').boundingBox();const preview=await row.getByRole('button',{name,exact:true}).boundingBox();
- expect(Math.abs(select!.y+select!.height/2-preview!.y-preview!.height/2)).toBeLessThan(2);
- expect(preview!.x).toBeGreaterThan(select!.x+select!.width);
- await page.screenshot({path:info.outputPath('sound-settings.png')});
+ await page.locator('[data-intro=tab-sound]').click();
+ const trigger=page.locator('#config-sound .config-action');
+ await trigger.click();
+ const dialog=page.getByRole('dialog');
+ await expect(dialog.locator('.sel-face')).toHaveCount(2);
+ await dialog.locator('.sel-face').last().click();
+ await dialog.getByRole('option').nth(1).click();
+ const play=dialog.locator('.modal-foot button');
+ await expect(play).toBeEnabled();await play.click();
+ await page.screenshot({path:info.outputPath('sound-preview.png')});
+ await page.keyboard.press('Escape');await expect(trigger).toBeFocused();
 });

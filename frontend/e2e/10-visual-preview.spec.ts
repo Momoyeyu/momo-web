@@ -36,7 +36,8 @@ test('resource editor supports custom checks, both lists, and keyboard close', a
   state.settings.general = { ...state.settings.general, lang: 'zh', voiceInput: false };
   await page.route('**/api/state', route => route.fulfill({ json: state }));
   await page.goto('/#/settings');
-  await page.getByRole('button', { name: '拓展', exact: true }).click();
+  await page.getByRole('button', { name: '显示', exact: true }).click();
+  await page.getByRole('button', { name: '管理形象', exact: true }).click();
   const card = page.locator('.avatar-row').first();
   await card.click();
   const dialog = page.getByRole('dialog', { name: /表情与动作/ });

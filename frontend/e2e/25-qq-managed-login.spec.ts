@@ -1,11 +1,11 @@
+import {mockEnabledMod,openModManager} from './mod-fixtures';
 import {test,expect,type Page} from './fixtures';
-import {openExtensionTab} from './helpers';
 const PNG='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
 const state=(status='idle')=>({provider:'qq',status,running:false,connected:false,actualSelfId:null as string|null,attemptId:null as string|null,error:null as string|null,executorQuiescent:true,qr:null as null|{dataUrl:string;expiresAt:number}});
 const connected=()=>({...state('connected'),running:true,connected:true,executorQuiescent:false,actualSelfId:'123456',attemptId:'authenticated'});
 const pending=(id='attempt-1',expiresAt=Date.now()+60000)=>({...state('qr_pending'),running:true,executorQuiescent:false,attemptId:id,qr:{dataUrl:PNG,expiresAt}});
 const openQQ=async(page:Page)=>{
-  await openExtensionTab(page,'插件');
+  await openModManager(page,'QQ');
   await page.locator('.official-plugins .social-card').getByRole('button',{name:'配置',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'QQ 账号设置'});await expect(dialog).toBeVisible();return dialog;
 };
@@ -15,6 +15,8 @@ const noExtraControls=async(page:Page)=>{
   await expect(dialog.getByRole('switch',{name:'启用 QQ 收发',exact:true})).toHaveCount(0);
   await expect(dialog.locator('#social-panel-account input')).toHaveCount(0);
 };
+
+test.beforeEach(async ({page}) => { await mockEnabledMod(page,'QQ'); });
 
 test('closing and reopening preferences keeps old and new editor writes in one order',async({page,request})=>{
   const initial=(await (await request.get('/api/social/accounts')).json()).accounts[0];
@@ -52,7 +54,7 @@ test('a failed initial account read recovers automatically without a Retry actio
     await route.fulfill({json:{accounts:[initial],providers:[]}});
   });
   await page.route(/\/api\/social\/accounts\/qq\/runtime$/,route=>route.fulfill({json:state()}));
-  await openExtensionTab(page,'插件');
+  await openModManager(page,'QQ');
   const card=page.locator('.official-plugins .social-card');
   await expect(card.getByRole('button',{name:'配置',exact:true})).toBeEnabled({timeout:15000});
   expect(reads).toBeGreaterThanOrEqual(2);
@@ -68,7 +70,7 @@ test('unknown native status offers no lifecycle action and cannot enable QQ',asy
   const dialog=await openQQ(page);
   await expect(dialog.getByText('正在读取登录状态…',{exact:true})).toBeVisible();
   await expect(dialog.getByRole('button',{name:/^(登录 QQ|退出登录)$/})).toHaveCount(0);
-  await expect(page.getByRole('switch',{name:'启用 QQ 收发',exact:true})).toBeDisabled();
+  await expect(page.locator('.social-card [role=switch]')).toBeDisabled();
   await expect.poll(()=>typeof release).toBe('function');release!();
   await expect(dialog.getByRole('button',{name:'登录 QQ',exact:true})).toBeEnabled();
 });
@@ -126,7 +128,7 @@ test('resource and identity errors remain safe and never offer Logout or enable 
   await dialog.getByRole('button',{name:'登录 QQ',exact:true}).click();
   await expect(dialog.getByRole('alert').filter({hasText:'登录账号与已绑定账号不同'})).toBeVisible();
   await expect(dialog.getByRole('button',{name:'退出登录',exact:true})).toHaveCount(0);await expect(dialog).not.toContainText('/private/session-token');
-  await expect(page.getByRole('switch',{name:'启用 QQ 收发',exact:true})).toBeDisabled();
+  await expect(page.locator('.social-card [role=switch]')).toBeDisabled();
   await page.screenshot({path:info.outputPath('qq-login-error.png')});
 });
 
@@ -146,7 +148,7 @@ test('Logout immediately disables the plugin and clears login with one action, w
   await expect(dialog.getByRole('button',{name:'登录 QQ',exact:true})).toBeDisabled();release!();
   await expect(dialog.getByRole('button',{name:'登录 QQ',exact:true})).toBeEnabled();
   await expect(dialog.getByRole('button',{name:'退出登录',exact:true})).toHaveCount(0);
-  await expect(page.getByRole('switch',{name:'启用 QQ 收发',exact:true})).toHaveAttribute('aria-checked','false');
+  await expect(page.locator('.social-card [role=switch]')).toHaveAttribute('aria-checked','false');
   expect(actions).toEqual(['forget']);expect(connects).toBe(0);expect(account.permissions).toEqual(initial.permissions);await noExtraControls(page);
   await page.screenshot({path:info.outputPath('qq-logged-out.png')});
 });
@@ -161,7 +163,7 @@ for(const disabled of [true,false])test(`failed Logout re-reads actual ${disable
   });
   const dialog=await openQQ(page);await dialog.getByRole('button',{name:'退出登录',exact:true}).click();
   await expect(dialog.getByRole('alert').filter({hasText:'未能移除登录会话'})).toBeVisible();
-  await expect(page.getByRole('switch',{name:'启用 QQ 收发',exact:true})).toHaveAttribute('aria-checked',String(!disabled));
+  await expect(page.locator('.social-card [role=switch]')).toHaveAttribute('aria-checked',String(!disabled));
 });
 
 test('the sole plugin switch turns ON only when logged in; OFF stays available after native disconnect',async({page,request})=>{
@@ -173,7 +175,7 @@ test('the sole plugin switch turns ON only when logged in; OFF stays available a
     const action=route.request().url().split('/').at(-1)!;actions.push(action);expect(route.request().postDataJSON()).toEqual({});
     account={...account,enabled:action==='connect',status:action==='connect'?'connected':'disabled'};await route.fulfill({json:account});
   });
-  await openExtensionTab(page,'插件');const enabled=page.getByRole('switch',{name:'启用 QQ 收发',exact:true});await expect(enabled).toBeDisabled();
+  await openModManager(page,'QQ');const enabled=page.locator('.social-card [role=switch]');await expect(enabled).toBeDisabled();
   runtime=connected();await expect(enabled).toBeEnabled();await enabled.click();await expect(enabled).toHaveAttribute('aria-checked','true');
   runtime=state('disconnected');await page.waitForTimeout(1400);await expect(enabled).toBeEnabled();await enabled.click();
   await expect(enabled).toHaveAttribute('aria-checked','false');await expect(enabled).toBeDisabled();expect(actions).toEqual(['connect','disconnect']);
@@ -202,7 +204,7 @@ test('permissions autosave only changed fields, serialize newer edits and never 
   await expect(dialog.getByRole('button',{name:'登录 QQ',exact:true})).toBeEnabled();release!();
   await expect.poll(()=>writes.length).toBe(2);await expect(dialog.locator('.social-save-state')).toContainText('已保存');
   expect(writes).toEqual([{permissions:{reply:false}},{permissions:{reply:true,receive:false}}]);
-  expect(account.enabled).toBe(false);expect(connects).toBe(0);await expect(page.getByRole('switch',{name:'启用 QQ 收发',exact:true})).toHaveAttribute('aria-checked','false');
+  expect(account.enabled).toBe(false);expect(connects).toBe(0);await expect(page.locator('.social-card [role=switch]')).toHaveAttribute('aria-checked','false');
   await dialog.getByRole('tab',{name:'权限',exact:true}).click();await expect(reply).toHaveAttribute('aria-checked','true');
   await expect(dialog.getByRole('switch',{name:'收取私聊',exact:true})).toHaveAttribute('aria-checked','false');
   await dialog.getByRole('button',{name:'关闭',exact:true}).click();
@@ -216,7 +218,7 @@ test('a rejected preference save reads actual settings and rolls back only the f
   const dialog=await openQQ(page);await dialog.getByRole('tab',{name:'权限',exact:true}).click();
   const before=reads;const reply=dialog.getByRole('switch',{name:'回复文字',exact:true});await reply.click();
   await expect(dialog.getByRole('alert')).toContainText('未能保存');await expect(reply).toHaveAttribute('aria-checked','true');expect(reads).toBeGreaterThan(before);
-  await expect(page.getByRole('switch',{name:'启用 QQ 收发',exact:true})).toHaveAttribute('aria-checked','false');
+  await expect(page.locator('.social-card [role=switch]')).toHaveAttribute('aria-checked','false');
 });
 
 test('identity and unresolved records are read-only with no manual owner or delivery recovery workflow',async({page,request})=>{

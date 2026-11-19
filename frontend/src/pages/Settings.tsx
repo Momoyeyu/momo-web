@@ -33,6 +33,7 @@ export default function Settings() {
   const scroll = useRef<HTMLDivElement>(null);
   const grid = useRef<GridBackdropApi>(null);
   const [active, setActive] = useState<Chapter>('language');
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [source] = useState(() => storedMeetingIdentity() ? 'chat' : fromRoute());
   const back = intro?.phase === 'return_title' || source !== 'chat' ? 'title' : 'chat';
   const guided = !!intro && intro.phase !== 'completed';
@@ -69,14 +70,14 @@ export default function Settings() {
   const content: Record<Chapter, ReactNode> = {
     language: <GeneralTab section="language"/>,
     display: <><GeneralTab section="display"/>{action('avatar', <AvatarPanel/>, state.avatars.find(a => a.id === state.avatarId)?.name)}
-      <details className="config-preview"><summary>{t('config.preview')}</summary><GeneralTab section="preview"/></details></>,
+      <details className="config-preview" onToggle={event => setPreviewOpen(event.currentTarget.open)}><summary>{t('config.preview')}</summary>{previewOpen && <GeneralTab section="preview"/>}</details></>,
     sound: <><GeneralTab section="sound"/>
       <ConfigAction label={t('config.sampleSound')} action={t('settings.soundPreview')}>
         <GeneralTab section="sample"/>
       </ConfigAction></>,
     models: <>{guided ? <ModelsTab section={intro.phase === 'tts' && intro.configurationValid ? 'tts' : 'llm'}/> : <>
       {action('llm', <ModelsTab section="llm"/>, state.settings.llm.model)}
-      {action('vision', <ModelsTab section="vision"/>, state.settings.llm.vision ? t('config.ready') : undefined)}
+      {action('vision', <ModelsTab section="vision"/>, t(state.settings.llm.vision ? 'browser.active' : 'browser.inactive'))}
       {action('asr', <AsrStatus/>, 'SenseVoice')}
       {action('tts', <ModelsTab section="tts"/>, state.settings.tts.voice)}
     </>}<BuiltinResourcesNotice/></>,

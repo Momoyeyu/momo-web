@@ -4,7 +4,6 @@
 // 拓展记录只做「建 → 断言 → 删」。
 import { expect, test } from "./fixtures";
 import {
-  activePane,
   fieldRow,
   openApp,
   openTab,
@@ -19,33 +18,25 @@ import {
 const restore = useStateRestore();
 test.afterEach(restore);
 
-test("四个 tab 齐全，可逐个切换", async ({ page }) => {
+test("目录的十章与正文顺序一致，最后一章可以定位到阅读线", async ({ page }) => {
   await openApp(page, "settings");
-  expect(await page.locator(".stab-label").allTextContents()).toEqual([
-    "通用",
-    "模型",
-    "记忆",
-    "拓展",
-  ]);
-
-  const tabs: [string, string][] = [
-    ["通用", ".settings-cols"],
-    ["模型", ".settings-cols"],
-    ["记忆", ".mem-panel"],
-    ["拓展", ".extension-settings"],
-  ];
-  for (const [label, sel] of tabs) {
-    await page.locator(".stab", { hasText: label }).click();
-    await expect(page.locator(sel).first()).toBeVisible();
+  const index = page.locator(".config-index button");
+  expect(await index.allTextContents()).toEqual(await page.locator(".config-scroll h2").allTextContents());
+  await expect(index).toHaveCount(10);
+  for (const link of await index.all()) {
+    await link.click();
+    await expect(link).toHaveAttribute("aria-current", "location");
   }
+  await expect.poll(() => page.locator('#config-mods').evaluate(el =>
+    Math.abs(el.getBoundingClientRect().top - el.parentElement!.getBoundingClientRect().top - 24))).toBeLessThan(2);
 });
 
 test("界面语言即时生效，且写回后端", async ({ page, request }) => {
-  await openTab(page, "通用");
+  await openTab(page, "语言");
   await pickSelect(page, "界面语言", "日本語");
   await waitSaved(page);
 
-  await expect(page.locator(".stab-label").first()).toHaveText("一般");
+  await expect(page.locator(".config-index button").first()).toHaveText("言語");
   const state = await readState(request);
   expect((state.settings as { general: { lang: string } }).general.lang).toBe("ja");
 });
@@ -58,7 +49,8 @@ test("滑块拖动即时反映数值并写盘", async ({ page, request }) => {
   tts.voice = "ref.wav";
   await writeState(request, st);
   await page.reload();
-  await openTab(page, "通用");
+  await openTab(page, "语言");
+  await openTab(page, "声音");
   const field = fieldRow(page, "语音音量");
   await field.locator("input.ux-range").fill("42");
   await expect(field.locator(".slider-val")).toHaveText("42%");
@@ -71,7 +63,8 @@ test("滑块拖动即时反映数值并写盘", async ({ page, request }) => {
 });
 
 test("开关点击切换并写盘", async ({ page, request }) => {
-  await openTab(page, "通用");
+  await openTab(page, "语言");
+  await openTab(page, "显示");
   const read = async () =>
     (await readState(request)).settings as { general: { showStatus: boolean } };
   const sw = fieldRow(page, "显示对话状态").locator(".switch");
@@ -86,6 +79,7 @@ test("开关点击切换并写盘", async ({ page, request }) => {
 
 test("端点探测：可点、出结果、2.5s 后自动复原", async ({ page }) => {
   await openTab(page, "模型");
+  await page.getByRole("button", {name: "配置模型"}).click();
   const btn = page.locator(".probe-btn").first(); // 首行是 LLM
   await expect(btn).toHaveText("测试");
   await btn.click();
@@ -93,7 +87,7 @@ test("端点探测：可点、出结果、2.5s 后自动复原", async ({ page }
   await expect(btn).toHaveText("测试", { timeout: 10_000 });
 });
 
-test("拓展 tab：登记 stdio MCP server → 出现在列表 → 删除", async ({ page }) => {
+test("设置弹窗：登记 stdio MCP server → 出现在列表 → 删除", async ({ page }) => {
   await openExtensionTab(page, "MCP");
   // 「说明书」性质的说明收进了问号浮窗：正文里不该再有那段长句，
   // 但说明本身要能在浮窗里拿到（鼠标走 data-tip，读屏走 aria-label）。
@@ -105,14 +99,14 @@ test("拓展 tab：登记 stdio MCP server → 出现在列表 → 删除", asyn
   await expect(page.locator(".ext-panel .list-body")).toBeVisible();
 
   await page.locator(".ext-panel .list-toolbar .icon-btn").click();
-  await expect(page.locator(".modal-overlay")).toBeVisible();
+  await expect(page.locator(".modal-box:not(.config-modal)")).toBeVisible();
 
   await fieldRow(page, "名称", ".ext-modal").locator("input").fill("e2e-echo");
   await pickSelect(page, "连接方式", "stdio", ".ext-modal");
   await fieldRow(page, "命令", ".ext-modal").locator("input").fill("echo");
   await page.locator(".ext-actions").getByText("保存").click();
 
-  await expect(page.locator(".modal-overlay")).toBeHidden();
+  await expect(page.locator(".modal-box:not(.config-modal)")).toBeHidden();
   const created = page.locator(".ext-row").filter({ hasText: "e2e-echo" });
   await expect(created).toBeVisible();
 
@@ -139,53 +133,20 @@ test('adapter permission policy survives JSON import, metadata edit and document
   const persisted=async()=>((await readState(request)).settings as {extensions:{name:string}[]}).extensions.find(ext=>ext.name==='e2e-scoped-renamed');
   await expect.poll(persisted).toMatchObject(policy);
   await page.reload();
-  await openTab(page,'通用'); // An unrelated update sends the complete normalized state.
+  await openTab(page,'显示'); // An unrelated update sends the complete normalized state.
   const saved=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/state'&&response.request().method()==='PUT'&&response.status()===204);
   await fieldRow(page,'显示对话状态').locator('.switch').click();
   await saved;
   await expect.poll(persisted).toMatchObject(policy);
 });
 
-test("通用 tab：语言/语音是与对话框设置同级的两个面板，语义检索开关已移除", async ({
+test("显示设置：预览跟随对话状态开关", async ({
   page,
 }) => {
-  await openTab(page, "通用");
-
-  // 左栏是两个**独立面板**（不再是套在一个面板里的子框）：第一列 2 项
-  const stack = page.locator(":is(.settings-pane:not([aria-hidden])) .settings-cols > .settings-stack > .panel");
-  await expect(stack).toHaveCount(2);
-  expect(await stack.locator(".opt-group").allTextContents()).toEqual([
-    "语言设置",
-    "语音设置",
-  ]);
-  // 第二列 1 项，与左栏的两个面板同级（都是 .settings-cols 的子级）
-  await expect(page.locator(":is(.settings-pane:not([aria-hidden])) .settings-cols > .panel")).toHaveCount(1);
-
-  // 两栏总高对齐
-  const [left, right] = await Promise.all([
-    page.locator(":is(.settings-pane:not([aria-hidden])) .settings-stack").boundingBox(),
-    page.locator(":is(.settings-pane:not([aria-hidden])) .settings-cols > .panel").boundingBox(),
-  ]);
-  expect(Math.abs((left?.height ?? 0) - (right?.height ?? 0))).toBeLessThan(2);
-
-  const backup = await page.locator('.data-transfer-panel').boundingBox();
-  expect(backup!.y).toBeGreaterThanOrEqual(left!.y + left!.height);
-  const actions = await page.locator('.data-transfer-actions button').evaluateAll(buttons => buttons.map(button=>{
-    const box=button.getBoundingClientRect();return {top:box.top,left:box.left,right:box.right};
-  }));
-  expect(Math.abs(actions[0].top-actions[1].top)).toBeLessThan(1);
-  expect(actions[1].left-actions[0].right).toBeGreaterThanOrEqual(8);
-
-  // 语义检索不再有开关（改为按 embedding 是否配置自动判定，后端有单测钉住）
-  await expect(page.getByText("语义检索", { exact: true })).toHaveCount(0);
-
-  // 「显示对话状态」归入右栏「对话框设置」组
-  const dialogPanel = page.locator(".settings-col").filter({ hasText: "对话框设置" });
-  await expect(
-    dialogPanel.locator(".opt-label").filter({ hasText: "显示对话状态" }),
-  ).toBeVisible();
-
-  // 预览与对话页一致：状态条属于对话框本体，跟着「显示对话状态」开关
+  await openTab(page, "显示");
+  await page.locator(".config-preview summary").click();
+  const dialogPanel = page.locator("#config-display");
+  await expect(page.getByText("语义检索", {exact:true})).toHaveCount(0);
   const preview = page.locator(".dialog-preview .chat-status");
   const sw = dialogPanel.locator(".opt-row", { hasText: "显示对话状态" }).locator(".switch");
   // 本开关的起点由前序用例决定，先归位到「开」再断言关掉后的效果
@@ -200,43 +161,24 @@ test("通用 tab：语言/语音是与对话框设置同级的两个面板，语
   await expect(page.locator(".dialog-preview .chat-status")).toHaveCount(0);
 });
 
-test("拓展二级滑块：三种配置各占完整宽度并支持键盘导航", async ({ page }, info) => {
-  await openTab(page, "拓展");
-  const tabs = page.getByRole("tablist", { name: "拓展分类" });
-  const avatar = page.getByRole("tab", { name: "Live2D", exact: true });
-  const mcp = page.getByRole("tab", { name: "MCP", exact: true });
-  const plugins = page.getByRole("tab", { name: "插件", exact: true });
-  await expect(tabs.getByRole("tab")).toHaveCount(3);
-  await expect(avatar).toHaveAttribute("aria-selected", "true");
-  for (const viewport of [{ width: 1366, height: 768 }, { width: 1920, height: 1080 }]) {
-    await page.setViewportSize(viewport);
-    const width = (await page.locator(".extension-viewport").boundingBox())!.width;
-    for (const [tab, panel] of [[avatar, "avatar"], [mcp, "mcp"], [plugins, "plugins"]] as const) {
-      await tab.click();
-      await expect(tab).toHaveAttribute("aria-selected", "true");
-      const active = page.locator(`#extension-panel-${panel}`);
-      await expect(active).toHaveAttribute("aria-hidden", "false");
-      await expect.poll(async () => Math.abs((await active.boundingBox())!.width - width)).toBeLessThan(2);
-      await expect.poll(async () => Math.abs((await active.boundingBox())!.x - (await page.locator(".extension-viewport").boundingBox())!.x)).toBeLessThan(2);
-      await expect(page.locator(".extension-pane[inert]")).toHaveCount(2);
-    }
-    await page.screenshot({ path: info.outputPath(`extension-plugins-${viewport.width}.png`) });
-  }
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect.poll(() => page.locator('.extension-track').evaluate(element => getComputedStyle(element).transitionDuration)).toBe('0s');
-  await plugins.press("Home");
-  await expect(avatar).toBeFocused();
-  await expect(avatar).toHaveAttribute("aria-selected", "true");
-  await avatar.press("ArrowRight");
-  await expect(mcp).toBeFocused();
-  await expect(mcp).toHaveAttribute("aria-selected", "true");
-  await page.getByRole("button", { name: "通用", exact: true }).click();
-  await page.getByRole("button", { name: "拓展", exact: true }).click();
-  await expect(mcp).toHaveAttribute("aria-selected", "true");
+test("设置操作按钮对齐，键盘关闭后焦点回到入口", async ({page}) => {
+  await openTab(page, "模型");
+  const actions = page.locator(".config-card .config-action");
+  const boxes = await actions.evaluateAll(buttons => buttons.map(b => {
+    const r = b.getBoundingClientRect();
+    return {x:r.x, w:r.width, h:r.height};
+  }));
+  expect(boxes.length).toBeGreaterThanOrEqual(18);
+  for (const box of boxes) expect(box).toEqual({x:boxes[0]!.x, w:112, h:34});
+  const entry = page.getByRole("button", {name:"验证能力"});
+  await entry.focus(); await entry.press("Enter");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape"); await expect(entry).toBeFocused();
 });
 
 test("探测按钮定宽：出结果不变宽，且与同列「显示」同宽", async ({ page }) => {
   await openTab(page, "模型");
+  await page.getByRole("button", {name: "配置模型"}).click();
   const probe = page.locator(".probe-btn").first();
   // 同列的「显示」按钮：两者共用 .row-btn 的定宽，必须完全等宽
   const show = page.locator(".key-toggle.row-btn:not(.probe-btn)").first();
@@ -279,11 +221,11 @@ test("探测按钮定宽：出结果不变宽，且与同列「显示」同宽",
   await expect(probe).toHaveText("测试", { timeout: 10_000 });
 });
 
-test("拓展 tab：Live2D 与「记忆」同构（检索 + 加号 + 翻页），加号开导入弹窗", async ({
+test("设置弹窗：Live2D 与「记忆」同构（检索 + 加号 + 翻页），加号开导入弹窗", async ({
   page,
 }) => {
-  await openTab(page, "拓展");
-  const panel = activePane(page).locator(".panel-stack").nth(0);
+  await openExtensionTab(page, "Live2D");
+  const panel = page.locator(".config-modal-body");
 
   await expect(panel.locator(".list-search")).toBeVisible();
   // 只取工具条的加号：卡片上还有编辑/删除两个 .icon-btn，多个匹配会触发严格模式报错
@@ -292,7 +234,7 @@ test("拓展 tab：Live2D 与「记忆」同构（检索 + 加号 + 翻页），
   await expect(panel.locator(".list-item").first()).toBeVisible();
 
   await panel.locator(".list-toolbar .icon-btn").click();
-  await expect(page.locator(".modal-overlay")).toBeVisible();
+  await expect(page.locator(".modal-box:not(.config-modal)")).toBeVisible();
   await expect(page.locator(".modal-meta")).toHaveText("导入模型 (.zip)");
   await expect(page.locator(".avatar-drop")).toContainText("拖入");
 
@@ -307,12 +249,12 @@ test("拓展 tab：Live2D 与「记忆」同构（检索 + 加号 + 翻页），
   await expect(page.locator(".avatar-error")).toHaveText("不是有效的 zip 文件");
 
   await page.locator(".modal-foot").getByText("取消").click();
-  await expect(page.locator(".modal-overlay")).toBeHidden();
+  await expect(page.locator(".modal-box:not(.config-modal)")).toBeHidden();
 });
 
-test("拓展 tab：点模型卡片弹出「表情与动作」，并可按名检索", async ({ page }) => {
-  await openTab(page, "拓展");
-  const panel = activePane(page).locator(".panel-stack").nth(0);
+test("设置弹窗：点模型卡片弹出「表情与动作」，并可按名检索", async ({ page }) => {
+  await openExtensionTab(page, "Live2D");
+  const panel = page.locator(".config-modal-body");
 
   // 检索过滤（内置 Hiyori 命中，乱词落空态）
   await panel.locator(".list-search").fill("Hiyori");
@@ -333,11 +275,11 @@ test("拓展 tab：点模型卡片弹出「表情与动作」，并可按名检�
   await desc.fill(before); // 还原
 
   await page.locator(".modal-foot").getByText("关闭").click();
-  await expect(page.locator(".modal-overlay")).toBeHidden();
+  await expect(page.locator(".modal-box:not(.config-modal)")).toBeHidden();
 });
 
-test("通用 tab：语言下拉展开后不被下面的「语音设置」面板盖住", async ({ page }) => {
-  await openTab(page, "通用");
+test("语言设置：下拉选项可见且可点", async ({ page }) => {
+  await openTab(page, "语言");
 
   await fieldRow(page, "对话语言").locator(".sel-face").click();
   const list = page.locator(".sel-list");
@@ -357,13 +299,13 @@ test("通用 tab：语言下拉展开后不被下面的「语音设置」面板�
 
   // 选项可点（能选到非首项，说明整列都在最上层）
   await page.locator(".sel-opt").filter({ hasText: "日本語" }).click();
-  await expect(page.locator(".stab-label").first()).toHaveText("通用"); // 界面语言未变
+  await expect(page.locator(".config-index button").first()).toHaveText("语言"); // 界面语言未变
 });
 
-test("四个 tab 都不产生横向溢出（定宽控件里只放短词汇，不放长文案）", async ({ page }) => {
+test("十章都不产生横向溢出", async ({ page }) => {
   await openApp(page, "settings");
-  for (const tab of ["通用", "模型", "记忆", "拓展"]) {
-    await page.locator(".stab", { hasText: tab }).click();
+  for (const tab of await page.locator(".config-index button").allTextContents()) {
+    await page.locator(".config-index").getByRole("button", {name:tab, exact:true}).click();
     const { scroll, client } = await page.evaluate(() => ({
       scroll: document.documentElement.scrollWidth,
       client: document.documentElement.clientWidth,
@@ -371,4 +313,29 @@ test("四个 tab 都不产生横向溢出（定宽控件里只放短词汇，不
     // 「禁止溢出」是硬约束：任何 tab 出现横向滚动都算回归
     expect(scroll, `${tab} tab 出现横向溢出`).toBeLessThanOrEqual(client + 1);
   }
+});
+
+test('RoPE uses actual scroll distance and stays fixed under reduced motion', async ({page}) => {
+  await page.addInitScript(() => {
+    const original = CanvasRenderingContext2D.prototype.rotate;
+    CanvasRenderingContext2D.prototype.rotate = function(angle) {
+      if (this.canvas.matches('.config-document .grid-backdrop')) {
+        this.canvas.dataset.drawnDegrees = String(angle * 180 / Math.PI);
+      }
+      original.call(this, angle);
+    };
+  });
+  await openApp(page, 'settings');
+  const angle = () => page.locator('.config-document canvas').evaluate(el => Number((el as HTMLElement).dataset.drawnDegrees));
+  const scroll = page.locator('.config-scroll');
+  for (const y of [500, 1000, 250, 0]) {
+    await scroll.evaluate((el, target) => el.scrollTop = target, y);
+    await expect.poll(angle).toBeCloseTo(25 + y * 0.02);
+  }
+  await page.emulateMedia({reducedMotion:'reduce'});
+  await scroll.evaluate(el => el.scrollTop = 500);
+  await expect.poll(angle).toBeCloseTo(25);
+  await page.locator('[data-intro=tab-mods]').click();
+  await expect(page.locator('[data-intro=tab-mods]')).toHaveAttribute('aria-current','location');
+  expect(await angle()).toBeCloseTo(25);
 });

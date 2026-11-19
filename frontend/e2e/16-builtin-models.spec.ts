@@ -57,26 +57,23 @@ test.afterEach(async ({page})=>{
 async function models(page:Page){
   await page.goto('/#/settings');
   await page.getByRole('button',{name:'模型',exact:true}).click();
-  return page.locator('.settings-pane:not([aria-hidden]) .settings-cols');
+  return page.locator('#config-models');
 }
 test('only LLM and TTS remain, thinking persists, four rows align, and unknown providers disable thinking',async({page})=>{
   const pane=await models(page);
-  await expect(pane.locator('section')).toHaveCount(2);
+  await expect(pane.locator('.config-action')).toHaveCount(4);
   await expect(pane).not.toContainText('Embedding');
-  await expect(pane).not.toContainText('ASR');
-  const cards=pane.locator('section');
-  for(const card of await cards.all())await expect(card.locator('.opt-row')).toHaveCount(4);
-  const boxes=await cards.evaluateAll(elements=>elements.map(el=>{const b=el.getBoundingClientRect();return {top:b.top,bottom:b.bottom};}));
-  expect(Math.abs(boxes[0].top-boxes[1].top)).toBeLessThan(2);
-  expect(Math.abs(boxes[0].bottom-boxes[1].bottom)).toBeLessThan(2);
+  await pane.getByRole('button',{name:'配置模型'}).click();
+  await expect(page.locator('[data-intro=llm] .opt-row')).toHaveCount(4);
   const thinking=page.getByRole('switch',{name:'思考模式',exact:true});
   await thinking.click();
   await expect(thinking).toHaveAttribute('aria-checked','true');
   await expect.poll(async()=>JSON.parse((await call('/api/state')).body).settings.llm.thinking).toBe(true);
   await page.reload();
   await page.getByRole('button',{name:'模型',exact:true}).click();
+  await page.getByRole('button',{name:'配置模型'}).click();
   await expect(thinking).toHaveAttribute('aria-checked','true');
-  const first=page.locator('.settings-pane:not([aria-hidden]) section').first();
+  const first=page.locator('[data-intro=llm]');
   await first.locator('.opt-row').first().locator('input').fill('https://other.example/v1');
   await expect(thinking).toBeDisabled();
   await expect(thinking).toHaveAttribute('aria-checked','false');
@@ -92,21 +89,22 @@ test('two model cards stay aligned and within a narrow stage in all interface la
     await call('/api/state','PUT',state);
     await page.reload();
     await page.getByRole('button',{name:label,exact:true}).click();
+    await page.locator('#config-models .config-action').first().click();
     const sw=page.getByRole('switch',{name:thinking,exact:true});
     await sw.scrollIntoViewIfNeeded();
     await expect(sw).toBeInViewport();
-    const pane=page.locator('.settings-pane:not([aria-hidden])');
+    const pane=page.locator('.config-modal');
     expect(await pane.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
-    await expect(pane.locator('.settings-cols section')).toHaveCount(2);
+    await expect(pane.locator('.opt-row')).toHaveCount(4);
   }
 });
 
 test('missing bundled resources give a recovery message without reintroducing configuration',async({page})=>{
   await page.route('**/api/resources/status',route=>route.fulfill({json:{asr:{ready:false},embedding:{state:'missing'},index:{state:'pending'}}}));
   await models(page);
-  await expect(page.getByRole('status')).toContainText('重新安装完整应用');
-  await expect(page.getByRole('status')).toContainText('当前使用文字匹配');
-  await expect(page.locator('.settings-pane:not([aria-hidden]) .settings-cols section')).toHaveCount(2);
+  await expect(page.locator('.builtin-resource-notice')).toContainText('重新安装完整应用');
+  await expect(page.locator('.builtin-resource-notice')).toContainText('当前使用文字匹配');
+  await expect(page.locator('#config-models .config-action')).toHaveCount(4);
 });
 
 test('clicking the microphone twice during connection cancels pending activation',async({page})=>{

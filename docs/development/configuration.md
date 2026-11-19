@@ -89,3 +89,5 @@ profile; do not publish it or copy machine-specific paths into another install.
 ## Electron 桌面接入（017）
 
 `MOMO_DESKTOP_DATA_DIR` 仅覆盖 Electron 的隔离 profile 根目录（包含 Chromium 状态与 data/），不修改 Web 的 `MOMO_DATA_DIR`。正式安装默认使用系统应用支持目录下的 momo，开发使用 momo-development。共享 API 接受 `momo://app` 与运行时内存令牌；旧 Tauri origin 不再接受。Python 生命周期持有数据目录排他锁，Web/桌面不能同时写同一目录。原生 helper 由安装资源/helpers 选择，不依赖玩家的 PATH。退出不删除 profile；迁移使用设置内备份导入，不直接搬 WebView IndexedDB 文件。
+
+在支持的平台上，设置 `MOMO_OFFICIAL_MOD_SMOKE=1` 并运行 `node scripts/browser-e2e.mjs --spec e2e/50-official-mod-download.spec.ts`，可在隔离资料中从 GitHub 下载、验签并启停两个官方包。该测试不登录真实账号。

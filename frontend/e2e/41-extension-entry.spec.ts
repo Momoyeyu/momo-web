@@ -1,15 +1,26 @@
 import {test,expect} from './fixtures';
-import {bootChat,openExtensionTab,gotoRoute} from './helpers';
-for(const viewport of [{width:1280,height:720},{width:1920,height:1080}])test(`extensions fit and Chat avoids duplicate plugin menus ${viewport.width}`,async({page},info)=>{
- await page.setViewportSize(viewport);
- await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:true}}}));
- await bootChat(page);await openExtensionTab(page,'插件');await page.waitForTimeout(450);
- await expect(page.locator('.extension-card')).toHaveCount(3);
- const pager=page.locator('.plugin-library .list-pager');
- await expect(pager).toBeVisible();
- const rect=await pager.boundingBox();expect(rect!.y+rect!.height).toBeLessThan(viewport.height);
- await page.screenshot({path:info.outputPath('plugin-cards.png')});
- await gotoRoute(page,'chat');
- await expect(page.getByRole('button',{name:'拓展',exact:true})).toHaveCount(0);
- await page.screenshot({path:info.outputPath('chat-scene-controls.png')});
-});
+import {bootChat,openTab,gotoRoute} from './helpers';
+
+for (const viewport of [{width:1280,height:720},{width:1920,height:1080}]) {
+  test('core controls and optional mod entries are reachable at '+viewport.width,async({page})=>{
+    await page.setViewportSize(viewport);
+    await page.route('**/api/mods',route=>route.fulfill({json:{mods:[]}}));
+    await bootChat(page);
+    await openTab(page,'模组');
+    const section=page.locator('#config-mods');
+    await expect(section.getByRole('button',{name:'安装模组'})).toHaveCount(2);
+    for(const name of ['QQ','Minecraft']){
+      const row=section.locator('.opt-row').filter({has:page.getByText(name,{exact:true})});
+      await row.getByRole('button',{name:'安装模组'}).click();
+      const modal=page.getByRole('dialog',{name,exact:true});
+      await expect(modal).toContainText('签名包');
+      await modal.getByRole('button',{name:'返回设置'}).click();
+    }
+    await openTab(page,'桌面');
+    await expect(page.locator('#config-desktop')).toBeInViewport();
+    await openTab(page,'浏览器');
+    await expect(page.locator('#config-browser')).toBeInViewport();
+    await gotoRoute(page,'chat');
+    await expect(page.getByRole('button',{name:'拓展',exact:true})).toHaveCount(0);
+  });
+}

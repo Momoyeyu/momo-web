@@ -55,16 +55,18 @@ export async function waitForChatReady(page: Page): Promise<void> {
   await expect.poll(() => page.locator('.chat-page').evaluate(element => !element.closest('[inert]'))).toBe(true);
 }
 
-/** 进设置页的某个 tab（tab 名按当前界面语言取，调用方给 zh 字面量即可）。 */
+/** Jump to a chapter of the continuous settings document. */
 export async function openTab(page: Page, label: string): Promise<void> {
   await gotoRoute(page, "settings");
-  await page.locator(".stab", { hasText: label }).click();
+  const button = page.locator(".config-index").getByRole("button", {name: label, exact: true});
+  await button.click();
+  await expect(button).toHaveAttribute("aria-current", "location");
 }
 
-/** 拓展内部的同级配置页，各自使用完整宽度。 */
 export async function openExtensionTab(page: Page, label: string): Promise<void> {
-  await openTab(page, "拓展");
-  await page.getByRole("tab", { name: label, exact: true }).click();
+  if (label === "插件") return openTab(page, "模组");
+  await openTab(page, label === "MCP" ? "工具" : "显示");
+  await page.getByRole("button", {name: label === "MCP" ? "管理连接" : "管理形象", exact:true}).click();
 }
 
 /** 收集控制台错误与未捕获异常，供「无错误」断言使用。 */
@@ -141,10 +143,6 @@ export async function settle(page: Page): Promise<void> {
     { timeout: 5_000 },
   );
 }
-
-/** 当前激活的设置面板（四个 tab 常驻横排，其余 pane 带 aria-hidden）。 */
-export const activePane = (page: Page) =>
-  page.locator(".settings-pane:not([aria-hidden])");
 
 export const fieldRow = (page: Page, label: string, scope = "") =>
   page

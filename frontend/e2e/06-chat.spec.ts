@@ -34,7 +34,7 @@ test("控件态：输入为空时发送禁用，工具条与状态条齐备", as
   const labels = await page
     .locator(".chat-toolbar button.tb[aria-label]")
     .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")));
-  expect(labels).toEqual(["记录", "语音·开", "设置", "返回标题"]);
+  expect(labels).toEqual(["全身", "专注对话", "主动回应", "手机", "记录", "语音·开", "设置", "返回标题"]);
 });
 
 test("真实回合：发送 → 逐句上屏 → 落账 → backlog 可见，且指令被剥离", async ({

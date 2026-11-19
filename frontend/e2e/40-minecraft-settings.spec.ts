@@ -1,5 +1,8 @@
+import {mockEnabledMod,openModManager} from './mod-fixtures';
 import {test,expect} from './fixtures';
-import {bootChat,openExtensionTab} from './helpers';
+import {bootChat,waitForChatReady} from './helpers';
+test.beforeEach(async ({page}) => { await mockEnabledMod(page,'Minecraft'); });
+
 test('chat offers independent game control beside the scene, with reachable pause and stop',async({page},info)=>{
  let active=false,paused=false;let attached:Record<string,unknown>|null=null;const actions:string[]=[];
  await page.setViewportSize({width:1600,height:900});
@@ -29,10 +32,6 @@ test('chat offers independent game control beside the scene, with reachable paus
  await panel.getByRole('button',{name:'暂停游玩'}).click();await expect.poll(()=>actions).toEqual(['pause']);
  await panel.getByRole('button',{name:'继续游玩'}).click();await expect.poll(()=>actions).toEqual(['pause','resume']);
  await page.screenshot({path:info.outputPath('game-entry-wide.png')});
- await page.keyboard.press('Escape');await expect(panel).toHaveCount(0);expect(active).toBe(true);await expect(trigger).toBeFocused();
- await trigger.click();await expect(panel).toBeVisible();await expect(panel.getByText('momo-test · local/test',{exact:true})).toBeVisible();
- await page.evaluate(()=>{location.hash='#/settings';});await expect(page.locator('.settings-page')).toBeVisible();await expect(panel).toHaveCount(0);expect(active).toBe(true);
- await page.getByRole('button',{name:'返回对话',exact:true}).click();await expect(trigger).toBeVisible();await trigger.click();await expect(panel).toBeVisible();
  await page.setViewportSize({width:800,height:450});
  await expect.poll(async()=>{const a=await panel.boundingBox(),b=await page.locator('.app-stage').boundingBox();return !!a&&!!b&&a.x>=b.x+b.width/2&&a.y>=b.y&&a.y+a.height<=b.y+b.height+1;}).toBe(true);
  await panel.getByRole('button',{name:'停止陪玩'}).scrollIntoViewIfNeeded();await panel.getByRole('button',{name:'停止陪玩'}).click();
@@ -41,6 +40,35 @@ test('chat offers independent game control beside the scene, with reachable paus
  await expect.poll(async()=>Boolean((await (await page.request.get('/api/state')).json()).settings.general.minecraftPlay)).toBe(originallyPermitted);
  await panel.getByRole('button',{name:'关闭',exact:true}).click();await expect(panel).toHaveCount(0);
 });
+test('an active game stays attached across closing the panel and returning from settings',async({page})=>{
+ let stops=0;
+ await page.route('**/api/extensions/activities',route=>route.fulfill({json:{enabled:{computer:false,browser:false,minecraft:true}}}));
+ await page.route('**/api/minecraft/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path.endsWith('/sessions')){
+   await route.fulfill({json:{sessions:[{id:'running',pid:42,world:'local/test',account:'owner',playerName:'momo-test',ready:true}]}});
+   return;
+  }
+  if(path.endsWith('/stop'))stops++;
+  await route.fulfill({json:{active:true,sessionId:'running',generation:17,permissions:['game.observe'],tasks:[]}});
+ });
+ await bootChat(page);
+ const trigger=page.getByRole('button',{name:'Minecraft 陪玩',exact:true});
+ const panel=page.locator('#chat-game-activity');
+ await trigger.click();
+ await expect(panel.getByText('momo-test · local/test',{exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(panel).toHaveCount(0);
+ await expect(trigger).toBeFocused();
+ await page.getByRole('button',{name:'设置',exact:true}).click();
+ await expect(page.locator('.settings-page')).toBeVisible();
+ await page.getByRole('button',{name:'返回对话',exact:true}).click();
+ await waitForChatReady(page);
+ await trigger.click();
+ await expect(panel.getByText('momo-test · local/test',{exact:true})).toBeVisible();
+ expect(stops).toBe(0);
+});
+
 test('Minecraft attaches existing world without launcher or login',async({page})=>{
  let active=false;let attached:Record<string,unknown>|null=null;
  await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:true}}}));
@@ -51,12 +79,15 @@ test('Minecraft attaches existing world without launcher or login',async({page})
  if(path.endsWith('/stop'))active=false;
  await r.fulfill({json:{active,generation:17,permissions:[],paused:false,autonomous:false,decisionNeeded:false,tasks:[],goal:null}});
  });
- await bootChat(page);await openExtensionTab(page,'插件');
- await page.locator('.extension-card').filter({hasText:'Minecraft 陪玩'}).getByRole('button',{name:'配置',exact:true}).click();
- const modal=page.getByRole('dialog');
+ await bootChat(page);await openModManager(page,'Minecraft');
+ const gameCard=page.locator('.extension-card').filter({hasText:'Minecraft 陪玩'});
+ await expect(gameCard.getByRole('switch')).toHaveCount(0);
+ await gameCard.getByRole('button',{name:'配置',exact:true}).click();
+ const modal=page.getByRole('dialog',{name:'Minecraft 陪玩',exact:true});
  await expect(modal.getByText('微软公共客户端 ID',{exact:true})).toHaveCount(0);
  await modal.locator('.sel-face').click();await modal.getByRole('option',{name:'momo-test · local/minecraft:overworld'}).click();
- await modal.getByRole('switch',{name:'操控角色与世界交互'}).click();
+ const gameplay=modal.getByRole('switch',{name:'操控角色与世界交互'});
+ if(await gameplay.getAttribute('aria-checked')!=='true')await gameplay.click();
  await modal.getByRole('button',{name:'启动陪玩'}).click();
  await expect.poll(()=>attached).toMatchObject({sessionId:'fixture',permissions:['game.observe','game.chat','game.move','game.modify']});
  await modal.getByRole('button',{name:'停止陪玩'}).click();
@@ -81,9 +112,11 @@ test('settings-owned gameplay requests subsequent decisions and discards unseen 
   const body=r.request().postDataJSON();if(body.outcome==='discarded')discarded.push(body);
   await r.fulfill({json:{activation:'active'}});
  });
- await bootChat(page);await openExtensionTab(page,'插件');
- await page.locator('.extension-card').filter({hasText:'Minecraft 陪玩'}).getByRole('button',{name:'配置',exact:true}).click();
- const modal=page.getByRole('dialog');await modal.locator('.sel-face').click();
+ await bootChat(page);await openModManager(page,'Minecraft');
+ const gameCard=page.locator('.extension-card').filter({hasText:'Minecraft 陪玩'});
+ await expect(gameCard.getByRole('switch')).toHaveCount(0);
+ await gameCard.getByRole('button',{name:'配置',exact:true}).click();
+ const modal=page.getByRole('dialog',{name:'Minecraft 陪玩',exact:true});await modal.locator('.sel-face').click();
  await modal.getByRole('option',{name:'momo-test · local/minecraft:overworld'}).click();
  const gameplay=modal.getByRole('switch',{name:'操控角色与世界交互'});
  if(await gameplay.getAttribute('aria-checked')!=='true')await gameplay.click();
