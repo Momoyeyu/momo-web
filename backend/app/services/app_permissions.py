@@ -15,8 +15,13 @@ class DesktopPermissionError(ValueError):
     pass
 
 
+def web_preview():
+    # The authenticated Vite proxy and Electron both use a local bearer token.
+    return bool(os.environ.get('MOMO_WEB_ORIGIN')) and not getattr(sys, 'frozen', False)
+
+
 def native_desktop():
-    return sys.platform == 'darwin' and bool(os.environ.get('MOMO_DESKTOP_TOKEN'))
+    return sys.platform == 'darwin' and bool(os.environ.get('MOMO_DESKTOP_TOKEN')) and not web_preview()
 
 
 class AppPermissions:

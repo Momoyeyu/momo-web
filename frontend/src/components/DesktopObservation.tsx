@@ -1,7 +1,7 @@
 import {createPortal} from 'react-dom';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {useT} from '../i18n';
-import {useActivities,type ActivityId} from '../services/extensionActivities';
+import {activitySupported,useActivities,type ActivityId} from '../services/extensionActivities';
 import {captureDesktop,computerSnapshot,setDesktopObservation,subscribeComputer} from '../services/computerClient';
 import {setDesktopPanel,useDesktopWindow} from '../services/desktopWindow';
 import {openDesktopAccessGuide} from './AppPermissions';
@@ -18,7 +18,7 @@ export default function DesktopObservation({playing=false}:{playing?:boolean}){
  const view=useSyncExternalStore(subscribeComputer,computerSnapshot);
  const [open,setOpen]=useState(false),[selected,setSelected]=useState<ActivityId>('computer'),[working,setWorking]=useState(false);
  const panel=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),gameTrigger=useRef<HTMLButtonElement>(null);
- const accessNeeded=view.status?.desktopAccessGranted===false;
+ const accessNeeded=!enabled.computer || view.status?.desktopAccessGranted===false;
  const allowed=!accessNeeded&&view.status?.desktopAllowed!==false;
  const problem=view.status?.desktopError;
  const observationState=!view.status?'loading':!allowed?'off':problem?'error':'on';
@@ -30,10 +30,10 @@ export default function DesktopObservation({playing=false}:{playing?:boolean}){
  const toggle=async()=>{if(accessNeeded){openDesktopAccessGuide();return;}if(working)return;setWorking(true);try{await setDesktopObservation(problem?true:!allowed);if(problem)await captureDesktop();}catch{/* The status store exposes capture/permission failure. */}finally{setWorking(false);}};
  const title=selected==='computer'?t('desktop.operate'):t(selected+'.title');
  return <>
-  {enabled.computer&&<>
+  {activitySupported('computer')&&<>
    <Button className="tb tip tb-observation" data-observation-state={observationState} aria-label={t('desktop.observe')} aria-pressed={allowed} aria-description={observationTip} data-tip={observationTip} data-tip-detail={t(problem==='screen-permission'?'desktop.screenPermissionHint':observationState==='off'?'desktop.resumeObservationHint':observationState==='error'?'desktop.retryObservationHint':'desktop.pauseObservationHint')} disabled={working||view.busy||!view.status} onClick={()=>void toggle()}><Icon name={observationState==='off'?'desktop-off':observationState==='error'?'desktop-alert':'desktop'}/></Button>
-   <ProactiveResponseToggle/>
   </>}
+  <ProactiveResponseToggle/>
   {(enabled.computer||enabled.browser)&&<button ref={trigger} type="button" className={`tb tip${open&&selected!=='minecraft'?' is-active':''}`} aria-label={t('desktop.operate')} aria-expanded={open&&selected!=='minecraft'} data-tip={t('desktop.operate')} onClick={()=>void show(enabled.computer?'computer':'browser')}><Icon name="browser"/></button>}
   {playing&&<button ref={gameTrigger} type="button" className="tb tip is-active" aria-label={t('minecraft.title')} aria-expanded={open&&selected==='minecraft'} data-tip={t('minecraft.title')} onClick={()=>void show('minecraft')}><Icon name="gamepad"/></button>}
   {open&&createPortal(<div ref={panel} tabIndex={-1} role="dialog" aria-label={playing&&selected==='minecraft'?title:t('desktop.operate')} className={`pet-utility${windowState.panel?.width&&windowState.panel.width>=220?' is-beside':''}`} data-pet-interactive onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();close();}}}>

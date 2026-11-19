@@ -15,5 +15,6 @@ it('offers the enabled game directly without requiring the desktop plugin or nat
 it('keeps the desktop entry independent and omits disabled games',()=>{
  state.computer=true;state.minecraft=false;state.native=true;
  expect(render()).toContain('aria-label="desktop.enter"');expect(render()).not.toContain('aria-label="minecraft.title"');
- state.computer=false;expect(render()).toBe('');
+ state.computer=false;expect(render()).toContain('aria-label="desktop.enter"');
+ state.native=false;expect(render()).toBe('');
 });

@@ -48,3 +48,16 @@ def test_desktop_consent_supplies_defaults_without_overwriting_plugin_choices(tm
 
     policy.consent(False)
     assert not activities.snapshot()['enabled']['browser']
+
+
+def test_authenticated_vite_uses_browser_capture_consent(monkeypatch):
+    from app.services.app_permissions import native_desktop
+    import sys
+    monkeypatch.setattr(sys, 'platform', 'darwin')
+    monkeypatch.setenv('MOMO_DESKTOP_TOKEN', 'web-proxy-test')
+    monkeypatch.setenv('MOMO_WEB_ORIGIN', 'http://127.0.0.1:5177')
+    assert not native_desktop()
+    assert activities.snapshot()['enabled']['computer']
+    monkeypatch.delenv('MOMO_WEB_ORIGIN')
+    assert native_desktop()
+    assert not activities.snapshot()['enabled']['computer']

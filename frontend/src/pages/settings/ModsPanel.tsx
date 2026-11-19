@@ -3,7 +3,7 @@ import {useT} from '../../i18n';
 import {jsonInit} from '../../services/http';
 import {runtimeFetch} from '../../services/runtime';
 import {refreshActivities} from '../../services/extensionActivities';
-import {refreshMods,useMods} from '../../services/mods';
+import {applyModChange,refreshMods,useMods,type InstalledMod} from '../../services/mods';
 import Pager from '../../ui/Pager';
 import {clampPage} from '../../lib/paging';
 import FieldRow from '../../ui/FieldRow';
@@ -42,9 +42,15 @@ export default function ModsPanel(){
         await Promise.allSettled([refreshMods(),refreshActivities()]);
         return;
       }
-      await refreshMods();
-      await refreshActivities();
+      if(init.method==='DELETE' && selection && 'id' in selection)applyModChange(selection.id,null);
+      else{
+        const record=await response.json() as InstalledMod;
+        applyModChange(record.id,record);
+      }
       select(next);
+      try{await refreshMods();}
+      catch{select(null);setError('listError');return;}
+      await refreshActivities().catch(()=>{});
     }catch{setError('actionError');}
     finally{working.current=false;setBusy(false);}
   }
@@ -79,6 +85,7 @@ export default function ModsPanel(){
       : selection.mode==='remove' ? <><p>{code('removeHint')}</p>
         {button('remove',()=>void run('/api/mods/'+selection.id,{method:'DELETE'},null))}</>
       : item && <><p>{item.version} · {code(item.enabled?'enabled':'disabled')}</p>
+        <p>{code(item.source==='official'?'officialSource':'localSource')} · {(item.platforms??[]).map(platform=>platform==='*'?code('allPlatforms'):platform).join(', ')}</p>
         <div className="extension-detail-actions">{button(item.enabled?'disable':'enable',()=>void run('/api/mods/'+item.id,jsonInit('PATCH',{enabled:!item.enabled}),selection))}
         {button('remove',()=>open({id:item.id,mode:'remove'}))}</div>
         {item.runtimeError && <p role="alert">{code('runtimeError')} {button('retry',()=>void run('/api/mods/'+item.id,jsonInit('PATCH',{enabled:false}),selection))}</p>}

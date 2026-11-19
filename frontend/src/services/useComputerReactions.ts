@@ -4,14 +4,14 @@ import {desktopWindowAvailable} from './desktopWindow';
 import {meetingIdentity,meetingSnapshot} from './meetingClient';
 
 /** Chat owns a single scheduler across normal/pet mode. Browser sharing owns its own frames. */
-export function useComputerReactions(active:boolean){
+export function useComputerReactions(active:boolean, permitted:boolean){
  const lastReaction=useRef(0);
  useEffect(()=>{
   if(!active)return;
   let disposed=false,timer:ReturnType<typeof setTimeout>|undefined;
   const canReact=()=>{
    const {status}=computerSnapshot();
-   return !disposed&&!!meetingIdentity()&&!meetingSnapshot().attention.focus&&
+   return permitted&&!disposed&&!!meetingIdentity()&&!meetingSnapshot().attention.focus&&
     !!status?.proactive&&status.reactions&&status.desktopAllowed!==false&&status.desktopAccessGranted!==false&&!status.desktopError;
   };
   const poll=async()=>{
@@ -33,5 +33,5 @@ export function useComputerReactions(active:boolean){
   };
   void poll();
   return()=>{disposed=true;clearTimeout(timer);};
- },[active]);
+ },[active,permitted]);
 }

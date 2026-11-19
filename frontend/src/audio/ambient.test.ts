@@ -3,14 +3,15 @@ import {AmbientAudio} from './ambient';
 const sources:{buffer:unknown;loop:boolean;start:ReturnType<typeof vi.fn>;stop:ReturnType<typeof vi.fn>;connect:ReturnType<typeof vi.fn>;disconnect:ReturnType<typeof vi.fn>;onended?:()=>void}[]=[];
 const gains:{gain:{value:number;setTargetAtTime:ReturnType<typeof vi.fn>;cancelScheduledValues:ReturnType<typeof vi.fn>;linearRampToValueAtTime:ReturnType<typeof vi.fn>;setValueAtTime:ReturnType<typeof vi.fn>};connect:ReturnType<typeof vi.fn>;disconnect:ReturnType<typeof vi.fn>}[]=[];
 const tick=()=>new Promise(r=>setTimeout(r,0));
+const decode=vi.fn(async(_bytes:ArrayBuffer)=>({duration:48}));
 beforeEach(()=>{
- sources.length=0;gains.length=0;
+ sources.length=0;gains.length=0;decode.mockReset();
  vi.stubGlobal('document',{hidden:false,hasFocus:()=>true});vi.stubGlobal('navigator',{});
  vi.stubGlobal('fetch',vi.fn(async()=>({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)})));
  vi.stubGlobal('AudioContext',class {
   state='running';currentTime=0;destination={};
   resume=vi.fn(async()=>{this.state='running';});suspend=vi.fn(async()=>{this.state='suspended';});
-  decodeAudioData=vi.fn(async()=>({duration:48}));
+  decodeAudioData=decode;
   createGain(){const node={gain:{value:0,setTargetAtTime:vi.fn(),cancelScheduledValues:vi.fn(),linearRampToValueAtTime:vi.fn(),setValueAtTime:vi.fn()},connect:vi.fn(),disconnect:vi.fn()};gains.push(node);return node;}
   createBufferSource(){const node={buffer:null,loop:false,start:vi.fn(),stop:vi.fn(),connect:vi.fn(),disconnect:vi.fn()};sources.push(node);return node;}
  });
@@ -60,4 +61,34 @@ it('reloads an aborted target during rapid scene reversals',async()=>{
  expect(pending[0].signal.aborted).toBe(true);
  for(const p of pending)p.resolve({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)} as Response);
  await tick();expect(sources.filter(s=>s.loop)).toHaveLength(2);
+});
+
+it('uses the built-in daily track after custom audio fails to decode and accepts a replacement',async()=>{
+ const a=new AmbientAudio();await a.unlock();await tick();
+ const bad=new ArrayBuffer(1);
+ vi.mocked(fetch).mockImplementation(async url=>({ok:true,
+  arrayBuffer:async()=>url==='/api/mods/bad'?bad:new ArrayBuffer(8)} as Response));
+ decode.mockImplementation(async bytes=>{
+  if(bytes===bad)throw Error('invalid media');
+  return {duration:6};
+ });
+ a.dailyTrack('/api/mods/bad');a.scene('daily');await tick();
+ expect(fetch).toHaveBeenCalledWith('/audio/daily.wav',expect.anything());
+ const fallback=sources.filter(s=>s.loop).at(-1)!;expect(fallback.buffer).toMatchObject({duration:6});
+ a.dailyTrack('/api/mods/good');await tick();
+ expect(fallback.stop).toHaveBeenCalled();
+ expect(fetch).toHaveBeenCalledWith('/api/mods/good',expect.anything());
+ expect(sources.filter(s=>s.loop).at(-1)).not.toBe(fallback);
+});
+
+it('revokes an old daily loop while the next scene is still loading',async()=>{
+ const a=new AmbientAudio();await a.unlock();await tick();
+ a.dailyTrack('/api/mods/music');a.scene('daily');await tick();
+ const custom=sources.filter(s=>s.loop).at(-1)!;
+ let finish!:(r:Response)=>void;
+ vi.mocked(fetch).mockImplementation(()=>new Promise(resolve=>{finish=resolve;}));
+ a.scene('night');expect(custom.stop).not.toHaveBeenCalled();
+ a.dailyTrack(null);expect(custom.stop).toHaveBeenCalledTimes(1);
+ finish({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)} as Response);await tick();
+ expect(sources.filter(s=>s.loop).at(-1)).not.toBe(custom);
 });

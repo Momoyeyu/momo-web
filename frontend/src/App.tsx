@@ -1,6 +1,8 @@
 import {getStage} from './live2d/stage';
 import {desktopWindowAvailable,useDesktopWindowBridge,setDesktopMode} from './services/desktopWindow';
 import './styles/desktop-pet.css';
+import {registerPhoneApp} from './phone/registry';
+import {qqPhoneApp} from './phone/qqApp';
 import {musicDirector} from './audio/director';
 import {useIntro} from './services/introClient';
 import {useMinecraftDecisions} from './services/useMinecraftDecisions';
@@ -83,6 +85,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   const audioIntro=useIntro().data?.phase;
   const [desktopGuideVisible,setDesktopGuideVisible]=useState(false);
   useEffect(()=>ambient.install(),[]);
+  useEffect(()=>registerPhoneApp(qqPhoneApp),[]);
   useEffect(()=>{const sync=()=>ambient.configure(getSettings().general);sync();return subscribe(sync);},[]);
   useEffect(()=>{musicDirector.page(route,!!audioIntro&&['naming','memory','return_title','celebration'].includes(audioIntro));},[route,audioIntro]);
   const t = useT();

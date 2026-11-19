@@ -34,7 +34,7 @@ export default function ExtensionActivities(){
  },[gameOpen]);
  const enter=async()=>{if(busy)return;setBusy(true);setError(false);try{await setDesktopMode('pet');}catch{setError(true);}finally{setBusy(false);}};
  return <>
-  {enabled.computer&&desktopWindowAvailable()&&<Button className="tb tip" data-tip={t('desktop.enter')} data-tip-detail={t('desktop.enterHint')} aria-label={t('desktop.enter')} disabled={busy} onClick={()=>void enter()}><Icon name="desktop"/></Button>}
+  {desktopWindowAvailable()&&<Button className="tb tip" data-tip={t('desktop.enter')} data-tip-detail={t('desktop.enterHint')} aria-label={t('desktop.enter')} disabled={busy} onClick={()=>void enter()}><Icon name="desktop"/></Button>}
   {enabled.minecraft&&<Button className={`tb tb-game tip${gameOpen?' is-active':''}`} aria-label={t('minecraft.title')} data-tip={t('minecraft.title')} aria-haspopup="dialog" aria-expanded={gameOpen} aria-controls={gameOpen?'chat-game-activity':undefined} onClick={event=>{trigger.current=event.currentTarget;setGameOpen(!gameOpen);}}><Icon name="gamepad"/></Button>}
   {gameOpen&&enabled.minecraft&&createPortal(<div id="chat-game-activity" ref={panel} className="chat-game-activity" role="dialog" aria-label={t('minecraft.title')} tabIndex={-1}><MinecraftCompanion mode="activity" onDismiss={close}/></div>,document.body)}
   {error&&<div role="alert" className="desktop-action-error">{t('desktop.error')}</div>}

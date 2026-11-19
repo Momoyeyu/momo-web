@@ -54,7 +54,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   const intro=useIntro();
   const introActive=!!intro.data && intro.data.phase!=="completed";
   const activities=useActivities();
-  useComputerReactions(active&&!introActive&&activities.computer);
+  useComputerReactions(active&&!introActive,activities.computer);
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
   const preferences=useSyncExternalStore(subscribe, getState).settings.general;
   const name = speakerName();
@@ -305,7 +305,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
           {phoneBusy && <Button className="tb" disabled={controlling} onClick={()=>void control('stop')} aria-label={t('attention.stopPhone')} title={t('attention.stopPhone')}><Icon name="stop" size={15}/></Button>}
           {attention.phonePaused && !attention.focus && <Button className="tb" disabled={controlling} onClick={()=>void control('resume_phone')} title={t('attention.resumePhone')}><Icon name="play" size={16}/></Button>}
           {active&&!introActive&&desktopWindow.mode!=='pet'&&<ExtensionActivities/>}
-          {!introActive&&activities.computer&&desktopWindow.mode!=='pet'&&<ProactiveResponseToggle/>}
+          {!introActive&&desktopWindow.mode!=='pet'&&<ProactiveResponseToggle/>}
           {!introActive&&<PhoneSurface active={interactive&&desktopWindow.mode!=='pet'} attention={attention} onVisibilityChange={setPhoneOpen} closeSignal={phoneClose}/>}
           <Button
             className="tb"

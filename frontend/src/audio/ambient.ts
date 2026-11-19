@@ -16,7 +16,7 @@ export class AmbientAudio {
  private lastSound=-Infinity;
  private voices=new Set<object>();
  private voiceRelease=new Map<object,ReturnType<typeof setTimeout>>();
- private musicSources=new Set<AudioBufferSourceNode>();
+ private musicSources=new Map<AudioBufferSourceNode,Music>();
  private mics=new Set<object>();
  private config:Config={};
  private customDaily:string|null=null;
@@ -41,18 +41,38 @@ export class AmbientAudio {
   this.customDaily=url;
   this.loadRequests.get('daily')?.abort();
   this.cache.delete('daily');
-  if(this.desired==='daily'){this.revision++;this.stopMusic();void this.syncMusic();}
+  // Stop the retired daily loop even during a crossfade or an unresolved scene load.
+  for(const [source,id] of this.musicSources){
+   if(id==='daily'){source.stop();this.musicSources.delete(source);}
+  }
+  if(this.music?.id==='daily')this.music=null;
+  if(this.desired==='daily'){this.revision++;void this.syncMusic();}
  }
  private async load(name:string){
   const ready=this.cache.get(name);if(ready)return ready;
   const old=this.loads.get(name);if(old&&!this.loadRequests.get(name)?.signal.aborted)return old;
   const ctx=this.ctx;if(!ctx)throw Error('locked');
-  const request=new AbortController();this.loadRequests.set(name,request);const timeout=setTimeout(()=>request.abort(),15000);
-  const job=(async()=>{const response=await (name==='daily' && this.customDaily ? runtimeFetch(this.customDaily,{signal:request.signal}) : fetch(`/audio/${name}.wav`,{signal:request.signal}));if(!response.ok)throw Error('audio unavailable');const buffer=await ctx.decodeAudioData(await response.arrayBuffer());request.signal.throwIfAborted();this.cache.set(name,buffer);
+  const request=new AbortController();this.loadRequests.set(name,request);
+  const modUrl=name==='daily' ? this.customDaily : null;
+  const decode=async(url:string,mod=false)=>{
+   const signal=AbortSignal.any([request.signal,AbortSignal.timeout(15000)]);
+   const response=await (mod ? runtimeFetch(url,{signal}) : fetch(url,{signal}));
+   if(!response.ok)throw Error('audio unavailable');
+   const buffer=await ctx.decodeAudioData(await response.arrayBuffer());
+   signal.throwIfAborted();
+   return buffer;
+  };
+  const job=(async()=>{
+   let buffer:AudioBuffer;
+   if(modUrl){
+    try{buffer=await decode(modUrl,true);}
+    catch{request.signal.throwIfAborted();buffer=await decode('/audio/daily.wav');}
+   }else buffer=await decode(`/audio/${name}.wav`);
+   this.cache.set(name,buffer);
   const musicKeys=[...this.cache.keys()].filter(k=>k in tempo);
   while(musicKeys.length>2){const victim=musicKeys.find(k=>k!==name&&k!==this.music?.id)??musicKeys[0];this.cache.delete(victim);musicKeys.splice(musicKeys.indexOf(victim),1);}
   while(this.cache.size>15)this.cache.delete(this.cache.keys().next().value!);return buffer;})();
-  this.loads.set(name,job);try{return await job;}finally{clearTimeout(timeout);if(this.loadRequests.get(name)===request)this.loadRequests.delete(name);if(this.loads.get(name)===job)this.loads.delete(name);}
+  this.loads.set(name,job);try{return await job;}finally{if(this.loadRequests.get(name)===request)this.loadRequests.delete(name);if(this.loads.get(name)===job)this.loads.delete(name);}
  }
  async unlock(){
   try{
@@ -85,13 +105,13 @@ export class AmbientAudio {
    const untilBar=previous?(bar-((ctx.currentTime-previous.started)%bar))%bar:0;
    // Align compatible tempos within one second; cross-tempo cues use a bounded fade.
    const at=ctx.currentTime+(previous&&tempo[previous.id]===tempo[id]&&untilBar<1?untilBar:0);
-   for(const old of this.musicSources)if(old!==previous?.source){old.stop();this.musicSources.delete(old);}
-   this.musicSources.add(source);this.music={id,source,gain,started:at};source.start(at);gain.gain.setValueAtTime(0,at);gain.gain.linearRampToValueAtTime(1,at+1.2);
+   for(const old of this.musicSources.keys())if(old!==previous?.source){old.stop();this.musicSources.delete(old);}
+   this.musicSources.set(source,id);this.music={id,source,gain,started:at};source.start(at);gain.gain.setValueAtTime(0,at);gain.gain.linearRampToValueAtTime(1,at+1.2);
    if(previous){previous.gain.gain.cancelScheduledValues(ctx.currentTime);previous.gain.gain.setValueAtTime(previous.gain.gain.value,ctx.currentTime);previous.gain.gain.linearRampToValueAtTime(0,at+1.2);previous.source.stop(at+1.25);}
    source.onended=()=>{this.musicSources.delete(source);source.disconnect();gain.disconnect();};
   }catch{/* Keep the previous track on load failure. */}
  }
- private stopMusic(){for(const source of this.musicSources)source.stop();this.musicSources.clear();this.music=null;}
+ private stopMusic(){for(const source of this.musicSources.keys())source.stop();this.musicSources.clear();this.music=null;}
  private hide=()=>{if(!document.hidden&&document.hasFocus()){if(this.ctx)void this.unlock();return;}this.revision++;for(const s of this.effects)s.stop();this.effects.clear();void this.ctx?.suspend();this.release?.();this.release=null;this.owned=false;};
  install(){const gesture=()=>void this.unlock();document.addEventListener('pointerdown',gesture,{capture:true});document.addEventListener('keydown',gesture,{capture:true});document.addEventListener('visibilitychange',this.hide);window.addEventListener('blur',this.hide);window.addEventListener('focus',this.hide);return()=>{document.removeEventListener('pointerdown',gesture,true);document.removeEventListener('keydown',gesture,true);document.removeEventListener('visibilitychange',this.hide);window.removeEventListener('blur',this.hide);window.removeEventListener('focus',this.hide);this.release?.();this.release=null;this.owned=false;this.revision++;void this.ctx?.suspend();};}
 }

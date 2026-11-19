@@ -345,6 +345,7 @@ export const en: Dict = {
     pageOf: "{cur} / {total}",
   },
   modManager: {
+    officialSource: "Signed official package", localSource: "Local content package", allPlatforms: "All platforms",
     "search": "Search mods",
     "integrity": "Invalid signature or checksum. Get a fresh package.",
     "download": "Download failed. Retry or import the signed file.",
@@ -374,8 +375,8 @@ export const en: Dict = {
 },
   title: {
     tagline: "Can you feel my heart?",
-    start: "Boot",
-    config: "Config",
+    start: "Start",
+    config: "Settings",
   },
   chat: {
     idle: "Idle",

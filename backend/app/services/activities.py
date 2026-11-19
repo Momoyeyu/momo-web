@@ -6,13 +6,14 @@ import tempfile
 import threading
 from ..core import state
 from . import mods
+from .app_permissions import web_preview
 
 IDS = ('computer', 'browser', 'minecraft')
 _lock = threading.RLock()
 
 
 def supported(key):
-    if not os.environ.get("MOMO_DESKTOP_TOKEN"):
+    if not os.environ.get("MOMO_DESKTOP_TOKEN") or web_preview():
         return True
     if key == "minecraft" and sys.platform == "win32":
         return False

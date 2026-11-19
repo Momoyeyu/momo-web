@@ -4,7 +4,6 @@ import {createPortal} from 'react-dom';
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {phoneSnapshot,type PhoneSnapshot,type PhoneMessage} from '../services/phoneClient';
 import {phoneApps,phoneRevision,subscribePhoneApps} from '../phone/registry';
-import '../phone/qqApp';
 import PhoneField from '../phone/PhoneField';
 import BlurPresence from '../effects/BlurPresence';
 import {mergePhoneMessages,phoneIdentityChanged} from '../phone/projection';

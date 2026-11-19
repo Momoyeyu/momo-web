@@ -347,6 +347,7 @@ export const zh = {
     pageOf: "{cur} / {total}",
   },
   modManager: {
+    officialSource: "官方签名包", localSource: "本地内容包", allPlatforms: "所有平台",
     "search": "搜索模组",
     "integrity": "签名或校验值无效，请重新获取模组。",
     "download": "下载失败，可重试或导入本地签名包。",

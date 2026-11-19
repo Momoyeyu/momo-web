@@ -131,3 +131,16 @@ def test_minecraft_build_inputs_are_owned_shared_snapshot_files(pair):
     for name in names:
         assert 'app/scripts/'+name in report['changed']
         assert (target/'app/scripts'/name).read_text()=='pinned '+name
+
+
+def test_demo_mod_and_its_source_are_in_the_promoted_fixture_path(pair):
+    source, target = pair
+    original = Path(__file__).resolve().parents[1] / "docs/examples"
+    examples = source / "docs/examples"
+    examples.mkdir(parents=True)
+    for name in ("evening-chimes.momomod", "make_evening_chimes.py"):
+        (examples / name).write_bytes((original / name).read_bytes())
+    commit(source)
+    module.promote(source, target, "HEAD", bootstrap=True, apply=True)
+    for name in ("evening-chimes.momomod", "make_evening_chimes.py"):
+        assert (target / "app/docs/examples" / name).read_bytes() == (original / name).read_bytes()

@@ -23,6 +23,8 @@ FILES = {
 }
 FILES.update(
     {
+        "docs/examples/evening-chimes.momomod": "app/docs/examples/evening-chimes.momomod",
+        "docs/examples/make_evening_chimes.py": "app/docs/examples/make_evening_chimes.py",
         "migration/cubism-core.json": "app/migration/cubism-core.json",
         ".env.example": "app/.env.example",
     }

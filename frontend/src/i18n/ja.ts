@@ -345,6 +345,7 @@ export const ja: Dict = {
     pageOf: "{cur} / {total}",
   },
   modManager: {
+    officialSource: "署名済み公式パッケージ", localSource: "ローカルコンテンツ", allPlatforms: "全プラットフォーム",
     "search": "Mod を検索",
     "integrity": "署名またはチェックサムが無効です。パッケージを取得し直してください。",
     "download": "ダウンロードに失敗しました。再試行するかローカルから読み込んでください。",
