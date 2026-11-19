@@ -33,13 +33,13 @@ def local(tmp_path, monkeypatch):
     # Vision provider configuration is external to the attention lifecycle under test.
     monkeypatch.setattr(computer.vision, 'require_enabled', lambda _: None)
     permissions = app_permissions.AppPermissions(tmp_path/'permissions.json')
-    monkeypatch.setattr(app_permissions, 'permissions', permissions)
+    permissions.consent(True)
+    monkeypatch.setattr(native_control, 'permissions', permissions)
+    monkeypatch.setattr(computer, 'permissions', permissions)
     screen = computer.Computer()
     native = native_control.NativeControl()
     monkeypatch.setattr(computer, 'computer', screen)
     monkeypatch.setattr(native_control, 'native_control', native)
-    approval = native.start(1, 12, ['observe', 'interact'], 'owner', 'lease')
-    permissions.decide(approval['requestId'], 'once', runtime.epoch)
     native.start(1, 12, ['observe', 'interact'], 'owner', 'lease')
     yield runtime, native, screen, permissions, calls
     screen.stop()
@@ -85,7 +85,7 @@ def test_owner_hold_does_not_bypass_other_gates(local, denial):
             if denial == 'remote': runtime.activity['source'] = 'qq'
             if denial == 'focus': runtime.focus = True
             if denial == 'restoring': runtime.restoring = True
-            if denial == 'revoked': permissions.revoke_grant(native.grant)
+            if denial == 'revoked': permissions.consent(False)
             if denial == 'epoch': runtime.epoch += 1
             with checkpoint.audience_scope('external' if denial == 'audience' else 'owner'):
                 before = len(calls)

@@ -74,16 +74,20 @@ def test_black_frame_does_not_react():
         assert c.claim_reaction(0,'client','lease') is None
 
 
-def test_desktop_observation_needs_no_app_grant_and_never_creates_input_binding():
+def test_desktop_observation_applies_blocklist_without_input_binding(tmp_path):
     import base64
     from types import SimpleNamespace
     from app.services import computer as module
+    from app.services.app_permissions import AppPermissions
+    policy=AppPermissions(tmp_path/'desktop-access.json');policy.consent(True)
+    policy.block('com.example.blocked','Blocked',True)
     c = active()
     calls=[]
     host=SimpleNamespace(permit=lambda purpose:{'purpose':purpose},request=lambda method,params:(calls.append((method,params)) or {'data':base64.b64encode(frame()).decode()}))
-    with patch.object(c,'gate'), patch.object(module.runtime,'host',host), patch('app.services.app_permissions.permissions.require',side_effect=AssertionError('No app approval for looking')):
+    with patch.object(c,'gate'), patch.object(module.runtime,'host',host), patch.object(module,'permissions',policy):
         assert c.desktop_frame()['observationAvailable']
         assert [method for method,_ in calls] == ['native.screen']
+        assert calls[0][1]['blocked']==['com.example.blocked']
         c.frames=120;c.last=0
         assert c.desktop_frame()['observationAvailable']
         c.set_desktop_allowed(False)
@@ -101,7 +105,7 @@ def test_stop_during_desktop_capture_discards_late_pixels():
         c.set_desktop_allowed(False)
         return {'data':base64.b64encode(frame()).decode()}
     host=SimpleNamespace(permit=lambda _: {},request=capture)
-    with patch.object(c,'gate'),patch.object(module.runtime,'host',host):
+    with patch.object(c,'gate'),patch.object(module.runtime,'host',host),patch.object(module.permissions,'before_action',return_value=(0,[])):
         with pytest.raises(ComputerError,match='revoked'):c.desktop_frame()
         assert c.frame is None
 
@@ -143,3 +147,23 @@ def test_restore_reloads_preferences_and_discards_current_observation():
     c.reload_preferences()
     assert not c.proactive and not c.reactions and c.desktop_allowed
     assert c.frame is None and not c.observing
+
+
+def test_policy_change_during_capture_discards_late_pixels(tmp_path):
+    import base64
+    from types import SimpleNamespace
+    from app.services import computer as module
+    from app.services.app_permissions import AppPermissions, DesktopPermissionError
+    policy=AppPermissions(tmp_path/'desktop-access.json')
+    policy.consent(True)
+    c=active()
+
+    def capture(*_):
+        policy.block('com.example.editor','Editor',True)
+        return {'data':base64.b64encode(frame()).decode()}
+
+    host=SimpleNamespace(permit=lambda _: {},request=capture)
+    with patch.object(c,'gate'),patch.object(module.runtime,'host',host),patch.object(module,'permissions',policy):
+        with pytest.raises(DesktopPermissionError,match='changed'):
+            c.desktop_frame()
+        assert c.frame is None

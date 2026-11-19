@@ -31,3 +31,17 @@ def test_invalid_and_corrupt_state_fail_closed(tmp_path):
     assert not any(activities.snapshot()['enabled'].values())
     with pytest.raises(ValueError): activities.set_enabled('shell',True)
     with pytest.raises(ValueError): activities.set_enabled('computer','true')
+
+
+def test_desktop_consent_supplies_defaults_without_overwriting_plugin_choices(tmp_path, monkeypatch):
+    from app.services import app_permissions
+    policy = app_permissions.AppPermissions(tmp_path/'desktop-access.json')
+    monkeypatch.setattr(app_permissions, 'permissions', policy)
+    monkeypatch.setattr(app_permissions, 'native_desktop', lambda: True)
+    monkeypatch.setattr(activities, 'supported', lambda _: True)
+    activities.set_enabled('minecraft', True)
+    assert not activities.snapshot()['enabled']['computer']
+    policy.consent(True)
+    assert activities.snapshot()['enabled'] == {'computer':True,'browser':True,'minecraft':True}
+    (tmp_path/'activity-plugins.json').write_text('{"computer":false,"minecraft":true}')
+    assert activities.snapshot()['enabled'] == {'computer':False,'browser':True,'minecraft':True}

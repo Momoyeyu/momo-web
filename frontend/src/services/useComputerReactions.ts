@@ -12,7 +12,7 @@ export function useComputerReactions(active:boolean){
   const canReact=()=>{
    const {status}=computerSnapshot();
    return !disposed&&!!meetingIdentity()&&!meetingSnapshot().attention.focus&&
-    !!status?.proactive&&status.reactions&&status.desktopAllowed!==false&&!status.desktopError;
+    !!status?.proactive&&status.reactions&&status.desktopAllowed!==false&&status.desktopAccessGranted!==false&&!status.desktopError;
   };
   const poll=async()=>{
    try{

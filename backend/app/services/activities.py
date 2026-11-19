@@ -18,14 +18,23 @@ def supported(key):
     return not (sys.platform != "darwin" and key in ("computer", "browser"))
 
 
+def _preferences():
+    try:
+        data = json.loads((state.DATA_DIR / 'activity-plugins.json').read_text())
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def snapshot():
+    from .app_permissions import native_desktop, permissions
     with _lock:
-        try:
-            data = json.loads((state.DATA_DIR / 'activity-plugins.json').read_text())
-        except (OSError, ValueError):
-            data = {}
-        if not isinstance(data, dict): data = {}
-        return {'enabled': {key: data.get(key) is True and supported(key) for key in IDS},
+        data = _preferences()
+        default_access = native_desktop() and permissions.granted()
+        return {'enabled': {
+                    key: data.get(key, default_access and key in ('computer','browser')) is True and supported(key)
+                    for key in IDS
+                },
                 'supported': {key: supported(key) for key in IDS}}
 
 
@@ -40,7 +49,7 @@ def set_enabled(key, enabled):
     if enabled and not supported(key):
         raise ValueError('Activity is not supported on this platform')
     with _lock:
-        data = snapshot()['enabled']
+        data = _preferences()
         data[key] = enabled
         state.DATA_DIR.mkdir(parents=True, exist_ok=True)
         fd, name = tempfile.mkstemp(dir=state.DATA_DIR, prefix='.activity-plugins-')

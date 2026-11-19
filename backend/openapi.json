@@ -287,6 +287,32 @@
         "title": "AttentionIn",
         "type": "object"
       },
+      "Block": {
+        "properties": {
+          "blocked": {
+            "title": "Blocked",
+            "type": "boolean"
+          },
+          "bundleId": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Bundleid",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "maxLength": 120,
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bundleId",
+          "blocked"
+        ],
+        "title": "Block",
+        "type": "object"
+      },
       "Body_frames_api_computer_frames_post": {
         "properties": {
           "file": {
@@ -662,6 +688,19 @@
         "title": "ConnectIn",
         "type": "object"
       },
+      "Consent": {
+        "properties": {
+          "granted": {
+            "title": "Granted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "granted"
+        ],
+        "title": "Consent",
+        "type": "object"
+      },
       "ContactIn": {
         "additionalProperties": false,
         "properties": {
@@ -742,52 +781,6 @@
           "name"
         ],
         "title": "ControlIn",
-        "type": "object"
-      },
-      "Decision": {
-        "properties": {
-          "capabilities": {
-            "anyOf": [
-              {
-                "items": {
-                  "enum": [
-                    "observe",
-                    "interact"
-                  ],
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Capabilities"
-          },
-          "clientId": {
-            "title": "Clientid",
-            "type": "string"
-          },
-          "decision": {
-            "enum": [
-              "once",
-              "always",
-              "deny"
-            ],
-            "title": "Decision",
-            "type": "string"
-          },
-          "leaseId": {
-            "title": "Leaseid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "clientId",
-          "leaseId",
-          "decision"
-        ],
-        "title": "Decision",
         "type": "object"
       },
       "DesktopFrame": {
@@ -1170,6 +1163,33 @@
           }
         },
         "title": "OpeningIn",
+        "type": "object"
+      },
+      "Owner": {
+        "properties": {
+          "clientId": {
+            "title": "Clientid",
+            "type": "string"
+          },
+          "leaseId": {
+            "title": "Leaseid",
+            "type": "string"
+          },
+          "plugin": {
+            "default": "computer",
+            "enum": [
+              "computer",
+              "browser"
+            ],
+            "title": "Plugin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "clientId",
+          "leaseId"
+        ],
+        "title": "Owner",
         "type": "object"
       },
       "OwnerChallengeIn": {
@@ -1618,40 +1638,6 @@
           "eventId"
         ],
         "title": "ReplayIn",
-        "type": "object"
-      },
-      "Resume": {
-        "properties": {
-          "clientId": {
-            "title": "Clientid",
-            "type": "string"
-          },
-          "leaseId": {
-            "title": "Leaseid",
-            "type": "string"
-          },
-          "plugin": {
-            "default": "computer",
-            "enum": [
-              "computer",
-              "browser"
-            ],
-            "title": "Plugin",
-            "type": "string"
-          },
-          "requestId": {
-            "maxLength": 128,
-            "minLength": 1,
-            "title": "Requestid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "clientId",
-          "leaseId",
-          "requestId"
-        ],
-        "title": "Resume",
         "type": "object"
       },
       "RetiredWaitIn": {
@@ -2117,24 +2103,6 @@
         "title": "ValidationError",
         "type": "object"
       },
-      "app__api__app_permissions__Owner": {
-        "properties": {
-          "clientId": {
-            "title": "Clientid",
-            "type": "string"
-          },
-          "leaseId": {
-            "title": "Leaseid",
-            "type": "string"
-          }
-        },
-        "required": [
-          "clientId",
-          "leaseId"
-        ],
-        "title": "Owner",
-        "type": "object"
-      },
       "app__api__browser__Action": {
         "properties": {
           "action": {
@@ -2472,33 +2440,6 @@
           "action"
         ],
         "title": "Action",
-        "type": "object"
-      },
-      "app__api__native_control__Owner": {
-        "properties": {
-          "clientId": {
-            "title": "Clientid",
-            "type": "string"
-          },
-          "leaseId": {
-            "title": "Leaseid",
-            "type": "string"
-          },
-          "plugin": {
-            "default": "computer",
-            "enum": [
-              "computer",
-              "browser"
-            ],
-            "title": "Plugin",
-            "type": "string"
-          }
-        },
-        "required": [
-          "clientId",
-          "leaseId"
-        ],
-        "title": "Owner",
         "type": "object"
       },
       "app__api__native_control__Start": {
@@ -3173,9 +3114,9 @@
         "summary": "Load Checkpoint"
       }
     },
-    "/api/computer/approvals": {
+    "/api/computer/access": {
       "get": {
-        "operationId": "status_api_computer_approvals_get",
+        "operationId": "status_api_computer_access_get",
         "responses": {
           "200": {
             "content": {
@@ -3189,25 +3130,14 @@
         "summary": "Status"
       }
     },
-    "/api/computer/approvals/{request_id}/decision": {
-      "post": {
-        "operationId": "decision_api_computer_approvals__request_id__decision_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "request_id",
-            "required": true,
-            "schema": {
-              "title": "Request Id",
-              "type": "string"
-            }
-          }
-        ],
+    "/api/computer/access/blocklist": {
+      "put": {
+        "operationId": "block_api_computer_access_blocklist_put",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Decision"
+                "$ref": "#/components/schemas/Block"
               }
             }
           },
@@ -3233,7 +3163,100 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Decision"
+        "summary": "Block"
+      }
+    },
+    "/api/computer/access/consent": {
+      "put": {
+        "operationId": "consent_api_computer_access_consent_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Consent"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Consent"
+      }
+    },
+    "/api/computer/access/system": {
+      "get": {
+        "operationId": "system_api_computer_access_system_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "System"
+      }
+    },
+    "/api/computer/access/system/{kind}": {
+      "post": {
+        "operationId": "request_system_api_computer_access_system__kind__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "screen",
+                "input"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Request System"
       }
     },
     "/api/computer/ask": {
@@ -3387,7 +3410,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__api__native_control__Owner"
+                "$ref": "#/components/schemas/Owner"
               }
             }
           },
@@ -3414,42 +3437,6 @@
           }
         },
         "summary": "Frame"
-      }
-    },
-    "/api/computer/native/resume": {
-      "post": {
-        "operationId": "resume_api_computer_native_resume_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Resume"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Resume"
       }
     },
     "/api/computer/native/start": {
@@ -3527,7 +3514,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__api__native_control__Owner"
+                "$ref": "#/components/schemas/Owner"
               }
             }
           },
@@ -3554,53 +3541,6 @@
           }
         },
         "summary": "Targets"
-      }
-    },
-    "/api/computer/permissions/{app_id}": {
-      "delete": {
-        "operationId": "remove_api_computer_permissions__app_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "app_id",
-            "required": true,
-            "schema": {
-              "title": "App Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/app__api__app_permissions__Owner"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Remove"
       }
     },
     "/api/computer/react": {

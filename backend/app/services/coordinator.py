@@ -620,10 +620,8 @@ class Coordinator:
 
     def _revoke_locked(self, reason):
         from .native_control import native_control
-        from .app_permissions import permissions
         if self is runtime:
             native_control.stop(reason)
-            permissions.revoke_epoch(self.epoch)
         from .computer import computer
         computer.stop(reason)
         from .minecraft import minecraft

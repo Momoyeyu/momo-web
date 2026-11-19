@@ -1,60 +1,49 @@
 import pytest
-from app.services.app_permissions import AppPermissions,AppApprovalRequired
-TARGET={'bundleId':'test.app','appPath':'/Applications/Test.app','name':'Test'}
-def request(p,key='a',caps=('observe',)):
- with pytest.raises(AppApprovalRequired) as e:p.require(TARGET,1,key,caps)
- return e.value.request_id
 
-def test_once_and_revoke(tmp_path):
- p=AppPermissions(tmp_path/'permissions.json');rid=request(p)
- assert request(p)==rid
- p.decide(rid,'once',1)
- grant=p.require(TARGET,1,'a',['observe']);assert p.check(grant,TARGET,1)
- assert not p.saved()
- p.revoke_epoch(1)
- with pytest.raises(ValueError):p.check(grant,TARGET,1)
+from app.services.app_permissions import AppPermissions, DesktopPermissionError
 
-def test_always_subset_and_revoke(tmp_path):
- p=AppPermissions(tmp_path/'permissions.json');rid=request(p,caps=['observe','interact'])
- p.decide(rid,'always',1,['observe'])
- grant=p.require(TARGET,1,'b',['observe']);assert p.check(grant,TARGET,1)
- request(p,'c',['interact'])
- p.remove(grant['appId'])
- with pytest.raises(ValueError):p.check(grant,TARGET,1)
- assert not p.saved()
-
-def test_denied_no_reprompt_expiry_and_duplicate(tmp_path):
- now=[0];p=AppPermissions(tmp_path/'permissions.json',lambda:now[0]);rid=request(p)
- p.decide(rid,'deny',1)
- assert request(p)==rid
- assert p.status()['pending']==[]
- with pytest.raises(ValueError):p.decide(rid,'always',1)
- request(p,'other');now[0]=301
- assert not p.status()['pending']
-
-def test_stop_consumes_once_and_revoke_callback(tmp_path):
- p=AppPermissions(tmp_path/'permissions.json');rid=request(p)
- p.decide(rid,'once',1);grant=p.require(TARGET,1,'a',['observe'])
- p.revoke_grant(grant)
- with pytest.raises(AppApprovalRequired) as e:p.require(TARGET,1,'a',['observe'])
- assert e.value.status=='denied'
- called=[];p.on_revoke=called.append;p.remove(grant['appId'])
- assert called==[grant['appId']]
+EDITOR = {'bundleId': 'com.apple.TextEdit'}
+BROWSER = {'bundleId': 'com.apple.Safari'}
 
 
-def test_grant_gets_five_minutes_from_approval_but_cannot_renew_itself(tmp_path):
- now=[0];p=AppPermissions(tmp_path/'permissions.json',lambda:now[0]);rid=request(p)
- now[0]=299;p.decide(rid,'once',1)
- grant=p.require(TARGET,1,'a',['observe'])
- now[0]=301;assert p.check(grant,TARGET,1)
- now[0]=599
- with pytest.raises(ValueError):p.check(grant,TARGET,1)
- with pytest.raises(AppApprovalRequired) as error:p.require(TARGET,1,'a',['observe'])
- assert error.value.status=='expired'
+def test_consent_enables_applications_without_individual_requests(tmp_path):
+    path = tmp_path / 'desktop-access.json'
+    policy = AppPermissions(path)
+    assert policy.status() == {'granted': None, 'blocked': []}
+    with pytest.raises(DesktopPermissionError, match='has not been granted'):
+        policy.before_action(EDITOR)
+    policy.consent(False)
+    assert AppPermissions(path).status()['granted'] is False
+    policy.consent(True)
+    assert policy.before_action(EDITOR) == policy.before_action(BROWSER)
+    assert AppPermissions(path).before_action(BROWSER)[1] == []
 
 
-def test_pending_request_still_expires_before_approval(tmp_path):
- now=[0];p=AppPermissions(tmp_path/'permissions.json',lambda:now[0]);rid=request(p)
- now[0]=300
- with pytest.raises(ValueError):p.decide(rid,'once',1)
- assert not p.grants
+def test_blocklist_is_app_scoped_and_invalidates_old_access(tmp_path):
+    policy = AppPermissions(tmp_path/'desktop-access.json')
+    policy.consent(True)
+    version, _ = policy.before_action(EDITOR)
+    assert policy.block('COM.APPLE.TEXTEDIT', 'TextEdit', True)
+    assert not policy.block('com.apple.textedit', 'TextEdit', True)
+    assert policy.before_action(BROWSER)[1] == ['com.apple.textedit']
+    with pytest.raises(DesktopPermissionError, match='blocklist'):
+        policy.before_action(EDITOR)
+    with pytest.raises(DesktopPermissionError, match='changed'):
+        policy.before_action(BROWSER, version)
+    policy.block('com.apple.textedit', '', False)
+    assert policy.before_action(EDITOR)[1] == []
+
+
+def test_revoked_global_access_rejects_old_capture_and_new_bindings(tmp_path):
+    policy = AppPermissions(tmp_path/'desktop-access.json')
+    policy.consent(True)
+    version, _ = policy.before_action()
+    policy.consent(False)
+    for target in (None, EDITOR, BROWSER):
+        with pytest.raises(DesktopPermissionError):
+            policy.before_action(target, version)
+
+
+def test_legacy_list_is_not_promoted_to_broad_consent(tmp_path):
+    (tmp_path/'app-permissions.json').write_text('{"old-app":{"capabilities":["observe","interact"]}}')
+    assert AppPermissions(tmp_path/'desktop-access.json').status()['granted'] is None

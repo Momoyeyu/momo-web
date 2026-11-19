@@ -24,8 +24,3 @@ def start(body:Start):return call(native_control.start,body.windowId,body.ownerP
 def stop():return call(native_control.stop)
 @router.post('/frame')
 def frame(body:Owner):return call(native_control.frame,body.clientId,body.leaseId)
-
-class Resume(Owner):
-    requestId: str = Field(min_length=1, max_length=128)
-@router.post('/resume')
-def resume(body:Resume):return call(native_control.resume,body.requestId,body.clientId,body.leaseId)

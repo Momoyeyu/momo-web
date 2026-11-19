@@ -9,6 +9,7 @@ import time
 
 from ..core import state, db
 from . import vision
+from .app_permissions import DesktopPermissionError, native_desktop, permissions
 from .coordinator import runtime
 
 class ComputerError(ValueError):
@@ -20,6 +21,7 @@ class Computer:
         self.generation = 0
         self.observing = False
         self.frame = None
+        self.frame_policy_version = None
         self.source = ''
         self.shared_source = False
         self.reason = 'stopped'
@@ -102,10 +104,13 @@ class Computer:
             return dict(observing=self.observing,generation=self.generation,source=self.source,
                         proactive=self.proactive,reactions=self.reactions,frames=self.frames,
                         reason=self.reason,executionAvailable=False,proactiveAvailable=True,
-                        observationAvailable=self.frame is not None,desktopAllowed=self.desktop_allowed,desktopError=self.desktop_error)
+                        observationAvailable=self.frame is not None,desktopAllowed=self.desktop_allowed,
+                        desktopAccessGranted=permissions.granted() if native_desktop() else None,desktopError=self.desktop_error)
 
     def start(self, source, proactive=False, reactions=False, *, shared=True):
         with self.lock:
+            if shared and native_desktop():
+                self.check_shared_capture()
             self.stop()
             cfg = self.gate()
             runtime.host.request('computer.start', {'source':source})
@@ -121,28 +126,45 @@ class Computer:
             self.observing, self.reason = True, ''
             return self.snapshot()
 
+    @staticmethod
+    def check_shared_capture():
+        try:
+            _, blocked = permissions.before_action()
+        except DesktopPermissionError as error:
+            raise ComputerError(str(error)) from None
+        if blocked:
+            raise ComputerError('Use desktop observation to apply the application blocklist')
+
     def desktop_frame(self):
-        """Read-only view of the visible display, independent of application grants."""
+        """Read the visible display through the current desktop policy."""
         with self.capture_lock:
             with self.lock:
                 self.gate()
                 if not self.desktop_allowed: raise ComputerError('computer.paused')
+                if self.observing and self.shared_source and not native_desktop():
+                    if self.frame and time.monotonic()-self.last < 15:
+                        return self.snapshot()
+                    raise ComputerError('computer.observationExpired')
+                try:
+                    policy_version, blocked = permissions.before_action()
+                except DesktopPermissionError as error:
+                    raise ComputerError(str(error)) from None
                 if not self.observing:
                     self.start('Desktop',self.proactive,self.reactions,shared=False)
                 generation = self.generation
                 if self.shared_source:
-                    if self.frame and time.monotonic()-self.last < 15: return self.snapshot()
+                    if not blocked and self.frame and time.monotonic()-self.last < 15: return self.snapshot()
                     raise ComputerError('computer.observationExpired')
-                if self.frame and time.monotonic()-self.last < 2:
+                if self.frame and self.frame_policy_version == policy_version and time.monotonic()-self.last < 2:
                     return self.snapshot()
             try:
-                result = runtime.host.request('native.screen',{'permit':runtime.host.permit('desktop-observe'),'prompt':self.desktop_error != 'screen-permission'})
+                result = runtime.host.request('native.screen',{'permit':runtime.host.permit('desktop-observe'),'blocked':blocked})
                 raw = base64.b64decode(result['data'],validate=True)
                 with self.lock:
                     self.gate()
                     if generation != self.generation or not self.desktop_allowed:
                         raise ComputerError('computer.revoked')
-                    self.capture(raw,generation,continuous=True)
+                    self.capture(raw,generation,continuous=True,policy_version=policy_version)
                     self.desktop_error = ''
                     return self.snapshot()
             except Exception as error:
@@ -164,9 +186,13 @@ class Computer:
             if self.generation == generation and getattr(self,"observed",None) == observed:
                 self.frame = None
 
-    def capture(self, raw, generation, *, continuous=False):
+    def capture(self, raw, generation, *, continuous=False, policy_version=None):
         with self.lock:
             self.gate()
+            if policy_version is not None:
+                permissions.before_action(version=policy_version)
+            elif native_desktop():
+                self.check_shared_capture()
             if not self.observing or generation != self.generation: raise ComputerError('computer.revoked')
             if not continuous and (self.frames >= 120 or time.monotonic()-self.started_at > 600):
                 self.stop('budget')
@@ -178,6 +204,7 @@ class Computer:
             self.signature = tuple(pixels.tobytes())
             self.unknown = ImageStat.Stat(pixels).mean[0] < 3
             self.frame = data
+            self.frame_policy_version = policy_version
             self.last, self.observed = time.monotonic(), time.time()
             if self.expiry: self.expiry.cancel()
             self.expiry = threading.Timer(15, self.expire_frame, (self.generation,self.observed))
@@ -204,6 +231,12 @@ class Computer:
             self.reacted_signature = self.signature
             return {"generation": generation}
 
+    def validate_frame(self):
+        if self.frame_policy_version is not None:
+            permissions.before_action(version=self.frame_policy_version)
+        elif native_desktop():
+            self.check_shared_capture()
+
     def stage_reaction(self, generation):
         """Project pixels once into the regular turn, never a separate inference."""
         from .computer_tools import stage
@@ -213,6 +246,7 @@ class Computer:
                 if (generation != self.generation or not self.observing or not self.proactive
                         or not self.reactions or not self.frame or time.monotonic()-self.last > 15):
                     raise ComputerError('computer.revoked')
+                self.validate_frame()
             validate()
             if self.analyses >= 12: raise ComputerError('computer.budget')
             self.analyses += 1

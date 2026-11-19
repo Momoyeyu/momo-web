@@ -1,38 +1,148 @@
-import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import {useT} from '../i18n';
-import {apiJson,jsonInit} from '../services/http';
-import {meetingIdentity,meetingSnapshot,subscribeMeeting} from '../services/meetingClient';
+import {apiJson, jsonInit} from '../services/http';
+import {refreshActivities} from '../services/extensionActivities';
+import {readComputer} from '../services/computerClient';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
-type Grant={appId:string;appName:string;bundleId:string;appPath:string;capabilities:string[]};
-type Request=Grant&{id:string;reason:string;status:string};
-export default function AppPermissions({manage=false}:{manage?:boolean}){
- const t=useT(),meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot),[pending,setPending]=useState<Request[]>([]),[grants,setGrants]=useState<Grant[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(false);
- const resumeEpoch=useRef(0);
- useEffect(()=>()=>{resumeEpoch.current++;},[]);
- useEffect(()=>{if(meeting.state!=='active')resumeEpoch.current++;},[meeting.state]);
- const read=async()=>{const result=await apiJson<{pending:Request[];allowlist:Grant[]}>('/api/computer/approvals');setPending(result.pending);setGrants(result.allowlist);};
- useEffect(()=>{if(meeting.state!=='active'&&!manage)return;let live=true;let timer:ReturnType<typeof setTimeout>;const poll=async()=>{try{if(live)await read();}catch{/* Keep last visible request; never approve on an error. */}if(live)timer=setTimeout(()=>void poll(),1500);};void poll();return()=>{live=false;clearTimeout(timer);};},[meeting.state,manage]);
- const run=async(fn:()=>Promise<unknown>)=>{if(busy)return;setBusy(true);setError(false);try{await fn();await read();}catch{setError(true);}finally{setBusy(false);}};
- if(manage)return <section><h4>{t('permissions.allowed')}</h4>{grants.length===0&&<p className="muted">{t('permissions.empty')}</p>}{grants.map(g=><div className="permission-app" key={g.appId}><div><strong>{g.appName}</strong><small>{g.bundleId}</small><span>{g.capabilities.map(c=>t('permissions.'+c)).join(' · ')}</span></div><Button variant="ghost" disabled={busy} onClick={()=>void run(()=>apiJson('/api/computer/permissions/'+encodeURIComponent(g.appId),jsonInit('DELETE',{...meetingIdentity()})))}>{t('permissions.revoke')}</Button></div>)}{error&&<p role="alert">{t('permissions.error')}</p>}</section>;
- const request=pending[0];if(meeting.state!=='active')return null;
- if(!request)return error?<Modal className="extension-modal" label={t('permissions.title')} onClose={()=>setError(false)}><p role="alert">{t('permissions.error')}</p><Button onClick={()=>setError(false)}>{t('browser.dismiss')}</Button></Modal>:null;
- const decide=(decision:string)=>void run(async()=>{
-  const owner=meetingIdentity();if(!owner)throw new Error('No owner');
-  const epoch=++resumeEpoch.current;
-  await apiJson('/api/computer/approvals/'+encodeURIComponent(request.id)+'/decision',jsonInit('POST',{...owner,decision}));
-  if(decision!=='deny'){
-   const deadline=Date.now()+30000;
-   while(true){
-    const current=meetingIdentity();if(epoch!==resumeEpoch.current||current?.leaseId!==owner.leaseId||current?.clientId!==owner.clientId)return;
-    const remaining=deadline-Date.now();if(remaining<=0)throw new Error('Approval resume timed out');
-    const result=await apiJson<{waiting?:boolean}>('/api/computer/native/resume',{...jsonInit('POST',{...owner,requestId:request.id}),signal:AbortSignal.timeout(Math.min(10000,remaining))});
-    if(!result.waiting)break;
-    if(Date.now()>=deadline)throw new Error('Approval resume timed out');
-    await new Promise(resolve=>setTimeout(resolve,500));
-   }
+import Icon from '../ui/Icon';
+import '../styles/plugin-library.css';
+
+type Application = {bundleId: string; name: string};
+type Policy = {available: boolean; granted: boolean | null; blocked: Application[]; stopUnconfirmed?: boolean};
+type SystemAccess = {screenPermission: boolean; inputPermission: boolean; applications: Application[]};
+const endpoint = '/api/computer/access';
+const guideEvent = 'momo:desktop-access-guide';
+export function openDesktopAccessGuide() { window.dispatchEvent(new Event(guideEvent)); }
+
+export default function AppPermissions({manage = false, ready = false}: {manage?: boolean; ready?: boolean}) {
+  const t = useT();
+  const [policy, setPolicy] = useState<Policy | null>(null);
+  const [system, setSystem] = useState<SystemAccess | null>(null);
+  const [guide, setGuide] = useState(false);
+  const [selected, setSelected] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const refreshSystem = useCallback(async () => setSystem(await apiJson<SystemAccess>(endpoint + '/system')), []);
+
+  useEffect(() => {
+    if (!manage && !ready || !window.momoDesktop) return;
+    const controller = new AbortController();
+    const open = () => {
+      void apiJson<Policy>(endpoint).then(value => {setPolicy(value); setGuide(value.available);}).catch(() => setError(true));
+    };
+    if (!manage) window.addEventListener(guideEvent, open);
+    apiJson<Policy>(endpoint, {signal: controller.signal}).then(value => {
+      if (controller.signal.aborted) return;
+      setPolicy(value);
+      if (!value.available || manage) return;
+      if (value.granted === null) setGuide(true);
+      else if (value.granted) {
+        void apiJson<SystemAccess>(endpoint + '/system', {signal: controller.signal}).then(current => {
+          if (controller.signal.aborted) return;
+          setSystem(current);
+          if (!current.screenPermission || !current.inputPermission) setGuide(true);
+        }).catch(() => { if (!controller.signal.aborted) setError(true); });
+      }
+    }).catch(() => { if (!controller.signal.aborted) setError(true); });
+    return () => {
+      controller.abort();
+      if (!manage) window.removeEventListener(guideEvent, open);
+    };
+  }, [manage, ready]);
+
+  useEffect(() => {
+    if (!policy?.available || !guide && !manage) return;
+    const refresh = () => { void refreshSystem().catch(() => setError(true)); };
+    refresh();
+    const loadPolicy = () => {void apiJson<Policy>(endpoint).then(setPolicy).catch(() => setError(true));};
+    window.addEventListener('focus', refresh);
+    if (manage) window.addEventListener('momo:desktop-access-changed',loadPolicy);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('momo:desktop-access-changed',loadPolicy);
+    };
+  }, [policy?.available, guide, manage, refreshSystem]);
+
+  async function run(action: () => Promise<void>) {
+    if (busy) return;
+    setBusy(true);
+    setError(false);
+    try { await action(); }
+    catch { setError(true); }
+    finally { setBusy(false); }
   }
-  window.dispatchEvent(new CustomEvent('momo:app-permission',{detail:{id:request.id,decision}}));
- });
- return <Modal className="extension-modal" label={t('permissions.title')} onClose={()=>{if(!busy)decide('deny');}}><h3>{t('permissions.title')}</h3><strong>{request.appName}</strong><small>{request.bundleId}</small><p>{request.reason}</p><ul>{request.capabilities.map(c=><li key={c}>{t('permissions.'+c)}</li>)}</ul><div className="plugin-library-actions"><Button variant="ghost" disabled={busy} onClick={()=>decide('deny')}>{t('permissions.deny')}</Button><Button disabled={busy} onClick={()=>decide('once')}>{t('permissions.once')}</Button><Button variant="ghost" disabled={busy} onClick={()=>decide('always')}>{t('permissions.always')}</Button></div>{error&&<p role="alert">{t('permissions.error')}</p>}</Modal>;
+
+  async function decide(granted: boolean) {
+    const updated = await apiJson<Policy>(endpoint + '/consent', jsonInit('PUT', {granted}));
+    setPolicy(previous => ({...previous!, ...updated}));
+    setGuide(false);
+    window.dispatchEvent(new Event('momo:desktop-access-changed'));
+    await Promise.allSettled([refreshActivities(),readComputer()]);
+  }
+
+  async function changeBlock(app: Application, blocked: boolean) {
+    const updated = await apiJson<Policy>(endpoint + '/blocklist', jsonInit('PUT', {...app, blocked}));
+    setPolicy(previous => ({...previous!, ...updated}));
+    setSelected('');
+  }
+
+  if (!policy?.available) return null;
+  if (manage) {
+    const blocked = new Set(policy.blocked.map(app => app.bundleId.toLowerCase()));
+    const candidates = [...new Map((system?.applications ?? []).filter(app => !blocked.has(app.bundleId.toLowerCase()))
+      .map(app => [app.bundleId, app])).values()];
+    const app = candidates.find(candidate => candidate.bundleId === selected);
+    return <section>
+      <p className="muted">{t('desktopAccess.blockHint')}</p>
+      <div className="plugin-library-actions">
+        <Button variant="ghost" onClick={openDesktopAccessGuide}>{t('desktopAccess.open')}</Button>
+      </div>
+      {policy.blocked.map(app => <div className="permission-app" key={app.bundleId}>
+        <div><strong>{app.name}</strong><small>{app.bundleId}</small></div>
+        <Button variant="ghost" disabled={busy} onClick={() => void run(() => changeBlock(app, false))}>{t('desktopAccess.unblock')}</Button>
+      </div>)}
+      <div className="permission-app">
+        <select className="extension-window-select" aria-label={t('desktopAccess.select')} value={selected}
+          onChange={event => setSelected(event.target.value)}>
+          <option value="">{t('desktopAccess.select')}</option>
+          {candidates.map(app => <option key={app.bundleId} value={app.bundleId}>{app.name}</option>)}
+        </select>
+        <Button disabled={!app || busy} onClick={() => app && void run(() => changeBlock(app, true))}>{t('desktopAccess.block')}</Button>
+      </div>
+      {(error || policy.stopUnconfirmed) && <p role="alert">{t(policy.stopUnconfirmed ? 'plugins.stopUnknown' : 'permissions.error')}</p>}
+    </section>;
+  }
+
+  if (!guide) return null;
+  const complete = system?.screenPermission && system.inputPermission;
+  const dismiss = () => {
+    if (busy) return;
+    if (policy.granted === null) void run(() => decide(false));
+    else setGuide(false);
+  };
+  return <Modal className="extension-modal" label={t('desktopAccess.title')} onClose={dismiss}>
+    <div className="extension-detail">
+      <header className="extension-detail-header"><h3>{t('desktopAccess.title')}</h3></header>
+      <p>{t('desktopAccess.description')}</p>
+      <section aria-label={t('desktopAccess.system')} className="extension-detail-section">
+        {(['screen', 'input'] as const).map(kind => {
+          const enabled = kind === 'screen' ? system?.screenPermission : system?.inputPermission;
+          return <div className="permission-app" key={kind}>
+            <div><strong>{t('desktopAccess.' + kind)}</strong><small>{t('desktopAccess.' + kind + 'Hint')}</small></div>
+            {enabled ? <span><Icon name="check"/> {t('desktopAccess.enabled')}</span>
+              : <Button variant="ghost" disabled={busy} onClick={() => void run(async () => {
+                setSystem(await apiJson<SystemAccess>(endpoint + '/system/' + kind, {method: 'POST'}));
+              })}>{t('desktopAccess.configure')}</Button>}
+          </div>;
+        })}
+      </section>
+      {error && <p role="alert">{t('desktopAccess.settingsHelp')}</p>}
+      <div className="plugin-library-actions">
+        {policy.granted && <Button variant="ghost" disabled={busy} onClick={() => void run(() => decide(false))}>{t('desktopAccess.disable')}</Button>}
+        <Button variant="ghost" disabled={busy} onClick={dismiss}>{t(policy.granted ? 'browser.dismiss' : 'desktopAccess.later')}</Button>
+        <Button disabled={!complete || busy} onClick={() => void run(() => decide(true))}>{t('desktopAccess.enable')}</Button>
+      </div>
+    </div>
+  </Modal>;
 }

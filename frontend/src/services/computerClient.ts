@@ -1,6 +1,6 @@
 import {apiJson,apiFetch,jsonInit} from './http';
 import {meetingIdentity,subscribeMeeting,meetingSnapshot} from './meetingClient';
-export type ComputerStatus={observing:boolean;generation:number;source:string;proactive:boolean;reactions:boolean;reason:string;executionAvailable:boolean;desktopAllowed?:boolean;desktopError?:string};
+export type ComputerStatus={observing:boolean;generation:number;source:string;proactive:boolean;reactions:boolean;reason:string;executionAvailable:boolean;desktopAllowed?:boolean;desktopAccessGranted?:boolean|null;desktopError?:string};
 export type ComputerView={status:ComputerStatus|null;busy:boolean;error:boolean;text:string};
 let view:ComputerView={status:null,busy:false,error:false,text:''};
 let stream:MediaStream|null=null,video:HTMLVideoElement|null=null,timer:ReturnType<typeof setTimeout>|undefined,epoch=0;

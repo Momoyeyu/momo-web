@@ -1,6 +1,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import ScreenCaptureKit
 func fail(_ reason:String) -> Never { print("{\"error\":\"\(reason)\"}"); exit(1) }
 let raw=FileHandle.standardInput.readDataToEndOfFile()
 guard let input=(try? JSONSerialization.jsonObject(with:raw)) as? [String:Any], let action=input["action"] as? String else { fail("INVALID_INPUT") }
@@ -17,10 +18,30 @@ func matchesTitle(_ accessibility:String?,_ visible:String)->Bool {
  return accessibility==visible || (!visible.isEmpty && accessibility.hasPrefix(visible+" - "))
 }
 func output(_ value:[String:Any]) { let d=try! JSONSerialization.data(withJSONObject:value);print(String(data:d,encoding:.utf8)!) }
-// Only the explicit local setup flow invokes this; never exposed as a model action.
-if action=="request-input-permission" {
- let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
- output(["inputPermission": AXIsProcessTrustedWithOptions(options)]);exit(0)
+// This method is wired only to the trusted desktop setup and settings UI.
+if action=="permissions" {
+ if let kind = input["kind"] as? String {
+  switch kind {
+  case "screen":
+   if !CGPreflightScreenCaptureAccess() { _ = CGRequestScreenCaptureAccess() }
+  case "input":
+   let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+   _ = AXIsProcessTrustedWithOptions(options)
+  default: fail("INVALID_INPUT")
+  }
+  if (kind == "screen" && !CGPreflightScreenCaptureAccess()) || (kind == "input" && !AXIsProcessTrusted()) {
+   let pane = kind == "input" ? "Privacy_Accessibility" : "Privacy_ScreenCapture"
+   if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?" + pane) {
+    NSWorkspace.shared.open(url)
+   }
+  }
+ }
+ let applications = NSWorkspace.shared.runningApplications.compactMap { app -> [String:String]? in
+  guard let id = app.bundleIdentifier, let name = app.localizedName, app.activationPolicy == .regular else { return nil }
+  return ["bundleId":id,"name":name]
+ }
+ output(["screenPermission":CGPreflightScreenCaptureAccess(),"inputPermission":AXIsProcessTrusted(),"applications":applications])
+ exit(0)
 }
 if action=="targets" {
  output(["screenPermission":CGPreflightScreenCaptureAccess(),"inputPermission":AXIsProcessTrusted(),"targets":windows().filter{($0[kCGWindowLayer as String] as? Int)==0}.map{ w in let r=rect(w);return ["bundleId":NSRunningApplication(processIdentifier:pid_t(w[kCGWindowOwnerPID as String] as? Int ?? 0))?.bundleIdentifier ?? "","path":NSRunningApplication(processIdentifier:pid_t(w[kCGWindowOwnerPID as String] as? Int ?? 0))?.bundleURL?.resolvingSymlinksInPath().path ?? "","windowId":w[kCGWindowNumber as String] as? Int ?? 0,"ownerPid":w[kCGWindowOwnerPID as String] as? Int ?? 0,"name":w[kCGWindowOwnerName as String] as? String ?? "","title":w[kCGWindowName as String] as? String ?? "","bounds":["x":r.minX,"y":r.minY,"width":r.width,"height":r.height]] as [String:Any] }]);exit(0)
@@ -28,10 +49,6 @@ if action=="targets" {
 // Read the composited display, with the same occlusion/layering the player sees.
 // Input authorization remains exclusively in the window-bound path below.
 if action=="screen" {
- if !CGPreflightScreenCaptureAccess() && input["prompt"] as? Bool == true {
-  _ = CGRequestScreenCaptureAccess()
-  if !CGPreflightScreenCaptureAccess(), let url=URL(string:"x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {NSWorkspace.shared.open(url)}
- }
  guard CGPreflightScreenCaptureAccess() else { fail("SCREEN_PERMISSION_REQUIRED") }
  guard let path=input["output"] as? String else { fail("OUTPUT_REQUIRED") }
  let cursor=CGEvent(source:nil)?.location ?? CGPoint.zero
@@ -39,18 +56,46 @@ if action=="screen" {
  guard CGGetActiveDisplayList(32,&ids,&count) == .success, count>0 else {fail("CAPTURE_FAILED")}
  let display=ids.prefix(Int(count)).first(where:{CGDisplayBounds($0).contains(cursor)}) ?? CGMainDisplayID()
  let area=CGDisplayBounds(display)
+ let blocked = Set((input["blocked"] as? [String] ?? []).map { $0.lowercased() })
+ if !blocked.isEmpty {
+  // An inclusion filter excludes even applications opened after enumeration.
+  // Never fall back to composited desktop pixels with an active blocklist.
+  Task { @MainActor in
+   do {
+    let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    guard let selected = content.displays.first(where: { $0.displayID == display }) else { fail("CAPTURE_FAILED") }
+    let allowed = content.applications.filter { !$0.bundleIdentifier.isEmpty && !blocked.contains($0.bundleIdentifier.lowercased()) }
+    guard !allowed.isEmpty else { fail("CAPTURE_FAILED") }
+    let filter = SCContentFilter(display: selected, including: allowed, exceptingWindows: [])
+    let config = SCStreamConfiguration()
+    config.width = CGDisplayPixelsWide(display)
+    config.height = CGDisplayPixelsHigh(display)
+    config.showsCursor = false
+    let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
+    guard let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else { fail("CAPTURE_FAILED") }
+    try data.write(to: URL(fileURLWithPath: path))
+    output(["source":"Desktop","displayId":display]);exit(0)
+   } catch { fail("CAPTURE_FAILED") }
+  }
+  dispatchMain()
+ }
  let region="\(Int(area.minX)),\(Int(area.minY)),\(Int(area.width)),\(Int(area.height))"
  let p=Process();p.executableURL=URL(fileURLWithPath:"/usr/sbin/screencapture");p.arguments=["-x","-R",region,path]
  try p.run();p.waitUntilExit();if p.terminationStatus != 0 {fail("CAPTURE_FAILED")}
  output(["source":"Desktop","displayId":display]);exit(0)
 }
 guard let id=input["windowId"] as? Int, let pid=input["ownerPid"] as? Int, id>0,pid>0 else { fail("INVALID_TARGET") }
-let denied=["terminal","iterm","warp","1password","keychain","system settings","activity monitor","codex","deepseek harness"]
+let permissionSurfaces:Set<String> = ["dev.momo.electron","com.apple.systempreferences","com.apple.securityagent"]
+// Preserve the no-shell and privileged-prompt boundaries for input.
+let protectedInputs = ["terminal","iterm","warp","1password","keychain","system settings","activity monitor","codex","deepseek harness"]
 func target(_ requireFront:Bool)->CGRect {
  guard let w=windows().first(where:{($0[kCGWindowNumber as String] as? Int)==id && ($0[kCGWindowOwnerPID as String] as? Int)==pid && ($0[kCGWindowLayer as String] as? Int)==0}) else { fail("TARGET_GONE") }
  if let bundle=input["bundleId"] as? String, let path=input["path"] as? String { guard let app=NSRunningApplication(processIdentifier:pid_t(pid)),app.bundleIdentifier==bundle,app.bundleURL?.resolvingSymlinksInPath().path==path else { fail("APP_IDENTITY_CHANGED") } }
- let name=(w[kCGWindowOwnerName as String] as? String ?? "").lowercased()
- if denied.contains(where:{name.contains($0)}) { fail("TARGET_DENIED") }
+ let bundle = NSRunningApplication(processIdentifier:pid_t(pid))?.bundleIdentifier?.lowercased() ?? ""
+ let name = (w[kCGWindowOwnerName as String] as? String ?? "").lowercased()
+ if action != "observe" && (permissionSurfaces.contains(bundle) || protectedInputs.contains(where: { name.contains($0) })) {
+  fail("TARGET_DENIED")
+ }
  if requireFront && (NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0) != pid_t(pid) { fail("TARGET_NOT_FOREGROUND") }
  let r=rect(w);if r.width<2 || r.height<2 { fail("TARGET_HIDDEN") }
  if requireFront {

@@ -345,9 +345,9 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
       </div>}
       <div className="desktop-window-grip" aria-hidden="true"/>
       <div id="desktop-controls-host"/>
-      <AppPermissions/>
       <TooltipLayer />
       <IntroGuide ready={ready} />
+      <AppPermissions ready={ready}/>
 
       {/* 换场特效：落点 + 水面光晕（涟漪环已删——正圆光环盖过不规则边缘） */}
       <div className="tx-fx" aria-hidden="true">

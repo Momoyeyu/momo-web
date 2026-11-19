@@ -2,9 +2,9 @@
 import threading
 import math
 import time
-import uuid
 from .coordinator import runtime
 from . import vision, activities
+from .app_permissions import permissions
 from ..core import state
 
 class NativeControl:
@@ -14,8 +14,6 @@ class NativeControl:
         self.operation=threading.RLock()
         self.target=None
         self.grant=None
-        self.pending=None
-        self.pending_request=None
         self.generation=0
         self.plugin='computer'
         self.stop_unconfirmed=False
@@ -42,95 +40,67 @@ class NativeControl:
         runtime.require_meeting(client,lease)
         activities.require_enabled(plugin)
         if not runtime.host: raise ValueError('Application executor unavailable')
-        return runtime.host.request('native.targets')
+        return self.available_targets()
+
+    def available_targets(self):
+        version, blocked = permissions.before_action()
+        result = runtime.host.request('native.targets')
+        permissions.before_action(version=version)
+        return {**result, 'targets': [
+            row for row in result['targets']
+            if row.get('bundleId') and row['bundleId'].lower() not in blocked
+        ]}
 
     def status(self):
-        from .app_permissions import permissions
         with self.lock:
-            # Keep a granted request while resume is in flight, but release
-            # expired/denied requests even when the permission dialog disappeared.
-            if self.pending_request and permissions.request_status(self.pending_request,runtime.epoch) not in ('pending','granted'):
-                permissions.revoke_request(self.pending_request)
-                self.pending=None
-                self.pending_request=None
-            return {'active':self.target is not None,'target':self.target,'generation':self.generation,'plugin':self.plugin,'permissions':sorted(self.grant['capabilities']) if self.grant else [],'stopUnconfirmed':self.stop_unconfirmed,'stopping':self.stopping,'pendingRequestId':self.pending_request}
+            return {'active': self.target is not None, 'target': self.target,
+                    'generation': self.generation, 'plugin': self.plugin,
+                    'permissions': sorted(self.grant['capabilities']) if self.grant else [],
+                    'stopUnconfirmed': self.stop_unconfirmed, 'stopping': self.stopping}
 
-    def start(self,window,pid,capabilities,client,lease,plugin='computer',proactive=None,reactions=None,expected_request=None):
-        from .app_permissions import permissions, AppApprovalRequired
+    def start(self,window,pid,capabilities,client,lease,plugin='computer'):
         if plugin not in ('computer','browser') or not set(capabilities)<= {'observe','interact'} or 'observe' not in capabilities:
             raise ValueError('Invalid application scope')
-        if not runtime.host: raise ValueError('Application executor unavailable')
+        if not runtime.host:
+            raise ValueError('Application executor unavailable')
         with runtime.host.control, self.lock:
-            if expected_request is not None and (self.pending_request != expected_request or not self.pending or self.pending[0][3] != runtime.epoch):
-                raise ValueError('Approval request no longer current')
-            # Repeating the same proposal must not invalidate an existing grant
-            # or force another permission dialog. Never expand its scope here.
             if (self.target and not self.stop_unconfirmed and not self.stopping
                     and plugin == self.plugin and window == self.target['windowId']
                     and pid == self.target['ownerPid']
                     and set(capabilities) <= set(self.grant['capabilities'])):
                 self.validate(self.generation,client,lease)
                 return self.status()
-            if self.target or self.stop_unconfirmed or self.stopping: raise ValueError('Stop the current application activity first')
-            from .computer import computer
+            if self.target or self.stop_unconfirmed or self.stopping:
+                raise ValueError('Stop the current application activity first')
             from .minecraft import minecraft
-            if minecraft.binding:raise ValueError('Another activity owns attention')
+            if minecraft.binding:
+                raise ValueError('Another activity owns attention')
             self.plugin=plugin
             self.gate(client,lease)
+            version,_=permissions.before_action()
             result=runtime.host.request('native.targets')
-            rows=result.get('targets',[]) if isinstance(result,dict) else result
-            target=next((r for r in rows if r.get('windowId')==window and r.get('ownerPid')==pid),None)
-            if target is None: raise ValueError('Target window no longer exists')
-            target={**target,'appPath':target['path']}
-            signature=(window,pid,tuple(sorted(capabilities)),runtime.epoch,plugin)
-            if not self.pending or self.pending[0]!=signature:
-                self.pending=(signature,str(uuid.uuid4()))
-            try: grant=permissions.require(target,runtime.epoch,self.pending[1],capabilities)
-            except AppApprovalRequired as error:
-                self.pending_request=error.request_id
-                if error.status == 'expired':
-                    self.pending = None
-                    self.pending_request = None
-                return {'approvalRequired':True,'requestId':error.request_id,'status':error.status}
-            with runtime.host.control:
-                self.gate(client,lease)
-                permissions.check(grant,target,runtime.epoch)
-                if 'observe' not in grant['capabilities']:raise ValueError('Observation approval required')
-                started=runtime.host.request('native.start',{'windowId':window,'ownerPid':pid,'permissions':grant['capabilities'],'permit':runtime.host.permit('native-start')})
-                self.session_id=started['bindingId']
-                self.target,self.grant=target,grant
-                self.epoch=runtime.epoch
-                self.fingerprint=vision.fingerprint(state.load()['settings']['llm'])
-                self.generation+=1
-                self.pending=None
-                self.pending_request=None
+            target=next((row for row in result['targets'] if row.get('windowId')==window and row.get('ownerPid')==pid), None)
+            if not target or not target.get('bundleId') or not target.get('path'):
+                raise ValueError('Target window no longer exists')
+            permissions.before_action(target,version)
+            started=runtime.host.request('native.start',{
+                'windowId':window,'ownerPid':pid,'permissions':capabilities,
+                'bundleId':target['bundleId'],'path':target['path'],
+                'permit':runtime.host.permit('native-start'),
+            })
+            self.session_id=started['bindingId']
+            self.target=target
+            self.grant={'capabilities':list(capabilities),'policyVersion':version}
+            self.epoch=runtime.epoch
+            self.fingerprint=vision.fingerprint(state.load()['settings']['llm'])
+            self.generation+=1
             return self.status()
 
-    def resume(self, request_id, client, lease):
-        """Resume only the server-held request; the UI cannot substitute a target."""
-        runtime.require_meeting(client, lease)
-        with self.lock:
-            if not self.pending or self.pending_request != request_id:
-                raise ValueError('Approval request no longer current')
-            window, pid, capabilities, epoch, plugin = self.pending[0]
-            if epoch != runtime.epoch:
-                raise ValueError('Activity changed')
-            self.gate(client, lease, allow_busy=True)
-            from .app_permissions import permissions
-            with permissions.lock:
-                grant = permissions.grants.get(request_id)
-                if not grant or grant['epoch'] != epoch or grant['expires'] <= permissions.clock():
-                    raise ValueError('Application approval required')
-            if runtime.active:
-                return {'waiting': True}
-        return self.start(window, pid, capabilities, client, lease, plugin, expected_request=request_id)
-
     def validate(self,generation,client=None,lease=None):
-        from .app_permissions import permissions
         self.gate(client,lease,allow_busy=True)
         if not self.target or generation!=self.generation or self.epoch!=runtime.epoch or self.fingerprint!=vision.fingerprint(state.load()['settings']['llm']):
             raise ValueError('Application grant changed')
-        permissions.check(self.grant,self.target,runtime.epoch)
+        permissions.before_action(self.target,self.grant['policyVersion'])
 
     def bind_observation(self,generation,version,dimensions):
         """Bind provider image coordinates to this exact authorized window observation."""
@@ -195,11 +165,7 @@ class NativeControl:
             if self.stopping:return self.status()
             had_binding=self.target is not None or self.stop_unconfirmed
             self.generation+=1
-            from .app_permissions import permissions
-            if self.grant: permissions.revoke_grant(self.grant)
-            if self.pending_request: permissions.revoke_request(self.pending_request)
-            self.target=self.grant=self.pending=None
-            self.pending_request=None
+            self.target=self.grant=None
             self.session_id=None
             self.observation=self.projection=None
             self.stopping=True
@@ -215,9 +181,3 @@ class NativeControl:
         return self.status()
 
 native_control=NativeControl()
-
-from .app_permissions import permissions
-def _revoke_application(app_id):
-    if native_control.grant and native_control.grant['appId']==app_id:
-        native_control.stop('permission-revoked')
-permissions.on_revoke=_revoke_application

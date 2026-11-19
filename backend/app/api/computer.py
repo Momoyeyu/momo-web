@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from ..services.computer import computer, ComputerError
+from ..services.app_permissions import DesktopPermissionError
 from ..services.vision import VisionError, MAX_BYTES
 from ..services.coordinator import CoordinationError, runtime
 from ..core.plugin_host import HostError
@@ -10,7 +11,7 @@ router = APIRouter(prefix='/api/computer')
 
 def invoke(fn, *args):
     try: return fn(*args)
-    except (ComputerError, VisionError, CoordinationError, HostError, LlmError) as error:
+    except (ComputerError, DesktopPermissionError, VisionError, CoordinationError, HostError, LlmError) as error:
         raise HTTPException(409, str(error)) from error
 
 class Settings(BaseModel):
