@@ -2,7 +2,12 @@ import {bootChat} from './helpers';
 import {test,expect} from './fixtures';
 import './helpers';
 
-test.beforeEach(()=>test.skip(process.env.MOMO_RUNTIME_SMOKE!=='1','Opt in: requires an explicitly isolated running Python/Cordis instance.'));
+test.beforeEach(async({request},info)=>{
+  test.skip(process.env.MOMO_RUNTIME_SMOKE!=='1','Opt in: requires an explicitly isolated running Python/Cordis instance.');
+  const intro=await (await request.get('/api/intro')).json();
+  const needsFresh=info.title.startsWith('actual unconfigured');
+  test.skip(needsFresh ? intro.phase !== 'setup' : intro.phase === 'setup', needsFresh ? 'Requires a fresh profile.' : 'Requires an established meeting profile.');
+});
 
 test('actual coordinator refuses a second window until the first leaves',async({page,context,request})=>{
   await bootChat(page);
@@ -29,17 +34,29 @@ test('actual coordinator refuses a second window until the first leaves',async({
 });
 
 test('actual unconfigured first meeting rejects an unusable API without saving it',async({page,request})=>{
-  const state=await(await request.get('/api/state')).json();
-  test.skip(Boolean(state.settings?.llm?.url),'Requires the fresh, unconfigured isolated profile.');
-  await bootChat(page);
-  const setup=page.locator('.first-meeting-setup');
-  await expect(setup).toBeVisible();
-  await setup.getByLabel('模型 API 地址',{exact:true}).fill('http://127.0.0.1:1');
-  await setup.getByLabel('模型名称',{exact:true}).fill('invalid-model');
-  await setup.getByRole('button',{name:'开始相遇',exact:true}).click();
-  await expect(setup.getByRole('alert')).toContainText('连接未通过');
-  await expect(setup).toBeVisible();
-  expect((await(await request.get('/api/state')).json()).settings?.llm?.url??'').toBe('');
+  const before=(await (await request.get('/api/state')).json()).settings?.llm;
+  expect(before?.url || '').toBe('');
+  await page.goto('/');
+  await page.locator('[data-intro=settings]').click();
+  await page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true}).click();
+  await page.locator('[data-intro=tab-models]').click();
+  await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','llm');
+  await expect(page.locator('.intro-guide')).toHaveAttribute('data-ready','true');
+  const model=page.locator('[data-intro=llm]');
+  await model.locator('input').nth(0).fill('http://127.0.0.1:1');
+  await model.locator('input').nth(1).fill('synthetic-unusable-test-key');
+  await model.locator('input').nth(2).fill('invalid-model');
+  await model.locator('.probe-btn').click();
+  await expect(page.locator('.intro-guide [role=alert]')).toBeVisible();
+  await expect(model.locator('input').nth(2)).toHaveValue('invalid-model');
+  expect((await (await request.get('/api/state')).json()).settings.llm).toMatchObject({url:'',key:'',model:''});
+  expect(await page.evaluate(()=>localStorage.getItem('momo-web.v1'))).not.toContain('synthetic-unusable-test-key');
+  expect((await (await request.get('/api/intro')).json()).configurationValid).toBe(false);
+  expect((await request.post('/api/meeting/enter',{data:{clientId:'fresh-isolated-check'}})).status()).toBe(409);
+  await page.reload();await page.locator('[data-intro=tab-models]').click();
+  await expect(model.locator('input').nth(0)).toHaveValue('');
+  await expect(model.locator('input').nth(1)).toHaveValue('');
+
 });
 
 test('owned meeting survives refreshing backlog and settings without a new title entrance',async({page})=>{

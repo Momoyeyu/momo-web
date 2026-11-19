@@ -1,5 +1,6 @@
 import {useSyncExternalStore} from 'react';
 import {apiJson,jsonInit} from './http';
+import type {LlmConfig} from '../lib/types';
 import {getState,pausePersistence,update} from '../lib/store';
 export interface IntroState {phase:'setup'|'tts'|'await_boot'|'naming'|'memory'|'return_title'|'celebration'|'completed';memoryId?:string;languageConfirmed:boolean;configurationValid:boolean;legacy?:boolean}
 interface Snapshot {data:IntroState|null;failed:boolean;busy:boolean;error:boolean}
@@ -23,9 +24,13 @@ export async function confirmIntroLanguage(){
   const resume=await pausePersistence();
   try{return await action('language',{lang:getState().settings.general.lang});}finally{resume();}
 }
-export async function verifyIntro(){
+export async function verifyIntro(candidate?: LlmConfig){
   const resume=await pausePersistence();
-  try{return await action('verify',{...getState().settings.llm});}finally{resume();}
+  try{
+    const result=await action('verify',candidate ?? getState().settings.llm);
+    if(candidate)update({settings:{...getState().settings,llm:candidate}});
+    return result;
+  }finally{resume();}
 }
 export const finishIntro=()=>action('finish',{});
 

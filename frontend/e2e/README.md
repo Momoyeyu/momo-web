@@ -24,6 +24,8 @@ node scripts/browser-e2e.mjs
 
 可用 `--api-port 7822 --web-port 5174` 调整端口、`--resources-dir PATH` 指定已准备的离线模型目录，或用 `--evidence-dir PATH` 指定证据目录。需要单独调试用例时，在自行启动的隔离实例上设置 `MOMO_E2E_BASE_URL`，再执行 `pnpm --dir frontend test:e2e`。真实 LLM / TTS 用例须单独 opt-in；真实浏览器模型用例另以 `MOMO_BROWSER_LLM_CONFIG` 指向私有测试配置 YAML，不默认读取玩家配置。不要将私人配置和会话放进测试产物。
 
+在全新的临时资料中验证首次模型连接失败时，运行 `MOMO_RUNTIME_SMOKE=1 node scripts/browser-e2e.mjs --fresh-profile --spec e2e/21-runtime-meeting.spec.ts`。
+
 当前整个 v3 阶段只推进 Web。最终同步与桌面验收等维护者明确要求后再做，不属于本轮浏览器回归。
 
 `21-runtime-meeting.spec.ts` 需要额外设置 `MOMO_RUNTIME_SMOKE=1`，直接使用真实 Python / Cordis，不由页面拦截模拟见面接口。分别准备未配置的新资料和已有合成对话的资料，覆盖错误 API 拦截、多窗口独占、设置 / 历史刷新续接。默认的合成套件通过不能替代这组运行时检查。

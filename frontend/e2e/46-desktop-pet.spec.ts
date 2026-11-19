@@ -67,7 +67,9 @@ test('game control brings the same meeting into desktop pet once per connection'
 
 for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit regions and escape controls (${lang})`,async({page,baseURL,request},info)=>{
  const copy={zh,en,ja}[lang];
- const saved=await readState(request);(saved as any).settings.general.lang=lang;await writeState(request,saved);
+ const saved=await readState(request);
+ Object.assign((saved as any).settings.general,{lang,petDialogCollapsed:true,petCloseUp:false,petClickThrough:false,chatCloseUp:true});
+ await writeState(request,saved);
  await page.setViewportSize({width:1280,height:720});
  await page.addInitScript(({base})=>{
   let state:{mode:'chat'|'pet';clickThrough:boolean;panel?:{width:number;petWidth:number}}={mode:'chat',clickThrough:false};
@@ -85,7 +87,7 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
  },{base:baseURL!});
  await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:true}}}));
  let observing=false,allowed=true,desktopError='',reacting=false;let requests=0,frames=0;
- const computerStatus=()=>({observing:false,desktopAllowed:allowed,desktopError,proactive:reacting,reactions:reacting});
+ const computerStatus=()=>({observing:false,desktopAllowed:allowed,desktopAccessGranted:true,desktopError,proactive:reacting,reactions:reacting});
  await page.route('**/api/computer/settings',r=>{const data=r.request().postDataJSON();expect(data.proactive).toBe(data.reactions);reacting=data.proactive;return r.fulfill({json:computerStatus()});});
  await page.route('**/api/computer/desktop/frame',r=>{frames++;return r.fulfill({json:computerStatus()});});
  const target={windowId:42,ownerPid:123,bundleId:'test.editor',path:'/test',name:'Test Editor',title:'Smoke document'};
@@ -223,4 +225,32 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
  await page.mouse.move(1,1);await page.screenshot({path:info.outputPath('pet-restored.png')});
  // Keep language cases independent even though the test API owns one state file.
  await page.evaluate(async()=>{const store=await import('/src/lib/store.ts');store.updateGeneral({petCloseUp:false,petDialogCollapsed:true,petClickThrough:false});await store.flushPendingState();});
+});
+
+test('pet mode and its return control work with desktop access declined',async({page,baseURL,request})=>{
+ const saved=await readState(request);
+ Object.assign((saved as any).settings.general,{lang:'zh',petClickThrough:false});
+ await writeState(request,saved);
+ await page.addInitScript(base=>{
+   let state:{mode:'chat'|'pet';clickThrough:boolean}={mode:'chat',clickThrough:false};
+   const listeners=new Set<(s:typeof state)=>void>();
+   window.momoDesktop={
+     getRuntime:async()=>({baseUrl:base,token:'isolated-pet-test'}),
+     getWindowState:async()=>state,
+     setWindowMode:async mode=>{state={mode,clickThrough:false};listeners.forEach(fn=>fn(state));return state;},
+     onWindowStateChanged:fn=>{listeners.add(fn);return()=>listeners.delete(fn);},
+   };
+ },baseURL!);
+ await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:false,browser:false,minecraft:false},supported:{computer:true,browser:true,minecraft:false}}}));
+ await page.route('**/api/computer/access',r=>r.fulfill({json:{available:true,granted:false,blocked:[]}}));
+ await page.route('**/api/computer/status',r=>r.fulfill({json:{desktopAllowed:true,desktopAccessGranted:false,proactive:true,reactions:true}}));
+ const frames:string[]=[];page.on('request',r=>{if(r.url().includes('/api/computer/desktop/frame'))frames.push(r.url());});
+ await bootChat(page);
+ await page.getByRole('button',{name:zh.desktop.enter,exact:true}).click();
+ await expect(page.locator('html')).toHaveClass(/desktop-pet/);
+ const rail=page.locator('.desktop-pet-controls');
+ await expect(rail.getByRole('button',{name:zh.desktop.observe})).toHaveAttribute('aria-pressed','false');
+ await rail.getByRole('button',{name:zh.desktop.return,exact:true}).click();
+ await expect(page.locator('html')).not.toHaveClass(/desktop-pet/);
+ expect(frames).toEqual([]);
 });

@@ -40,7 +40,10 @@ function urlError(sec: EndpointSection, url: string): boolean {
 export default function ModelsTab({ section }: { section: "llm" | "tts" | "vision" }) {
   const t = useT();
   const intro=useIntro();
-  const settings = useSyncExternalStore(subscribe, getState).settings;
+  const saved = useSyncExternalStore(subscribe, getState).settings;
+  const [draft, setDraft] = useState(saved.llm);
+  const firstSetup = section === "llm" && intro.data?.phase === "setup";
+  const settings = firstSetup ? {...saved, llm: draft} : saved;
 
   const audition = useRef<AbortController | null>(null);
   const voiceEdited = useRef(false);
@@ -92,7 +95,8 @@ export default function ModelsTab({ section }: { section: "llm" | "tts" | "visio
   > = {
     llm: async (s) => {
       if(!introRestricted())return probeLlm(s.llm);
-      try{await verifyIntro();return {ok:true,detail:"1ms"};}catch{return {ok:false,detail:"invalid response"};}
+      const started = performance.now();
+      try{await verifyIntro(firstSetup ? s.llm : undefined);return {ok:true,detail:Math.round(performance.now()-started)+"ms"};}catch{return {ok:false,detail:"invalid response"};}
     },
     tts: () => {
       audition.current?.abort();
@@ -210,7 +214,7 @@ export default function ModelsTab({ section }: { section: "llm" | "tts" | "visio
           className={warn ? "invalid" : undefined}
           value={settings[sec].url}
           placeholder={disabled ? "—" : t(phKey)}
-          disabled={disabled}
+          disabled={disabled || (firstSetup && probes.llm === "running")}
           onChange={(e) => patchEndpoint(sec, "url", e.target.value)}
         />
         <Button
@@ -235,6 +239,10 @@ export default function ModelsTab({ section }: { section: "llm" | "tts" | "visio
       invalidateWarmup();
       voiceEdited.current = true;
     }
+    if (sec === "llm" && firstSetup) {
+      setDraft(previous => ({...previous, [key]: v, vision: false, ...(key === "url" && !supportsThinking(v) ? {thinking: false} : {})}));
+      return;
+    }
     update({
       settings: { ...settings, [sec]: { ...settings[sec], [key]: v, ...(sec === "llm" ? {vision:false} : {}), ...(sec === "llm" && key === "url" && !supportsThinking(v) ? { thinking: false } : {}) } },
     });
@@ -245,7 +253,7 @@ export default function ModelsTab({ section }: { section: "llm" | "tts" | "visio
       <input
         type={showKey[sec] ? "text" : "password"}
         value={settings[sec].key}
-        disabled={disabled}
+        disabled={disabled || (firstSetup && probes.llm === "running")}
         onChange={(e) => patchEndpoint(sec, "key", e.target.value)}
       />
       <Button
@@ -272,6 +280,7 @@ export default function ModelsTab({ section }: { section: "llm" | "tts" | "visio
       className={
         settings.llm.model.trim() ? undefined : "invalid"
       }
+      disabled={firstSetup && probes.llm === "running"}
       value={settings.llm.model}
       placeholder={t("settings.llmModelPh")}
       onChange={(e) => patchEndpoint("llm", "model", e.target.value)}

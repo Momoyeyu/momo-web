@@ -77,8 +77,14 @@ def verify(config):
         if not value.get('languageConfirmed'):raise ValueError('Confirm interface language first')
         if value['phase'] not in {'setup','tts','await_boot','naming'}:raise ValueError('Configuration step is not active')
     if not config.get('url','').strip() or not config.get('model','').strip():raise ValueError('Configure model API and model name')
-    stamp=fingerprint(config)
-    if stamp!=fingerprint(state.load()['settings']['llm']):raise ValueError('Save the current configuration first')
+    original=state.load()['settings']['llm']
+    original_stamp=fingerprint(original)
+    candidate={**original, **config}
+    if any(candidate.get(key)!=original.get(key) for key in ('url','key','model')):
+        candidate['vision']=False
+    stamp=fingerprint(candidate)
+    if value['phase']!='setup' and stamp!=original_stamp:
+        raise ValueError('Save the current configuration first')
     result=llm.chat_completion(config,[{'role':'user','content':'Call intro_connection_check with ok=true. This is only a connection test.'}],tools=[TOOL])
     try:
         calls=result.get('tool_calls') or []
@@ -88,7 +94,13 @@ def verify(config):
         raise ValueError('Model must support tool calls') from error
     with db.tx() as c, state.configuration_lock:
         value=_read(c)
-        if stamp!=fingerprint(state.load()['settings']['llm']) or value['phase'] not in {'setup','tts','await_boot','naming'}:raise ValueError('Configuration changed; check again')
+        current=state.load()
+        if original_stamp!=fingerprint(current['settings']['llm']) or value['phase'] not in {'setup','tts','await_boot','naming'}:
+            raise ValueError('Configuration changed; check again')
+        if stamp!=original_stamp:
+            if value['phase']!='setup':raise ValueError('Configuration step is no longer active')
+            current['settings']['llm']=candidate
+            state.write_state(current)
         value['configuration']=stamp
         if value['phase']=='setup':value['phase']='tts'
         _save(c,value)

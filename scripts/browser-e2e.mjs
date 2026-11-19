@@ -10,12 +10,13 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const app = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const options = {apiPort:7822, webPort:5174, resources:path.join(app,'resources/models'), evidence:null, smoke:false, specs:[]};
+const options = {apiPort:7822, webPort:5174, resources:path.join(app,'resources/models'), evidence:null, fresh:false, smoke:false, specs:[]};
 for(let index=2;index<process.argv.length;index++){
   const flag=process.argv[index];
   if(flag==='--help'){
-    console.log('Usage: node scripts/browser-e2e.mjs [--smoke] [--spec e2e/NN-name.spec.ts] [--api-port 7822] [--web-port 5174] [--resources-dir PATH] [--evidence-dir PATH]');process.exit(0);
+    console.log('Usage: node scripts/browser-e2e.mjs [--smoke] [--fresh-profile] [--spec e2e/NN-name.spec.ts] [--api-port 7822] [--web-port 5174] [--resources-dir PATH] [--evidence-dir PATH]');process.exit(0);
   } else if(flag==='--smoke') options.smoke=true;
+  else if(flag==='--fresh-profile') options.fresh=true;
   else if(flag==='--spec'){
     const spec=process.argv[++index];
     if(!spec || !/^e2e\/[A-Za-z0-9._-]+\.spec\.ts$/.test(spec))throw new Error('Specs must be repository-relative e2e/*.spec.ts files');
@@ -106,7 +107,7 @@ try{
   const env={...process.env,MOMO_DATA_DIR:data,MOMO_RESOURCES_DIR:options.resources};
   for(const key of ['MOMO_DESKTOP_TOKEN','MOMO_DESKTOP_NONCE','MOMO_REAL_LLM_E2E','MOMO_REAL_TTS_E2E','MOMO_REAL_ONBOARDING_E2E','MOMO_BROWSER_LLM_CONFIG','MOMO_E2E_LLM_CONFIG','MOMO_ASR_MODELS','MOMO_QQ_RUNTIME_CONFIG'])delete env[key];
   const seed=`import sys\nfrom app.core import state,db\nfrom app.services import checkpoint\nstate.write_state({'settings':{'llm':{'url':sys.argv[1],'model':'deterministic','key':''},'general':{'lang':'zh','voiceInput':False,'textSpeed':100,'sentenceSpeed':100}}})\nat=db.now_iso();gen=checkpoint.generation()\ncheckpoint.begin_turn('隔离测试会话',gen,at)\ncheckpoint.append_sentence('欢迎回来。',gen,at)\ncheckpoint.acknowledge(checkpoint.current_run(gen,at),'欢迎回来。',gen)\ndb.reset()`;
-  if(await start(python,['-c',seed,providerUrl],path.join(app,'backend'),env,path.join(evidence,'seed.log')).done!==0)throw new Error('Could not seed synthetic test profile');
+  if(!options.fresh && await start(python,['-c',seed,providerUrl],path.join(app,'backend'),env,path.join(evidence,'seed.log')).done!==0)throw new Error('Could not seed synthetic test profile');
   const backend=start(python,['-m','uvicorn','app.main:app','--host','127.0.0.1','--port',String(options.apiPort)],path.join(app,'backend'),env,path.join(evidence,'backend.log'));
   const web=start(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port',String(options.webPort),'--strictPort'],frontend,{...env,MOMO_WEB_API_UPSTREAM:`http://127.0.0.1:${options.apiPort}`,MOMO_WEB_LLM_UPSTREAM:providerUrl,MOMO_WEB_ASR_UPSTREAM:providerUrl,MOMO_WEB_TTS_UPSTREAM:providerUrl},path.join(evidence,'frontend.log'));
   const baseURL=`http://127.0.0.1:${options.webPort}`;

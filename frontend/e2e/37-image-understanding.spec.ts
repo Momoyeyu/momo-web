@@ -12,7 +12,7 @@ async function paste(page:Page,count=1){
 }
 for(const lang of ['zh','en','ja'])test(`native image input, removal, image-only send and history (${lang})`,async({page,request},info)=>{
  const original=await(await request.get('/api/state')).json();
- const state=structuredClone(original);state.settings.general.lang=lang;state.settings.general.voiceInput=false;state.settings.llm.vision=false;
+ const state=structuredClone(original);state.settings.general.lang=lang;state.settings.general.voiceInput=false;state.settings.general.phonePresentation='closed';state.settings.llm.vision=false;
  try{
   expect((await request.put('/api/state',{data:state})).ok()).toBeTruthy();
   const proof=await(await request.post('/api/vision/probe',{data:state.settings.llm})).json();expect(proof.ok).toBe(true);

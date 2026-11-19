@@ -43,6 +43,20 @@ def test_failed_and_stale_health_cannot_complete(monkeypatch):
     assert intro.status()['phase']=='setup'
 
 
+def test_first_model_credentials_are_written_only_after_the_tool_handshake(monkeypatch):
+    intro.confirm_language('zh')
+    initial=state.load()['settings']['llm']
+    candidate={**initial,'url':'https://example.test','key':'synthetic-draft','model':'tiny'}
+    monkeypatch.setattr(llm,'chat_completion',lambda *args,**kwargs:{'content':'no tool call'})
+    with pytest.raises(ValueError,match='tool calls'):
+        intro.verify(candidate)
+    assert state.load()['settings']['llm']==initial
+    assert not intro.can_boot()
+    health(monkeypatch)
+    assert intro.verify(candidate)['configurationValid']
+    assert state.load()['settings']['llm']['key']==candidate['key']
+
+
 def test_boot_is_not_allowed_before_checkpoint(monkeypatch):
     intro.status()
     core=Coordinator()

@@ -44,12 +44,18 @@ test('Home fractures the actual scene, reveals live title and releases all resou
 });
 
 test('glass composition holds title behind the falling scene',async({page},info)=>{
- await bootChat(page);await page.clock.install();
+ await bootChat(page);
+ const start=new Date('2030-01-01T12:00:00Z');
+ await page.clock.install({time:start});
+ await page.clock.pauseAt(start.getTime()+60000);
  await page.locator('[data-intro=chat-back]').click();
- await expect(page.locator('.glass-return-canvas')).toHaveAttribute('data-textured','true');
- // html-to-image itself uses RAF to finish image decoding; pause only once
- // the capture is complete, then advance the independent fragment timeline.
- await page.clock.pauseAt(await page.evaluate(()=>Date.now())+150);
+ const glass=page.locator('.glass-return-canvas');
+ // Supply animation frames during native image decoding, then keep the
+ // composition on its exact logical frame while Playwright writes each image.
+ await expect.poll(async()=>{
+  await page.clock.runFor(16);
+  return glass.count().then(count=>count?glass.getAttribute('data-textured'):null);
+ }).toBe('true');
  await page.clock.runFor(80);await page.screenshot({path:info.outputPath('glass-assembled.png')});
  await page.clock.runFor(270);await page.screenshot({path:info.outputPath('glass-falling.png')});
  await page.clock.runFor(350);await page.screenshot({path:info.outputPath('glass-clearing.png')});
@@ -72,13 +78,21 @@ test('crack, separation and fall are observable in order, with preparation behin
  await expect(page.locator('.glass-return-canvas')).toBeVisible();
  await expect(page.locator('.glass-return-canvas')).toHaveCount(0);
  const observed=await page.evaluate(()=>{const scope=window as unknown as {glassPhases:string[];crackedDuringCapture:boolean;splitFrame?:string};return {glassPhases:scope.glassPhases,crackedDuringCapture:scope.crackedDuringCapture,splitFrame:scope.splitFrame};});
- expect(observed.glassPhases).toEqual(['cracking','breaking','falling']);expect(observed.crackedDuringCapture).toBe(true);
+ const timing=await page.evaluate(()=>({
+   capture:performance.getEntriesByName('momo-home-capture').map(entry=>entry.duration),
+   timeout:performance.getEntriesByName('momo-home-capture-timeout').length,
+   failure:performance.getEntriesByName('momo-home-capture-failed').length,
+   fonts:performance.getEntriesByType('resource').filter(entry=>entry.name.endsWith('.woff2')).length,
+ }));
+ expect(observed.glassPhases,JSON.stringify(timing)).toEqual(['cracking','breaking','falling']);expect(observed.crackedDuringCapture).toBe(true);
  expect(observed.splitFrame).toBeTruthy();
  await writeFile(info.outputPath('separated-glass.png'),Buffer.from(observed.splitFrame!.split(',')[1],'base64'));
 });
 
 test('phone-open Home, resize cancellation and reduced motion cannot trap the title',async({page})=>{
- await bootChat(page);await page.locator('.phone-toggle').click();
+ await bootChat(page);
+ const phone=page.locator('.phone-toggle');
+ if(await phone.getAttribute('aria-expanded')!=='true')await phone.click();
  await expect(page.locator('.blur-presence')).toHaveAttribute('data-phase','visible');
  await page.locator('[data-intro=chat-back]').click();await expect(page.locator('.glass-return-canvas')).toBeVisible();
  await page.setViewportSize({width:960,height:800});

@@ -27,7 +27,14 @@ export async function captureStage(node:HTMLElement):Promise<HTMLCanvasElement|n
       fontEmbedCSS, skipFonts: !fontEmbedCSS,
       style:{position:'relative',inset:'0',margin:'0'},
       filter:element=>{
-        if(element instanceof Element && element.matches('.tooltip-layer,.chat-entry-canvas,.glass-return-canvas,.tx-fx'))return false;
+        if(element instanceof Element){
+          if(element.matches('.tooltip-layer,.chat-entry-canvas,.glass-return-canvas,.tx-fx'))return false;
+          const css=getComputedStyle(element);
+          if(css.display==='none')return false;
+          // The room retains all four photographs for its time-of-day fade.
+          // Transparent, out-of-flow layers contribute no pixels or layout.
+          if(css.opacity==='0' && (css.position==='absolute'||css.position==='fixed'))return false;
+        }
         // WebGL discards its buffer between paints. Repaint in the same task
         // immediately before html-to-image serializes this particular canvas.
         if(element instanceof HTMLCanvasElement && element.classList.contains('live2d-canvas'))getStage().renderForSnapshot();
