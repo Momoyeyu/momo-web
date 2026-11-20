@@ -13,14 +13,15 @@ const render = (props: Parameters<typeof DetailModal>[0]): string =>
   renderToStaticMarkup(createElement(DetailModal, props));
 
 describe("DetailModal", () => {
-  it("聚焦遮罩 + 居中弹窗 + 只读全文 + [关闭]", () => {
+  it("聚焦遮罩 + 居中弹窗 + 只读全文 + 返回图标", () => {
     const html = render({ text: "第一行\n第二行", onClose: () => {} });
     expect(html).toContain("modal-overlay");
     expect(html).toContain("modal-box");
     expect(html).toContain("modal-body");
     expect(html).toContain("第一行");
     expect(html).toContain("第二行");
-    expect(html).toContain("关闭"); // 默认中文
+    expect(html).toContain('aria-label="返回"');
+    expect(html).toContain("<svg");
   });
 
   it("meta 可选：缺省不渲染 meta 行，传入则展示", () => {
