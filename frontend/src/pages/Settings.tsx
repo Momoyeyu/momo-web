@@ -81,13 +81,13 @@ export default function Settings() {
       <ModelsTab section={intro.phase === 'tts' && intro.configurationValid ? 'tts' : 'llm'}/>
       <BuiltinResourcesNotice/>
     </> : <>
-      <BuiltinResourcesNotice showSpeech/>
       <ConfigAction model="LLM" label={t('config.llm')} action={t('config.llmAction')} value={state.settings.llm.model}>
         <ModelsTab section="llm"/><VisionSettings/>
       </ConfigAction>
       <ConfigAction model="TTS" label={t('config.tts')} action={t('config.ttsAction')} value="GPT-SoVITS">
         <ModelsTab section="tts"/>
       </ConfigAction>
+      <BuiltinResourcesNotice/>
     </>,
     memory: guided ? <MemoryPanel/> : <>{action('memories', <MemoryPanel/>)}{action('pinned', <MemoryPanel pinnedOnly/>)}</>,
     archive: <>{action('history', <ArchivePanel/>)}<DataTransfer/></>,

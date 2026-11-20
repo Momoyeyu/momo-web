@@ -5,7 +5,7 @@ import Button from '../../ui/Button';
 import FieldRow from '../../ui/FieldRow';
 
 export default function ConfigAction({label, action, value, model, children}: {
-  label: string; action: string; value?: string; model?: 'ASR' | 'LLM' | 'TTS'; children?: ReactNode;
+  label: string; action: string; value?: string; model?: 'LLM' | 'TTS'; children?: ReactNode;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);

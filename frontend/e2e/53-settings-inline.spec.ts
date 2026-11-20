@@ -24,11 +24,11 @@ test('sound preview offers the existing palette and plays the selected action in
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('vision verification gates the LLM switch and ASR details report readiness', async ({page}) => {
+test('vision verification gates the LLM switch and built-in ASR has no settings entry', async ({page}) => {
   await page.route('**/api/vision/capability', route => route.fulfill({json:{verified:false}}));
   await page.route('**/api/vision/probe', route => route.fulfill({json:{ok:true,detail:'verified'}}));
   await page.route('**/api/resources/status', route => route.fulfill({json:{
-    asr:{ready:true,engine:'SenseVoice',language:'auto',missing:[]},embedding:{state:'ready'},index:{state:'ready'},
+    asr:{ready:false,engine:'SenseVoice',language:'auto',missing:['model']},embedding:{state:'ready'},index:{state:'ready'},
   }}));
   await openTab(page, '模型');
   const models = page.locator('#config-models');
@@ -42,10 +42,10 @@ test('vision verification gates the LLM switch and ASR details report readiness'
   await expect(vision).toHaveAttribute('aria-checked','true');
   await vision.click();
   await page.keyboard.press('Escape');
-  await models.getByRole('button',{name:'查看配置'}).click();
-  await expect(details.getByText(/SenseVoice/)).toBeVisible();
-  await expect(details.getByText('已就绪', {exact:true})).toBeVisible();
-  await page.keyboard.press('Escape');
+  await expect(models.locator('.config-model-row b')).toHaveText(['LLM', 'TTS']);
+  await expect(page.locator('.config-document')).not.toContainText(/ASR|SenseVoice|内置语音资源不可用/);
+  await openTab(page, '声音');
+  await expect(page.locator('#config-sound').getByRole('switch', {name:'语音输入'})).toBeVisible();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 

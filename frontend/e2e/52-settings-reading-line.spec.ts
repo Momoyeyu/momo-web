@@ -16,7 +16,7 @@ test('settings directory selects the last chapter at the scroll limit',async({pa
  }
 });
 
-test('sound controls remain paired and model details occupy three full rows',async({page})=>{
+test('sound controls remain paired and model details occupy two full rows',async({page})=>{
  await page.route('**/api/intro',route=>route.fulfill({json:{phase:'completed',configurationValid:true}}));
  await openApp(page,'settings');
  for(const [width,height] of [[1280,720],[960,540],[1280,360]]){
@@ -34,7 +34,7 @@ test('sound controls remain paired and model details occupy three full rows',asy
    expect((await select.boundingBox())!.width).toBeCloseTo(preview!.width,0);
   }
   const rows=page.locator('#config-models .config-model-row');
-  await expect(rows.locator('b')).toHaveText(['ASR','LLM','TTS']);
+  await expect(rows.locator('b')).toHaveText(['LLM','TTS']);
   expect(await rows.evaluateAll(nodes=>{
    const boxes=nodes.map(el=>el.getBoundingClientRect());
    return boxes.every((box,i)=>box.x===boxes[0].x && box.width===boxes[0].width && (!i || box.top>=boxes[i-1].bottom-1));

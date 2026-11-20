@@ -59,9 +59,9 @@ async function models(page:Page){
   await page.getByRole('button',{name:'模型',exact:true}).click();
   return page.locator('#config-models');
 }
-test('the three model entries open details, thinking persists, four rows align, and unknown providers disable thinking',async({page})=>{
+test('the two model entries open details, thinking persists, four rows align, and unknown providers disable thinking',async({page})=>{
   const pane=await models(page);
-  await expect(pane.locator('.config-action')).toHaveCount(3);
+  await expect(pane.locator('.config-action')).toHaveCount(2);
   await expect(pane).not.toContainText('Embedding');
   await pane.getByRole('button',{name:'配置模型'}).click();
   await expect(page.locator('[data-intro=llm] .opt-row')).toHaveCount(4);
@@ -99,12 +99,11 @@ test('model details stay aligned and within a narrow stage in all interface lang
   }
 });
 
-test('missing bundled resources give a recovery message without reintroducing configuration',async({page})=>{
+test('missing recall resources explain the fallback without reintroducing configuration',async({page})=>{
   await page.route('**/api/resources/status',route=>route.fulfill({json:{asr:{ready:false},embedding:{state:'missing'},index:{state:'pending'}}}));
   await models(page);
-  await expect(page.locator('.builtin-resource-notice')).toContainText('重新安装完整应用');
   await expect(page.locator('.builtin-resource-notice')).toContainText('当前使用文字匹配');
-  await expect(page.locator('#config-models .config-action')).toHaveCount(3);
+  await expect(page.locator('#config-models .config-action')).toHaveCount(2);
 });
 
 test('clicking the microphone twice during connection cancels pending activation',async({page})=>{
