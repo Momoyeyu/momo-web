@@ -52,6 +52,16 @@ for (const width of [640, 960, 1280]) {
       await expect(page.locator('#config-mods').getByRole('button')).toHaveCount(1);
       await expect(page.locator('#config-mods')).not.toContainText('QQ');
       await page.evaluate(() => document.fonts.ready);
+      const languageFields = page.locator('#config-language .sel-face');
+      await expect(languageFields).toHaveCount(2);
+      const interfaceLanguage = (await languageFields.nth(0).boundingBox())!;
+      const chatLanguage = (await languageFields.nth(1).boundingBox())!;
+      expect(interfaceLanguage).not.toBeNull();
+      expect(chatLanguage).not.toBeNull();
+      expect(interfaceLanguage.x + interfaceLanguage.width).toBeLessThan(chatLanguage.x);
+      expect(interfaceLanguage.y).toBeCloseTo(chatLanguage.y, 0);
+      expect(interfaceLanguage.width).toBeCloseTo(chatLanguage.width, 0);
+
 
       const actions = await page.locator('.config-document .config-action').evaluateAll(buttons => buttons.map(button => {
         const range = document.createRange();

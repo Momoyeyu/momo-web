@@ -26,7 +26,7 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
   };
   if (section === 'language') {
     const languages = LANGS.map(value => ({value, label: t('settings.langs.' + value)}));
-    return <>
+    return <div className="language-pair">
       <div data-intro="language"><FieldRow label={t('settings.langLabel')}>
         <Select label={t('settings.langLabel')} value={general.lang} options={languages} onChange={v => patch({lang: v as Lang})}/>
       </FieldRow></div>
@@ -34,7 +34,7 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
         <Select label={t('settings.chatLang')} value={guided ? 'auto' : general.chatLang} options={[{value: 'auto', label: t('settings.langAuto')}, ...languages]}
           onChange={v => patch({chatLang: v as GeneralConfig['chatLang']})}/>
       </FieldRow></div>
-    </>;
+    </div>;
   }
   if (section === 'preview') {
     const lang = resolveChatLang(general);

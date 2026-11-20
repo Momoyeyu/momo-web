@@ -37,10 +37,11 @@
 .config-card .opt-label {width: auto; white-space: normal;}
 .config-card .opt-ctl {justify-content: flex-start;}
 .config-card .sel {width: 100%; max-width: none;}
-.sound-pairs {container-type: inline-size;}
-.sound-pair {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px;}
+.sound-pairs, .language-pair {container-type: inline-size;}
+.sound-pair, .language-pair {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px;}
+.language-pair {gap: clamp(16px, 2.5cqw, 32px);}
 .sound-pair + .sound-pair {border-top: 1px solid var(--line-soft);}
-.config-card .sound-pair .opt-row {grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 10px; min-height: 48px;}
+.config-card :is(.sound-pair, .language-pair) .opt-row {grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 10px; min-height: 48px;}
 .config-card .sound-pair .config-action {width: 100%; flex-basis: 100%;}
 .sound-pair .opt-ctl {justify-content: flex-end;}
 .sound-pair .slider-val {min-width: 4ch; text-align: right;}
@@ -49,8 +50,8 @@
 .config-model-row .config-value {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 @container (max-width: 660px) {
   .sound-pair {gap: 18px;}
-  .config-card .sound-pair .opt-row {display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 4px; min-height: 70px;}
-  .sound-pair .opt-ctl {flex: none; justify-content: flex-start;}
+  .config-card :is(.sound-pair, .language-pair) .opt-row {display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 4px; min-height: 70px;}
+  :is(.sound-pair, .language-pair) .opt-ctl {flex: none; justify-content: flex-start;}
 }
 @container (max-width: 820px) {
   .config-model-row {grid-template-columns: 36px minmax(0, 1fr) auto; gap: 8px;}
