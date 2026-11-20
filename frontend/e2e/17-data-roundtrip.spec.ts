@@ -51,7 +51,13 @@ test('backup round-trips imported model ZIP, YAML and SQLite through actual cont
   const savedMemory = await (await request.post('/api/memories',{data:{content:'three-store preserved memory'}})).json();
   await page.keyboard.press('Escape');
   await openTab(page,'存档');
-  await expect(page.locator('#config-archive').getByRole('button',{name:'管理存档'})).toHaveCount(0);
+  const archiveSection = page.locator('#config-archive');
+  await expect(archiveSection.getByRole('button',{name:'管理存档'})).toHaveCount(0);
+  await expect(archiveSection.locator('.opt-row')).toHaveCount(2);
+  await expect(archiveSection).not.toContainText('备份包含聊天');
+  const backupHint = archiveSection.getByRole('img',{name:/备份包含聊天.*恢复会替换当前数据/});
+  await backupHint.hover();
+  await expect(page.locator('.tooltip-bubble')).toContainText('恢复会替换当前数据');
   const download = page.waitForEvent('download');
   await page.getByRole('button',{name:'导出文件',exact:true}).click();
   const file = await download;

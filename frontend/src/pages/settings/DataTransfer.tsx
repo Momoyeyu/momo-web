@@ -60,7 +60,7 @@ export default function DataTransfer() {
   }, [busy]);
 
   return <>
-    <FieldRow label={t('config.backup')}>
+    <FieldRow label={t('config.backup')} hint={t('config.backupHint')}>
       <Button className="config-action" variant="ghost" disabled={busy !== null} onClick={() => void runTransfer('export', async () => {
         const url = URL.createObjectURL(await exportData());
         const a = document.createElement('a');
@@ -83,7 +83,6 @@ export default function DataTransfer() {
         setPendingRestore(null);
         void runTransfer('restore', () => importData(pendingRestore));
       }}/>}
-    <p className="data-transfer-note">{t('config.backupHint')}</p>
     {busy && <dialog ref={busyDialog} className="modal-box data-transfer-busy" aria-label={t(busy === 'restore' ? 'config.restore' : 'config.backup')}
       onCancel={event => event.preventDefault()}>
       <p role="status" aria-live="polite">{t('config.backupWorking')}</p>
