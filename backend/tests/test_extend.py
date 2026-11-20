@@ -22,6 +22,28 @@ NODE = shutil.which("node")
 BUILTIN = {item["function"]["name"] for item in TOOLS}
 
 
+def test_only_explicit_mcp_connections_load_and_package_import_is_unavailable(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    from app.services import extend
+
+    record = tmp_path / "plugins" / "legacy" / "record.json"
+    record.parent.mkdir(parents=True)
+    before = json.dumps({"manifest": {"id": "legacy", "entry": "main.mjs"}, "enabled": True})
+    record.write_text(before)
+    accepted = []
+    monkeypatch.setattr(extend, "hub", SimpleNamespace(
+        bind=lambda runtime: None,
+        configure=lambda connections: accepted.append(connections) or True,
+    ))
+    configured = [{"name": "local-mcp", "transport": "stdio", "command": "node", "enabled": True}]
+    assert extend.configure(configured)
+    assert accepted == [configured]
+    response = TestClient(app).post("/api/extensions/plugins", json={"manifest": {}, "files": {}})
+    assert response.status_code == 404
+    assert record.read_text() == before
+
+
 @pytest.fixture
 def live_hub(monkeypatch):
     if not NODE:

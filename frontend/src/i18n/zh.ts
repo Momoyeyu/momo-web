@@ -2,8 +2,6 @@
 
 export const zh = {
   config: {
-    "localMcp": "本地 MCP 包",
-    "localMcpAction": "导入管理",
     "soundAction": "试听动作",
     "soundTap": "按钮点击",
     "soundConfirm": "确认操作",
@@ -60,7 +58,7 @@ export const zh = {
   desktop: {"startObservation": "开始观察", "stopObservation": "停止观察", "observe": "观察桌面", "observing": "观察已开启", "otherActivities": "浏览器与游戏", "halfBody": "半身", "controls": "桌宠工具栏", "expandDialog": "展开对话框", "collapseDialog": "收起对话框", "enter": "进入桌面", "return": "返回 chat", "enterHint": "让 momo 留在桌面陪伴你。看屏幕与操作应用独立，点击和输入需要授权。", "drag": "拖动 momo 的身体可移动桌宠。", "clickThrough": "鼠标穿透", "clickThroughHint": "穿透人物与空白区域；工具栏和展开的对话框仍可操作。", "error": "无法切换桌面模式。请先退出全屏后重试。", "operate": "操作应用", "operateHint": "桌面授权生效后，可以观察和操作黑名单以外的应用。", "react": "主动回应", "reactHint": "允许 momo 在画面变化时主动说话。关闭后，她仍可应你的提问查看屏幕。", "observeHint": "momo 可以直接查看你当前看到的屏幕。点击暂停或恢复；这不授予点击和输入权限。", "observationPaused": "观察已禁止", "observationUnavailable": "观察暂不可用", "screenPermissionHint": "需要 macOS 录屏许可。系统设置会在首次需要时打开；完成后点击重试。", "observationLoading": "正在读取状态", "pauseObservationHint": "点击禁止 momo 看屏幕；这不会改变应用操作的授权。", "resumeObservationHint": "点击允许 momo 看屏幕；点击、输入仍需要单独的应用授权。", "retryObservationHint": "目前无法读取画面。点击重试；这不会申请应用操作授权。"},
   activities: {
     platformUnsupported: "此平台暂不支持","title": "一起做点什么", "computerSummary": "观察与陪伴你的桌面", "browserSummary": "连接你已打开的浏览器", "minecraftSummary": "加入当前角色与世界", "disabled": "未启用", "empty": "先在设置中启用一个活动插件。"},
-  plugins: {"retryStop":"重试停止","stopUnknown":"尚未确认插件已停止，请重试停用或卸载。","title": "插件", "search": "搜索插件", "importFile": "导入插件", "empty": "没有匹配的插件", "error": "操作未完成，请检查插件文件或连接后重试。", "trust": "此插件以当前账户权限运行本地代码，可能访问文件和网络。权限声明不是沙箱。仅启用信任的插件。", "enable": "信任并启用", "cancel": "取消", "remove": "卸载", "removeAsk": "卸载此插件？运行任务将停止。", "loading": "正在读取插件…", "details": "插件详情", "fileLarge": "插件文件过大。", "importHint": "导入 momo JSON 插件包。安装后默认关闭，启用前可查看详情。"},
+  plugins: {"stopUnknown": "尚未确认插件已停止，请重试停用或卸载。", "error": "操作未完成，请检查插件文件或连接后重试。"},
   desktopAccess: {"systemAction": "系统设置", "title": "桌面访问", "description": "开启后，momo 可以查看屏幕并操作应用。你可以在「桌面」设置的应用黑名单中排除指定软件。", "system": "macOS 权限", "screen": "屏幕录制", "screenHint": "让 momo 读取画面。", "input": "辅助功能", "inputHint": "让 momo 点击、输入和滚动。", "enabled": "已授权", "configure": "去授权", "settingsHelp": "在系统设置中允许当前 momo。若系统提示退出并重新打开，请按提示操作。", "disable": "撤回桌面访问", "later": "稍后再说", "enable": "启用桌面访问", "open": "打开授权引导", "blocklist": "应用黑名单", "blockHint": "名单中的软件会从截图中排除，也不能被 momo 操作。", "select": "选择正在运行的软件", "block": "加入黑名单", "unblock": "移除"},
   permissions: {"openSystemSettings": "打开系统授权设置","screenPermission": "需要屏幕录制权限","screenPermissionHint": "macOS 尚未允许当前 momo 读取画面。请检查系统设置中的屏幕录制权限，再查找窗口。","inputPermission": "需要辅助功能权限","inputPermissionHint": "操作应用需要 macOS 辅助功能权限；仅观察时不需要这项权限。","noWindows": "当前没有可选窗口","noWindowsHint": "这里只显示当前桌面的可见窗口。全屏应用可能位于单独的空间（Space）；退出全屏或切换到目标应用所在桌面，再查找窗口。空列表本身不代表权限被拒绝。","existingHint": "选择已打开的窗口。应用黑名单和系统权限适用于此窗口。", "findWindows": "查找窗口", "window": "应用窗口", "selectWindow": "选择一个窗口", "waiting": "等待应用授权…", "title": "应用授权", "allowed": "允许的应用", "empty": "尚未授权任何应用", "revoke": "撤销", "observe": "观察画面", "interact": "操作应用", "deny": "拒绝", "once": "仅允许本次", "always": "始终允许", "error": "授权操作失败，请重试。", "interactHint": "关闭时仅观察；开启后仍需批准目标应用的操作权限。"},
   browser: {"connected": "已连接", "disconnected": "未连接", "dismiss":"关闭配置","title": "浏览器", "hint": "在隔离环境中读取你指定的网站。画面交给当前视觉模型，momo 可通过对话观察和操作。", "active": "已开启", "inactive": "已关闭", "configure": "配置", "readOnly": "首版为只读网页快照：不使用你的浏览器登录状态，不支持登录、提交表单或跨站资源。", "interact": "页面内操作", "interactHint": "允许 momo 点击、输入和滚动隔离快照；不会向网站提交内容。", "hosts": "允许访问的网站", "add": "添加", "removeHost": "移除网站", "start": "开启", "stop": "关闭", "url": "网页地址", "visit": "打开", "preview": "隔离浏览器画面", "invalidHost": "请输入完整域名，不含 https://、路径或通配符，最多 20 个。", "error": "浏览器操作未完成。请确认已开启视觉、环境资源就绪，并且网页及跳转域名在许可范围内。"},
@@ -524,9 +522,7 @@ export const zh = {
     extName: "名称",
     extNamePh: "如 tavily",
     extTransport: "连接方式",
-    extConnections: "服务连接",
-    extLocalTools: "本地工具",
-    extAddLocal: "添加本地工具",
+    extConnections: "MCP",
     extImportFile: "从文件导入",
     extTransports: {
       http: "Streamable HTTP",

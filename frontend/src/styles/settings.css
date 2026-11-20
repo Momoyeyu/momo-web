@@ -7,36 +7,23 @@
 }
 
 #config-tools .config-card {container-type: inline-size;}
-.extension-settings {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  padding-block: 14px;
-  column-gap: 24px;
-}
+.extension-settings {padding-block: 14px;}
 .extension-settings .mcp-section {display: flex; flex-direction: column; min-width: 0; gap: 8px;}
-.mcp-section + .mcp-section {border-inline-start: 1px solid var(--line); padding-inline-start: 24px;}
-.mcp-heading {display: flex; align-items: center; gap: 6px;}
+.mcp-heading {display: flex; align-items: center; gap: 8px;}
 .mcp-heading h3 {margin: 0; font-size: 16px;}
-.mcp-heading .icon-btn {margin-inline-start: auto;}
-.mcp-section .icon-btn {width: 32px; height: 30px;}
-.mcp-section .list-search {box-sizing: border-box; width: 100%; min-width: 0; height: 33px; flex: none; padding-inline: 10px;}
+.mcp-section .icon-btn {width: 32px; height: 30px; flex: none;}
+.mcp-heading .list-search {
+  box-sizing: border-box; width: min(260px, 52%); min-width: 0; height: 33px;
+  margin-inline-start: auto; flex: 0 1 auto; padding-inline: 10px;
+}
 .mcp-section .mcp-items {min-height: 0; flex: none;}
 .mcp-row {display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; min-height: 47px;}
 .mcp-row + .mcp-row {border-top: 1px solid var(--line-soft);}
-.mcp-row small {grid-column: 1 / -1; color: var(--danger);}
 .mcp-items p {margin: 8px 0; font-size: 13px;}
 .mcp-section .list-pager {align-self: flex-end; align-items: center; gap: 8px; border: none; overflow: visible; margin-top: auto;}
 .mcp-section .pager-btn {width: 32px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm);}
 .mcp-section .pager-text {padding: 0;}
 .mcp-remove {margin-inline-end: auto;}
-@container (max-width: 660px) {
-  .extension-settings {column-gap: 14px;}
-  .mcp-section + .mcp-section {padding-inline-start: 14px;}
-}
-@container (max-width: 440px) {
-  .extension-settings {grid-template-columns: 1fr; row-gap: 14px;}
-  .mcp-section + .mcp-section {border-inline-start: 0; padding-inline-start: 0; border-top: 1px solid var(--line); padding-top: 14px;}
-}
 
 .vision-settings > p, .asr-status > p {
   margin: 0;

@@ -1,4 +1,4 @@
-// Endpoint connections and trusted local MCP packages share one entry in Tools.
+// MCP connections use a single registry, regardless of transport.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { useT } from "../../i18n";
@@ -11,7 +11,6 @@ import Hint from "../../ui/Hint";
 import IconButton from "../../ui/IconButton";
 import Pager from "../../ui/Pager";
 import Switch from "../../ui/Switch";
-import PluginLibrary from "./PluginLibrary";
 import ExtConfigModal from "./ExtConfigModal";
 
 export default function McpSettings() {
@@ -111,11 +110,11 @@ export default function McpSettings() {
         <header className="mcp-heading">
           <h3>{t("settings.extConnections")}</h3>
           <Hint text={t("settings.extHint")} side="down" />
+          <input className="list-search" type="search" aria-label={t("settings.extSearchPh")}
+            placeholder={t("settings.extSearchPh")} value={extQuery}
+            onChange={e => { setExtQuery(e.target.value); setExtPage(0); }} />
           <IconButton icon="plus" label={t("settings.extAdd")} onClick={() => setExtEditing(-1)} />
         </header>
-        <input className="list-search" type="search" aria-label={t("settings.extSearchPh")}
-          placeholder={t("settings.extSearchPh")} value={extQuery}
-          onChange={e => { setExtQuery(e.target.value); setExtPage(0); }} />
         <div className="list-body mcp-items">
           {!extSlice.length && <p className="muted">{t("settings.extEmpty")}</p>}
           {extSlice.map(({ ext, i }) => (
@@ -131,7 +130,6 @@ export default function McpSettings() {
         </div>
         {extPg.pages > 1 && <Pager page={extPg.page} pages={extPg.pages} onChange={setExtPage} />}
       </section>
-      <PluginLibrary active={viewed}/>
       {extEditing !== null && (
         <ExtConfigModal
           initial={

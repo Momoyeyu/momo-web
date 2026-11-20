@@ -8,9 +8,7 @@ One Cordis extension model and one Python coordinator. Desktop observation and c
 
 ## Implemented and checked
 
-- Versioned JSON package contract, strict paths/size/manifest checks, atomic disabled-by-default installation, explicit trust review, disk reconstruction, enable/disable/removal and retryable unconfirmed stop. Portable example included in `plugin-host/examples/hello-plugin.json`.
-- Imported plugins are out-of-process MCP tool providers owned by Cordis. They run with the local user's permissions after explicit trust; capability labels are **not** sandbox enforcement. V1 does not yet support third-party phone views, channels or arbitrary frontend code. See `plugin-host/PLUGIN-FORMAT.md`.
-- Registry-backed imported-plugin list, search and four-item paginated grid. Existing MCP pagination reused. Browser tests cover 11 plugins and 17 MCP entries, search and deletion of the correct underlying record.
+- The Tools section manages MCP connections, including configuration file import, search, and paging. Built-in tools are provided by momo. The former source-bearing JSON package format has been retired.
 - Selected screen capture and optional reactions. Normal chat consumes transient actual pixels; proactive output uses normal sentence/TTS/display acknowledgement without a fabricated player row.
 - Existing application native broker replaces the retired Docker renderer. Browser and desktop share selected-window control; no independent browser session is created.
 - Existing Minecraft instance discovery/attach replaces the mistaken independent account/client workflow. Fixed Fabric actions include bounded obstacle navigation; no account credentials are read.
@@ -20,13 +18,11 @@ One Cordis extension model and one Python coordinator. Desktop observation and c
 
 ## Additional decisions and corrections
 
-1. Failed-stop plugin ownership remains visible and retryable.
-2. Imported code remains an explicitly trusted local process; capability metadata does not sandbox arbitrary code.
-3. Screen evidence is transient and rechecked before provider submission.
-4. Proactive reactions use the ordinary chat presentation path.
-5. User corrected the architecture: operate existing applications. Docker renderer, independent game login/client/resource provisioning are removed, not release prerequisites.
-6. Application permissions are separate from plugin enablement and current activity; permanent approval never implies unattended start.
-7. Native helper uses AIRI's local executor approach with fixed actions and target identity checks, no new reasoning loop.
+1. Screen evidence is transient and rechecked before provider submission.
+2. Proactive reactions use the ordinary chat presentation path.
+3. User corrected the architecture: operate existing applications. Docker renderer, independent game login/client/resource provisioning are removed, not release prerequisites.
+4. Application permissions are separate from plugin enablement and current activity; permanent approval never implies unattended start.
+5. Native helper uses AIRI's local executor approach with fixed actions and target identity checks, no new reasoning loop.
 
 ## Remaining acceptance requirements
 

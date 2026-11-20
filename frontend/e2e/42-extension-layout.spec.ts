@@ -15,13 +15,14 @@ for(const lang of ['zh','en','ja'])for(const size of [{width:1280,height:720},{w
   await expect(pager).toBeInViewport();
   expect(await panel.evaluate(el=>el.scrollWidth)).toBeLessThanOrEqual(await panel.evaluate(el=>el.clientWidth)+2);
   if(section==='tools'){
-   const searches=await page.locator('#config-tools input[type=search]').evaluateAll(inputs=>
-    inputs.map(input=>{const box=input.getBoundingClientRect();return {top:box.top,height:box.height,left:box.left};}));
-   expect(searches).toHaveLength(2);
-   expect(searches[0].top).toBeCloseTo(searches[1].top,0);
-   expect(searches[0].height).toBeCloseTo(searches[1].height,0);
-   expect(searches[0].height).toBeLessThan(42);
-   expect(searches[0].left).toBeLessThan(searches[1].left);
+   const tools=page.locator('#config-tools');
+   const search=tools.getByRole('searchbox');
+   await expect(search).toHaveCount(1);
+   await expect(tools.getByRole('heading',{name:'MCP',exact:true})).toBeVisible();
+   await expect(tools.locator('.mcp-heading button')).toHaveCount(1);
+   const box=(await search.boundingBox())!;
+   expect(box.width).toBeLessThanOrEqual(260);
+   expect(box.height).toBeLessThan(42);
   }
   await page.screenshot({path:info.outputPath(row+'.png')});
   if(section==='display')await page.keyboard.press('Escape');
