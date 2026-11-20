@@ -24,7 +24,7 @@ test('sound preview offers the existing palette and plays the selected action in
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('vision verification gates the inline switch and ASR readiness is visible', async ({page}) => {
+test('vision verification gates the LLM switch and ASR details report readiness', async ({page}) => {
   await page.route('**/api/vision/capability', route => route.fulfill({json:{verified:false}}));
   await page.route('**/api/vision/probe', route => route.fulfill({json:{ok:true,detail:'verified'}}));
   await page.route('**/api/resources/status', route => route.fulfill({json:{
@@ -32,15 +32,20 @@ test('vision verification gates the inline switch and ASR readiness is visible',
   }}));
   await openTab(page, '模型');
   const models = page.locator('#config-models');
-  const vision = models.getByRole('switch', {name:'识图'});
+  await models.getByRole('button', {name:'配置模型'}).click();
+  const details = page.getByRole('dialog');
+  const vision = details.getByRole('switch', {name:'识图'});
   await expect(vision).toBeDisabled();
-  await models.getByRole('button', {name:'验证识图能力'}).click();
+  await details.getByRole('button', {name:'验证识图能力'}).click();
   await expect(vision).toBeEnabled();
   await vision.click();
   await expect(vision).toHaveAttribute('aria-checked','true');
   await vision.click();
-  await expect(models.getByText(/SenseVoice/)).toBeVisible();
-  await expect(models.getByText('已就绪', {exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
+  await models.getByRole('button',{name:'查看配置'}).click();
+  await expect(details.getByText(/SenseVoice/)).toBeVisible();
+  await expect(details.getByText('已就绪', {exact:true})).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
@@ -61,22 +66,41 @@ test('an installed mod can be enabled and disabled from its list row', async ({p
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
-test('desktop access shows its status and opens the permission guide directly', async ({page, baseURL}) => {
+test('desktop access shows both system permissions and keeps confirmed consent if status refresh fails', async ({page, baseURL}) => {
   await page.addInitScript(base => {
     window.momoDesktop = {getRuntime: async () => ({baseUrl:base, token:'isolated-desktop-access'})};
   }, baseURL!);
   await page.route('**/api/intro', route => route.fulfill({json:{phase:'completed',configurationValid:true}}));
-  await page.route('**/api/computer/status', route => route.fulfill({json:{desktopAccessGranted:true}}));
+  let granted=true, failStatus=false;
+  await page.route('**/api/computer/status', route => failStatus
+    ? route.fulfill({status:503,json:{}})
+    : route.fulfill({json:{desktopAccessGranted:granted}}));
+  await page.route('**/api/computer/access/consent',route=>{
+    granted=route.request().postDataJSON().granted;
+    return route.fulfill({json:{granted}});
+  });
   await page.route('**/api/computer/access', route => route.fulfill({json:{available:true,granted:true,blocked:[]}}));
   await page.route('**/api/computer/access/system', route => route.fulfill({json:{screenPermission:true,inputPermission:true,applications:[]}}));
   await openTab(page, '桌面');
   const access = page.locator('#config-desktop .opt-row').filter({hasText:'桌面访问'});
   await expect(access.getByRole('status')).toHaveText('已授权');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await access.getByRole('button',{name:'打开授权引导'}).click();
-  const guide = page.getByRole('dialog',{name:'桌面访问',exact:true});
-  await expect(guide.getByRole('button',{name:'撤回桌面访问'})).toBeVisible();
-  await expect(page.getByRole('dialog')).toHaveCount(1);
+  for(const permission of ['屏幕录制','辅助功能']){
+    await expect(page.locator('#config-desktop .opt-row').filter({hasText:permission}).getByRole('status')).toHaveText('已授权');
+  }
+  const toggle=access.getByRole('switch',{name:'桌面访问',exact:true});
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked','false');
+  failStatus=true;
+  const failedRead=page.waitForResponse(response=>response.url().endsWith('/api/computer/status') && response.status()===503);
+  await toggle.click();
+  await failedRead;
+  await expect(toggle).toBeEnabled();
+  await expect(toggle).toHaveAttribute('aria-checked','true');
+  await expect(access.getByRole('status')).toHaveText('已授权');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked','false');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
 test('an in-progress export stays locked across browser history navigation', async ({page}) => {

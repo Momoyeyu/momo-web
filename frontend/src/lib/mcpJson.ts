@@ -3,6 +3,7 @@
 // command→stdio，url/endpoint/type→http，apiKey→headers.Authorization。
 // 解析失败抛 McpJsonError——表单报错，不落库。
 
+import { splitMcpWords } from "./mcpArguments";
 import type { McpExtension } from "./types";
 import {mcpPermissions} from './mcpPermissions';
 
@@ -43,11 +44,15 @@ function toExtension(name: string, raw: unknown): McpExtension {
   const url =
     (typeof o.url === "string" && o.url.trim()) ||
     (typeof o.endpoint === "string" ? o.endpoint.trim() : "");
-  const type = typeof o.type === "string" ? o.type.toLowerCase() : "";
+  const transport = o.type ?? o.transport;
+  const type = typeof transport === "string" ? transport.toLowerCase() : "";
   if (command) {
     // command 应为可执行名；含空格（旧式整行命令）时首 token 作命令、
     // 其余前置于 args。
-    const parts = command.split(/\s+/).filter(Boolean);
+    // The host checks a path verbatim before trying legacy whole-line command parsing.
+    const pathCommand = /^(?:\.{0,2}\/|[A-Za-z]:[\\/]|\\\\)/u.test(command);
+    const parts = pathCommand ? [command] : splitMcpWords(command);
+    if (!parts?.[0]) throw new McpJsonError("invalid command");
     const cmd = parts[0];
     const args = [...parts.slice(1), ...strArr(o.args)];
     return {
@@ -65,7 +70,7 @@ function toExtension(name: string, raw: unknown): McpExtension {
   if (url || type === "http" || type === "sse" || type === "streamable-http") {
     return {
       name: finalName,
-      transport: "http",
+      transport: type === "sse" ? "sse" : "http",
       enabled,
       command: "",
       args: [],

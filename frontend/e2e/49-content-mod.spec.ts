@@ -6,8 +6,11 @@ const bundle=fileURLToPath(new URL('../../docs/examples/evening-chimes.momomod',
 test('local content mod installs disabled, serves audio only when enabled and can be removed',async({page,request})=>{
   await openTab(page,'模组');
   const section=page.locator('#config-mods');
-  await section.locator('input[type=file]').setInputFiles(bundle);
+  await section.getByRole('button',{name:'管理',exact:true}).click();
   const dialog=page.getByRole('dialog');
+  const chooser=page.waitForEvent('filechooser');
+  await dialog.getByRole('button',{name:'导入文件'}).click();
+  await (await chooser).setFiles(bundle);
   await expect(dialog).toContainText('evening-chimes.momomod');
   await dialog.getByRole('button',{name:'导入文件'}).click();
   await expect(dialog).toHaveCount(0);
@@ -25,7 +28,7 @@ test('local content mod installs disabled, serves audio only when enabled and ca
     expect((await file.body()).subarray(0,4).toString()).toBe('RIFF');
     await page.reload();
     await openTab(page,'模组');
-    await expect(row).toContainText('已启用');
+    await expect(row.getByRole('switch')).toHaveAttribute('aria-checked','true');
     await row.getByRole('button',{name:'配置模组'}).click();
     await dialog.getByRole('button',{name:'停用模组'}).click();
     await expect(dialog.getByRole('button',{name:'启用模组'})).toBeVisible();

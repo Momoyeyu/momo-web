@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { useT } from "../../i18n";
-import { CARD_PAGE_SIZE, clampPage } from "../../lib/paging";
+import { MCP_PAGE_SIZE, clampPage } from "../../lib/paging";
 import { getState, subscribe, update } from "../../lib/store";
 import type { McpExtension } from "../../lib/types";
 import { probeExtension } from "../../services/extClient";
@@ -11,7 +11,7 @@ import Hint from "../../ui/Hint";
 import IconButton from "../../ui/IconButton";
 import Pager from "../../ui/Pager";
 import Switch from "../../ui/Switch";
-import PluginLibrary from './PluginLibrary';
+import PluginLibrary from "./PluginLibrary";
 import ExtConfigModal from "./ExtConfigModal";
 
 export default function McpSettings() {
@@ -65,10 +65,10 @@ export default function McpSettings() {
     .filter(({ ext }) =>
       (ext.name || "").toLowerCase().includes(extQuery.trim().toLowerCase()),
     );
-  const extPg = clampPage(extPage, extHits.length, CARD_PAGE_SIZE);
+  const extPg = clampPage(extPage, extHits.length, MCP_PAGE_SIZE);
   const extSlice = extHits.slice(
-  extPg.page * CARD_PAGE_SIZE,
-  (extPg.page + 1) * CARD_PAGE_SIZE,
+    extPg.page * MCP_PAGE_SIZE,
+    (extPg.page + 1) * MCP_PAGE_SIZE,
   );
 
   const blankExt = (): McpExtension => ({
@@ -97,122 +97,51 @@ export default function McpSettings() {
     setExtEditing(null);
   };
 
-  /** 行内状态点：未启用灰点 / 探测中 / ●成功(n tools) / ✗失败。 */
-  const extDot = (i: number, ext: McpExtension): React.ReactNode => {
-    if (!ext.enabled) {
-      return (
-        <span className="ext-dot off" title={t("settings.extStOff")}>
-          ○
-        </span>
-      );
-    }
-    const r = extProbes[i];
-    if (!r || r === "running") {
-      return (
-        <span className="ext-dot wait" title={t("settings.extStRun")}>
-          …
-        </span>
-      );
-    }
-    if (r.ok) {
-      const label = t("settings.extStOk", { n: String(r.tools) });
-      return (
-        <span className="ext-dot ok" title={label}>
-          ● {label}
-        </span>
-      );
-    }
-    return (
-      <span
-        className="ext-dot err"
-        title={r.error || t("settings.extStFail")}
-      >
-        ✗ {t("settings.extStFail")}
-      </span>
-    );
-  };
+  function statusLabel(i: number, ext: McpExtension) {
+    const probe = extProbes[i];
+    if (!ext.enabled) return t("settings.extStOff");
+    if (!probe || probe === "running") return t("settings.extStRun");
+    return probe.ok ? t("settings.extStOk", { n: String(probe.tools) })
+      : probe.error || t("settings.extStFail");
+  }
 
   return (
     <div className="extension-settings" ref={panel}>
-        <section className="panel panel-stack settings-col ext-panel extension-panel">
-          <div className="panel-title-row">
-            <h3 className="opt-group">{t("settings.groups.extensions")}</h3>
-            <Hint text={t("settings.extHint")} side="down" />
-          </div>
-          <div className="list-toolbar">
-            <input
-              className="list-search"
-              aria-label={t("settings.extSearchPh")}
-              placeholder={t("settings.extSearchPh")}
-              value={extQuery}
-              onChange={(e) => {
-                setExtQuery(e.target.value);
-                setExtPage(0);
-              }}
-            />
-            <IconButton
-              icon="plus"
-              label={t("settings.extAdd")}
-              tip={t("settings.extAdd")}
-              onClick={() => setExtEditing(-1)}
-            />
-          </div>
-          <div className="list-body">
-            {extSlice.length === 0 && (
-              <p className="muted">{t("settings.extEmpty")}</p>
-            )}
-            {extSlice.map(({ ext, i }) => (
-              <div className="list-item ext-row" key={i}>
-                <span className="ext-name">
-                  {ext.name || t("settings.extUnnamed")}
-                </span>
-                <span className="ext-badge">{ext.transport}</span>
-                <Switch
-                  title={ext.name || t("settings.extUnnamed")}
-                  on={ext.enabled}
-                  onChange={(v) =>
-                    patchExtensions(
-                      settings.extensions.map((x, j) =>
-                        j === i ? { ...x, enabled: v } : x,
-                      ),
-                    )
-                  }
-                />
-                {extDot(i, ext)}
-                <IconButton
-                  icon="edit"
-                  size="sm"
-                  label={t("common.edit")}
-                  tip={t("common.edit")}
-                  onClick={() => setExtEditing(i)}
-                />
-                <IconButton
-                  icon="trash"
-                  size="sm"
-                  danger
-                  label={t("common.del")}
-                  tip={t("common.del")}
-                  onClick={() =>
-                    patchExtensions(
-                      settings.extensions.filter((_, j) => j !== i),
-                    )
-                  }
-                />
-              </div>
-            ))}
-          </div>
-          <div className="col-foot">
-            <div className="list-foot">
-              <Pager page={extPg.page} pages={extPg.pages} onChange={setExtPage} />
+      <section className="ext-panel mcp-section">
+        <header className="mcp-heading">
+          <h3>{t("settings.extConnections")}</h3>
+          <Hint text={t("settings.extHint")} side="down" />
+          <IconButton icon="plus" label={t("settings.extAdd")} onClick={() => setExtEditing(-1)} />
+        </header>
+        <input className="list-search" type="search" aria-label={t("settings.extSearchPh")}
+          placeholder={t("settings.extSearchPh")} value={extQuery}
+          onChange={e => { setExtQuery(e.target.value); setExtPage(0); }} />
+        <div className="list-body mcp-items">
+          {!extSlice.length && <p className="muted">{t("settings.extEmpty")}</p>}
+          {extSlice.map(({ ext, i }) => (
+            <div className="mcp-row ext-row" key={i}>
+              <strong className="ext-name" title={statusLabel(i, ext)}>{ext.name || t("settings.extUnnamed")}</strong>
+              <Switch title={ext.name || t("settings.extUnnamed")} on={ext.enabled}
+                onChange={enabled => patchExtensions(settings.extensions.map((item, index) =>
+                  index === i ? { ...item, enabled } : item))} />
+              <IconButton icon="edit" size="sm" label={t("common.edit")} tip={t("common.edit")}
+                onClick={() => setExtEditing(i)} />
             </div>
-          </div>
-        </section>
+          ))}
+        </div>
+        {extPg.pages > 1 && <Pager page={extPg.page} pages={extPg.pages} onChange={setExtPage} />}
+      </section>
       <PluginLibrary active={viewed}/>
       {extEditing !== null && (
         <ExtConfigModal
           initial={
             extEditing >= 0 ? settings.extensions[extEditing] : blankExt()
           }
+          status={extEditing >= 0 ? statusLabel(extEditing, settings.extensions[extEditing]) : undefined}
+          onRemove={extEditing >= 0 ? () => {
+            patchExtensions(settings.extensions.filter((_, index) => index !== extEditing));
+            setExtEditing(null);
+          } : undefined}
           onSave={saveExt}
           onImport={importExts}
           onClose={() => setExtEditing(null)}

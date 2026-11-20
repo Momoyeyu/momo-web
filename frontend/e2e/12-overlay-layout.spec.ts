@@ -52,7 +52,7 @@ test('settings overlays and resource controls remain reachable in a small window
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '工具', exact: true }).click();
-  await page.locator('.ext-panel .list-toolbar .icon-btn').click();
+  await page.locator('.ext-panel .mcp-heading .icon-btn').click();
   await insideStage(page.getByRole('dialog').last());
   const mcp = page.getByRole('dialog').last();
   const mcpBounds = await mcp.boundingBox();

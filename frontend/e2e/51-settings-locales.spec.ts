@@ -14,7 +14,8 @@ test('title menu hints are plain text', async ({page}) => {
 
 test('settings modal footer gives its action room below the divider', async ({page}) => {
   await openApp(page, 'settings');
-  await page.locator('#config-mods input[type="file"]').setInputFiles({
+  await page.locator('#config-mods').getByRole('button',{name:'管理',exact:true}).click();
+  await page.getByRole('dialog').locator('input[type="file"]').setInputFiles({
     name: 'test.momomod',
     mimeType: 'application/octet-stream',
     buffer: Buffer.from('test'),
@@ -54,10 +55,11 @@ for (const width of [640, 960, 1280]) {
         const text = Array.from(range.getClientRects());
         const bounds = button.getBoundingClientRect();
         const row = button.closest('.opt-row');
-        const group = button.closest('.config-group, .config-card, .config-header');
+        const group = button.closest('.config-card, .config-header');
         const positions = [row, group].filter(el => el !== null).map(el => el.getBoundingClientRect());
         return {
           label: button.textContent,
+          paired: !!button.closest('.sound-pair'),
           width: bounds.width,
           height: bounds.height,
           lines: new Set(text.map(rect => Math.round(rect.top))).size,
@@ -71,7 +73,7 @@ for (const width of [640, 960, 1280]) {
       expect(actions.filter(action => action.lines !== 1 || !action.textFits || !action.buttonFits),
         `${lang} at ${width}px`).toEqual([]);
       for (const action of actions) {
-        if (width >= 960) expect([action.width, action.height], `${lang} at ${width}px, ${action.label}`).toEqual([112, 34]);
+        if (width >= 960 && !action.paired) expect([action.width, action.height], `${lang} at ${width}px, ${action.label}`).toEqual([112, 34]);
       }
       const cardActions = actions.filter(action => action.group && action.columnRight !== null);
       expect(new Set(cardActions.map(action => action.columnRight)).size).toBeLessThanOrEqual(2);

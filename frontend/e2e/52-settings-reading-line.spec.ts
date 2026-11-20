@@ -16,27 +16,28 @@ test('settings directory selects the last chapter at the scroll limit',async({pa
  }
 });
 
-test('sound and models use two aligned groups on wide stages and one column on narrow stages',async({page})=>{
- await page.setViewportSize({width:1280,height:720});
+test('sound controls remain paired and model details occupy three full rows',async({page})=>{
  await page.route('**/api/intro',route=>route.fulfill({json:{phase:'completed',configurationValid:true}}));
  await openApp(page,'settings');
- for(const [width,height,wide] of [[1280,720,true],[960,540,false],[1280,360,false]] as const){
+ for(const [width,height] of [[1280,720],[960,540],[1280,360]]){
   await page.setViewportSize({width,height});
-  for(const section of ['sound','models']){
-   const groups=page.locator('#config-'+section+' .config-columns > .config-group');
-   await expect(groups).toHaveCount(2);
-   await expect.poll(()=>groups.evaluateAll(nodes=>{
+  const pairs=page.locator('#config-sound .sound-pair');
+  await expect(pairs).toHaveCount(4);
+  for(const pair of await pairs.all()){
+   expect(await pair.locator('.opt-row').evaluateAll(nodes=>{
     const [a,b]=nodes.map(el=>el.getBoundingClientRect());
     return a.right<=b.left && Math.abs(a.top-b.top)<1;
-   })).toBe(wide);
-   if(!wide){
-    const [a,b]=(await groups.evaluateAll(nodes=>nodes.map(el=>{
-     const r=el.getBoundingClientRect();
-     return {x:r.left,top:r.top,bottom:r.bottom};
-    })));
-    expect(a.x).toBe(b.x);
-    expect(a.bottom).toBeLessThanOrEqual(b.top);
-   }
+   })).toBe(true);
   }
+  const preview=await page.locator('#config-sound .config-action').boundingBox();
+  for(const select of await page.locator('#config-sound .sel-face').all()){
+   expect((await select.boundingBox())!.width).toBeCloseTo(preview!.width,0);
+  }
+  const rows=page.locator('#config-models .config-model-row');
+  await expect(rows.locator('b')).toHaveText(['ASR','LLM','TTS']);
+  expect(await rows.evaluateAll(nodes=>{
+   const boxes=nodes.map(el=>el.getBoundingClientRect());
+   return boxes.every((box,i)=>box.x===boxes[0].x && box.width===boxes[0].width && (!i || box.top>=boxes[i-1].bottom-1));
+  })).toBe(true);
  }
 });

@@ -3,9 +3,10 @@
 // MCP server 配置弹窗：transport 下拉切换差分字段（stdio=命令/参数/环境变量，
 // http=端点/请求头）；顶部「从 JSON 填入」粘贴标准 MCP 配置 —— 单条填表、
 // 多条直接逐个导入列表；点遮罩或取消关闭（未保存丢弃）。
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { McpExtension } from "../../lib/types";
 import { useT } from "../../i18n";
+import { parseMcpArguments } from "../../lib/mcpArguments";
 import { parseMcpJson } from "../../lib/mcpJson";
 import {extToForm,formToExt,type ExtForm} from "../../lib/mcpForm";
 import FieldRow from "../../ui/FieldRow";
@@ -26,9 +27,9 @@ function extEndpointError(url: string): boolean {
 }
 
 /** 校验：名称必填；stdio 命令必填；http 端点必填且 http(s)://。 */
-function extFormValid(f: ExtForm): boolean {
+function extFormValid(f: ExtForm, validArgs: boolean): boolean {
   if (!f.name.trim()) return false;
-  if (f.transport === "stdio") return f.command.trim() !== "";
+  if (f.transport === "stdio") return f.command.trim() !== "" && validArgs;
   return f.endpoint.trim() !== "" && !extEndpointError(f.endpoint);
 }
 
@@ -91,11 +92,15 @@ function KvEditor({
  */
 export default function ExtConfigModal({
   initial,
+  onRemove,
+  status,
   onSave,
   onImport,
   onClose,
 }: {
   initial: McpExtension;
+  onRemove?: () => void;
+  status?: string;
   onSave: (ext: McpExtension) => void;
   /** JSON 多条导入：直接进列表并关弹窗（草稿丢弃）。 */
   onImport: (exts: McpExtension[]) => void;
@@ -109,9 +114,10 @@ export default function ExtConfigModal({
   const patch = (p: Partial<ExtForm>): void =>
     setForm((f) => ({ ...f, ...p }));
 
-  const applyJson = (): void => {
+  const file = useRef<HTMLInputElement>(null);
+  const applyJson = (text: string): void => {
     try {
-      const exts = parseMcpJson(jsonText);
+      const exts = parseMcpJson(text);
       if (exts.length === 1) {
         // A connection snippet must not silently erase an adapter's reviewed scopes.
         setForm(previous => extToForm(exts[0], previous));
@@ -126,10 +132,19 @@ export default function ExtConfigModal({
     }
   };
 
+  async function importFile(selected: File) {
+    try {
+      applyJson(await selected.text());
+    } catch {
+      setJsonErr(true);
+    }
+  }
+
+  const validArgs = parseMcpArguments(form.argsText) !== null;
   const endpointErr = extEndpointError(form.endpoint);
 
   return (
-    <Modal onClose={onClose} className="ext-modal">
+    <Modal onClose={onClose} className="ext-modal" label={t("settings.extCfgTitle")}>
         <div className="ext-modal-head">
           <h3 className="opt-group">{t("settings.extCfgTitle")}</h3>
           <Button
@@ -143,6 +158,17 @@ export default function ExtConfigModal({
             {t("settings.extJsonBtn")}
           </Button>
         </div>
+        <div className="ext-import-file">
+              <input hidden type="file" ref={file} accept=".json,application/json" onChange={e => {
+                const selected = e.target.files?.[0];
+                e.target.value = "";
+                if (selected) void importFile(selected);
+              }} />
+              <Button size="sm" variant="ghost" onClick={() => file.current?.click()}>
+                {t("settings.extImportFile")}
+              </Button>
+        </div>
+        {jsonErr && <p role="alert" className="probe-err">{t("settings.extJsonErr")}</p>}
         {jsonOpen && (
           <div className="ext-json">
             <textarea
@@ -155,13 +181,10 @@ export default function ExtConfigModal({
               }}
             />
             <div className="ext-json-ops">
-              {jsonErr && (
-                <span className="probe-err">{t("settings.extJsonErr")}</span>
-              )}
               <Button
                 size="sm"
                 disabled={!jsonText.trim()}
-                onClick={applyJson}
+                onClick={() => applyJson(jsonText)}
               >
                 {t("settings.extJsonApply")}
               </Button>
@@ -188,6 +211,10 @@ export default function ExtConfigModal({
                   label: t("settings.extTransports.http"),
                 },
                 {
+                  value: "sse",
+                  label: "SSE",
+                },
+                {
                   value: "stdio",
                   label: t("settings.extTransports.stdio"),
                 },
@@ -210,12 +237,14 @@ export default function ExtConfigModal({
                   <span className="probe-err">{t("settings.required")}</span>
                 )}
               </FieldRow>
-              <FieldRow label={t("settings.extArgs")}>
+              <FieldRow label={t("settings.extArgs")} hint={t("settings.extArgsHint")}>
                 <input
+                  aria-invalid={!validArgs}
                   value={form.argsText}
                   placeholder={t("settings.extArgsPh")}
                   onChange={(e) => patch({ argsText: e.target.value })}
                 />
+                {!validArgs && <span className="probe-err" role="alert">{t("settings.extArgsInvalid")}</span>}
               </FieldRow>
               <FieldRow label={t("settings.extEnv")} top>
                 <KvEditor
@@ -258,13 +287,15 @@ export default function ExtConfigModal({
             />
           </FieldRow>
         </div>
+        {status && <p className="muted" role="status">{status}</p>}
         <div className="ext-actions">
+          {onRemove && <Button variant="ghost" className="mcp-remove" onClick={onRemove}>{t("common.del")}</Button>}
           <Button variant="ghost" className="key-toggle" onClick={onClose}>
             {t("common.cancel")}
           </Button>
           <Button
             className="key-toggle"
-            disabled={!extFormValid(form)}
+            disabled={!extFormValid(form, validArgs)}
             onClick={() => onSave(formToExt(form))}
           >
             {t("common.save")}

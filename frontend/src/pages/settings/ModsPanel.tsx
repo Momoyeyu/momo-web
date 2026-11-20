@@ -14,7 +14,7 @@ import OfficialPlugins from './OfficialPlugins';
 import MinecraftCompanion from './MinecraftCompanion';
 
 const official = {'momo.qq':'QQ','momo.minecraft':'Minecraft'};
-type Selection = {id:string; mode:'manage'|'install'|'remove'} | {file:File};
+type Selection = {id:string; mode:'manage'|'install'|'remove'} | {mode:'local'; file?:File};
 
 export default function ModsPanel(){
   const t=useT(), mods=useMods(), file=useRef<HTMLInputElement>(null);
@@ -68,23 +68,32 @@ export default function ModsPanel(){
   const list=[...entries].filter(([id,label])=>!filterable||(id+' '+label).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
   const paging=clampPage(page,list.length,5);
   return <>
-    <FieldRow label={code('local')}><span/>{button('import',()=>file.current?.click())}
-      <input ref={file} type="file" hidden accept=".momomod" onChange={e=>{const picked=e.target.files?.[0];e.target.value='';if(picked)open({file:picked});}}/>
-    </FieldRow>
     {filterable&&<input type="search" className="list-search" value={query} aria-label={code('search')} placeholder={code('search')} onChange={e=>{setQuery(e.target.value);setPage(0);}}/>}
     {list.slice(paging.page*5,paging.page*5+5).map(([id,label])=>{
       const installed=mods.find(m=>m.id===id);
-      return <FieldRow key={id} label={label}><span className="muted">{code(installed?(installed.enabled?'enabled':'disabled'):'absent')}</span>
-        {installed&&<Switch title={label} on={installed.enabled} disabled={busy} onChange={enabled=>setEnabled(installed,enabled)}/>}
+      return <FieldRow key={id} label={label}>
+        {installed ? <Switch title={label} on={installed.enabled} disabled={busy} onChange={enabled=>setEnabled(installed,enabled)}/>
+          : <span className="muted">{code('absent')}</span>}
         {button(installed?'manage':'install',()=>open({id,mode:installed?'manage':'install'}))}
       </FieldRow>;
     })}
     {filterable&&<Pager page={paging.page} pages={paging.pages} onChange={setPage}/>}
+    <FieldRow label={code('local')}>{button('manageLocal',()=>open({mode:'local'}))}</FieldRow>
     {!selection&&error&&<div role="alert">{code(error)} {button('retry',()=>{setError('');void load();})}</div>}
-    {selection&&<Modal label={'file' in selection?code('import'):name} onClose={()=>open(null)} className="extension-modal">
-      <div className="extension-detail"><h3>{'file' in selection?code('import'):name}</h3>
-      {'file' in selection ? <><p>{selection.file.name}</p><p>{code('importHint')}</p>
-        {button('import',()=>{const data=new FormData();data.append('file',selection.file);void run('/api/mods',{method:'POST',body:data},null);})}</>
+    {selection&&<Modal label={selection.mode==='local'?code('local'):name} onClose={()=>open(null)} className="extension-modal">
+      <div className="extension-detail"><h3>{selection.mode==='local'?code('local'):name}</h3>
+      {selection.mode==='local' ? <>
+        <p>{code('importHint')}</p>
+        <input ref={file} type="file" hidden accept=".momomod" onChange={e=>{
+          const picked=e.target.files?.[0];e.target.value='';
+          if(picked)open({mode:'local',file:picked});
+        }}/>
+        {selection.file ? <><p>{selection.file.name}</p>{button('import',()=>{
+          if(!selection.file)return;
+          const data=new FormData();data.append('file',selection.file);
+          void run('/api/mods',{method:'POST',body:data},null);
+        })}</> : button('import',()=>file.current?.click())}
+      </>
       : selection.mode==='install' ? <><p>{code('officialHint')}</p>
         {button('install',()=>void run('/api/mods/official/'+selection.id,{method:'POST'},{id:selection.id,mode:'manage'}))}</>
       : selection.mode==='remove' ? <><p>{code('removeHint')}</p>

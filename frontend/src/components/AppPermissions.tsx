@@ -2,7 +2,7 @@ import {useCallback, useEffect, useLayoutEffect, useState} from 'react';
 import {useT} from '../i18n';
 import {apiJson, jsonInit} from '../services/http';
 import {refreshActivities} from '../services/extensionActivities';
-import {readComputer} from '../services/computerClient';
+import {readComputer, recordDesktopConsent} from '../services/computerClient';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
@@ -10,10 +10,18 @@ import '../styles/plugin-library.css';
 
 type Application = {bundleId: string; name: string};
 type Policy = {available: boolean; granted: boolean | null; blocked: Application[]; stopUnconfirmed?: boolean};
-type SystemAccess = {screenPermission: boolean; inputPermission: boolean; applications: Application[]};
+export type SystemAccess = {screenPermission: boolean; inputPermission: boolean; applications: Application[]};
 const endpoint = '/api/computer/access';
 const guideEvent = 'momo:desktop-access-guide';
 export function openDesktopAccessGuide() { window.dispatchEvent(new Event(guideEvent)); }
+
+export async function setDesktopConsent(granted: boolean) {
+  const policy = await apiJson<Policy>(endpoint + '/consent', jsonInit('PUT', {granted}));
+  recordDesktopConsent(policy.granted);
+  window.dispatchEvent(new Event('momo:desktop-access-changed'));
+  await Promise.allSettled([refreshActivities(), readComputer()]);
+  return policy;
+}
 
 export default function AppPermissions({manage = false, ready = false, onGuideVisibility}: {
   manage?: boolean; ready?: boolean; onGuideVisibility?: (visible: boolean) => void;
@@ -78,11 +86,9 @@ export default function AppPermissions({manage = false, ready = false, onGuideVi
   }
 
   async function decide(granted: boolean) {
-    const updated = await apiJson<Policy>(endpoint + '/consent', jsonInit('PUT', {granted}));
+    const updated = await setDesktopConsent(granted);
     setPolicy(previous => ({...previous!, ...updated}));
     setGuide(false);
-    window.dispatchEvent(new Event('momo:desktop-access-changed'));
-    await Promise.allSettled([refreshActivities(),readComputer()]);
   }
 
   async function changeBlock(app: Application, blocked: boolean) {

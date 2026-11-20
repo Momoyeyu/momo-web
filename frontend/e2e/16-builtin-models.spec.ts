@@ -59,9 +59,9 @@ async function models(page:Page){
   await page.getByRole('button',{name:'模型',exact:true}).click();
   return page.locator('#config-models');
 }
-test('only LLM and TTS remain, thinking persists, four rows align, and unknown providers disable thinking',async({page})=>{
+test('the three model entries open details, thinking persists, four rows align, and unknown providers disable thinking',async({page})=>{
   const pane=await models(page);
-  await expect(pane.locator('.config-action')).toHaveCount(4);
+  await expect(pane.locator('.config-action')).toHaveCount(3);
   await expect(pane).not.toContainText('Embedding');
   await pane.getByRole('button',{name:'配置模型'}).click();
   await expect(page.locator('[data-intro=llm] .opt-row')).toHaveCount(4);
@@ -80,7 +80,7 @@ test('only LLM and TTS remain, thinking persists, four rows align, and unknown p
   await expect.poll(async()=>JSON.parse((await call('/api/state')).body).settings.llm.thinking).toBe(false);
   await page.screenshot({path:'../.workbuddy/004-008-009/settings-models.png'});
 });
-test('two model cards stay aligned and within a narrow stage in all interface languages',async({page})=>{
+test('model details stay aligned and within a narrow stage in all interface languages',async({page})=>{
   await page.setViewportSize({width:800,height:450});
   await models(page);
   for(const [lang,label,thinking] of [['zh','模型','思考模式'],['en','Models','Thinking'],['ja','モデル','思考モード']]){
@@ -89,13 +89,13 @@ test('two model cards stay aligned and within a narrow stage in all interface la
     await call('/api/state','PUT',state);
     await page.reload();
     await page.getByRole('button',{name:label,exact:true}).click();
-    await page.locator('#config-models .config-action').first().click();
+    await page.locator('#config-models .config-model-row').filter({hasText:'LLM'}).getByRole('button').click();
     const sw=page.getByRole('switch',{name:thinking,exact:true});
     await sw.scrollIntoViewIfNeeded();
     await expect(sw).toBeInViewport();
     const pane=page.locator('.config-modal');
     expect(await pane.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
-    await expect(pane.locator('.opt-row')).toHaveCount(4);
+    await expect(pane.locator('[data-intro=llm] .opt-row')).toHaveCount(4);
   }
 });
 
@@ -104,7 +104,7 @@ test('missing bundled resources give a recovery message without reintroducing co
   await models(page);
   await expect(page.locator('.builtin-resource-notice')).toContainText('重新安装完整应用');
   await expect(page.locator('.builtin-resource-notice')).toContainText('当前使用文字匹配');
-  await expect(page.locator('#config-models .config-action')).toHaveCount(4);
+  await expect(page.locator('#config-models .config-action')).toHaveCount(3);
 });
 
 test('clicking the microphone twice during connection cancels pending activation',async({page})=>{

@@ -173,9 +173,9 @@ function normalizeExtensions(raw: unknown): McpExtension[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((x): x is Record<string, unknown> => !!x && typeof x === "object")
-    .map((o) => ({
+    .map((o): McpExtension => ({
       name: typeof o.name === "string" ? o.name : "",
-      transport: o.transport === "stdio" ? ("stdio" as const) : ("http" as const),
+      transport: o.transport === "stdio" || o.transport === "sse" ? o.transport : "http",
       enabled: o.enabled !== false,
       command: typeof o.command === "string" ? o.command : "",
       args: strArr(o.args),

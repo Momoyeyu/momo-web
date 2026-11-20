@@ -1,4 +1,5 @@
 import type {McpExtension} from "./types";
+import {formatMcpArguments, parseMcpArguments} from "./mcpArguments";
 import {mcpPermissions} from "./mcpPermissions";
 
 /** 弹窗表单草稿：args/env/headers 用文本/键值对形态便于编辑，保存时归一。 */
@@ -7,7 +8,7 @@ export interface ExtForm extends Pick<McpExtension,"declaredPermissions"|"grante
   transport: McpExtension["transport"];
   enabled: boolean;
   command: string;
-  /** stdio 参数：空格分隔文本，保存时拆数组。 */
+  /** stdio 参数：支持简短的命令行写法和无损的 JSON 字符串数组。 */
   argsText: string;
   envPairs: [string, string][];
   endpoint: string;
@@ -22,7 +23,7 @@ export function extToForm(ext: McpExtension, previousPolicy: Pick<McpExtension,"
     transport: ext.transport,
     enabled: ext.enabled,
     command: ext.command,
-    argsText: ext.args.join(" "),
+    argsText: formatMcpArguments(ext.args),
     envPairs: Object.entries(ext.env),
     endpoint: ext.endpoint,
     headerPairs: Object.entries(ext.headers),
@@ -30,6 +31,8 @@ export function extToForm(ext: McpExtension, previousPolicy: Pick<McpExtension,"
 }
 
 export function formToExt(f: ExtForm): McpExtension {
+  const args = parseMcpArguments(f.argsText);
+  if (f.transport === "stdio" && !args) throw new Error("Invalid MCP arguments");
   const dict = (pairs: [string, string][]): Record<string, string> =>
     Object.fromEntries(
       pairs.filter(([k]) => k.trim()).map(([k, v]) => [k.trim(), v]),
@@ -40,7 +43,7 @@ export function formToExt(f: ExtForm): McpExtension {
     transport: f.transport,
     enabled: f.enabled,
     command: f.command.trim(),
-    args: f.argsText.split(/\s+/).filter(Boolean),
+    args: args ?? [],
     env: dict(f.envPairs),
     endpoint: f.endpoint.trim(),
     headers: dict(f.headerPairs),

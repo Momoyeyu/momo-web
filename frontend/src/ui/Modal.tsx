@@ -13,12 +13,14 @@ export default function Modal({
   className,
   children,
   label,
+  describedBy,
 }: {
   onClose: () => void;
   /** 弹窗盒子的附加类（用于覆盖尺寸/布局）。 */
   className?: string;
   children: ReactNode;
   label?: string;
+  describedBy?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -71,6 +73,7 @@ export default function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={label}
+        aria-describedby={describedBy}
         onClick={(e) => e.stopPropagation()}
       >
         {children}

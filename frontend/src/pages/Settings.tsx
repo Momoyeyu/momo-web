@@ -76,20 +76,19 @@ export default function Settings() {
     language: <GeneralTab section="language"/>,
     display: <><GeneralTab section="display"/>{action('avatar', <AvatarPanel/>, state.avatars.find(a => a.id === state.avatarId)?.name)}
       <details className="config-preview" onToggle={event => setPreviewOpen(event.currentTarget.open)}><summary>{t('config.preview')}</summary>{previewOpen && <GeneralTab section="preview"/>}</details></>,
-    sound: <div className="config-columns">
-      <div className="config-group"><GeneralTab section="sound"/></div>
-      <div className="config-group"><GeneralTab section="sample"/></div>
-    </div>,
+    sound: <GeneralTab section="sound"/>,
     models: guided ? <>
       <ModelsTab section={intro.phase === 'tts' && intro.configurationValid ? 'tts' : 'llm'}/>
       <BuiltinResourcesNotice/>
-    </> : <div className="config-columns">
-      <div className="config-group">
-        {action('llm', <ModelsTab section="llm"/>, state.settings.llm.model)}
-        {action('tts', <ModelsTab section="tts"/>, state.settings.tts.voice)}
-      </div>
-      <div className="config-group"><VisionSettings/><BuiltinResourcesNotice showSpeech/></div>
-    </div>,
+    </> : <>
+      <BuiltinResourcesNotice showSpeech/>
+      <ConfigAction model="LLM" label={t('config.llm')} action={t('config.llmAction')} value={state.settings.llm.model}>
+        <ModelsTab section="llm"/><VisionSettings/>
+      </ConfigAction>
+      <ConfigAction model="TTS" label={t('config.tts')} action={t('config.ttsAction')} value="GPT-SoVITS">
+        <ModelsTab section="tts"/>
+      </ConfigAction>
+    </>,
     memory: guided ? <MemoryPanel/> : <>{action('memories', <MemoryPanel/>)}{action('pinned', <MemoryPanel pinnedOnly/>)}</>,
     archive: <>{action('history', <ArchivePanel/>)}<DataTransfer/></>,
     desktop: <DesktopSettings/>,

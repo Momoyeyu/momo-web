@@ -89,7 +89,7 @@ export interface McpExtension {
   /** 显示名；同时用作工具名前缀（backend 会合法化为 [a-zA-Z0-9_]）。 */
   name: string;
   /** 连接方式：stdio = 本地命令子进程；http = Streamable HTTP 端点。 */
-  transport: "stdio" | "http";
+  transport: "stdio" | "http" | "sse";
   /** 开关；关闭即不连接不注入（下一回合生效）。 */
   enabled: boolean;
   /** stdio：可执行名（如 `npx`、`uvx`）。 */

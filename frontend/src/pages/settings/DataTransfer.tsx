@@ -1,5 +1,6 @@
-import {useEffect, useRef, useSyncExternalStore} from 'react';
+import {useEffect, useRef, useState, useSyncExternalStore} from 'react';
 import Button from '../../ui/Button';
+import Confirm from '../../ui/Confirm';
 import FieldRow from '../../ui/FieldRow';
 import '../../styles/modal.css';
 import '../../styles/data-transfer.css';
@@ -47,6 +48,7 @@ async function runTransfer(operation: Operation, action: () => Promise<void>) {
 
 export default function DataTransfer() {
   const t = useT();
+  const [pendingRestore, setPendingRestore] = useState<File | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const busyDialog = useRef<HTMLDialogElement>(null);
   const {busy, error} = useSyncExternalStore(subscribeTransfer, getTransfer);
@@ -73,9 +75,14 @@ export default function DataTransfer() {
       <input ref={input} hidden type="file" accept=".zip" onChange={event => {
         const file = event.target.files?.[0];
         event.target.value = '';
-        if (file && !transfer.busy && confirm(t('config.restoreConfirm'))) void runTransfer('restore', () => importData(file));
+        if (file && !transfer.busy) setPendingRestore(file);
       }}/>
     </FieldRow>
+    {pendingRestore && <Confirm title={t('config.restore')} message={pendingRestore.name + ' · ' + t('config.restoreConfirm')}
+      confirmLabel={t('config.restore')} danger onCancel={() => setPendingRestore(null)} onConfirm={() => {
+        setPendingRestore(null);
+        void runTransfer('restore', () => importData(pendingRestore));
+      }}/>}
     <p className="data-transfer-note">{t('config.backupHint')}</p>
     {busy && <dialog ref={busyDialog} className="modal-box data-transfer-busy" aria-label={t(busy === 'restore' ? 'config.restore' : 'config.backup')}
       onCancel={event => event.preventDefault()}>

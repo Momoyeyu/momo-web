@@ -98,7 +98,7 @@ test("工具章节：登记、停用并删除一条 MCP 连接", async ({ page }
   await expect(hint).toHaveAttribute("aria-label", /MCP/);
   await expect(page.locator(".ext-panel .list-body")).toBeVisible();
 
-  await page.locator(".ext-panel .list-toolbar .icon-btn").click();
+  await page.locator(".ext-panel .mcp-heading .icon-btn").click();
   await expect(page.getByRole("dialog")).toHaveCount(1);
 
   await fieldRow(page, "名称", ".ext-modal").locator("input").fill("e2e-echo");
@@ -115,13 +115,14 @@ test("工具章节：登记、停用并删除一条 MCP 连接", async ({ page }
   await expect(enabled).toHaveAttribute("aria-checked", "false");
 
   // 用完即删（配置随后还会被 afterEach 整体还原）
-  await created.locator(".danger").click();
+  await created.getByRole("button", { name: "编辑" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "删除" }).click();
   await expect(page.locator(".ext-row").filter({ hasText: "e2e-echo" })).toHaveCount(0);
 });
 
 test('adapter permission policy survives JSON import, metadata edit and document reload',async({page,request})=>{
   await openExtensionTab(page,'MCP');
-  await page.locator('.ext-panel .list-toolbar .icon-btn').click();
+  await page.locator('.ext-panel .mcp-heading .icon-btn').click();
   await page.locator('.ext-modal-head').getByRole('button',{name:'⇩ 从 JSON 填入',exact:true}).click();
   const policy={declaredPermissions:['mcp.tools','activities.game'],grantedPermissions:['mcp.tools','activities.game']};
   await page.locator('.ext-json textarea').fill(JSON.stringify({name:'e2e-scoped-game',command:'echo',enabled:false,...policy}));

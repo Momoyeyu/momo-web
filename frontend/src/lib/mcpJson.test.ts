@@ -63,9 +63,9 @@ describe("parseMcpJson", () => {
     expect(ext.headers.Authorization).toBe("Bearer new");
   });
 
-  it("detects http via type field without url", () => {
+  it("preserves the SSE transport in imported configuration", () => {
     const [ext] = parseMcpJson('{"type":"sse","endpoint":"https://x/sse"}');
-    expect(ext.transport).toBe("http");
+    expect(ext.transport).toBe("sse");
     expect(ext.endpoint).toBe("https://x/sse");
   });
 
@@ -105,4 +105,13 @@ describe("parseMcpJson", () => {
     const [ext]=parseMcpJson(JSON.stringify({command:'node',...policy}));
     expect(ext).toMatchObject({declaredPermissions:[],grantedPermissions:[]});
   });
+});
+
+it('preserves executable path boundaries and quoted inline arguments in old command lines', () => {
+  const parseCommand = (command: string) => parseMcpJson(JSON.stringify({command, args:["explicit arg", ""]}))[0];
+  const path = "/Users/A User/bin/example";
+  expect(parseCommand(path)).toMatchObject({command:path, args:["explicit arg", ""]});
+  expect(parseCommand(`node 'some path/main.mjs' --name "it's me"`))
+    .toMatchObject({command:"node", args:["some path/main.mjs", "--name", "it's me", "explicit arg", ""]});
+  expect(() => parseCommand(`node "unterminated`)).toThrow(McpJsonError);
 });

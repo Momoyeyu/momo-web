@@ -75,8 +75,10 @@ test('backup round-trips imported model ZIP, YAML and SQLite through actual cont
   await page.reload(); await openTab(page,'存档'); await pendingPut;
   const picker = page.waitForEvent('filechooser');
   await page.getByRole('button',{name:'选择文件',exact:true}).click();
-  page.once('dialog',dialog=>void dialog.accept());
   await (await picker).setFiles(path);
+  const confirmation = page.getByRole('dialog', {name: '恢复备份', exact: true});
+  await expect(confirmation).toHaveAccessibleDescription(/synthetic-backup\.zip/);
+  await confirmation.getByRole('button', {name: '恢复备份', exact: true}).click();
   await expect.poll(async () => ((await readState(request)) as any).settings.llm.key).toBe('synthetic-backup-marker');
   await expect.poll(async () => (await blobs(page))[id]).toBe(sha(model));
   const restored = await (await request.get('/api/memories')).json();

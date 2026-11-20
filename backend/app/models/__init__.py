@@ -18,7 +18,7 @@ from typing_extensions import NotRequired, TypedDict
 
 # ==================== 配置层（data/momo.yaml） ====================
 
-Transport = Literal["stdio", "http"]
+Transport = Literal["stdio", "http", "sse"]
 
 
 class LlmConfig(TypedDict):

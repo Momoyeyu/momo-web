@@ -6,28 +6,36 @@
   flex-direction: column;
 }
 
+#config-tools .config-card {container-type: inline-size;}
 .extension-settings {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-block: 14px;
+  column-gap: 24px;
 }
-
-.settings-page .extension-settings > .panel {
-  padding: 12px 0;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+.extension-settings .mcp-section {display: flex; flex-direction: column; min-width: 0; gap: 8px;}
+.mcp-section + .mcp-section {border-inline-start: 1px solid var(--line); padding-inline-start: 24px;}
+.mcp-heading {display: flex; align-items: center; gap: 6px;}
+.mcp-heading h3 {margin: 0; font-size: 16px;}
+.mcp-heading .icon-btn {margin-inline-start: auto;}
+.mcp-section .icon-btn {width: 32px; height: 30px;}
+.mcp-section .list-search {box-sizing: border-box; width: 100%; min-width: 0; height: 33px; flex: none; padding-inline: 10px;}
+.mcp-section .mcp-items {min-height: 0; flex: none;}
+.mcp-row {display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; min-height: 47px;}
+.mcp-row + .mcp-row {border-top: 1px solid var(--line-soft);}
+.mcp-row small {grid-column: 1 / -1; color: var(--danger);}
+.mcp-items p {margin: 8px 0; font-size: 13px;}
+.mcp-section .list-pager {align-self: flex-end; align-items: center; gap: 8px; border: none; overflow: visible; margin-top: auto;}
+.mcp-section .pager-btn {width: 32px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm);}
+.mcp-section .pager-text {padding: 0;}
+.mcp-remove {margin-inline-end: auto;}
+@container (max-width: 660px) {
+  .extension-settings {column-gap: 14px;}
+  .mcp-section + .mcp-section {padding-inline-start: 14px;}
 }
-.settings-page .extension-settings > .plugin-library {
-  border-top: 1px solid var(--line-soft);
-}
-.settings-page .extension-settings .list-body {
-  min-height: 0;
-}
-.settings-page .extension-settings .plugin-library-card {
-  height: auto;
+@container (max-width: 440px) {
+  .extension-settings {grid-template-columns: 1fr; row-gap: 14px;}
+  .mcp-section + .mcp-section {border-inline-start: 0; padding-inline-start: 0; border-top: 1px solid var(--line); padding-top: 14px;}
 }
 
 .vision-settings > p, .asr-status > p {
@@ -398,45 +406,6 @@
   font-weight: 600;
 }
 
-/* transport 徽标：小描边 chip。 */
-.ext-badge {
-  flex: none;
-  padding: 1px 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  font-family: monospace;
-  font-size: 11px;
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
-}
-
-/* 连接状态点：●成功(n tools) / ✗失败 / ○未启用 / …探测中。 */
-.ext-dot {
-  flex: none;
-  min-width: 84px;
-  font-size: 12px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.ext-dot.ok {
-  color: var(--ok);
-}
-
-.ext-dot.err {
-  color: var(--danger);
-}
-
-.ext-dot.off {
-  color: var(--text-faint);
-}
-
-.ext-dot.wait {
-  color: var(--text-dim);
-  opacity: 0.6;
-}
-
-/* 底部两行：第一行 [+ 添加] 通宽、第二行独立翻页器（行内居中窄控件）。 */
 /* 弹窗底部操作行：右对齐。 */
 .ext-actions {
   display: flex;

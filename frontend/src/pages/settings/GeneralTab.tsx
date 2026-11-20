@@ -13,7 +13,7 @@ import Slider from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import DialogPreview from './DialogPreview';
 
-export default function GeneralTab({section}: {section: 'language' | 'sound' | 'display' | 'preview' | 'sample'}) {
+export default function GeneralTab({section}: {section: 'language' | 'sound' | 'display' | 'preview'}) {
   const t = useT();
   const intro = useIntro();
   const [sample, setSample] = useState<'tap' | 'confirm' | 'cancel'>('tap');
@@ -57,27 +57,30 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
       ]} onChange={v => patch({soundPalette: v as GeneralConfig['soundPalette']})}/>
     </FieldRow>
   );
-  if (section === 'sample') return <>
-    {palette}
-    <FieldRow label={t('config.soundAction')}>
-      <Select label={t('config.soundAction')} value={sample} options={[
-        {value:'tap', label:t('config.soundTap')}, {value:'confirm', label:t('config.soundConfirm')}, {value:'cancel', label:t('config.soundCancel')},
-      ]} onChange={v => setSample(v as typeof sample)}/>
-    </FieldRow>
-    <FieldRow label={t('config.sampleSound')}>
-      <Button variant="ghost" className="config-action" sound={false} disabled={general.sfxVolume === 0} onClick={() => ambient.sound(sample)}>{t('config.soundPlay')}</Button>
-    </FieldRow>
-  </>;
   const voiceReady = ttsConfigured(settings.tts);
   const voiceOn = voiceReady && !general.voiceMuted;
-  return <>
-    <FieldRow label={t('settings.voiceInput')}><Switch title={t('settings.voiceInput')} on={general.voiceInput} onChange={voiceInput => {
-      patch({voiceInput});
-      if (!voiceInput) getChatEngine().stopListening();
-    }}/></FieldRow>
-    <FieldRow label={t('settings.voiceOut')} hint={!voiceReady ? t('settings.voiceNeedTts') : undefined}>
-      <Switch title={t('settings.voiceOut')} on={voiceOn} disabled={!voiceReady} onChange={v => getChatEngine().setMuted(!v)}/>
-    </FieldRow>
-    {slider('voiceVolume', !voiceOn)}{slider('sfxVolume')}{slider('musicVolume')}
-  </>;
+  return <div className="sound-pairs">
+    <div className="sound-pair">
+      <FieldRow label={t('settings.voiceInput')}><Switch title={t('settings.voiceInput')} on={general.voiceInput} onChange={voiceInput => {
+        patch({voiceInput});
+        if (!voiceInput) getChatEngine().stopListening();
+      }}/></FieldRow>
+      <FieldRow label={t('settings.voiceOut')} hint={!voiceReady ? t('settings.voiceNeedTts') : undefined}>
+        <Switch title={t('settings.voiceOut')} on={voiceOn} disabled={!voiceReady} onChange={v => getChatEngine().setMuted(!v)}/>
+      </FieldRow>
+    </div>
+    <div className="sound-pair">{slider('voiceVolume', !voiceOn)}{palette}</div>
+    <div className="sound-pair">{slider('sfxVolume')}
+      <FieldRow label={t('config.soundAction')}>
+        <Select label={t('config.soundAction')} value={sample} options={[
+          {value:'tap', label:t('config.soundTap')}, {value:'confirm', label:t('config.soundConfirm')}, {value:'cancel', label:t('config.soundCancel')},
+        ]} onChange={v => setSample(v as typeof sample)}/>
+      </FieldRow>
+    </div>
+    <div className="sound-pair">{slider('musicVolume')}
+      <FieldRow label={t('config.sampleSound')}>
+        <Button variant="ghost" className="config-action" sound={false} disabled={general.sfxVolume === 0} onClick={() => ambient.sound(sample)}>{t('config.soundPlay')}</Button>
+      </FieldRow>
+    </div>
+  </div>;
 }

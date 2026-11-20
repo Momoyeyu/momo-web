@@ -3,7 +3,7 @@
 // 用自定义 UI 而不是浏览器弹窗：文案换行、字距、按钮顺序都可控，i18n 长度差异也好排。
 // Esc / 点遮罩 = 取消；busy 时确认键置灰防重复提交。
 
-import { useEffect } from "react";
+import { useId } from "react";
 import Modal from "./Modal";
 import Button from "./Button";
 import { t } from "../i18n";
@@ -27,18 +27,11 @@ export default function Confirm({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === "Escape") onCancel();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel]);
-
+  const descriptionId = useId();
   return (
-    <Modal onClose={onCancel} className="confirm-box">
+    <Modal onClose={onCancel} label={title} describedBy={descriptionId} className="confirm-box">
       <h2 className="confirm-title">{title}</h2>
-      <p className="confirm-text">{message}</p>
+      <p id={descriptionId} className="confirm-text">{message}</p>
       <div className="modal-foot">
         <Button variant="ghost" onClick={onCancel}>
           {t("common.cancel")}

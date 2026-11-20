@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { apiJson } from "../services/http";
 import { useT } from "../i18n";
+import ConfigAction from "../pages/settings/ConfigAction";
 import FieldRow from "../ui/FieldRow";
 import Button from "../ui/Button";
 
@@ -29,21 +30,26 @@ export default function BuiltinResourcesNotice({showSpeech = false}: {showSpeech
   }, [attempt]);
   const messages = [];
   const asr = status?.asr;
-  if (!showSpeech && asr && !asr.ready) messages.push(t("settings.builtinSpeechUnavailable"));
+  const engine = asr?.engine === "sensevoice" ? "SenseVoice" : asr?.engine;
+  if (asr && !asr.ready) messages.push(t("settings.builtinSpeechUnavailable"));
   if (status && (["missing", "error"].includes(status.embedding.state) || status.index.state === "degraded")) {
     messages.push(t("settings.builtinRecallUnavailable"));
   }
   return <>
-    {showSpeech && <div className="asr-status">
-      <FieldRow label={t('config.asr')}>
-        {asr && <span className="config-value">{asr.engine} · {asr.language}</span>}
-        <span className="config-value" role={error ? 'alert' : 'status'}>
-          {t(error ? 'config.unavailable' : !asr ? 'config.loading' : asr.ready ? 'config.ready' : 'settings.builtinSpeechUnavailable')}
-        </span>
-        {error && <Button variant="ghost" size="sm" onClick={() => setAttempt(v => v + 1)}>{t('meeting.retry')}</Button>}
-      </FieldRow>
-      {!!asr?.missing?.length && <p className="config-value">{asr.missing.join(', ')}</p>}
-    </div>}
+    {showSpeech && <ConfigAction model="ASR" label={t('config.asr')} action={t('config.asrAction')}
+      value={engine || t(!asr && !error ? 'config.loading' : 'config.unavailable')}>
+      <div className="asr-status">
+        {engine && <FieldRow label={t('config.recognitionEngine')}><span>{engine}</span></FieldRow>}
+        {asr?.language && <FieldRow label={t('config.language')}><span>{asr.language}</span></FieldRow>}
+        <FieldRow label={t('config.modelResources')}>
+          <span className="config-value" role={error ? 'alert' : 'status'}>
+            {t(error ? 'config.unavailable' : !asr ? 'config.loading' : asr.ready ? 'config.ready' : 'settings.builtinSpeechUnavailable')}
+          </span>
+          {error && <Button variant="ghost" size="sm" onClick={() => setAttempt(v => v + 1)}>{t('meeting.retry')}</Button>}
+        </FieldRow>
+        {!!asr?.missing?.length && <p className="config-value">{asr.missing.join(', ')}</p>}
+      </div>
+    </ConfigAction>}
     {messages.length > 0 && <div className="builtin-resource-notice" role="status">{messages.map(text => <p key={text}>{text}</p>)}</div>}
   </>;
 }

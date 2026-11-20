@@ -66,8 +66,9 @@ test('settings gates vision verification, resets on model edit, and stale upload
   const config=structuredClone(original);config.settings.llm={...config.settings.llm,model:'no-vision',vision:false};config.settings.general.lang='zh';
   await request.put('/api/state',{data:config});await page.goto('/#/settings');
   await page.locator('[data-intro=tab-models]').click();
-  const vision=page.locator('#config-models .vision-settings');
-  const editModel=async(value:string)=>{await page.getByRole('button',{name:'配置模型'}).click();await page.locator('[data-intro=llm] input').nth(2).fill(value);await page.keyboard.press('Escape');};
+  await page.getByRole('button',{name:'配置模型'}).click();
+  const vision=page.getByRole('dialog').locator('.vision-settings');
+  const editModel=(value:string)=>page.locator('[data-intro=llm] input').nth(2).fill(value);
   const row=vision.locator('.opt-row');
   await expect(row.getByRole('switch')).toBeDisabled();
   await row.getByRole('button',{name:'验证识图能力'}).click();

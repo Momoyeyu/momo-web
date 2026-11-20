@@ -6,7 +6,7 @@ for(const lang of ['zh','en','ja'])test(`sound preview is available from the sou
  await page.route('**/api/state',r=>r.fulfill({json:state}));
  await page.goto('/#/settings');
  await page.locator('[data-intro=tab-sound]').click();
- const preview=page.locator('#config-sound .config-group').last();
+ const preview=page.locator('#config-sound');
  await expect(preview.locator('.sel-face')).toHaveCount(2);
  await preview.locator('.sel-face').last().click();
  await preview.getByRole('option').nth(1).click();

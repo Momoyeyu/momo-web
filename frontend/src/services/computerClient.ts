@@ -1,27 +1,39 @@
 import {apiJson,apiFetch,jsonInit} from './http';
 import {meetingIdentity,subscribeMeeting,meetingSnapshot} from './meetingClient';
 export type ComputerStatus={observing:boolean;generation:number;source:string;proactive:boolean;reactions:boolean;reason:string;executionAvailable:boolean;desktopAllowed?:boolean;desktopAccessGranted?:boolean|null;desktopError?:string};
-export type ComputerView={status:ComputerStatus|null;busy:boolean;error:boolean;text:string};
+export type ComputerView={status:ComputerStatus|null;confirmedConsent?:boolean|null;busy:boolean;error:boolean;text:string};
 let view:ComputerView={status:null,busy:false,error:false,text:''};
 let stream:MediaStream|null=null,video:HTMLVideoElement|null=null,timer:ReturnType<typeof setTimeout>|undefined,epoch=0;
+let consentRevision=0;
 let pendingStart:Promise<ComputerStatus>|null=null,stopping:Promise<void>|null=null;
 const listeners=new Set<()=>void>();
 function publish(patch:Partial<ComputerView>){view={...view,...patch};listeners.forEach(fn=>fn());}
 export const computerSnapshot=()=>view;
 export const hasSharedScreen=()=>stream!==null;
 export const subscribeComputer=(fn:()=>void)=>{listeners.add(fn);return()=>{listeners.delete(fn);};};
-export async function readComputer(){publish({status:await apiJson<ComputerStatus>('/api/computer/status')});}
+export function recordDesktopConsent(granted:boolean|null){
+ consentRevision++;
+ publish({confirmedConsent:granted,status:view.status && {...view.status,desktopAccessGranted:granted}});
+}
+async function readStatus(path:string,init?:RequestInit):Promise<ComputerStatus>{
+ const revision=consentRevision;
+ const status=await apiJson<ComputerStatus>(path,init);
+ // An earlier request may finish after the consent endpoint has confirmed a change.
+ if(revision!==consentRevision)return {...status,desktopAccessGranted:view.confirmedConsent};
+ return status;
+}
+export async function readComputer(){publish({status:await readStatus('/api/computer/status')});}
 export function stopComputer():Promise<void>{
  if(stopping)return stopping;
  epoch++;clearTimeout(timer);const old=stream;stream=null;video=null;old?.getTracks().forEach(track=>track.stop());
  publish({busy:true,text:'',status:view.status?{...view.status,observing:false}:null});
  stopping=(async()=>{
-  try{await pendingStart?.catch(()=>{});publish({status:await apiJson<ComputerStatus>('/api/computer/stop',{method:'POST'})});}catch{publish({error:true});}
+  try{await pendingStart?.catch(()=>{});publish({status:await readStatus('/api/computer/stop',{method:'POST'})});}catch{publish({error:true});}
   finally{stopping=null;publish({busy:false});}
  })();return stopping;
 }
 subscribeMeeting(()=>{if(stream&&(!meetingIdentity()||meetingSnapshot().attention.focus))void stopComputer();});
-export async function configureComputer(proactive:boolean,reactions:boolean){publish({status:await apiJson<ComputerStatus>('/api/computer/settings',jsonInit('PATCH',{proactive,reactions}))});}
+export async function configureComputer(proactive:boolean,reactions:boolean){publish({status:await readStatus('/api/computer/settings',jsonInit('PATCH',{proactive,reactions}))});}
 export async function startComputer(){
  if(view.busy||stream)return;publish({busy:true,error:false,text:''});const own=++epoch;
  try{
@@ -30,7 +42,7 @@ export async function startComputer(){
   if(own!==epoch){media.getTracks().forEach(track=>track.stop());return;}
   stream=media;const track=media.getVideoTracks()[0]!;track.onended=()=>void stopComputer();
   const player=document.createElement('video');player.muted=true;player.srcObject=media;await player.play();if(own!==epoch)return;video=player;
-  pendingStart=apiJson<ComputerStatus>('/api/computer/start',jsonInit('POST',{source:track.label.slice(0,200)||'Shared screen',proactive:view.status?.proactive??false,reactions:view.status?.reactions??false}));
+  pendingStart=readStatus('/api/computer/start',jsonInit('POST',{source:track.label.slice(0,200)||'Shared screen',proactive:view.status?.proactive??false,reactions:view.status?.reactions??false}));
   const status=await pendingStart.finally(()=>{pendingStart=null;});
   if(own!==epoch)return;publish({status,busy:false});
   let lastReaction=0;
@@ -63,11 +75,11 @@ export async function askComputer(question:string){
 export async function setDesktopObservation(enabled:boolean){
  const identity=meetingIdentity();if(!identity)return;
  publish({busy:true,error:false});
- try{publish({status:await apiJson<ComputerStatus>('/api/computer/desktop/observation',jsonInit('POST',{...identity,enabled}))});}
+ try{publish({status:await readStatus('/api/computer/desktop/observation',jsonInit('POST',{...identity,enabled}))});}
  catch{publish({error:true});}finally{publish({busy:false});}
 }
 export async function captureDesktop(){
  const identity=meetingIdentity();if(!identity||meetingSnapshot().attention.focus)return;
- try{publish({status:await apiJson<ComputerStatus>('/api/computer/desktop/frame',jsonInit('POST',identity)),error:false});}
+ try{publish({status:await readStatus('/api/computer/desktop/frame',jsonInit('POST',identity)),error:false});}
  catch{await readComputer().catch(()=>{});publish({error:true});}
 }
