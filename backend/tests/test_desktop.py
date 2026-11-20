@@ -44,6 +44,7 @@ def test_window_selection_and_observation_preference_do_not_need_meeting(monkeyp
     from app.services.computer import computer
 
     monkeypatch.setenv("MOMO_DESKTOP_TOKEN", "a" * 64)
+    monkeypatch.setattr("app.api.app_permissions.native_desktop", lambda: True)
     headers = {"x-momo-token": "a" * 64, "origin": "momo://app"}
     target = {"windowId": 7, "ownerPid": 9}
     monkeypatch.setattr(native_control, "targets", lambda plugin: {"targets": [dict(target, plugin=plugin)]})
