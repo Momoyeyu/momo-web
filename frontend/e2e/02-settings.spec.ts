@@ -87,7 +87,7 @@ test("端点探测：可点、出结果、2.5s 后自动复原", async ({ page }
   await expect(btn).toHaveText("测试", { timeout: 10_000 });
 });
 
-test("设置弹窗：登记 stdio MCP server → 出现在列表 → 删除", async ({ page }) => {
+test("工具章节：登记、停用并删除一条 MCP 连接", async ({ page }) => {
   await openExtensionTab(page, "MCP");
   // 「说明书」性质的说明收进了问号浮窗：正文里不该再有那段长句，
   // 但说明本身要能在浮窗里拿到（鼠标走 data-tip，读屏走 aria-label）。
@@ -99,16 +99,20 @@ test("设置弹窗：登记 stdio MCP server → 出现在列表 → 删除", as
   await expect(page.locator(".ext-panel .list-body")).toBeVisible();
 
   await page.locator(".ext-panel .list-toolbar .icon-btn").click();
-  await expect(page.locator(".modal-box:not(.config-modal)")).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(1);
 
   await fieldRow(page, "名称", ".ext-modal").locator("input").fill("e2e-echo");
   await pickSelect(page, "连接方式", "stdio", ".ext-modal");
   await fieldRow(page, "命令", ".ext-modal").locator("input").fill("echo");
   await page.locator(".ext-actions").getByText("保存").click();
 
-  await expect(page.locator(".modal-box:not(.config-modal)")).toBeHidden();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   const created = page.locator(".ext-row").filter({ hasText: "e2e-echo" });
   await expect(created).toBeVisible();
+  const enabled = created.getByRole("switch", {name: "e2e-echo"});
+  await expect(enabled).toHaveAttribute("aria-checked", "true");
+  await enabled.click();
+  await expect(enabled).toHaveAttribute("aria-checked", "false");
 
   // 用完即删（配置随后还会被 afterEach 整体还原）
   await created.locator(".danger").click();
@@ -163,14 +167,13 @@ test("显示设置：预览跟随对话状态开关", async ({
 
 test("设置操作按钮对齐，键盘关闭后焦点回到入口", async ({page}) => {
   await openTab(page, "模型");
-  const actions = page.locator(".config-card .config-action");
-  const boxes = await actions.evaluateAll(buttons => buttons.map(b => {
-    const r = b.getBoundingClientRect();
-    return {x:r.x, w:r.width, h:r.height};
-  }));
-  expect(boxes.length).toBeGreaterThanOrEqual(18);
-  for (const box of boxes) expect(box).toEqual({x:boxes[0]!.x, w:112, h:34});
-  const entry = page.getByRole("button", {name:"验证能力"});
+  const section = page.locator("#config-models");
+  const entry = section.getByRole("button", {name:"配置模型",exact:true});
+  const speech = section.getByRole("button", {name:"配置语音",exact:true});
+  const modelBox = await entry.boundingBox();
+  const speechBox = await speech.boundingBox();
+  expect(modelBox).toMatchObject({width:112,height:34});
+  expect(speechBox).toMatchObject({x:modelBox!.x,width:112,height:34});
   await entry.focus(); await entry.press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape"); await expect(entry).toBeFocused();

@@ -51,9 +51,8 @@ test('backup round-trips imported model ZIP, YAML and SQLite through actual cont
   const savedMemory = await (await request.post('/api/memories',{data:{content:'three-store preserved memory'}})).json();
   await page.keyboard.press('Escape');
   await openTab(page,'存档');
-  await page.getByRole('button',{name:'导出文件'}).click();
   const download = page.waitForEvent('download');
-  await page.getByRole('button',{name:'导出备份',exact:true}).click();
+  await page.getByRole('button',{name:'导出文件',exact:true}).click();
   const file = await download;
   const path = info.outputPath('synthetic-backup.zip'); await file.saveAs(path);
   const archive = await JSZip.loadAsync(await readFile(path));
@@ -73,9 +72,11 @@ test('backup round-trips imported model ZIP, YAML and SQLite through actual cont
     await route.continue();
   });
   const pendingPut=page.waitForRequest(req=>new URL(req.url()).pathname==='/api/state' && req.method()==='PUT');
-  await page.reload(); await openTab(page,'存档'); await page.getByRole('button',{name:'选择文件'}).click(); await pendingPut;
+  await page.reload(); await openTab(page,'存档'); await pendingPut;
+  const picker = page.waitForEvent('filechooser');
+  await page.getByRole('button',{name:'选择文件',exact:true}).click();
   page.once('dialog',dialog=>void dialog.accept());
-  await page.locator('input[type=file][accept=".zip"]').setInputFiles(path);
+  await (await picker).setFiles(path);
   await expect.poll(async () => ((await readState(request)) as any).settings.llm.key).toBe('synthetic-backup-marker');
   await expect.poll(async () => (await blobs(page))[id]).toBe(sha(model));
   const restored = await (await request.get('/api/memories')).json();

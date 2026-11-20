@@ -271,6 +271,8 @@
   pointer-events: none;
 }
 
+.is-chat-resume .dialog-zone, .is-chat-resume .chat-toolbar { animation: none; }
+
 @media (prefers-reduced-motion: reduce) {
   .dialog-zone, .chat-toolbar { animation: none; }
 }

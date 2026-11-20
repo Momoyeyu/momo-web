@@ -18,6 +18,9 @@ export default function DesktopSettings() {
   const native = !!window.momoDesktop;
   useEffect(() => { void readComputer().catch(() => setFailed(true)); }, []);
   const granted = status?.desktopAccessGranted === true;
+  const accessStatus = !native ? 'config.nativeOnly' : status
+    ? (granted ? 'desktopAccess.enabled' : 'config.grantedOff')
+    : (failed ? 'config.unavailable' : 'config.loading');
   const disabled = !native || !status || saving || busy;
   async function configure(on: boolean) {
     setSaving(true);
@@ -27,10 +30,11 @@ export default function DesktopSettings() {
     finally { setSaving(false); }
   }
   return <>
-    <ConfigAction label={t('desktopAccess.title')} action={t('config.accessAction')}
-      value={native && status ? t(granted ? 'desktopAccess.enabled' : 'config.grantedOff') : undefined}
-    >
-      {native ? <Button className="config-action" onClick={openDesktopAccessGuide}>{t('desktopAccess.open')}</Button> : <p>{t('config.nativeOnly')}</p>}
+    <FieldRow label={t('desktopAccess.title')} hint={native ? t('desktopAccess.description') : undefined}>
+      <span className="config-value" role="status">{t(accessStatus)}</span>
+      {native && <Button variant="ghost" className="config-action" onClick={openDesktopAccessGuide}>{t('config.accessAction')}</Button>}
+    </FieldRow>
+    <ConfigAction label={t('computer.title')} action={t('config.windowAction')}>
       <NativeCompanion plugin="computer" mode="activity"/>
     </ConfigAction>
     <ConfigAction label={t('desktopAccess.blocklist')} action={t('config.blockAction')}>

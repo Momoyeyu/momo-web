@@ -1,25 +1,81 @@
-import {test,expect} from './fixtures';
+import {test, expect} from './fixtures';
+import {openApp} from './helpers';
 
-for (const width of [960,1280]) test('settings action column is stable in three languages at '+width,async({page,request})=>{
-  const state=await (await request.get('/api/state')).json();
-  await page.setViewportSize({width,height:width*9/16});
-  await page.route('**/api/state',route=>route.fulfill({json:state}));
-  await page.route('**/api/intro',route=>route.fulfill({json:{phase:'completed',configurationValid:true}}));
-  let reference:unknown;
-  for(const lang of ['zh','en','ja']){
-    state.settings.general.lang=lang;
-    await page.goto('/#/settings');await page.reload();
-    await expect(page.locator('html')).toHaveAttribute('lang',lang==='zh'?'zh-CN':lang);
-    await expect(page.locator('.config-index button')).toHaveCount(10);
-    await page.evaluate(()=>document.fonts.ready);
-    const geometry=await page.locator('.config-card .config-action').evaluateAll(buttons=>buttons.map(el=>{
-      const b=el as HTMLElement,r=b.getBoundingClientRect();
-      return {width:r.width,height:r.height,right:Math.round(r.right),fits:b.scrollWidth<=b.clientWidth+1&&b.scrollHeight<=b.clientHeight+1};
-    }));
-    expect(geometry.length).toBeGreaterThanOrEqual(17);
-    expect(geometry.every(g=>g.width===112&&g.height===34&&g.fits)).toBe(true);
-    expect(new Set(geometry.map(g=>g.right)).size).toBe(1);
-    if(reference)expect(geometry).toEqual(reference);
-    reference=geometry;
+test('title menu hints are plain text', async ({page}) => {
+  await openApp(page);
+  const hints = page.locator('.title-menu .mi-hint');
+  await expect(hints).toHaveText(['boot', 'config']);
+  for (const hint of await hints.all()) {
+    await expect(hint).toHaveCSS('border-top-width', '0px');
+    await expect(hint).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(hint).toHaveCSS('text-transform', 'uppercase');
   }
 });
+
+test('settings modal footer gives its action room below the divider', async ({page}) => {
+  await openApp(page, 'settings');
+  await page.locator('#config-mods input[type="file"]').setInputFiles({
+    name: 'test.momomod',
+    mimeType: 'application/octet-stream',
+    buffer: Buffer.from('test'),
+  });
+  const dialog = page.getByRole('dialog').filter({has: page.locator('.extension-detail')});
+  const footer = dialog.locator('.modal-foot');
+  const action = footer.getByRole('button');
+  await expect(action).toBeVisible();
+  await expect(footer).toHaveCSS('border-top-width', '1px');
+  expect(await action.evaluate(button =>
+    button.getBoundingClientRect().top - button.parentElement!.getBoundingClientRect().top,
+  )).toBeGreaterThanOrEqual(12);
+});
+
+for (const width of [640, 960, 1280]) {
+  test(`settings action labels stay on one line in three languages at ${width}px`, async ({page, request}) => {
+    const state = await (await request.get('/api/state')).json();
+    await page.setViewportSize({width, height: width * 9 / 16});
+    await page.route('**/api/state', route => route.fulfill({json: state}));
+    await page.route('**/api/intro', route => route.fulfill({json: {phase: 'completed', configurationValid: true}}));
+    await page.route('**/api/mods', route => route.fulfill({
+      json: {mods: [{id: 'momo.qq', name: 'QQ', enabled: false, resources: []}]},
+    }));
+
+    for (const lang of ['zh', 'en', 'ja']) {
+      state.settings.general.lang = lang;
+      await page.goto('/#/settings');
+      await page.reload();
+      await expect(page.locator('html')).toHaveAttribute('lang', lang === 'zh' ? 'zh-CN' : lang);
+      await expect(page.locator('.config-index button')).toHaveCount(10);
+      await expect(page.locator('#config-mods').getByRole('switch', {name: 'QQ'})).toHaveCount(1);
+      await page.evaluate(() => document.fonts.ready);
+
+      const actions = await page.locator('.config-document .config-action').evaluateAll(buttons => buttons.map(button => {
+        const range = document.createRange();
+        range.selectNodeContents(button);
+        const text = Array.from(range.getClientRects());
+        const bounds = button.getBoundingClientRect();
+        const row = button.closest('.opt-row');
+        const group = button.closest('.config-group, .config-card, .config-header');
+        const positions = [row, group].filter(el => el !== null).map(el => el.getBoundingClientRect());
+        return {
+          label: button.textContent,
+          width: bounds.width,
+          height: bounds.height,
+          lines: new Set(text.map(rect => Math.round(rect.top))).size,
+          textFits: text.every(rect => rect.left >= bounds.left + 4 && rect.right <= bounds.right - 4),
+          buttonFits: positions.every(rect => bounds.left >= rect.left - 1 && bounds.right <= rect.right + 1),
+          columnRight: group ? Math.round(group.getBoundingClientRect().right - bounds.right) : null,
+          group: group?.closest('section')?.id,
+        };
+      }));
+      expect(actions.length).toBeGreaterThanOrEqual(12);
+      expect(actions.filter(action => action.lines !== 1 || !action.textFits || !action.buttonFits),
+        `${lang} at ${width}px`).toEqual([]);
+      for (const action of actions) {
+        if (width >= 960) expect([action.width, action.height], `${lang} at ${width}px, ${action.label}`).toEqual([112, 34]);
+      }
+      const cardActions = actions.filter(action => action.group && action.columnRight !== null);
+      expect(new Set(cardActions.map(action => action.columnRight)).size).toBeLessThanOrEqual(2);
+      expect(await page.locator('.config-scroll').evaluate(el=>el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+    }
+  });
+}

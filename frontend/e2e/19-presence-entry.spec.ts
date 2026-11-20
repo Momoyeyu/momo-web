@@ -123,6 +123,90 @@ for (const destination of ['设置', '记录']) {
   });
 }
 
+test('browser history cannot replay Boot or activate a released meeting', async ({page}) => {
+  const activations: unknown[] = [];
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/meeting/enter') activations.push(request.postDataJSON());
+  });
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      document.body.dataset.bootEntries = '0';
+      new MutationObserver(records => {
+        for (const record of records) for (const node of record.addedNodes) {
+          if (node instanceof Element && (node.matches('.chat-entry-canvas') || node.querySelector('.chat-entry-canvas'))) {
+            document.body.dataset.bootEntries = String(Number(document.body.dataset.bootEntries) + 1);
+          }
+        }
+      }).observe(document.body, {childList:true,subtree:true});
+    });
+  });
+  await fixture(page);
+  await page.getByRole('button',{name:'启动 boot'}).click();
+  await expect(page.locator('.input-row input')).toBeEditable();
+  await expect(page.locator('body')).toHaveAttribute('data-boot-entries','1');
+  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await expect(page.locator('[data-intro=settings-back]')).toBeVisible();
+  await page.goBack();
+  await expect(page.locator('.input-row input')).toBeEditable();
+  await expect(page.locator('body')).toHaveAttribute('data-boot-entries','1');
+  await page.evaluate(() => {location.hash='/title';});
+  await expect(page.locator('.title-screen')).toBeVisible();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('momo.meeting-owner.v1'))).toBeNull();
+  await page.goBack();
+  await expect(page).toHaveURL(/#\/title$/);
+  await expect(page.locator('.title-screen')).toBeVisible();
+  await expect(page.locator('.chat-page')).toHaveCount(0);
+  await expect(page.locator('body')).toHaveAttribute('data-boot-entries','1');
+  expect(activations).toEqual([{clientId:expect.any(String)}]);
+});
+
+test('Settings opened from browser history returns to Title after the meeting ends', async ({page}) => {
+  await fixture(page);
+  await page.getByRole('button',{name:'启动 boot'}).click();
+  await expect(page.locator('.input-row input')).toBeEditable();
+  await page.getByRole('button',{name:'设置',exact:true}).click();
+  const back = page.locator('[data-intro=settings-back]');
+  await expect(back).toHaveAccessibleName('返回对话');
+
+  await page.evaluate(() => {location.hash='/title';});
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem('momo.meeting-owner.v1'))).toBeNull();
+  await expect(page.locator('.settings-page')).toHaveCount(0);
+  await page.goBack();
+  await expect(back).toHaveAccessibleName('返回标题');
+  await back.click();
+  await expect(page).toHaveURL(/#\/title$/);
+});
+
+test('an abandoned Boot releases a late meeting lease without opening Chat', async ({page}) => {
+  await fixture(page);
+  const requested = Promise.withResolvers<void>();
+  const respond = Promise.withResolvers<void>();
+  await page.route('**/api/meeting/enter', async route => {
+    requested.resolve();
+    await respond.promise;
+    await route.fulfill({json:{leaseId:'abandoned-boot',epoch:1,expiresIn:60}});
+  },{times:1});
+
+  await page.getByRole('button',{name:'启动 boot'}).click();
+  await requested.promise;
+  await page.evaluate(() => {location.hash='/settings';});
+  const back = page.locator('[data-intro=settings-back]');
+  await expect(back).toBeVisible();
+  const released = page.waitForRequest(request => new URL(request.url()).pathname==='/api/meeting/leave'
+    && request.postDataJSON().leaseId==='abandoned-boot',{timeout:6000});
+  respond.resolve();
+  await released;
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(back).toHaveAccessibleName('返回标题');
+  await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
+  expect(await page.evaluate(() => sessionStorage.getItem('momo.meeting-owner.v1'))).toBeNull();
+
+  await back.click();
+  await page.getByRole('button',{name:'启动 boot'}).click();
+  await expect(page.locator('.chat-entry-canvas')).toBeVisible();
+  await expect(page.locator('.input-row input')).toBeEditable();
+});
+
 test('rapid navigation cancels ASCII; only a new title-to-chat entry replays it', async ({page}) => {
   await fixture(page);
   await page.getByRole('button',{name:'启动 boot'}).click();

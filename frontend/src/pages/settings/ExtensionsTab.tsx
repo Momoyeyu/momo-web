@@ -1,5 +1,5 @@
 // Endpoint connections and trusted local MCP packages share one entry in Tools.
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { useT } from "../../i18n";
 import { CARD_PAGE_SIZE, clampPage } from "../../lib/paging";
@@ -11,13 +11,14 @@ import Hint from "../../ui/Hint";
 import IconButton from "../../ui/IconButton";
 import Pager from "../../ui/Pager";
 import Switch from "../../ui/Switch";
-import ConfigAction from './ConfigAction';
 import PluginLibrary from './PluginLibrary';
 import ExtConfigModal from "./ExtConfigModal";
 
 export default function McpSettings() {
   const t = useT();
   const settings = useSyncExternalStore(subscribe, getState).settings;
+  const panel = useRef<HTMLDivElement>(null);
+  const [viewed, setViewed] = useState(false);
   const [extEditing, setExtEditing] = useState<number | null>(null);
   const [extQuery, setExtQuery] = useState("");
   const [extPage, setExtPage] = useState(0);
@@ -27,11 +28,23 @@ export default function McpSettings() {
   >({});
 
   const patchExtensions = (list: McpExtension[]): void => {
-    update({ settings: { ...settings, extensions: list } });
+    update({ settings: { ...getState().settings, extensions: list } });
   };
+
+  useEffect(() => {
+    if (!panel.current) return;
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      setViewed(true);
+      observer.disconnect();
+    });
+    observer.observe(panel.current);
+    return () => observer.disconnect();
+  }, []);
 
   // 连接状态：清单变化时对 enabled 记录各探测一次，结果只影响状态点、失败不阻塞 UI。
   useEffect(() => {
+    if (!viewed) return;
     let alive = true;
     setExtProbes({});
     settings.extensions.forEach((ext, i) => {
@@ -44,7 +57,7 @@ export default function McpSettings() {
     return () => {
       alive = false;
     };
-  }, [settings.extensions]);
+  }, [settings.extensions, viewed]);
 
   // 检索 + 分页（与 Live2D 面板同构：过滤命中集分页，索引映射回原清单）
   const extHits = settings.extensions
@@ -120,8 +133,7 @@ export default function McpSettings() {
   };
 
   return (
-    <div className="extension-settings">
-      <ConfigAction label={t('config.localMcp')} action={t('config.localMcpAction')}><PluginLibrary active/></ConfigAction>
+    <div className="extension-settings" ref={panel}>
         <section className="panel panel-stack settings-col ext-panel extension-panel">
           <div className="panel-title-row">
             <h3 className="opt-group">{t("settings.groups.extensions")}</h3>
@@ -130,6 +142,7 @@ export default function McpSettings() {
           <div className="list-toolbar">
             <input
               className="list-search"
+              aria-label={t("settings.extSearchPh")}
               placeholder={t("settings.extSearchPh")}
               value={extQuery}
               onChange={(e) => {
@@ -155,6 +168,7 @@ export default function McpSettings() {
                 </span>
                 <span className="ext-badge">{ext.transport}</span>
                 <Switch
+                  title={ext.name || t("settings.extUnnamed")}
                   on={ext.enabled}
                   onChange={(v) =>
                     patchExtensions(
@@ -193,6 +207,7 @@ export default function McpSettings() {
             </div>
           </div>
         </section>
+      <PluginLibrary active={viewed}/>
       {extEditing !== null && (
         <ExtConfigModal
           initial={

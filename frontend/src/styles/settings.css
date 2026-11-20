@@ -14,6 +14,50 @@
   min-height: 0;
 }
 
+.settings-page .extension-settings > .panel {
+  padding: 12px 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.settings-page .extension-settings > .plugin-library {
+  border-top: 1px solid var(--line-soft);
+}
+.settings-page .extension-settings .list-body {
+  min-height: 0;
+}
+.settings-page .extension-settings .plugin-library-card {
+  height: auto;
+}
+
+.vision-settings > p, .asr-status > p {
+  margin: 0;
+  padding-bottom: 8px;
+  font-size: 12px;
+}
+.asr-status .opt-ctl {
+  flex-wrap: wrap;
+}
+
+#config-browser .extension-window-select {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  font: inherit;
+  color: var(--text);
+  background: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+#config-browser .desktop-observed-target {
+  overflow-wrap: anywhere;
+}
+#config-browser .extension-detail-notice {
+  padding: 7px 0;
+}
+
 .settings-col {
   display: flex;
   flex-direction: column;

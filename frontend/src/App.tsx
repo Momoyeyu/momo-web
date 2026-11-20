@@ -29,7 +29,7 @@ import GlassReturn from "./effects/GlassReturn";
 import {captureStage,prepareTitle} from "./effects/captureStage";
 import { blobForward } from "./lib/blobMask";
 import { setRopeFrom } from "./lib/ropeAngle";
-import { navigate,useRoute, type Route } from "./router";
+import { consumeBoot,navigate,useRoute, type Route } from "./router";
 import { getSettings, subscribe } from "./lib/store";
 
 // Boot uses ink/ASCII; chat's Home fractures the captured scene. Subpages keep RoPE.
@@ -50,6 +50,7 @@ interface PageEntry {
   id: number;
   route: Route;
   leaving?: boolean;
+  resumeChat?: boolean;
 }
 
 function renderPage(route: Route, active: boolean, attention:AttentionState,onHome:()=>void) {
@@ -134,7 +135,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     } else if (storedMeetingIdentity()) {
       void enterMeeting(true).then(() => {if (location.hash.replace(/^#\/?/,"") === "title") void leaveMeeting(getChatEngine().finishMeeting());}).catch(() => {});
     } else if (route === "chat") {
-      location.hash="#/title";
+      location.replace('#/title');
     }
   },[route]);
   useEffect(()=>{
@@ -216,6 +217,8 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   useEffect(() => {
     if (route === curRef.current) return;
     const prevRoute = curRef.current;
+    const titleEntry = consumeBoot() && prevRoute === "title" && route === "chat";
+    const resumeChat = prevRoute === "settings" && route === "chat";
     curRef.current = route;
     captureToken.current++;capturePending.current=false;setCapturing(false);
     if(route!=='title'){setExitFrame(null);setExitScene(null);}
@@ -229,7 +232,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     if (hist.length > 24) hist.splice(0, hist.length - 24);
 
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setStack([{ id: seq.current++, route }]);
+      setStack([{ id: seq.current++, route, resumeChat }]);
       setFront(false);
       setRev(false);
       setBooting(false);
@@ -239,7 +242,6 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
       setExitScene(null);
       return;
     }
-    const titleEntry = prevRoute === "title" && route === "chat";
     const glassExit = prevRoute === 'chat' && route === 'title' && exitFrame !== null;
     setRev(back);
     setFx(!titleEntry&&!glassExit);
@@ -266,11 +268,11 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
       setEntry(seq.current++);
     } else {
       setEntry(null);
-      setBooting(route === "chat");
+      setBooting(route === "chat" && !resumeChat);
       // RoPE 页之间：新页压栈顶，盖上不规则遮罩漫开；旧页在下面等着被盖住
       setStack((prev) => [
         ...withoutSame(prev),
-        { id: seq.current++, route },
+        { id: seq.current++, route, resumeChat },
       ]);
       setFront(true);
       t1 = window.setTimeout(() => {
@@ -319,6 +321,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
         }
         // 进入 chat 的化开还没结束时，压住 chat 内部的入场动画（对话框抢跑）
         if (top && p.route === "chat" && (booting || !ready || !meetingReady)) cls += " is-booting";
+        if (p.resumeChat) cls += " is-chat-resume";
         return (
           <div
             key={p.id}

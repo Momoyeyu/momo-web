@@ -68,7 +68,7 @@ function expectSequenced(frames:Frame[]) {
 }
 
 for(const destination of ['设置','记录']){
-  test(`dialog waits for the scene when returning from ${destination}`,async({page},info)=>{
+  test(`dialog resumes with the correct presentation when returning from ${destination}`,async({page},info)=>{
     await fixture(page);
     await bootChat(page);
     await finishAudit(page,info);
@@ -77,15 +77,23 @@ for(const destination of ['设置','记录']){
     await page.evaluate(()=>(window as unknown as {__startDialogAudit:()=>void}).__startDialogAudit());
     await page.getByRole('button',{name:'返回对话',exact:true}).click();
     const frames=await finishAudit(page,info);
-    expectSequenced(frames);
+    if(destination==='设置'){
+      expect(frames.some(frame=>frame.cover)).toBe(true);
+      expect(frames.some(frame=>frame.animation==='dialog-rise')).toBe(false);
+      expect(frames.filter(frame=>frame.cover&&(frame.interactive||frame.setup))).toEqual([]);
+      expect(frames.at(-1)?.interactive).toBe(true);
+    }else expectSequenced(frames);
     expect(frames.some(frame=>frame.ink)).toBe(false);
   });
 }
 
-test('direct chat waits for startup before its dialog rises',async({page},info)=>{
+test('reloading an owned chat waits for startup before its dialog rises',async({page},info)=>{
   await fixture(page);
   await bootChat(page);
-  expectSequenced(await finishAudit(page,info));
+  await page.reload();
+  const frames=await finishAudit(page,info);
+  expectSequenced(frames);
+  expect(frames.some(frame=>frame.ink)).toBe(false);
 });
 
 test('title ASCII finishes before the dialog rises and input unlocks',async({page},info)=>{
@@ -126,20 +134,21 @@ test('cancelling during the rise cannot unlock a later page or duplicate chat',a
   await fixture(page);
   await bootChat(page);
   await finishAudit(page,info);
-  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await page.getByRole('button',{name:'记录',exact:true}).click();
   await expect(page.locator('.page-wrap')).toHaveCount(1);
   await page.getByRole('button',{name:'返回对话',exact:true}).click();
   await page.waitForFunction(()=>{
     const zone=document.querySelector('.dialog-zone');
     return zone && !zone.closest('.is-front') && Number(getComputedStyle(zone).opacity)>.05 && Number(getComputedStyle(zone).opacity)<.9;
   });
-  await page.evaluate(()=>{location.hash='/backlog';});
-  await expect(page.locator('.backlog-page')).toBeVisible();
+  await page.evaluate(()=>{location.hash='/settings';});
+  await expect(page.locator('.settings-page')).toBeVisible();
   await expect(page.locator('.page-wrap')).toHaveCount(1);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.evaluate(()=>(window as unknown as {__startDialogAudit:()=>void}).__startDialogAudit());
   await page.getByRole('button',{name:'返回对话',exact:true}).click();
-  expectSequenced(await finishAudit(page,info));
+  const frames=await finishAudit(page,info);
+  expect(frames.every(frame=>!frame.ink&&frame.animation!=='dialog-rise')).toBe(true);
   await expect(page.locator('.chat-page')).toHaveCount(1);
 });
 
@@ -147,7 +156,7 @@ test('input follows a paused or cancelled visual animation instead of a timer',a
   await fixture(page);
   await bootChat(page);
   await finishAudit(page,info);
-  await page.getByRole('button',{name:'设置',exact:true}).click();
+  await page.getByRole('button',{name:'记录',exact:true}).click();
   await expect(page.locator('.page-wrap')).toHaveCount(1);
   const style=await page.addStyleTag({content:'.dialog-zone { animation-play-state: paused !important; }'});
   await page.getByRole('button',{name:'返回对话',exact:true}).click();

@@ -8,13 +8,13 @@ for(const lang of ['zh','en','ja'])for(const size of [{width:1280,height:720},{w
  await page.goto('/#/settings');
  for(const [section, row] of [['display', 'avatar'], ['tools', 'mcp']]){
   await page.locator('[aria-controls="config-'+section+'"]').click();
-  await page.locator('#config-'+section+' .config-action').click();
-  const panel=page.locator('.config-modal'),pager=panel.locator('.list-pager');
+  if(section==='display')await page.locator('#config-display .config-action').click();
+  const panel=page.locator(section==='display'?'.config-modal':'#config-tools .ext-panel'),pager=panel.locator('.list-pager');
   await expect(pager).toBeVisible();
   await pager.scrollIntoViewIfNeeded();
   await expect(pager).toBeInViewport();
   expect(await panel.evaluate(el=>el.scrollWidth)).toBeLessThanOrEqual(await panel.evaluate(el=>el.clientWidth)+2);
   await page.screenshot({path:info.outputPath(row+'.png')});
-  await page.keyboard.press('Escape');
+  if(section==='display')await page.keyboard.press('Escape');
  }
 });

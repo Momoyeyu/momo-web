@@ -65,8 +65,9 @@ export async function openTab(page: Page, label: string): Promise<void> {
 
 export async function openExtensionTab(page: Page, label: string): Promise<void> {
   if (label === "插件") return openTab(page, "模组");
-  await openTab(page, label === "MCP" ? "工具" : "显示");
-  await page.getByRole("button", {name: label === "MCP" ? "管理连接" : "管理形象", exact:true}).click();
+  if (label === "MCP") return openTab(page, "工具");
+  await openTab(page, "显示");
+  await page.getByRole("button", {name:"管理形象", exact:true}).click();
 }
 
 /** 收集控制台错误与未捕获异常，供「无错误」断言使用。 */

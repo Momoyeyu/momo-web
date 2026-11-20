@@ -1,59 +1,86 @@
-import {useEffect, useRef, useState} from 'react';
+import {useEffect, useRef, useSyncExternalStore} from 'react';
 import Button from '../../ui/Button';
+import FieldRow from '../../ui/FieldRow';
 import '../../styles/modal.css';
 import '../../styles/data-transfer.css';
-import {useSyncExternalStore} from 'react';
-import {getState, subscribe, pausePersistence} from '../../lib/store';
+import {useT} from '../../i18n';
+import {pausePersistence} from '../../lib/store';
 import {exportData, importData} from '../../services/dataTransfer';
-const labels = {
-  zh: ['数据备份', '导出备份', '恢复备份', '备份包含聊天、记忆、模型和服务密钥，请妥善保管。恢复会替换当前数据。', '确定恢复备份并替换当前数据？', '操作失败，请检查备份文件后重试。', '处理中…'],
-  en: ['Data backup', 'Export backup', 'Restore backup', 'Backups contain chats, memories, models and service keys. Keep them private. Restoring replaces current data.', 'Restore this backup and replace current data?', 'Could not complete the operation. Check the backup and retry.', 'Working…'],
-  ja: ['データのバックアップ', '書き出す', '復元する', 'バックアップには会話、記憶、モデル、サービスキーが含まれます。安全に保管してください。復元すると現在のデータが置き換わります。', '現在のデータをバックアップで置き換えますか？', '操作に失敗しました。ファイルを確認して再試行してください。', '処理中…'],
-};
-export default function DataTransfer({mode}: {mode: 'export' | 'restore'}) {
-  const lang = useSyncExternalStore(subscribe, getState).settings.general.lang;
-  const text = labels[lang];
-  const input = useRef<HTMLInputElement>(null);
-  const busyDialog = useRef<HTMLDialogElement>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
-  useEffect(() => {
-    const dialog = busyDialog.current;
-    if (!dialog) return;
-    if (busy && !dialog.open) dialog.showModal();
-    else if (!busy && dialog.open) dialog.close();
-  }, [busy]);
-  async function run(action: () => Promise<void>, reload = false) {
-    setBusy(true); setError(false);
-    let resume: (() => void) | undefined;
-    let completed = false;
-    try {
-      resume = await pausePersistence();
-      await action(); completed = true;
-      if (reload) location.reload();
-    } catch { setError(true); } finally {
-      if (!reload || !completed) resume?.();
-      setBusy(false);
+type Operation = 'export' | 'restore';
+type TransferState = {busy: Operation | null; error: Operation | null};
+
+// History navigation can remount Settings while a snapshot or restore is in flight.
+let transfer: TransferState = {busy: null, error: null};
+const listeners = new Set<() => void>();
+const getTransfer = () => transfer;
+function subscribeTransfer(listener: () => void) {
+  listeners.add(listener);
+  return () => {listeners.delete(listener);};
+}
+function publishTransfer(next: TransferState) {
+  transfer = next;
+  listeners.forEach(listener => listener());
+}
+
+async function runTransfer(operation: Operation, action: () => Promise<void>) {
+  if (transfer.busy) return;
+  publishTransfer({busy: operation, error: null});
+  let resume: (() => void) | undefined;
+  let reloading = false;
+  let error: Operation | null = null;
+  try {
+    resume = await pausePersistence();
+    await action();
+    if (operation === 'restore') {
+      location.reload();
+      reloading = true;
+    }
+  } catch {
+    error = operation;
+  } finally {
+    if (!reloading) {
+      resume?.();
+      publishTransfer({busy: null, error});
     }
   }
-  return <section className="panel data-transfer-panel">
-    <div className="data-transfer-copy"><h3 className="opt-group">{text[0]}</h3><p>{text[3]}</p></div>
-    <div className="data-transfer-actions">
-    {mode === "export" && <Button variant="ghost" size="sm" disabled={busy} onClick={() => void run(async () => {
-      const blob = await exportData(); const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'momo-backup.zip'; a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    })}>{text[1]}</Button>}
-    {mode === "restore" && <Button variant="ghost" size="sm" disabled={busy} onClick={() => input.current?.click()}>{text[2]}</Button>}
-    </div>
-    <input ref={input} hidden type="file" accept=".zip" onChange={event => {
-      const file = event.target.files?.[0]; event.target.value = '';
-      if (file && confirm(text[4])) void run(() => importData(file), true);
-    }}/>
-    <dialog ref={busyDialog} className="modal-box data-transfer-busy" aria-label={text[0]}
+}
+
+export default function DataTransfer() {
+  const t = useT();
+  const input = useRef<HTMLInputElement>(null);
+  const busyDialog = useRef<HTMLDialogElement>(null);
+  const {busy, error} = useSyncExternalStore(subscribeTransfer, getTransfer);
+  useEffect(() => {
+    const dialog = busyDialog.current;
+    if (!busy || !dialog) return;
+    if (!dialog.open) dialog.showModal();
+    return () => dialog.close();
+  }, [busy]);
+
+  return <>
+    <FieldRow label={t('config.backup')}>
+      <Button className="config-action" variant="ghost" disabled={busy !== null} onClick={() => void runTransfer('export', async () => {
+        const url = URL.createObjectURL(await exportData());
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'momo-backup.zip';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      })}>{busy === 'export' ? t('config.backupWorking') : t('config.backupAction')}</Button>
+    </FieldRow>
+    <FieldRow label={t('config.restore')}>
+      <Button className="config-action" variant="ghost" disabled={busy !== null} onClick={() => input.current?.click()}>{t('config.restoreAction')}</Button>
+      <input ref={input} hidden type="file" accept=".zip" onChange={event => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (file && !transfer.busy && confirm(t('config.restoreConfirm'))) void runTransfer('restore', () => importData(file));
+      }}/>
+    </FieldRow>
+    <p className="data-transfer-note">{t('config.backupHint')}</p>
+    {busy && <dialog ref={busyDialog} className="modal-box data-transfer-busy" aria-label={t(busy === 'restore' ? 'config.restore' : 'config.backup')}
       onCancel={event => event.preventDefault()}>
-      <p role="status" aria-live="polite">{text[6]}</p>
-    </dialog>
-    {error && <p className="data-transfer-error" role="alert">{text[5]}</p>}
-  </section>;
+      <p role="status" aria-live="polite">{t('config.backupWorking')}</p>
+    </dialog>}
+    {error && <p className="data-transfer-error" role="alert">{t(error === 'restore' ? 'config.restoreError' : 'config.backupError')}</p>}
+  </>;
 }

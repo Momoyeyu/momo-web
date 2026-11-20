@@ -15,7 +15,6 @@ import FieldRow from "../../ui/FieldRow";
 import Hint from "../../ui/Hint";
 import Switch from "../../ui/Switch";
 import {introRestricted,verifyIntro,useIntro} from "../../services/introClient";
-import {probeVision,visionStatus} from "../../services/visionClient";
 import { supportsThinking } from "../../lib/thinking";
 
 type EndpointSection = "llm" | "tts";
@@ -37,7 +36,7 @@ function urlError(sec: EndpointSection, url: string): boolean {
 }
 
 
-export default function ModelsTab({ section }: { section: "llm" | "tts" | "vision" }) {
+export default function ModelsTab({ section }: { section: EndpointSection }) {
   const t = useT();
   const intro=useIntro();
   const saved = useSyncExternalStore(subscribe, getState).settings;
@@ -49,35 +48,6 @@ export default function ModelsTab({ section }: { section: "llm" | "tts" | "visio
   const voiceEdited = useRef(false);
   const route = useRoute();
   useEffect(() => () => audition.current?.abort(), [route, section]);
-
-  const signature=JSON.stringify([settings.llm.url,settings.llm.key,settings.llm.model]);
-  const [visionCheck,setVisionCheck]=useState({signature:'',verified:false,running:false,detail:''});
-  useEffect(()=>{
-    if(section !== "vision") return;
-    const abort=new AbortController();
-    setVisionCheck({signature,verified:false,running:false,detail:''});
-    void visionStatus(settings.llm,abort.signal).then(result=>{if(!abort.signal.aborted)setVisionCheck(value=>value.signature===signature && !value.running && !value.detail ? {...value,verified:result.verified} : value);}).catch(()=>{});
-    return()=>abort.abort();
-  },[signature,section]);
-  const checkVision=async()=>{
-    const captured=signature,cfg={...settings.llm};
-    setVisionCheck(value=>({...value,running:true,detail:''}));
-    try{
-      const result=await probeVision(cfg);
-      setVisionCheck(value=>value.signature===captured?{...value,verified:result.ok,detail:result.detail,running:false}:value);
-    }catch(error){
-      const detail = error instanceof Error && /^HTTP \d{3}$/.test(error.message) ? error.message : 'unreachable';
-      setVisionCheck(value=>value.signature===captured?{...value,detail,running:false}:value);
-    }
-  };
-
-  const resultKey: Record<string,string> = {
-    verified: 'vision.verified', 'not verified': 'vision.notVerified', unconfigured: 'settings.testNeedUrl',
-    timeout: 'config.timeout', unreachable: 'config.unreachable', 'invalid response': 'config.invalidResponse',
-  };
-  const visionResult = /^HTTP \d{3}$/.test(visionCheck.detail)
-    ? visionCheck.detail + ' · ' + t('vision.checkFailed')
-    : t(resultKey[visionCheck.detail] ?? 'vision.checkFailed');
 
   const [showKey, setShowKey] = useState<Record<EndpointSection, boolean>>({
     llm: false,
@@ -298,16 +268,6 @@ export default function ModelsTab({ section }: { section: "llm" | "tts" | "visio
   </FieldRow>
 </div>
 </section>}
-{section === "vision" &&   <div inert={!!intro.data && intro.data.phase!=="completed"}>
-    <FieldRow label={t('vision.label')} hint={t('vision.hint')}>
-      <div className="vision-status">
-        <Switch on={!!settings.llm.vision} disabled={!settings.llm.vision&&(!visionCheck.verified||visionCheck.running)} title={t('vision.label')} onChange={vision=>update({settings:{...settings,llm:{...settings.llm,vision}}})}/>
-        <Button variant="ghost" size="sm" disabled={visionCheck.running||!settings.llm.url.trim()||!settings.llm.model.trim()} onClick={()=>void checkVision()} title={visionCheck.detail?visionResult:t('vision.verify')} aria-label={t('vision.verify')}>{visionCheck.running?'…':visionCheck.verified?'✓':t('settings.test')}</Button>
-
-      </div>
-    </FieldRow>
-    <p role="status">{visionCheck.detail ? visionResult : t(visionCheck.verified ? "vision.verified" : "vision.hint")}</p>
-  </div>}
 {section === "tts" && <section onBlur={() => {
   if (voiceEdited.current) { voiceEdited.current = false; warmVoice(); }
 }} data-intro="tts" className="panel settings-col opt-list">

@@ -3,20 +3,30 @@ import {ambient} from './audio/ambient';
 import {useSyncExternalStore} from 'react';
 export type Route = 'title' | 'chat' | 'settings' | 'backlog';
 const ROUTES: readonly Route[] = ['title','chat','settings','backlog'];
-function currentRoute(): Route {
+export function currentRoute(): Route {
   const hash = window.location.hash.replace(/^#\/?/, '');
   return (ROUTES as readonly string[]).includes(hash) ? hash as Route : 'title';
 }
-let from: Route | null = null;
-export function navigate(route: Route): void {
-  if(route===currentRoute())return;
-  ambient.sound(route==='chat'?(currentRoute()==='title'?'boot':'cancel'):route==='title'?'home':'confirm');
-  from = currentRoute();
+let pendingBoot = false;
+export function navigate(route: Route, intent?: 'boot'): void {
+  const source = currentRoute();
+  if(route===source || intent==='boot'&&source!=='title')return;
+  pendingBoot = route==='chat'&&intent==='boot';
+  ambient.sound(route==='chat'?(pendingBoot?'boot':'cancel'):route==='title'?'home':'confirm');
   window.location.hash = `#/${route}`;
 }
-export function fromRoute(): Route {return from ?? 'title';}
+// The opening belongs to this Boot action, never to the saved history entry.
+export function consumeBoot(): boolean {
+  const boot = pendingBoot;
+  pendingBoot = false;
+  return boot;
+}
 function subscribeHash(fn: () => void): () => void {
-  window.addEventListener('hashchange', fn);
-  return () => window.removeEventListener('hashchange', fn);
+  const changed = (event: HashChangeEvent) => {
+    if(pendingBoot && new URL(event.newURL).hash!=='#/chat')pendingBoot=false;
+    fn();
+  };
+  window.addEventListener('hashchange', changed);
+  return () => window.removeEventListener('hashchange', changed);
 }
 export function useRoute(): Route {return useSyncExternalStore(subscribeHash,currentRoute);}

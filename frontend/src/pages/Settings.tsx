@@ -1,8 +1,8 @@
 import {useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode} from 'react';
 import {useT} from '../i18n';
 import {getState, subscribe} from '../lib/store';
-import {fromRoute, navigate} from '../router';
-import {storedMeetingIdentity} from '../services/meetingClient';
+import {navigate} from '../router';
+import {meetingSnapshot, storedMeetingIdentity, subscribeMeeting} from '../services/meetingClient';
 import {useIntro} from '../services/introClient';
 import Button from '../ui/Button';
 import GridBackdrop, {type GridBackdropApi} from '../components/GridBackdrop';
@@ -10,7 +10,6 @@ import BuiltinResourcesNotice from '../components/BuiltinResourcesNotice';
 import ArchivePanel from './settings/ArchivePanel';
 import AvatarPanel from './panels/Avatar';
 import MemoryPanel from './panels/Memory';
-import AsrStatus from './settings/AsrStatus';
 import ConfigAction from './settings/ConfigAction';
 import DataTransfer from './settings/DataTransfer';
 import DesktopSettings from './settings/DesktopSettings';
@@ -19,12 +18,14 @@ import GeneralTab from './settings/GeneralTab';
 import ModelsTab from './settings/ModelsTab';
 import NativeCompanion from './settings/NativeCompanion';
 import ModsPanel from './settings/ModsPanel';
+import VisionSettings from './settings/VisionSettings';
 import '../styles/settings.css';
 import '../styles/config-document.css';
 
 const chapters = ['language', 'display', 'sound', 'models', 'memory', 'archive', 'desktop', 'browser', 'tools', 'mods'] as const;
 type Chapter = (typeof chapters)[number];
 const inset = 24;
+const canResumeMeeting = () => meetingSnapshot().state === 'active' || !!storedMeetingIdentity();
 
 export default function Settings() {
   const t = useT();
@@ -34,16 +35,20 @@ export default function Settings() {
   const grid = useRef<GridBackdropApi>(null);
   const [active, setActive] = useState<Chapter>('language');
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [source] = useState(() => storedMeetingIdentity() ? 'chat' : fromRoute());
-  const back = intro?.phase === 'return_title' || source !== 'chat' ? 'title' : 'chat';
+  const hasMeeting = useSyncExternalStore(subscribeMeeting, canResumeMeeting);
+  const back = intro?.phase === 'return_title' || !hasMeeting ? 'title' : 'chat';
   const guided = !!intro && intro.phase !== 'completed';
 
   const track = useCallback(() => {
     const el = scroll.current;
     if (!el) return;
-    const readingLine = el.getBoundingClientRect().top + inset + 1;
+    const readingLine = el.scrollTop + inset + 1;
+    const maxScroll = el.scrollHeight - el.clientHeight;
     const headings = Array.from(el.querySelectorAll<HTMLElement>('[data-chapter]'));
-    const last = headings.filter(section => section.getBoundingClientRect().top <= readingLine).at(-1);
+    // The last heading may be below the reading line when scrolling is clamped.
+    const last = maxScroll > 0 && el.scrollTop >= maxScroll - 1
+      ? headings.at(-1)
+      : headings.filter(section => section.offsetTop <= readingLine).at(-1);
     setActive(last?.dataset.chapter as Chapter ?? 'language');
     const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
     grid.current?.setAngle(25 + (reduced ? 0 : el.scrollTop * 0.02));
@@ -63,7 +68,7 @@ export default function Settings() {
     const section = el?.querySelector<HTMLElement>('[data-chapter="'+id+'"]');
     if (!el || !section) return;
     const smooth = !guided && !matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollTo({top: section.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - inset, behavior: smooth ? 'smooth' : 'instant'});
+    el.scrollTo({top: section.offsetTop - inset, behavior: smooth ? 'smooth' : 'instant'});
   }
   const action = (id: string, children: ReactNode, value?: string) =>
     <ConfigAction label={t('config.' + id)} action={t('config.' + id + 'Action')} value={value}>{children}</ConfigAction>;
@@ -71,21 +76,25 @@ export default function Settings() {
     language: <GeneralTab section="language"/>,
     display: <><GeneralTab section="display"/>{action('avatar', <AvatarPanel/>, state.avatars.find(a => a.id === state.avatarId)?.name)}
       <details className="config-preview" onToggle={event => setPreviewOpen(event.currentTarget.open)}><summary>{t('config.preview')}</summary>{previewOpen && <GeneralTab section="preview"/>}</details></>,
-    sound: <><GeneralTab section="sound"/>
-      <ConfigAction label={t('config.sampleSound')} action={t('settings.soundPreview')}>
-        <GeneralTab section="sample"/>
-      </ConfigAction></>,
-    models: <>{guided ? <ModelsTab section={intro.phase === 'tts' && intro.configurationValid ? 'tts' : 'llm'}/> : <>
-      {action('llm', <ModelsTab section="llm"/>, state.settings.llm.model)}
-      {action('vision', <ModelsTab section="vision"/>, t(state.settings.llm.vision ? 'browser.active' : 'browser.inactive'))}
-      {action('asr', <AsrStatus/>, 'SenseVoice')}
-      {action('tts', <ModelsTab section="tts"/>, state.settings.tts.voice)}
-    </>}<BuiltinResourcesNotice/></>,
+    sound: <div className="config-columns">
+      <div className="config-group"><GeneralTab section="sound"/></div>
+      <div className="config-group"><GeneralTab section="sample"/></div>
+    </div>,
+    models: guided ? <>
+      <ModelsTab section={intro.phase === 'tts' && intro.configurationValid ? 'tts' : 'llm'}/>
+      <BuiltinResourcesNotice/>
+    </> : <div className="config-columns">
+      <div className="config-group">
+        {action('llm', <ModelsTab section="llm"/>, state.settings.llm.model)}
+        {action('tts', <ModelsTab section="tts"/>, state.settings.tts.voice)}
+      </div>
+      <div className="config-group"><VisionSettings/><BuiltinResourcesNotice showSpeech/></div>
+    </div>,
     memory: guided ? <MemoryPanel/> : <>{action('memories', <MemoryPanel/>)}{action('pinned', <MemoryPanel pinnedOnly/>)}</>,
-    archive: <>{action('history', <ArchivePanel/>)}{action('backup', <DataTransfer mode="export"/>)}{action('restore', <DataTransfer mode="restore"/>)}</>,
+    archive: <>{action('history', <ArchivePanel/>)}<DataTransfer/></>,
     desktop: <DesktopSettings/>,
-    browser: <NativeCompanion plugin="browser" mode="entry"/>,
-    tools: action('mcp', <McpSettings/>),
+    browser: <NativeCompanion plugin="browser" mode="inline"/>,
+    tools: <McpSettings/>,
     mods: <ModsPanel/>,
   };
   return <div className="settings-page config-document">

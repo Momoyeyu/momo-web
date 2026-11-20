@@ -16,24 +16,51 @@ test('browser settings find existing windows, start and stop the selected native
   await r.fulfill({json:{active,plugin:'browser',target:active?target:undefined}});
  });
  await bootChat(page);await openTab(page,'浏览器');
- await page.getByRole('button',{name:'选择窗口'}).click();
- const config=page.getByRole('dialog',{name:'浏览器窗口'});
+ const config=page.locator('#config-browser');
  await config.getByRole('button',{name:'查找窗口'}).click();
  await config.getByRole('combobox').selectOption('7');
  await config.getByRole('button',{name:'开启',exact:true}).click();
  await expect.poll(()=>active).toBe(true);
- await page.keyboard.press('Escape');
- await expect(page.locator('#config-browser .config-value')).toHaveText('Test browser');
- await page.getByRole('button',{name:'选择窗口'}).click();
- await config.locator('.extension-detail-actions').getByRole('button',{name:'关闭',exact:true}).click();
+ await expect(config.getByText('Test browser · 7',{exact:true})).toBeVisible();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await config.getByRole('button',{name:'关闭',exact:true}).click();
  await expect.poll(()=>active).toBe(false);
 });
 
 test('missing screen permission explains how to find the window',async({page})=>{
  await page.route('**/api/computer/native/targets',r=>r.fulfill({json:{targets:[],screenPermission:false,inputPermission:true}}));
- await bootChat(page);await openTab(page,'浏览器');await page.getByRole('button',{name:'选择窗口'}).click();
- const dialog=page.getByRole('dialog',{name:'浏览器窗口'});
- await dialog.getByRole('button',{name:'查找窗口'}).click();
- await expect(dialog).toContainText('需要屏幕录制权限');
- await expect(dialog.getByRole('button',{name:'开启',exact:true})).toBeDisabled();
+ await bootChat(page);await openTab(page,'浏览器');
+ const config=page.locator('#config-browser');
+ await config.getByRole('button',{name:'查找窗口'}).click();
+ await expect(config).toContainText('需要屏幕录制权限');
+ await expect(config.getByRole('button',{name:'开启',exact:true})).toBeDisabled();
+});
+
+test('browser status recovers after a failed poll and keeps separate action errors',async({page})=>{
+ let statusUnavailable=true, scanUnavailable=true, successfulPolls=0;
+ await page.route('**/api/computer/native/status',route=>{
+  if(statusUnavailable)return route.fulfill({status:503,json:{}});
+  successfulPolls++;
+  return route.fulfill({json:{active:false}});
+ });
+ await page.route('**/api/computer/native/targets',route=>scanUnavailable
+  ? route.fulfill({status:503,json:{}})
+  : route.fulfill({json:{targets:[],screenPermission:true,inputPermission:true}}));
+ await bootChat(page);
+ await openTab(page,'浏览器');
+ const config=page.locator('#config-browser');
+ await expect(config.getByText('读取失败，请重试。',{exact:true})).toBeVisible();
+ statusUnavailable=false;
+ await expect(config.getByText('已关闭',{exact:true})).toBeVisible();
+ await expect(config.getByRole('alert')).toHaveCount(0);
+
+ await config.getByRole('button',{name:'查找窗口'}).click();
+ const error=config.getByRole('alert');
+ await expect(error).toHaveText('授权操作失败，请重试。');
+ const previous=successfulPolls;
+ await expect.poll(()=>successfulPolls).toBeGreaterThan(previous);
+ await expect(error).toBeVisible();
+ scanUnavailable=false;
+ await config.getByRole('button',{name:'查找窗口'}).click();
+ await expect(error).toHaveCount(0);
 });

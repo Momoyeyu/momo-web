@@ -8,7 +8,6 @@ test('plugin library searches, pages, and requires trust before enabling importe
   await route.fulfill({json:{plugins}});
  });
  await openExtensionTab(page,'MCP');
- await page.getByRole('button',{name:'导入管理',exact:true}).click();
  const library=page.locator('.plugin-library');
  await expect(library.locator('.plugin-library-card')).toHaveCount(4);
  await library.locator('.pager-btn').last().click();

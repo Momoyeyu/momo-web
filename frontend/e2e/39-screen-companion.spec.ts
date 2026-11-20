@@ -12,8 +12,11 @@ test('native desktop start, companionship preferences and confirmed stop remain 
   if(path.endsWith('/stop'))active=false;
   await r.fulfill({json:{active,plugin:'computer',observing:active,generation:23,proactive,reactions}});
  });
- await bootChat(page);await openTab(page,'桌面');await page.getByRole('button',{name:'查看授权'}).click();
- const modal=page.getByRole('dialog',{name:'桌面访问'});
+ await bootChat(page);await openTab(page,'桌面');
+ const desktop=page.locator('#config-desktop');
+ await expect(desktop.getByText('请在桌面版中打开此设置。',{exact:true})).toBeVisible();
+ await desktop.getByRole('button',{name:'选择窗口'}).click();
+ const modal=page.getByRole('dialog',{name:'桌面陪伴'});
  await modal.getByRole('button',{name:'查找窗口'}).click();await modal.getByRole('combobox').selectOption('7');
  await modal.getByRole('button',{name:'开启',exact:true}).click();
  await expect.poll(()=>active).toBe(true);
@@ -21,7 +24,7 @@ test('native desktop start, companionship preferences and confirmed stop remain 
  await expect.poll(()=>proactive).toBe(true);
  await page.keyboard.press('Escape');await page.reload();await openTab(page,'桌面');
  await expect(page.getByRole('button',{name:'返回对话'})).toBeVisible();
- await page.getByRole('button',{name:'查看授权'}).click();
+ await desktop.getByRole('button',{name:'选择窗口'}).click();
  await modal.locator('.extension-detail-actions').getByRole('button',{name:'关闭',exact:true}).click();
  await expect.poll(()=>active).toBe(false);
 });
@@ -32,8 +35,9 @@ test('unconfirmed native stop stays retryable instead of looking idle',async({pa
   if(r.request().url().endsWith('/stop')){stops++;stopUnconfirmed=false;}
   await r.fulfill({json:{active:false,stopUnconfirmed}});
  });
- await bootChat(page);await openTab(page,'桌面');await page.getByRole('button',{name:'查看授权'}).click();
- const modal=page.getByRole('dialog',{name:'桌面访问'});
+ await bootChat(page);await openTab(page,'桌面');
+ await page.locator('#config-desktop').getByRole('button',{name:'选择窗口'}).click();
+ const modal=page.getByRole('dialog',{name:'桌面陪伴'});
  const stop=modal.locator('.extension-detail-actions').getByRole('button',{name:'关闭',exact:true});
  await expect(stop).toBeEnabled();await stop.click();
  await expect.poll(()=>stops).toBe(1);await expect(stop).toHaveCount(0);

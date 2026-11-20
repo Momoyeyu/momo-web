@@ -1,5 +1,5 @@
 // 回到同一个 momo。进入见面不清空记录，也不恢复另一条时间线。
-import {navigate} from "../router";
+import {currentRoute,navigate} from "../router";
 import {useT} from "../i18n";
 import TerminalTagline from "../components/TerminalTagline";
 import EcgCanvas from "../components/EcgCanvas";
@@ -7,7 +7,7 @@ import Button from "../ui/Button";
 import {PRESENCE_URL,TITLE_PRESENCE} from "../lib/presenceTransition";
 import "../styles/title.css";
 import {introSnapshot,verifyIntro} from "../services/introClient";
-import {useState} from "react";
+import {useLayoutEffect,useRef,useState} from "react";
 import {enterMeeting,leaveMeeting,meetingSnapshot} from "../services/meetingClient";
 import {warmVoice} from "../services/ttsWarmup";
 import {getChatEngine} from "../chat/engineInstance";
@@ -16,7 +16,44 @@ export default function Title({active}: {active:boolean}) {
   const t = useT();
   const [starting,setStarting]=useState(false);
   const [failed,setFailed]=useState(false);
-  const boot=async()=>{setStarting(true);setFailed(false);try{if(introSnapshot().data?.phase!=="completed")await verifyIntro();await leaveMeeting(getChatEngine().finishMeeting());await enterMeeting();if(!getChatEngine().muted)warmVoice();navigate('chat');}catch{setFailed(true);}finally{setStarting(false);}};
+  const bootAttempt = useRef<{cancelled:boolean;entering:boolean}|null>(null);
+  useLayoutEffect(() => {
+    if (!active) return;
+    return () => {
+      const attempt = bootAttempt.current;
+      if (!attempt) return;
+      attempt.cancelled = true;
+      // The meeting client releases a superseded lease when Enter responds.
+      if (attempt.entering) void leaveMeeting();
+    };
+  }, [active]);
+  const boot = async () => {
+    if (!active || bootAttempt.current || currentRoute() !== 'title') return;
+    const attempt = {cancelled:false,entering:false};
+    bootAttempt.current = attempt;
+    const stillOnTitle = () => !attempt.cancelled && currentRoute() === 'title';
+    setStarting(true);
+    setFailed(false);
+    try {
+      if (introSnapshot().data?.phase !== 'completed') await verifyIntro();
+      if (!stillOnTitle()) return;
+      await leaveMeeting(getChatEngine().finishMeeting());
+      if (!stillOnTitle()) return;
+      attempt.entering = true;
+      const lease = await enterMeeting();
+      if (!stillOnTitle()) {
+        if (meetingSnapshot().lease?.leaseId === lease.leaseId) await leaveMeeting();
+        return;
+      }
+      if (!getChatEngine().muted) warmVoice();
+      navigate('chat','boot');
+    } catch {
+      if (stillOnTitle()) setFailed(true);
+    } finally {
+      bootAttempt.current = null;
+      setStarting(false);
+    }
+  };
   const items = [
     {key: "boot", labelKey: "title.start", hint: "boot", onClick: () => void boot()},
     {key: "config", labelKey: "title.config", hint: "config", onClick: () => navigate("settings")},

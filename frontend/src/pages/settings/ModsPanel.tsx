@@ -9,6 +9,7 @@ import {clampPage} from '../../lib/paging';
 import FieldRow from '../../ui/FieldRow';
 import Button from '../../ui/Button';
 import Modal from '../../ui/Modal';
+import Switch from '../../ui/Switch';
 import OfficialPlugins from './OfficialPlugins';
 import MinecraftCompanion from './MinecraftCompanion';
 
@@ -57,6 +58,9 @@ export default function ModsPanel(){
   function button(label:string,onClick:()=>void,disabled=false){
     return <Button className="config-action" size="sm" variant="ghost" disabled={disabled||busy} onClick={onClick}>{code(label)}</Button>;
   }
+  function setEnabled(mod: InstalledMod, enabled: boolean) {
+    void run('/api/mods/'+mod.id, jsonInit('PATCH', {enabled}), selection);
+  }
   const name=item?.name??(selection&&'id' in selection?official[selection.id as keyof typeof official]:'');
   const entries=new Map<string,string>(Object.entries(official));
   mods.forEach(m=>entries.set(m.id,m.name));
@@ -71,6 +75,7 @@ export default function ModsPanel(){
     {list.slice(paging.page*5,paging.page*5+5).map(([id,label])=>{
       const installed=mods.find(m=>m.id===id);
       return <FieldRow key={id} label={label}><span className="muted">{code(installed?(installed.enabled?'enabled':'disabled'):'absent')}</span>
+        {installed&&<Switch title={label} on={installed.enabled} disabled={busy} onChange={enabled=>setEnabled(installed,enabled)}/>}
         {button(installed?'manage':'install',()=>open({id,mode:installed?'manage':'install'}))}
       </FieldRow>;
     })}
@@ -86,7 +91,7 @@ export default function ModsPanel(){
         {button('remove',()=>void run('/api/mods/'+selection.id,{method:'DELETE'},null))}</>
       : item && <><p>{item.version} · {code(item.enabled?'enabled':'disabled')}</p>
         <p>{code(item.source==='official'?'officialSource':'localSource')} · {(item.platforms??[]).map(platform=>platform==='*'?code('allPlatforms'):platform).join(', ')}</p>
-        <div className="extension-detail-actions">{button(item.enabled?'disable':'enable',()=>void run('/api/mods/'+item.id,jsonInit('PATCH',{enabled:!item.enabled}),selection))}
+        <div className="extension-detail-actions">{button(item.enabled?'disable':'enable',()=>setEnabled(item,!item.enabled))}
         {button('remove',()=>open({id:item.id,mode:'remove'}))}</div>
         {item.runtimeError && <p role="alert">{code('runtimeError')} {button('retry',()=>void run('/api/mods/'+item.id,jsonInit('PATCH',{enabled:false}),selection))}</p>}
         {item.enabled&&item.id==='momo.qq'&&<OfficialPlugins/>}

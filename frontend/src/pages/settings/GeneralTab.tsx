@@ -64,7 +64,9 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
         {value:'tap', label:t('config.soundTap')}, {value:'confirm', label:t('config.soundConfirm')}, {value:'cancel', label:t('config.soundCancel')},
       ]} onChange={v => setSample(v as typeof sample)}/>
     </FieldRow>
-    <footer className="modal-foot"><Button className="config-action" sound={false} disabled={general.sfxVolume === 0} onClick={() => ambient.sound(sample)}>{t('config.soundPlay')}</Button></footer>
+    <FieldRow label={t('config.sampleSound')}>
+      <Button variant="ghost" className="config-action" sound={false} disabled={general.sfxVolume === 0} onClick={() => ambient.sound(sample)}>{t('config.soundPlay')}</Button>
+    </FieldRow>
   </>;
   const voiceReady = ttsConfigured(settings.tts);
   const voiceOn = voiceReady && !general.voiceMuted;
@@ -77,6 +79,5 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
       <Switch title={t('settings.voiceOut')} on={voiceOn} disabled={!voiceReady} onChange={v => getChatEngine().setMuted(!v)}/>
     </FieldRow>
     {slider('voiceVolume', !voiceOn)}{slider('sfxVolume')}{slider('musicVolume')}
-    {palette}
   </>;
 }

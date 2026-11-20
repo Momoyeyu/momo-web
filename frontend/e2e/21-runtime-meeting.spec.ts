@@ -60,21 +60,33 @@ test('actual unconfigured first meeting rejects an unusable API without saving i
 });
 
 test('owned meeting survives refreshing backlog and settings without a new title entrance',async({page})=>{
+  const entries: unknown[] = [];
+  page.on('request', request => {
+    if(new URL(request.url()).pathname==='/api/meeting/enter')entries.push(request.postDataJSON());
+  });
   await bootChat(page);
   await expect.poll(()=>page.locator('.chat-page').evaluate(element=>!element.closest('[inert]'))).toBe(true);
   // A fresh unconfigured fixture has its setup portal; this case needs established chat.
   if(await page.locator('.first-meeting-setup').count())await page.locator('.first-meeting-setup').getByRole('button',{name:'取消',exact:true}).click();
   test.skip(await page.locator('.title-screen').count()>0,'Requires an established isolated profile.');
-  const owner=()=>page.evaluate(()=>sessionStorage.getItem('momo.meeting-owner.v1'));
+  const owner=()=>page.evaluate(()=>JSON.parse(sessionStorage.getItem('momo.meeting-owner.v1')??'null') as {clientId:string;leaseId:string}|null);
+  expect(entries).toEqual([{clientId:expect.any(String)}]);
   for(const destination of ['记录','设置']){
-    expect(await owner()).not.toBeNull();
+    const saved=await owner();
+    expect(saved).not.toBeNull();
+    const count=entries.length;
     await page.getByRole('button',{name:destination,exact:true}).click();
-    expect(await owner()).not.toBeNull();
+    expect(await owner()).toEqual(saved);
     const restored=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/meeting/enter'&&response.status()===200);
-    await page.reload();await restored;
-    expect(await owner()).not.toBeNull();
+    await page.reload();
+    const {leaseId}=await (await restored).json();
+    const resumed={clientId:saved!.clientId,leaseId};
+    await expect.poll(owner).toEqual(resumed);
     await page.getByRole('button',{name:'返回对话',exact:true}).click();
     await expect.poll(()=>page.locator('.chat-page').evaluate(element=>!element.closest('[inert]'))).toBe(true);
     await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
+    if(destination==='设置')await expect(page.locator('.dialog-zone')).toHaveCSS('animation-name','none');
+    expect(await owner()).toEqual(resumed);
+    expect(entries.slice(count)).toEqual([{...saved,restore:true}]);
   }
 });
