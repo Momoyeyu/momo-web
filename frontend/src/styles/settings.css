@@ -34,8 +34,10 @@
   flex-wrap: wrap;
 }
 
-#config-browser .extension-window-select {
-  flex: 1;
+.permission-app .extension-window-select {
+  flex: 0 1 192px;
+  width: min(100%, 192px);
+  text-overflow: ellipsis;
   min-width: 0;
   height: 34px;
   box-sizing: border-box;

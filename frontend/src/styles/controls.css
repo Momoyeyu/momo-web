@@ -12,9 +12,9 @@
 
 .sel {
   position: relative;
-  flex: 1;
+  flex: 0 1 auto;
+  width: min(100%, var(--select-width, 192px));
   min-width: 0;
-  max-width: 320px;
 }
 
 .sel-face {
@@ -34,6 +34,13 @@
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
+}
+
+.sel-face > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .sel-face:hover {
@@ -106,6 +113,7 @@
   font-weight: 400;
   letter-spacing: 0.03em;
   text-align: left;
+  overflow-wrap: anywhere;
   transition:
     color 0.12s ease,
     background 0.12s ease,

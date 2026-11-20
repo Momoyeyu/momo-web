@@ -30,8 +30,11 @@ test('sound controls remain paired and model details occupy two full rows',async
    })).toBe(true);
   }
   const preview=await page.locator('#config-sound .config-action').boundingBox();
+  expect(preview!.width).toBeLessThanOrEqual(168);
   for(const select of await page.locator('#config-sound .sel-face').all()){
-   expect((await select.boundingBox())!.width).toBeCloseTo(preview!.width,0);
+   const box=(await select.boundingBox())!;
+   expect(box.width).toBeCloseTo(preview!.width,0);
+   expect(box.x).toBeCloseTo(preview!.x,0);
   }
   const rows=page.locator('#config-models .config-model-row');
   await expect(rows.locator('b')).toHaveText(['LLM','TTS']);

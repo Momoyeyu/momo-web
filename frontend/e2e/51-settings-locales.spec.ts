@@ -59,6 +59,7 @@ for (const width of [640, 960, 1280]) {
       expect(interfaceLanguage.x + interfaceLanguage.width).toBeLessThan(chatLanguage.x);
       expect(interfaceLanguage.y).toBeCloseTo(chatLanguage.y, 0);
       expect(interfaceLanguage.width).toBeCloseTo(chatLanguage.width, 0);
+      expect(interfaceLanguage.width).toBeLessThanOrEqual(144);
 
 
       const browser = page.locator('#config-browser');
@@ -66,6 +67,7 @@ for (const width of [640, 960, 1280]) {
       const picker = (await browser.locator('.sel-face').boundingBox())!;
       const status = (await browser.locator('.browser-connection').boundingBox())!;
       expect(picker.x + picker.width).toBeLessThan(status.x);
+      expect(picker.width).toBeLessThanOrEqual(200);
       expect(picker.y + picker.height / 2).toBeCloseTo(status.y + status.height / 2, 0);
 
       const actions = await page.locator('.config-document .config-action').evaluateAll(buttons => buttons.map(button => {
