@@ -65,7 +65,7 @@
 }
 .config-card .config-action {margin-left: auto;}
 .config-preview {padding: 9px 0; font-size: 13px; color: var(--text-dim);}
-.config-preview summary {cursor: pointer;}
+.config-preview h3 {margin: 0; font: inherit; font-weight: 600;}
 .config-preview .dialog-preview {margin-block: 10px;}
 .config-modal {box-sizing: border-box; width: min(620px, 92cqw); max-height: 86cqh; overflow: auto; padding: 0;}
 .config-modal-head {display: flex; justify-content: space-between; align-items: center; padding: 14px 22px; border-bottom: 1px solid var(--line);}

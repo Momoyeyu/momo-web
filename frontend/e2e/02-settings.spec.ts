@@ -145,11 +145,11 @@ test('adapter permission policy survives JSON import, metadata edit and document
   await expect.poll(persisted).toMatchObject(policy);
 });
 
-test("显示设置：预览跟随对话状态开关", async ({
+test("显示设置：预览默认可见并跟随对话状态开关", async ({
   page,
 }) => {
   await openTab(page, "显示");
-  await page.locator(".config-preview summary").click();
+  await expect(page.getByRole("region", {name: "对话框预览"}).locator(".dialog-box")).toBeVisible();
   const dialogPanel = page.locator("#config-display");
   await expect(page.getByText("语义检索", {exact:true})).toHaveCount(0);
   const preview = page.locator(".dialog-preview .chat-status");

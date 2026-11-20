@@ -34,7 +34,6 @@ export default function Settings() {
   const scroll = useRef<HTMLDivElement>(null);
   const grid = useRef<GridBackdropApi>(null);
   const [active, setActive] = useState<Chapter>('language');
-  const [previewOpen, setPreviewOpen] = useState(false);
   const hasMeeting = useSyncExternalStore(subscribeMeeting, canResumeMeeting);
   const back = intro?.phase === 'return_title' || !hasMeeting ? 'title' : 'chat';
   const guided = !!intro && intro.phase !== 'completed';
@@ -75,7 +74,10 @@ export default function Settings() {
   const content: Record<Chapter, ReactNode> = {
     language: <GeneralTab section="language"/>,
     display: <><GeneralTab section="display"/>{action('avatar', <AvatarPanel/>, state.avatars.find(a => a.id === state.avatarId)?.name)}
-      <details className="config-preview" onToggle={event => setPreviewOpen(event.currentTarget.open)}><summary>{t('config.preview')}</summary>{previewOpen && <GeneralTab section="preview"/>}</details></>,
+      <section className="config-preview" aria-labelledby="config-dialog-preview">
+        <h3 id="config-dialog-preview">{t('config.preview')}</h3>
+        <GeneralTab section="preview"/>
+      </section></>,
     sound: <GeneralTab section="sound"/>,
     models: guided ? <>
       <ModelsTab section={intro.phase === 'tts' && intro.configurationValid ? 'tts' : 'llm'}/>

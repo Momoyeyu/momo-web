@@ -39,7 +39,6 @@ for(const lang of ['zh','en','ja'])test(`terminal dialog aligns its prompts and 
  await page.setViewportSize({width:1440,height:900});
  await page.locator('[data-intro=chat-settings]').click();
  await page.locator('[data-intro=tab-display]').click();
- await page.locator('.config-preview summary').click();
  const preview=page.locator('.dialog-preview .dialog-box');await expect(preview).toBeVisible();
  await expect(page.locator('.page-wrap.is-front')).toHaveCount(0);
  await expect(preview.locator('.terminal-output-prompt')).toBeVisible();
