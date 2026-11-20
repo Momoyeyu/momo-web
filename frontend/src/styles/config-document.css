@@ -94,9 +94,6 @@ body:has(.config-document) .extension-modal .extension-detail > .modal-foot {
   border-top: 1px solid var(--line-soft);
 }
 
-.desktop-config > .opt-row + .opt-row {border-top: 1px solid var(--line-soft);}
-.desktop-config .opt-ctl {justify-content: flex-end; flex-wrap: wrap;}
-.desktop-config .config-action {margin-inline-start: 0;}
 .native-window-picker {width: min(100%, 230px); min-width: 0;}
 .native-window-picker .sel-face > span:first-child,
 .native-window-picker .sel-opt,

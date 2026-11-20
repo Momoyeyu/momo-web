@@ -380,6 +380,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/computer/access/precheck": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Precheck */
+        post: operations["precheck_api_computer_access_precheck_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/computer/access/system": {
         parameters: {
             query?: never;
@@ -2332,6 +2349,19 @@ export interface components {
             /** Reply */
             reply?: boolean | null;
         };
+        /** PermissionPrecheck */
+        PermissionPrecheck: {
+            /**
+             * Operation
+             * @enum {string}
+             */
+            operation: "targets" | "observe" | "control";
+        };
+        /** PermissionPrecheckResult */
+        PermissionPrecheckResult: {
+            /** Missing */
+            missing: ("screen" | "input")[];
+        };
         /** PresentationAckIn */
         PresentationAckIn: {
             /** Clientid */
@@ -3453,6 +3483,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    precheck_api_computer_access_precheck_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PermissionPrecheck"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PermissionPrecheckResult"];
                 };
             };
             /** @description Validation Error */

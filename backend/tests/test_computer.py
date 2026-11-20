@@ -19,6 +19,28 @@ def active():
     return c
 
 
+def test_native_desktop_checks_screen_permission_before_starting_observation(monkeypatch):
+    from types import SimpleNamespace
+    from app.core.plugin_host import HostError
+    from app.services import computer as module
+
+    c = Computer()
+    monkeypatch.setattr(c, 'gate', lambda: {})
+    monkeypatch.setattr(module, 'native_desktop', lambda: True)
+    module.permissions.consent(True)
+    requests = []
+
+    def request(method, params=None):
+        requests.append((method, params))
+        return {'screenPermission': False, 'inputPermission': True, 'applications': []}
+
+    monkeypatch.setattr(module.runtime, 'host', SimpleNamespace(request=request))
+    with pytest.raises(HostError, match='SCREEN_PERMISSION_REQUIRED'):
+        c.desktop_frame()
+    assert not c.observing
+    assert requests == [('native.permissions', None)]
+
+
 def test_stop_invalidates_frame_and_generation():
     c = active()
     with patch.object(c,'gate'):

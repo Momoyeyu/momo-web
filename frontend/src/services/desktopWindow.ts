@@ -2,8 +2,22 @@ import {useEffect,useSyncExternalStore} from 'react';
 import './runtime';
 import {getSettings,updateGeneral} from '../lib/store';
 export type DesktopWindowState={mode:'chat'|'pet';clickThrough:boolean;panel?:{width:number;petWidth:number}};
+export interface PermissionGuideCopy {
+ title:string;
+ instructions:string;
+ dragLabel:string;
+ doneLabel:string;
+ grantedLabel:string;
+ closeLabel:string;
+ openSettingsLabel?:string;
+ revealLabel?:string;
+}
 export interface DesktopWindowBridge {
  requestSystemPermission?(kind:"screen"|"input"):Promise<void>;
+ openPermissionGuide?(kind:"screen"|"input",copy:PermissionGuideCopy):Promise<void>;
+ closePermissionGuide?():Promise<void>;
+ onPermissionGuideClosed?(listener:()=>void):()=>void;
+ setPermissionGuideGranted?(granted:boolean):Promise<void>;
  setGameOverlay?(enabled:boolean):Promise<void>;
  setPetPanel?(open:boolean):Promise<DesktopWindowState>;
  dragPetWindow?(phase:"start"|"move"|"end",point?:{x:number;y:number}):Promise<void>;

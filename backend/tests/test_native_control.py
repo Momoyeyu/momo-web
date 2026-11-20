@@ -7,7 +7,15 @@ TARGET={'windowId':1,'ownerPid':12,'path':'/Applications/Test.app','bundleId':'t
 @pytest.fixture
 def setup(tmp_path,monkeypatch):
  calls=[]
- host=SimpleNamespace(control=threading.RLock(),request=lambda method,params=None:(calls.append((method,params)) or ({'targets':[TARGET]} if method=='native.targets' else {'ok':True,'bindingId':'fixture-binding'})),permit=lambda _: {})
+ system={'screenPermission':True,'inputPermission':True}
+
+ def request(method,params=None):
+  calls.append((method,params))
+  if method=='native.targets':return {**system,'targets':[TARGET]}
+  if method=='native.permissions':return {**system,'applications':[]}
+  return {'ok':True,'bindingId':'fixture-binding'}
+
+ host=SimpleNamespace(control=threading.RLock(),request=request,permit=lambda _: {})
  monkeypatch.setattr(module,'runtime',SimpleNamespace(host=host,epoch=1))
  monkeypatch.setattr(module.state,'load',lambda:{'settings':{'llm':{}}})
  monkeypatch.setattr(module.vision,'fingerprint',lambda _: 'fixed')
@@ -30,6 +38,25 @@ def test_start_requires_global_consent_and_enforces_blocklist(setup):
  p.block('test.app','Test',False)
  assert c.start(1,12,['observe','interact'],'owner','lease')['active']
  assert calls[-1][1]['permissions']==['observe','interact']
+
+
+def test_control_requires_input_before_binding_and_observation_does_not(setup):
+ from app.core.plugin_host import HostError
+ c,p,calls=setup
+ p.consent(True)
+ original=module.runtime.host.request
+
+ def request(method,params=None):
+  if method=='native.targets':
+   return {'targets':[TARGET],'screenPermission':True,'inputPermission':False}
+  return original(method,params)
+
+ module.runtime.host.request=request
+ with pytest.raises(HostError,match='INPUT_PERMISSION_REQUIRED'):
+  c.start(1,12,['observe','interact'],'owner','lease')
+ assert not c.status()['active']
+ assert not calls
+ assert c.start(1,12,['observe'],'owner','lease')['active']
 
 def test_replacement_cannot_mutate_live_plugin(setup):
  c,p,calls=setup

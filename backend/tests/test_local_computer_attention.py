@@ -23,7 +23,8 @@ def local(tmp_path, monkeypatch):
     calls = []
     def request(method, params=None):
         calls.append(method)
-        if method == 'native.targets': return {'targets': [target]}
+        if method == 'native.targets': return {'targets': [target], 'screenPermission': True, 'inputPermission': True}
+        if method == 'native.permissions': return {'screenPermission': True, 'inputPermission': True, 'applications': []}
         if method in ('native.observe','native.screen'): return {'data': base64.b64encode(pixels.getvalue()).decode(), 'version': 1}
         return {'ok': True, 'bindingId': 'fixture'}
     runtime.host = SimpleNamespace(control=threading.RLock(), request=request, permit=lambda _: {})

@@ -20,6 +20,7 @@ export default function Select({
   onOpen,
   popupNotice,
   hideOptions = false,
+  reopenKey,
 }: {
   label?: string;
   value: string;
@@ -29,11 +30,21 @@ export default function Select({
   onOpen?: () => void;
   popupNotice?: ReactNode;
   hideOptions?: boolean;
+  reopenKey?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [hl, setHl] = useState(0);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
+  const faceRef = useRef<HTMLButtonElement | null>(null);
+  const lastReopen = useRef(reopenKey);
+
+  useEffect(() => {
+    if (lastReopen.current === reopenKey || disabled) return;
+    lastReopen.current = reopenKey;
+    setOpen(true);
+    faceRef.current?.focus();
+  }, [reopenKey, disabled]);
 
   const idx = options.findIndex((o) => o.value === value);
   const current = idx >= 0 ? options[idx] : undefined;
@@ -135,6 +146,7 @@ export default function Select({
   return (
     <div className={`sel${open ? " open" : ""}`} ref={rootRef}>
       <button
+        ref={faceRef}
         type="button"
         className="sel-face"
         aria-label={label ? label + ' · ' + (current?.label ?? value) : undefined}

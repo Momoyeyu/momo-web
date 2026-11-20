@@ -4,7 +4,11 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from ..core.desktop_auth import valid
-from ..services.app_permissions import DesktopPermissionError, native_desktop, permissions
+from ..core.plugin_host import HostError
+from ..services.app_permissions import (
+    DesktopOperation, DesktopPermissionError, SystemPermission, denied_system_permissions,
+    missing_system_permissions, native_desktop, permissions, read_system_permissions,
+)
 from ..services.computer import computer
 from ..services.coordinator import runtime
 from ..services.native_control import native_control
@@ -22,9 +26,23 @@ class Block(BaseModel):
     blocked: bool
 
 
+class PermissionPrecheck(BaseModel):
+    operation: DesktopOperation
+
+
+class PermissionPrecheckResult(BaseModel):
+    missing: list[SystemPermission]
+
+
 def require_desktop(request):
     if not native_desktop() or request.headers.get('origin') != 'momo://app' or not valid(request.headers.get('x-momo-token')):
         raise HTTPException(403, 'Local desktop required')
+
+
+def system_permission_detail(error):
+    missing = denied_system_permissions(error)
+    if missing:
+        return {'code': 'permission_required', 'missing': missing}
 
 
 def invalidate_activity(changed):
@@ -65,7 +83,17 @@ def system(request: Request):
     require_desktop(request)
     if not runtime.host:
         raise HTTPException(409, 'Application executor unavailable')
-    return runtime.host.request('native.permissions')
+    return read_system_permissions(runtime.host)
+
+
+@router.post('/precheck')
+def precheck(body: PermissionPrecheck, request: Request) -> PermissionPrecheckResult:
+    require_desktop(request)
+    try:
+        missing = missing_system_permissions(body.operation, read_system_permissions(runtime.host))
+    except HostError:
+        raise HTTPException(409, 'Application permission status unavailable') from None
+    return PermissionPrecheckResult(missing=missing)
 
 
 @router.post('/system/{kind}')

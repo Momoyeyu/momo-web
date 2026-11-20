@@ -71,11 +71,18 @@ test('desktop access can be configured before Boot and keeps confirmed consent i
   await page.addInitScript(base => {
     window.momoDesktop = {
       getRuntime: async () => ({baseUrl:base, token:'isolated-desktop-access'}),
-      requestSystemPermission: async kind => {document.documentElement.dataset.permission = kind;},
+      openPermissionGuide: async kind => {document.documentElement.dataset.permission = kind;},
+      setPermissionGuideGranted: async granted => {
+        if (granted) document.documentElement.dataset.permission = 'granted';
+      },
+      onPermissionGuideClosed: listener => {
+        window.addEventListener('test:permission-guide-closed', listener);
+        return () => window.removeEventListener('test:permission-guide-closed', listener);
+      },
     };
   }, baseURL!);
   await page.route('**/api/intro', route => route.fulfill({json:{phase:'completed',configurationValid:true}}));
-  let granted=true, failStatus=false, observing=true;
+  let granted=true, failStatus=false, observing=true, inputPermission=true;
   await page.route('**/api/computer/status', route => failStatus
     ? route.fulfill({status:503,json:{}})
     : route.fulfill({json:{desktopAccessGranted:granted, desktopAllowed:observing}}));
@@ -83,8 +90,8 @@ test('desktop access can be configured before Boot and keeps confirmed consent i
     granted=route.request().postDataJSON().granted;
     return route.fulfill({json:{granted}});
   });
-  await page.route('**/api/computer/access', route => route.fulfill({json:{available:true,granted:true,blocked:[]}}));
-  await page.route('**/api/computer/access/system', route => route.fulfill({json:{screenPermission:true,inputPermission:true,applications:[]}}));
+  await page.route('**/api/computer/access', route => route.fulfill({json:{available:true,granted,blocked:[]}}));
+  await page.route('**/api/computer/access/system', route => route.fulfill({json:{screenPermission:true,inputPermission,applications:[]}}));
   await page.route('**/api/computer/desktop/observation',route=>{
     expect(route.request().method()).toBe('PATCH');
     const payload=route.request().postDataJSON();
@@ -97,17 +104,36 @@ test('desktop access can be configured before Boot and keeps confirmed consent i
   const access = page.locator('#config-desktop .opt-row').filter({hasText:'桌面访问'});
   await expect(access.getByRole('status')).toHaveText('已授权');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  for(const [kind,permission] of [['screen','屏幕录制'],['input','辅助功能']]){
-    const row=page.locator('#config-desktop .opt-row').filter({hasText:permission});
-    await expect(row.getByRole('status')).toHaveText('已授权');
-    await row.getByRole('button',{name:'系统设置'}).click();
-    await expect(page.locator('html')).toHaveAttribute('data-permission',kind);
-  }
-  const observation=page.locator('#config-desktop').getByRole('switch',{name:'观察桌面'});
+  const accessGroup = page.getByRole('region',{name:'访问权限'});
+  const behaviorGroup = page.getByRole('region',{name:'桌面行为'});
+  const screen = accessGroup.locator('.opt-row').filter({hasText:'屏幕录制'});
+  const input = accessGroup.locator('.opt-row').filter({hasText:'辅助功能'});
+  await expect(screen.getByRole('button',{name:'已授权'})).toBeDisabled();
+  await expect(input.getByRole('button',{name:'已授权'})).toBeDisabled();
+
+  inputPermission=false;
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  const authorize = input.getByRole('button',{name:'去授权'});
+  const toggle=access.getByRole('switch',{name:'桌面访问',exact:true});
+  await expect(authorize).toBeVisible();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked','false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-checked','true');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('html')).not.toHaveAttribute('data-permission', 'input');
+  await authorize.click();
+  await expect(page.locator('html')).toHaveAttribute('data-permission','input');
+  inputPermission=true;
+  await expect(page.locator('html')).toHaveAttribute('data-permission','granted');
+  await page.evaluate(() => window.dispatchEvent(new Event('test:permission-guide-closed')));
+  await expect(input.getByRole('button',{name:'已授权'})).toBeDisabled();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
+  const observation=behaviorGroup.getByRole('switch',{name:'观察桌面'});
   await expect(observation).toBeEnabled();
   await observation.click();
   await expect(observation).toHaveAttribute('aria-checked','false');
-  const toggle=access.getByRole('switch',{name:'桌面访问',exact:true});
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked','false');
   failStatus=true;

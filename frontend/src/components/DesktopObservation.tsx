@@ -4,7 +4,8 @@ import {useT} from '../i18n';
 import {activitySupported,useActivities,type ActivityId} from '../services/extensionActivities';
 import {captureDesktop,computerSnapshot,setDesktopObservation,subscribeComputer} from '../services/computerClient';
 import {setDesktopPanel,useDesktopWindow} from '../services/desktopWindow';
-import {openDesktopAccessGuide} from './AppPermissions';
+import {withDesktopPermissions} from '../services/desktopPermissionGate';
+import {meetingIdentity} from '../services/meetingClient';
 import ProactiveResponseToggle from './ProactiveResponseToggle';
 import NativeCompanion from '../pages/settings/NativeCompanion';
 import MinecraftCompanion from '../pages/settings/MinecraftCompanion';
@@ -27,7 +28,22 @@ export default function DesktopObservation({playing=false}:{playing?:boolean}){
  const close=()=>{setOpen(false);void setDesktopPanel(false).catch(()=>{});(selected==='minecraft'?gameTrigger.current??trigger.current:trigger.current)?.focus();};
  useEffect(()=>{if(open)panel.current?.focus();},[open,windowState.panel]);
  const show=async(id:ActivityId)=>{if(open&&(selected==='minecraft')===(id==='minecraft')){close();return;}try{await setDesktopPanel(true);setSelected(id);setOpen(true);}catch{/* Keep the trigger available for retry. */}};
- const toggle=async()=>{if(accessNeeded){openDesktopAccessGuide();return;}if(working)return;setWorking(true);try{await setDesktopObservation(problem?true:!allowed);if(problem)await captureDesktop();}catch{/* The status store exposes capture/permission failure. */}finally{setWorking(false);}};
+ const toggle=async()=>{
+  if(working)return;
+  const enable=accessNeeded||!!problem||!allowed;
+  const owner=meetingIdentity();
+  const perform=async()=>{
+   if(meetingIdentity()?.leaseId!==owner?.leaseId)return;
+   await setDesktopObservation(enable);
+   if(enable&&problem)await captureDesktop();
+  };
+  setWorking(true);
+  try{
+   if(enable)await withDesktopPermissions('observe',perform);
+   else await perform();
+  }catch{/* The status store exposes capture/permission failure. */}
+  finally{setWorking(false);}
+ };
  const title=selected==='computer'?t('desktop.operate'):t(selected+'.title');
  return <>
   {activitySupported('computer')&&<>

@@ -1,12 +1,13 @@
 import {useEffect, useState, useSyncExternalStore} from 'react';
 import {useT} from '../../i18n';
-import AppPermissions, {openDesktopAccessGuide, setDesktopConsent, type SystemAccess} from '../../components/AppPermissions';
+import AppPermissions, {
+  authorizeSystemPermission, DesktopPermissionAction, isSystemPermissionGranted,
+  readSystemAccess, setDesktopConsent, type SystemAccess,
+} from '../../components/AppPermissions';
 import {computerSnapshot, configureComputer, readComputer, setDesktopObservation, subscribeComputer} from '../../services/computerClient';
-import Button from '../../ui/Button';
 import FieldRow from '../../ui/FieldRow';
 import Switch from '../../ui/Switch';
 import NativeCompanion from './NativeCompanion';
-import {apiJson} from '../../services/http';
 import ConfigAction from './ConfigAction';
 
 export default function DesktopSettings() {
@@ -24,7 +25,7 @@ export default function DesktopSettings() {
       controller?.abort();
       controller = new AbortController();
       const {signal} = controller;
-      void apiJson<SystemAccess>('/api/computer/access/system', {signal})
+      void readSystemAccess(signal)
         .then(value => {if (!signal.aborted) setSystem(value);})
         .catch(() => {if (!signal.aborted) setSystem('error');});
     };
@@ -44,10 +45,6 @@ export default function DesktopSettings() {
     : (failed ? 'config.unavailable' : 'config.loading');
   const disabled = !native || !status || saving || busy;
   async function changeAccess(on: boolean) {
-    if (on && (!system || system === 'error' || !system.screenPermission || !system.inputPermission)) {
-      openDesktopAccessGuide();
-      return;
-    }
     setSaving(true);
     setFailed(false);
     try {
@@ -55,11 +52,6 @@ export default function DesktopSettings() {
       if (updated.stopUnconfirmed) setFailed(true);
     } catch { setFailed(true); }
     finally { setSaving(false); }
-  }
-  async function openSystem(kind: 'screen' | 'input') {
-    setFailed(false);
-    try { await window.momoDesktop?.requestSystemPermission?.(kind); }
-    catch { setFailed(true); }
   }
   async function configure(on: boolean) {
     setSaving(true);
@@ -69,34 +61,38 @@ export default function DesktopSettings() {
     finally { setSaving(false); }
   }
   return <div className="desktop-config">
-    <FieldRow label={t('desktopAccess.title')} hint={native ? t('desktopAccess.description') : undefined}>
-      <span className="config-value" role="status">{t(accessStatus)}</span>
-      <Switch title={t('desktopAccess.title')} on={granted} disabled={!native || (!status && consent === undefined) || saving || busy} onChange={on => void changeAccess(on)}/>
-    </FieldRow>
-    {native && (['screen','input'] as const).map(kind => {
-      const key = kind === 'screen' ? 'screenPermission' : 'inputPermission';
-      const state = !system ? 'config.loading' : system === 'error' ? 'config.unavailable'
-        : system[key] ? 'desktopAccess.enabled' : 'config.grantedOff';
-      return <FieldRow key={kind} label={t('desktopAccess.' + kind)}>
-        <span className="config-value" role="status">{t(state)}</span>
-        <Button className="config-action" variant="ghost" onClick={() => {
-          if (window.momoDesktop?.requestSystemPermission) void openSystem(kind);
-          else openDesktopAccessGuide();
-        }}>{t('desktopAccess.systemAction')}</Button>
-      </FieldRow>;
-    })}
-    <FieldRow label={t('desktop.observe')} hint={t(!native ? 'config.nativeOnly' : 'desktop.observeHint')}>
-      <Switch title={t('desktop.observe')} on={!!status?.desktopAllowed} disabled={disabled} onChange={on => void setDesktopObservation(on, 'settings')}/>
-    </FieldRow>
-    <FieldRow label={t('desktop.react')} hint={t('desktop.reactHint')}>
-      <Switch title={t('desktop.react')} on={!!(status?.proactive && status.reactions)} disabled={disabled} onChange={on => void configure(on)}/>
-    </FieldRow>
-    <ConfigAction label={t('computer.title')} action={t('config.windowAction')}>
-      <NativeCompanion plugin="computer" mode="activity"/>
-    </ConfigAction>
-    <ConfigAction label={t('desktopAccess.blocklist')} action={t('config.blockAction')}>
-      {native ? <AppPermissions manage/> : <p>{t('config.nativeOnly')}</p>}
-    </ConfigAction>
+    <div className="desktop-config-groups">
+      <section className="desktop-config-group" aria-labelledby="desktop-access-heading">
+        <h3 id="desktop-access-heading">{t('desktopAccess.accessGroup')}</h3>
+        <FieldRow label={t('desktopAccess.title')} hint={native ? t('desktopAccess.description') : undefined}>
+          <span className={native ? 'desktop-config-status' : 'config-value'} role="status">{t(accessStatus)}</span>
+          <Switch title={t('desktopAccess.title')} on={granted} disabled={!native || (!status && consent === undefined) || saving || busy} onChange={on => void changeAccess(on)}/>
+        </FieldRow>
+        {native && (['screen', 'input'] as const).map(kind => <FieldRow key={kind} label={t('desktopAccess.' + kind)}>
+          {!system || system === 'error'
+            ? <span className="config-value" role="status">{t(system === 'error' ? 'config.unavailable' : 'config.loading')}</span>
+            : <DesktopPermissionAction kind={kind} granted={isSystemPermissionGranted(system, kind)} onClick={() => {
+              setFailed(false);
+              authorizeSystemPermission(kind, () => setFailed(true));
+            }}/>}
+        </FieldRow>)}
+      </section>
+      <section className="desktop-config-group" aria-labelledby="desktop-behavior-heading">
+        <h3 id="desktop-behavior-heading">{t('desktopAccess.behaviorGroup')}</h3>
+        <FieldRow label={t('desktop.observe')} hint={t(!native ? 'config.nativeOnly' : 'desktop.observeHint')}>
+          <Switch title={t('desktop.observe')} on={!!status?.desktopAllowed} disabled={disabled} onChange={on => void setDesktopObservation(on, 'settings')}/>
+        </FieldRow>
+        <FieldRow label={t('desktop.react')} hint={t('desktop.reactHint')}>
+          <Switch title={t('desktop.react')} on={!!(status?.proactive && status.reactions)} disabled={disabled} onChange={on => void configure(on)}/>
+        </FieldRow>
+        <ConfigAction label={t('computer.title')} action={t('config.windowAction')}>
+          <NativeCompanion plugin="computer" mode="activity"/>
+        </ConfigAction>
+        <ConfigAction label={t('desktopAccess.blocklist')} action={t('config.blockAction')}>
+          {native ? <AppPermissions manage/> : <p>{t('config.nativeOnly')}</p>}
+        </ConfigAction>
+      </section>
+    </div>
     {(failed || error) && <p role="alert">{t('permissions.error')}</p>}
   </div>;
 }

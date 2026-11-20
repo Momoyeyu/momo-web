@@ -4,6 +4,7 @@ import {useT} from '../../i18n';
 import {apiJson,jsonInit} from '../../services/http';
 import {useActivities} from '../../services/extensionActivities';
 import {meetingIdentity,meetingSnapshot,subscribeMeeting} from '../../services/meetingClient';
+import {withDesktopPermissions,type DesktopOperation} from '../../services/desktopPermissionGate';
 import ExtensionCard from './ExtensionCard';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
@@ -30,6 +31,7 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
  const [open,setOpen]=useState(false),[targets,setTargets]=useState<Target[]>(()=>saved?[saved]:[]),[selected,setSelected]=useState(()=>saved?targetKey(saved):''),[busy,setBusy]=useState(false),[active,setActive]=useState(false);
  const [actionFailed,setActionFailed]=useState(false);
  const [scanState,setScanState]=useState<'idle'|'loading'|'failed'>('idle');
+ const [reopenKey,setReopenKey]=useState(0);
  const scanRequest=useRef<AbortController|null>(null);
  const [statusState,setStatusState]=useState<'loading'|'ready'|'failed'>('loading');
  const [activeTarget,setActiveTarget]=useState<Target|null>(null);
@@ -57,9 +59,15 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
   return()=>{mounted.current=false;clearInterval(timer);request.current?.abort();request.current=null;scanRequest.current?.abort();};
  },[read]);
  useEffect(()=>{if(plugin==='computer'&&(open||mode!=='settings'))void readComputer().catch(()=>{});},[plugin,open,mode]);
- const run=async(fn:()=>Promise<void>)=>{
-  if(operation.current)return;operation.current=true;setBusy(true);setActionFailed(false);request.current?.abort();
-  try{await fn();if(mounted.current)await read();}catch{if(mounted.current)setActionFailed(true);}
+ const run=async(fn:()=>Promise<void>, check?:DesktopOperation)=>{
+  if(!mounted.current||operation.current)return;
+  operation.current=true;setBusy(true);setActionFailed(false);request.current?.abort();
+  try{
+   const performed=check
+    ? await withDesktopPermissions(check,fn,()=>run(fn,check))
+    : (await fn(),true);
+   if(performed&&mounted.current)await read();
+  }catch{if(mounted.current)setActionFailed(true);}
   finally{operation.current=false;if(mounted.current)setBusy(false);}
  };
  const start=async(body:Record<string,unknown>)=>{await post('start',body);};
@@ -74,20 +82,34 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
   if(rememberSelection)selectedWindows[plugin]=refreshed;
   setSelected(refreshed?targetKey(refreshed):'');
  };
- const refreshPicker=()=>{
+ const refreshPicker=async(reopen=false)=>{
+  if(!mounted.current)return;
   scanRequest.current?.abort();
   const controller=new AbortController();
   scanRequest.current=controller;
   setScanState('loading');
-  void findTargets(controller.signal).then(()=>{
-   if(!controller.signal.aborted)setScanState('idle');
-  }).catch(()=>{
+  try{
+   const performed=await withDesktopPermissions('targets',()=>findTargets(controller.signal),()=>refreshPicker(true),controller.signal);
+   if(controller.signal.aborted)return;
+   setScanState('idle');
+   if(performed&&reopen)setReopenKey(key=>key+1);
+  }catch{
    if(!controller.signal.aborted)setScanState('failed');
-  });
+  }
  };
- useEffect(()=>{if(mode==='pet'&&enabled&&meeting.state==='active'&&!scanned.current){scanned.current=true;void run(findTargets);}},[mode,enabled,meeting.state]);
+ useEffect(()=>{
+  if(mode==='pet'&&enabled&&meeting.state==='active'&&!scanned.current){scanned.current=true;void run(findTargets,'targets');}
+ },[mode,enabled,meeting.state]);
  const target=targets.find(x=>targetKey(x)===selected);
  const live=meeting.state==='active';
+ const startSelected=()=>{
+  const identity=meetingIdentity();
+  if(!identity||!target)return;
+  void run(async()=>{
+   if(meetingIdentity()?.leaseId!==identity.leaseId)return;
+   await start({...identity,plugin,windowId:target.windowId,ownerPid:target.ownerPid,permissions:['observe','interact']});
+  },'control');
+ };
  const selectWindow=(value:string)=>{
   setSelected(value);
   if(rememberSelection)selectedWindows[plugin]=targets.find(x=>targetKey(x)===value);
@@ -100,15 +122,15 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
   </div>}
   {(actionFailed||statusState==='failed')&&<p role="alert" className="pet-control-status">{t(actionFailed?'permissions.error':'config.unavailable')}</p>}
   <footer className="pet-control-footer">
-   {!active&&<button type="button" className="pet-icon tip" aria-label={t('permissions.findWindows')} data-tip={t('permissions.findWindows')} disabled={busy} onClick={()=>void run(findTargets)}><Icon name="load"/></button>}
+   {!active&&<button type="button" className="pet-icon tip" aria-label={t('permissions.findWindows')} data-tip={t('permissions.findWindows')} disabled={busy} onClick={()=>void run(findTargets,'targets')}><Icon name="load"/></button>}
    <Hint text={t('desktop.operateHint')}/>
-   {active||stopUnconfirmed?<button type="button" className="pet-icon is-primary tip" aria-label={t('browser.stop')} data-tip={t('browser.stop')} disabled={busy} onClick={()=>void run(async()=>{await post('stop',{...meetingIdentity(),plugin});})}><Icon name="stop"/></button>:<button type="button" className="pet-icon is-primary tip" aria-label={t('desktop.operate')} data-tip={t('desktop.operate')} disabled={!target||busy||!enabled||meeting.state!=='active'} onClick={()=>void run(()=>start({...meetingIdentity(),plugin,windowId:target!.windowId,ownerPid:target!.ownerPid,permissions:['observe','interact']}))}><Icon name="play"/></button>}
+   {active||stopUnconfirmed?<button type="button" className="pet-icon is-primary tip" aria-label={t('browser.stop')} data-tip={t('browser.stop')} disabled={busy} onClick={()=>void run(async()=>{await post('stop',{...meetingIdentity(),plugin});})}><Icon name="stop"/></button>:<button type="button" className="pet-icon is-primary tip" aria-label={t('desktop.operate')} data-tip={t('desktop.operate')} disabled={!target||busy||!enabled||meeting.state!=='active'} onClick={startSelected}><Icon name="play"/></button>}
   </footer>
  </div>;
- const findButton = mode!=='inline' && !active && <Button variant="ghost" disabled={busy} onClick={()=>void run(findTargets)}>{t('permissions.findWindows')}</Button>;
+ const findButton = mode!=='inline' && !active && <Button variant="ghost" disabled={busy} onClick={()=>void run(findTargets,'targets')}>{t('permissions.findWindows')}</Button>;
  const runButton = active||stopUnconfirmed
   ? <Button variant="ghost" className={mode==='inline'?'config-action':undefined} disabled={busy} onClick={()=>void run(async()=>{await post('stop',{...meetingIdentity(),plugin});})}>{t('browser.stop')}</Button>
-  : live && <Button className={mode==='inline'?'config-action':undefined} disabled={!enabled||busy||!target||scanState==='loading'} onClick={()=>target&&void run(()=>start({...meetingIdentity(),plugin,windowId:target.windowId,ownerPid:target.ownerPid,permissions:['observe','interact']}))}>{t('browser.start')}</Button>;
+  : live && <Button className={mode==='inline'?'config-action':undefined} disabled={!enabled||busy||!target||scanState==='loading'} onClick={startSelected}>{t('browser.start')}</Button>;
  const pickerNotice = mode==='inline' && <div className="window-scan-feedback">
   {scanState==='loading' ? <span role="status">{t('config.loading')}</span>
    : scanState==='failed' ? <span role="alert">{t('permissions.error')}</span>
@@ -118,7 +140,7 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
   ? <span className="desktop-observed-target" title={targetLabel(activeTarget)}>{targetLabel(activeTarget)}</span>
   : <div className="native-window-picker"><Select label={t('permissions.window')} value={selected} disabled={busy}
     options={[{value:'',label:t('permissions.selectWindow')},...targets.map(x=>({value:targetKey(x),label:targetLabel(x)}))]}
-    onChange={selectWindow} onOpen={mode==='inline'?refreshPicker:undefined} popupNotice={pickerNotice}
+    onChange={selectWindow} onOpen={mode==='inline'?()=>void refreshPicker():undefined} popupNotice={pickerNotice} reopenKey={reopenKey}
     hideOptions={mode==='inline'&&scanState!=='idle'}/></div>;
  const notices = <>
   {!live&&target&&<p className="extension-detail-notice">{t('computer.windowReady')}</p>}

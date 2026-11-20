@@ -2,7 +2,7 @@ from typing import Literal
 from fastapi import APIRouter,HTTPException,Request
 from pydantic import BaseModel,Field
 from ..services.native_control import native_control
-from .app_permissions import require_desktop
+from .app_permissions import require_desktop,system_permission_detail
 router=APIRouter(prefix='/api/computer/native')
 class TargetQuery(BaseModel):
     plugin:Literal['computer','browser']='computer'
@@ -15,7 +15,8 @@ class Start(Owner):
     permissions:list[Literal['observe','interact']]
 def call(fn,*args):
     try:return fn(*args)
-    except Exception:raise HTTPException(409,'Application unavailable or permission denied') from None
+    except Exception as error:
+        raise HTTPException(409,system_permission_detail(error) or 'Application unavailable or permission denied') from None
 @router.post('/targets')
 def targets(body:TargetQuery, request:Request):
     require_desktop(request)

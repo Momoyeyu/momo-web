@@ -1,4 +1,4 @@
-"""The local desktop consent and application blocklist."""
+"""Local desktop consent, application blocklist, and OS permission checks."""
 import json
 import os
 from pathlib import Path
@@ -7,8 +7,56 @@ import stat
 import sys
 import tempfile
 import threading
+from typing import Literal
 
 from ..core import state
+from ..core.plugin_host import HostError
+
+
+SystemPermission = Literal['screen', 'input']
+DesktopOperation = Literal['targets', 'observe', 'control']
+SYSTEM_REQUIREMENTS: dict[DesktopOperation, tuple[SystemPermission, ...]] = {
+    'targets': ('screen',),
+    'observe': ('screen',),
+    'control': ('screen', 'input'),
+}
+SYSTEM_PERMISSION_CODES = {
+    'SCREEN_PERMISSION_REQUIRED': 'screen',
+    'INPUT_PERMISSION_REQUIRED': 'input',
+}
+
+
+class SystemPermissionRequired(HostError):
+    def __init__(self, missing: list[SystemPermission]):
+        super().__init__(f'{missing[0].upper()}_PERMISSION_REQUIRED')
+        self.missing = missing
+
+
+def missing_system_permissions(operation: DesktopOperation, status) -> list[SystemPermission]:
+    required = SYSTEM_REQUIREMENTS[operation]
+    if not isinstance(status, dict) or any(type(status.get(f'{kind}Permission')) is not bool for kind in required):
+        raise HostError('Application permission status unavailable')
+    return [kind for kind in required if not status[f'{kind}Permission']]
+
+
+def read_system_permissions(host):
+    if not host:
+        raise HostError('Application executor unavailable')
+    return host.request('native.permissions')
+
+
+def require_system_permissions(operation: DesktopOperation, status):
+    missing = missing_system_permissions(operation, status)
+    if missing:
+        raise SystemPermissionRequired(missing)
+
+
+def denied_system_permissions(error):
+    if isinstance(error, SystemPermissionRequired):
+        return error.missing
+    if isinstance(error, HostError) and (kind := SYSTEM_PERMISSION_CODES.get(str(error))):
+        return [kind]
+    return []
 
 
 class DesktopPermissionError(ValueError):

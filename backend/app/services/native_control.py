@@ -4,7 +4,7 @@ import math
 import time
 from .coordinator import runtime
 from . import vision, activities
-from .app_permissions import permissions
+from .app_permissions import permissions, read_system_permissions, require_system_permissions
 from ..core import state
 
 class NativeControl:
@@ -45,6 +45,7 @@ class NativeControl:
         version, blocked = permissions.before_action()
         result = runtime.host.request('native.targets')
         permissions.before_action(version=version)
+        require_system_permissions('targets', result)
         return {**result, 'targets': [
             row for row in result['targets']
             if row.get('bundleId') and row['bundleId'].lower() not in blocked
@@ -62,12 +63,14 @@ class NativeControl:
             raise ValueError('Invalid application scope')
         if not runtime.host:
             raise ValueError('Application executor unavailable')
+        operation = 'control' if 'interact' in capabilities else 'observe'
         with runtime.host.control, self.lock:
             if (self.target and not self.stop_unconfirmed and not self.stopping
                     and plugin == self.plugin and window == self.target['windowId']
                     and pid == self.target['ownerPid']
                     and set(capabilities) <= set(self.grant['capabilities'])):
                 self.validate(self.generation,client,lease)
+                require_system_permissions(operation, read_system_permissions(runtime.host))
                 return self.status()
             if self.target or self.stop_unconfirmed or self.stopping:
                 raise ValueError('Stop the current application activity first')
@@ -78,6 +81,7 @@ class NativeControl:
             self.gate(client,lease)
             version,_=permissions.before_action()
             result=runtime.host.request('native.targets')
+            require_system_permissions(operation, result)
             target=next((row for row in result['targets'] if row.get('windowId')==window and row.get('ownerPid')==pid), None)
             if not target or not target.get('bundleId') or not target.get('path'):
                 raise ValueError('Target window no longer exists')

@@ -6,14 +6,14 @@ from ..services.vision import VisionError, MAX_BYTES
 from ..services.coordinator import CoordinationError, runtime
 from ..core.plugin_host import HostError
 from ..core.llm import LlmError
-from .app_permissions import require_desktop
+from .app_permissions import require_desktop, system_permission_detail
 
 router = APIRouter(prefix='/api/computer')
 
 def invoke(fn, *args):
     try: return fn(*args)
     except (ComputerError, DesktopPermissionError, VisionError, CoordinationError, HostError, LlmError) as error:
-        raise HTTPException(409, str(error)) from error
+        raise HTTPException(409, system_permission_detail(error) or str(error)) from error
 
 class Settings(BaseModel):
     proactive: bool = False

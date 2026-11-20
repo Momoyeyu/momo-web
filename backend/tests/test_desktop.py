@@ -69,6 +69,50 @@ def test_window_selection_and_observation_preference_do_not_need_meeting(monkeyp
             computer.set_desktop_allowed(before)
 
 
+def test_desktop_permission_precheck_is_authenticated_and_read_only(monkeypatch, tmp_path):
+    from types import SimpleNamespace
+    from app.api import app_permissions
+
+    monkeypatch.setenv('MOMO_DESKTOP_TOKEN', 'a' * 64)
+    monkeypatch.setattr(app_permissions, 'native_desktop', lambda: True)
+    requests = []
+
+    def request(method, params=None):
+        requests.append((method, params))
+        return {'screenPermission': True, 'inputPermission': False, 'applications': []}
+
+    monkeypatch.setattr(app_permissions.runtime, 'host', SimpleNamespace(request=request))
+    client = TestClient(app)
+    url = '/api/computer/access/precheck'
+    headers = {'x-momo-token': 'a' * 64, 'origin': 'momo://app'}
+    assert client.post(url, json={'operation': 'control'}).status_code == 403
+    assert client.post(url, headers=headers, json={'operation': 'request'}).status_code == 422
+    assert requests == []
+
+    for operation, missing in [('targets', []), ('observe', []), ('control', ['input'])]:
+        response = client.post(url, headers=headers, json={'operation': operation})
+        assert response.status_code == 200
+        assert response.json() == {'missing': missing}
+    assert requests == [('native.permissions', None)] * 3
+    assert not (tmp_path / 'desktop-access.json').exists()
+
+
+@pytest.mark.parametrize('path', ['/api/computer/native/frame', '/api/computer/desktop/frame'])
+def test_desktop_frame_routes_return_structured_permission_denial(monkeypatch, path):
+    from app.core.plugin_host import HostError
+    from app.services.computer import computer
+    from app.services.coordinator import runtime
+
+    def denied():
+        raise HostError('SCREEN_PERMISSION_REQUIRED')
+
+    monkeypatch.setattr(runtime, 'require_meeting', lambda *_: None)
+    monkeypatch.setattr(computer, 'desktop_frame', denied)
+    response = TestClient(app).post(path, json={'clientId': 'owner', 'leaseId': 'lease'})
+    assert response.status_code == 409
+    assert response.json() == {'detail': {'code': 'permission_required', 'missing': ['screen']}}
+
+
 def test_websocket_requires_first_frame(monkeypatch):
     monkeypatch.setenv("MOMO_DESKTOP_TOKEN", "a" * 64)
     with TestClient(app) as client:

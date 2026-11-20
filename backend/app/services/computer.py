@@ -9,7 +9,10 @@ import time
 
 from ..core import state, db
 from . import vision
-from .app_permissions import DesktopPermissionError, native_desktop, permissions
+from .app_permissions import (
+    DesktopPermissionError, SystemPermissionRequired, native_desktop, permissions,
+    read_system_permissions, require_system_permissions,
+)
 from .coordinator import runtime
 
 class ComputerError(ValueError):
@@ -150,6 +153,13 @@ class Computer:
                 except DesktopPermissionError as error:
                     raise ComputerError(str(error)) from None
                 if not self.observing:
+                    if native_desktop():
+                        try:
+                            require_system_permissions('observe', read_system_permissions(runtime.host))
+                        except SystemPermissionRequired:
+                            self.desktop_error = 'screen-permission'
+                            raise
+                        permissions.before_action(version=policy_version)
                     self.start('Desktop',self.proactive,self.reactions,shared=False)
                 generation = self.generation
                 if self.shared_source:

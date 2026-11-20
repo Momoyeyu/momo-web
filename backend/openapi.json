@@ -1341,6 +1341,44 @@
         "title": "PermissionIn",
         "type": "object"
       },
+      "PermissionPrecheck": {
+        "properties": {
+          "operation": {
+            "enum": [
+              "targets",
+              "observe",
+              "control"
+            ],
+            "title": "Operation",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "title": "PermissionPrecheck",
+        "type": "object"
+      },
+      "PermissionPrecheckResult": {
+        "properties": {
+          "missing": {
+            "items": {
+              "enum": [
+                "screen",
+                "input"
+              ],
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          }
+        },
+        "required": [
+          "missing"
+        ],
+        "title": "PermissionPrecheckResult",
+        "type": "object"
+      },
       "PresentationAckIn": {
         "properties": {
           "clientId": {
@@ -3256,6 +3294,44 @@
           }
         },
         "summary": "Consent"
+      }
+    },
+    "/api/computer/access/precheck": {
+      "post": {
+        "operationId": "precheck_api_computer_access_precheck_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PermissionPrecheck"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PermissionPrecheckResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Precheck"
       }
     },
     "/api/computer/access/system": {

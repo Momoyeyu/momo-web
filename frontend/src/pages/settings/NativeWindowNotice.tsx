@@ -1,6 +1,7 @@
 import {useT} from '../../i18n';
 import Hint from '../../ui/Hint';
 import Icon from '../../ui/Icon';
+import {authorizeSystemPermission} from '../../components/AppPermissions';
 export type NativeWindowDiagnostics={targets:unknown[];screenPermission?:boolean;inputPermission?:boolean};
 export default function NativeWindowNotice({result,interact}:{result:NativeWindowDiagnostics|null;interact:boolean}){
  const t=useT();
@@ -11,5 +12,5 @@ export default function NativeWindowNotice({result,interact}:{result:NativeWindo
   ...(result.targets.length===0?['noWindows']:[]),
  ];
  return <>{notices.map(key=><p key={key} role="status" className="extension-detail-notice">{t('permissions.'+key)} <Hint text={t('permissions.'+key+'Hint')} side="down"/>
-  {key!=='noWindows'&&typeof window!=='undefined'&&window.momoDesktop?.requestSystemPermission&&<button type="button" className="icon-btn" aria-label={t('permissions.openSystemSettings')} onClick={()=>void window.momoDesktop!.requestSystemPermission!(key==='inputPermission'?'input':'screen').catch(()=>{})}><Icon name="gear"/></button>}</p>)}</>;
+  {key!=='noWindows'&&typeof window!=='undefined'&&(window.momoDesktop?.requestSystemPermission||window.momoDesktop?.openPermissionGuide)&&<button type="button" className="icon-btn" aria-label={t('permissions.openSystemSettings')} onClick={()=>authorizeSystemPermission(key==='inputPermission'?'input':'screen')}><Icon name="gear"/></button>}</p>)}</>;
 }
