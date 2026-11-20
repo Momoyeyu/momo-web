@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import {useT} from '../../i18n';
-import {jsonInit} from '../../services/http';
+import {apiJson,jsonInit} from '../../services/http';
 import {runtimeFetch} from '../../services/runtime';
 import {refreshActivities} from '../../services/extensionActivities';
 import {applyModChange,refreshMods,useMods,type InstalledMod} from '../../services/mods';
@@ -13,11 +13,17 @@ import Switch from '../../ui/Switch';
 import OfficialPlugins from './OfficialPlugins';
 import MinecraftCompanion from './MinecraftCompanion';
 
-const official = {'momo.qq':'QQ','momo.minecraft':'Minecraft'};
+type OfficialMod = {id:string; name:string; version:string; compatible:boolean};
+type LibraryView = 'installed' | 'catalog';
 type Selection = {id:string; mode:'manage'|'install'|'remove'} | {mode:'local'; file?:File};
 
 export default function ModsPanel(){
   const t=useT(), mods=useMods(), file=useRef<HTMLInputElement>(null);
+  const [manager,setManager]=useState(false);
+  const [view,setView]=useState<LibraryView>('installed');
+  const [catalog,setCatalog]=useState<OfficialMod[]|null>(null);
+  const [catalogFailed,setCatalogFailed]=useState(false);
+  const [catalogRetry,setCatalogRetry]=useState(0);
   const [selection,select]=useState<Selection|null>(null);
   const [page,setPage]=useState(0);
   const [query,setQuery]=useState('');
@@ -25,7 +31,21 @@ export default function ModsPanel(){
   const working=useRef(false), code=(key:string)=>t('modManager.'+key);
   const item=selection && 'id' in selection ? mods.find(m=>m.id===selection.id) : undefined;
   const load=()=>refreshMods().catch(()=>setError('listError'));
-  useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    if(!manager||view!=='catalog')return;
+    const controller=new AbortController();
+    setCatalogFailed(false);
+    void apiJson<{mods:OfficialMod[]}>('/api/mods/official',{signal:controller.signal}).then(result=>{
+      if(!controller.signal.aborted)setCatalog(result.mods);
+    }).catch(()=>{if(!controller.signal.aborted)setCatalogFailed(true);});
+    return ()=>controller.abort();
+  },[manager,view,catalogRetry]);
+  function showView(next:LibraryView) {
+    setError('');
+    setView(next);
+    setPage(0);
+    setQuery('');
+  }
   function open(next:Selection|null){if(!working.current){setError('');select(next);}}
   async function run(url:string, init:RequestInit, next:Selection|null){
     if(working.current)return;
@@ -47,6 +67,7 @@ export default function ModsPanel(){
       else{
         const record=await response.json() as InstalledMod;
         applyModChange(record.id,record);
+        if(init.method==='POST')showView('installed');
       }
       select(next);
       try{await refreshMods();}
@@ -61,27 +82,48 @@ export default function ModsPanel(){
   function setEnabled(mod: InstalledMod, enabled: boolean) {
     void run('/api/mods/'+mod.id, jsonInit('PATCH', {enabled}), selection);
   }
-  const name=item?.name??(selection&&'id' in selection?official[selection.id as keyof typeof official]:'');
-  const entries=new Map<string,string>(Object.entries(official));
-  mods.forEach(m=>entries.set(m.id,m.name));
-  const filterable=entries.size>5;
-  const list=[...entries].filter(([id,label])=>!filterable||(id+' '+label).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
-  const paging=clampPage(page,list.length,5);
+  const candidate=selection && 'id' in selection ? catalog?.find(mod=>mod.id===selection.id) : undefined;
+  const name=item?.name??candidate?.name??'';
+  const entries=view==='installed' ? mods : catalog?.filter(mod=>!mods.some(owned=>owned.id===mod.id))??[];
+  const filterable=entries.length>5;
+  const matches=filterable ? entries.filter(mod=>(mod.id+' '+mod.name).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) : entries;
+  const paging=clampPage(page,matches.length,5);
   return <>
-    {filterable&&<input type="search" className="list-search" value={query} aria-label={code('search')} placeholder={code('search')} onChange={e=>{setQuery(e.target.value);setPage(0);}}/>}
-    {list.slice(paging.page*5,paging.page*5+5).map(([id,label])=>{
-      const installed=mods.find(m=>m.id===id);
-      return <FieldRow key={id} label={label}>
-        {installed ? <Switch title={label} on={installed.enabled} disabled={busy} onChange={enabled=>setEnabled(installed,enabled)}/>
-          : <span className="muted">{code('absent')}</span>}
-        {button(installed?'manage':'install',()=>open({id,mode:installed?'manage':'install'}))}
-      </FieldRow>;
-    })}
-    {filterable&&<Pager page={paging.page} pages={paging.pages} onChange={setPage}/>}
-    <FieldRow label={code('local')}>{button('manageLocal',()=>open({mode:'local'}))}</FieldRow>
-    {!selection&&error&&<div role="alert">{code(error)} {button('retry',()=>{setError('');void load();})}</div>}
-    {selection&&<Modal label={selection.mode==='local'?code('local'):name} onClose={()=>open(null)} className="extension-modal">
-      <div className="extension-detail"><h3>{selection.mode==='local'?code('local'):name}</h3>
+    <FieldRow label={code('library')}>{button('manageLocal',()=>{
+      showView('installed');
+      setManager(true);
+      void load();
+    })}</FieldRow>
+    {manager&&<Modal label={code('library')} onClose={()=>{if(!working.current)setManager(false);}} className="extension-modal mod-library">
+      <header className="extension-detail-header"><h3>{code('library')}</h3></header>
+      <div className="mod-library-header">
+        <div className="mod-library-views" role="group" aria-label={code('library')}>
+          {(['installed','catalog'] as const).map(section=><Button key={section} variant="ghost" size="sm"
+            aria-pressed={view===section} disabled={busy} onClick={()=>showView(section)}>{code(section)}</Button>)}
+        </div>
+        {view==='catalog'&&button('import',()=>open({mode:'local'}))}
+      </div>
+      {filterable&&<input type="search" className="list-search" value={query} aria-label={code('search')} placeholder={code('search')} onChange={e=>{setQuery(e.target.value);setPage(0);}}/>}
+      {view==='catalog' && catalogFailed ? <p role="alert">{code('catalogError')} {button('retry',()=>setCatalogRetry(n=>n+1))}</p>
+      : view==='catalog' && catalog===null ? <p role="status">{t('config.loading')}</p>
+      : !matches.length && <p className="muted">{code(entries.length?'noMatches':view==='installed'?'empty':'catalogEmpty')}</p>}
+      <div className="mod-library-rows">
+        {matches.slice(paging.page*5,paging.page*5+5).map(mod=><FieldRow key={mod.id} label={mod.name}>
+          {'enabled' in mod ? <>
+            <Switch title={mod.name} on={mod.enabled} disabled={busy} onChange={enabled=>setEnabled(mod,enabled)}/>
+            {button('manage',()=>open({id:mod.id,mode:'manage'}))}
+          </> : <>
+            {!mod.compatible&&<span className="config-value">{code('platformUnavailable')}</span>}
+            {button('install',()=>open({id:mod.id,mode:'install'}),!mod.compatible)}
+          </>}
+        </FieldRow>)}
+      </div>
+      {filterable&&<Pager page={paging.page} pages={paging.pages} onChange={setPage}/>}
+      {!selection&&error&&<p role="alert">{code(error)} {button('retry',()=>{setError('');void load();})}</p>}
+      <div className="modal-foot">{button('close',()=>setManager(false))}</div>
+    </Modal>}
+    {selection&&<Modal label={selection.mode==='local'?code('import'):name} onClose={()=>open(null)} className="extension-modal">
+      <div className="extension-detail"><h3>{selection.mode==='local'?code('import'):name}</h3>
       {selection.mode==='local' ? <>
         <p>{code('importHint')}</p>
         <input ref={file} type="file" hidden accept=".momomod" onChange={e=>{
@@ -108,7 +150,7 @@ export default function ModsPanel(){
         {item.kind==='content'&&item.resources.map(r=><p key={r.path}>{code(r.type)} · {r.path}</p>)}
       </>}
       {error&&<p role="alert">{code(error)}</p>}
-      <div className="modal-foot">{button('close',()=>open(null))}</div>
+      <div className="modal-foot">{button('backToLibrary',()=>open(null))}</div>
       </div>
     </Modal>}
   </>;

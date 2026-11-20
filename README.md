@@ -13,7 +13,7 @@ momo 是一个逐渐熟悉你的 AI 伙伴。这是 v3 的 Web 体验迭代仓�
 - **对话与手机共享注意力**：可以请她处理消息、叫停或开启“专注对话”。Python 保留唯一大脑，Node 宿主管理常驻连接和可撤销执行。
 - **贯通式设置**：十个目录锚点定位到同一份设置文档。中、英、日三个版本共用操作列，背景网格随滚动旋转。
 - **桌面与浏览器**：桌宠、屏幕观察、应用操作与已有浏览器连接由核心提供。macOS 版在系统授权后按应用黑名单过滤观察和输入。
-- **可选模组**：在「设置 → 模组」安装、启用官方签名 QQ 或 Minecraft 包。QQ 复用本机兼容的 QQ 客户端资源。Minecraft 使用现有 Java 1.21.1 / Fabric 客户端和玩家账号。可从本地导入背景、音乐内容包。[官方包与平台要求](https://github.com/Momoyeyu/momo-plugin/releases/tag/v1.0.0) · [示例音乐包](docs/examples/evening-chimes.momomod)
+- **可选模组**：在「设置 → 模组 → 管理 → 获取模组」安装 QQ 或 Minecraft，再从已安装列表启用。官方包由独立的 momo-plugin 仓库发布，momo 校验签名后通过自己的运行宿主加载。QQ 复用本机兼容的 QQ 客户端资源。Minecraft 使用现有 Java 1.21.1 / Fabric 客户端和玩家账号。可从本地导入背景、音乐内容包。[官方包与平台要求](https://github.com/Momoyeyu/momo-plugin/releases/tag/v1.0.0) · [示例音乐包](docs/examples/evening-chimes.momomod)
 - 继续保留 soul、逐句表情 / 动作与语音同步、初次见面、中英日界面，以及内置 ASR / embedding。
 
 完整历史与模型上下文分开保存，压缩不删除原文。下一步将与项目维护者共同研究上下文管理，尤其是长期目标、压缩质量与记忆的配合。

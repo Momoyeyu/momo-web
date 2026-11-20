@@ -1,3 +1,4 @@
+import {openModLibrary} from './mod-fixtures';
 import {expect, test} from './fixtures';
 import {openTab, pickSelect} from './helpers';
 
@@ -56,14 +57,14 @@ test('an installed mod can be enabled and disabled from its list row', async ({p
     mod.enabled = route.request().postDataJSON().enabled;
     return route.fulfill({json:mod});
   });
-  await openTab(page, '模组');
-  const toggle = page.locator('#config-mods').getByRole('switch', {name:'Fixture mod'});
+  const library=await openModLibrary(page);
+  const toggle = library.getByRole('switch', {name:'Fixture mod'});
   await expect(toggle).toHaveAttribute('aria-checked','false');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked','true');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked','false');
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(1);
 });
 
 test('desktop access can be configured before Boot and keeps confirmed consent if status refresh fails', async ({page, baseURL}) => {

@@ -190,7 +190,15 @@ def test_failed_upgrade_restores_previous_binding(integration, monkeypatch):
 
 
 def test_fixed_official_catalog_checks_download_identity(integration, monkeypatch):
-    _, build = integration
+    host, build = integration
+    monkeypatch.setattr(mod_bundle, "current_platform", lambda: "linux-x64")
+    catalog = client.get("/api/mods/official").json()["mods"]
+    assert {row["id"] for row in catalog} == {"momo.qq", "momo.minecraft"}
+    assert all(not row["compatible"] for row in catalog)
+    assert client.post("/api/mods/official/momo.minecraft").status_code == 400
+    assert client.get("/api/mods").json() == {"mods": []}
+    monkeypatch.setattr(mod_bundle, "current_platform", lambda: "darwin-arm64")
+    assert all(row["compatible"] for row in client.get("/api/mods/official").json()["mods"])
     payload = build("momo.qq").getvalue()
     @contextmanager
     def stream(method, url, **kwargs):
@@ -204,6 +212,9 @@ def test_fixed_official_catalog_checks_download_identity(integration, monkeypatc
     assert client.post("/api/mods/official/arbitrary").status_code == 404
     payload = build().getvalue()
     assert client.post("/api/mods/official/momo.minecraft").json()["enabled"] is False
+    assert host.calls == []
+    assert client.patch("/api/mods/momo.minecraft", json={"enabled": True}).json()["enabled"]
+    assert host.calls[-1]["id"] == "momo.minecraft" and host.calls[-1]["binding"]
 
 
 def test_clean_profile_hides_phone_and_game(monkeypatch):

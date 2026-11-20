@@ -4986,6 +4986,22 @@
         "summary": "Install"
       }
     },
+    "/api/mods/official": {
+      "get": {
+        "operationId": "official_catalog_api_mods_official_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Official Catalog"
+      }
+    },
     "/api/mods/official/{ident}": {
       "post": {
         "operationId": "official_api_mods_official__ident__post",

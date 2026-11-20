@@ -64,6 +64,11 @@ def install(file: UploadFile):
     return invoke(mods.install, file.file)
 
 
+@router.get("/official")
+def official_catalog():
+    return {"mods": mods.official_catalog()}
+
+
 @router.post("/official/{ident}")
 def official(ident: str):
     return invoke(mods.install_official, ident)

@@ -1,12 +1,13 @@
 import {test,expect} from './fixtures';
-import {openTab} from './helpers';
+import {openModLibrary} from './mod-fixtures';
 test.beforeEach(()=>test.skip(process.env.MOMO_OFFICIAL_MOD_SMOKE!=='1'||process.platform!=='darwin','Requires the official GitHub release and a disposable profile.'));
 for(const [name,id] of [['QQ','momo.qq'],['Minecraft','momo.minecraft']])test('real signed catalog '+name, async ({page,request})=>{
  test.setTimeout(200000);
- await openTab(page,'模组');
- const b=page.locator('#config-mods .opt-row').filter({hasText:name}).getByRole('button',{name:'安装模组'});
+ const library=await openModLibrary(page);
+ await library.getByRole('button',{name:'获取模组',exact:true}).click();
+ const b=library.locator('.opt-row').filter({hasText:name}).getByRole('button',{name:'安装模组'});
  await b.click();
- const dialog=page.getByRole('dialog');
+ const dialog=page.getByRole('dialog',{name,exact:true});
  await dialog.getByRole('button',{name:'安装模组'}).click();
  await expect(dialog.getByRole('button',{name:'启用模组'})).toBeVisible({timeout:120000});
  await dialog.getByRole('button',{name:'启用模组'}).click();

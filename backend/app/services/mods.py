@@ -200,6 +200,20 @@ def restore(host):
                     shutil.rmtree(directory, ignore_errors=True)
 
 
+# Published assets from the independent momo-plugin repository.
+_OFFICIAL_RELEASE = "1.0.0"
+_OFFICIAL_CATALOG = (
+    {"id": "momo.qq", "name": "QQ", "platforms": ("darwin-arm64",)},
+    {"id": "momo.minecraft", "name": "Minecraft", "platforms": ("darwin-arm64",)},
+)
+
+
+def official_catalog():
+    platform = mod_bundle.current_platform()
+    return [{**row, "version": _OFFICIAL_RELEASE, "compatible": platform in row["platforms"]}
+            for row in _OFFICIAL_CATALOG]
+
+
 def install(bundle, *, expected_id=None):
     packages = _root() / "packages"
     packages.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -208,7 +222,7 @@ def install(bundle, *, expected_id=None):
         root.mkdir()
         manifest = mod_bundle.stage(bundle, root)
         ident = manifest["id"]
-        if expected_id is not None and (ident != expected_id or manifest["kind"] != "integration" or manifest["version"] != "1.0.0"):
+        if expected_id is not None and (ident != expected_id or manifest["kind"] != "integration" or manifest["version"] != _OFFICIAL_RELEASE):
             raise ValueError("Official release identity mismatch")
         with _lock:
             old = _read(ident)
@@ -296,9 +310,12 @@ def asset(ident, path, version=None):
 
 
 def install_official(ident):
-    if ident not in mod_bundle.OFFICIAL:
+    listing = next((row for row in official_catalog() if row["id"] == ident), None)
+    if listing is None:
         raise KeyError(ident)
-    url = f"https://github.com/Momoyeyu/momo-plugin/releases/download/v1.0.0/{ident}-1.0.0.momomod"
+    if not listing["compatible"]:
+        raise ValueError("Incompatible platform")
+    url = f"https://github.com/Momoyeyu/momo-plugin/releases/download/v{_OFFICIAL_RELEASE}/{ident}-{_OFFICIAL_RELEASE}.momomod"
     with tempfile.TemporaryFile() as bundle:
         try:
             with httpx.stream("GET", url, follow_redirects=True, timeout=60) as response:

@@ -15,7 +15,10 @@ test('title menu hints are plain text', async ({page}) => {
 test('settings modal footer gives its action room below the divider', async ({page}) => {
   await openApp(page, 'settings');
   await page.locator('#config-mods').getByRole('button',{name:'管理',exact:true}).click();
-  await page.getByRole('dialog').locator('input[type="file"]').setInputFiles({
+  const library=page.getByRole('dialog',{name:'模组库',exact:true});
+  await library.getByRole('button',{name:'获取模组',exact:true}).click();
+  await library.getByRole('button',{name:'导入文件',exact:true}).click();
+  await page.getByRole('dialog',{name:'导入文件',exact:true}).locator('input[type="file"]').setInputFiles({
     name: 'test.momomod',
     mimeType: 'application/octet-stream',
     buffer: Buffer.from('test'),
@@ -46,7 +49,8 @@ for (const width of [640, 960, 1280]) {
       await page.reload();
       await expect(page.locator('html')).toHaveAttribute('lang', lang === 'zh' ? 'zh-CN' : lang);
       await expect(page.locator('.config-index button')).toHaveCount(10);
-      await expect(page.locator('#config-mods').getByRole('switch', {name: 'QQ'})).toHaveCount(1);
+      await expect(page.locator('#config-mods').getByRole('button')).toHaveCount(1);
+      await expect(page.locator('#config-mods')).not.toContainText('QQ');
       await page.evaluate(() => document.fonts.ready);
 
       const actions = await page.locator('.config-document .config-action').evaluateAll(buttons => buttons.map(button => {

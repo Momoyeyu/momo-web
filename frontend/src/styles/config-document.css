@@ -80,8 +80,6 @@
   .config-card {padding-inline: 12px;}
   .config-card .opt-row {grid-template-columns: minmax(80px, 1fr) minmax(118px, 1.1fr); gap: 8px;}
   .config-index button {padding-inline: 7px;}
-  #config-mods .opt-ctl {flex-wrap: wrap;}
-  #config-mods .opt-label {overflow-wrap: anywhere;}
 }
 body:has(.config-document) .modal-overlay :is(.modal-foot, .ext-actions, .extension-detail-actions, .plugin-library-actions) {
   flex-wrap: wrap;
@@ -109,3 +107,12 @@ body:has(.config-document) .extension-modal .extension-detail > .modal-foot {
   text-overflow: ellipsis;
 }
 #config-browser .opt-ctl {justify-content: flex-end; flex-wrap: wrap;}
+
+.mod-library {width: min(570px, 92cqw);}
+.mod-library-header, .mod-library-views {display: flex; align-items: center; gap: 8px;}
+.mod-library-header {justify-content: space-between; flex-wrap: wrap;}
+.mod-library-views button[aria-pressed="true"] {background: var(--accent-soft); border-color: var(--accent); color: var(--accent);}
+.mod-library-rows .opt-label {white-space: normal; overflow-wrap: anywhere;}
+.mod-library-rows .opt-ctl {justify-content: flex-end; flex-wrap: wrap;}
+.mod-library-rows .opt-row + .opt-row {border-top: 1px solid var(--line-soft);}
+.mod-library > .modal-foot {padding-top: 12px; border-top: 1px solid var(--line-soft);}
