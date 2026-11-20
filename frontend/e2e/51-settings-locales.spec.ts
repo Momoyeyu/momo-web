@@ -63,6 +63,13 @@ for (const width of [640, 960, 1280]) {
       expect(interfaceLanguage.width).toBeCloseTo(chatLanguage.width, 0);
 
 
+      const browser = page.locator('#config-browser');
+      await expect(browser.locator('.opt-row')).toHaveCount(1);
+      const picker = (await browser.locator('.sel-face').boundingBox())!;
+      const status = (await browser.locator('.browser-connection').boundingBox())!;
+      expect(picker.x + picker.width).toBeLessThan(status.x);
+      expect(picker.y + picker.height / 2).toBeCloseTo(status.y + status.height / 2, 0);
+
       const actions = await page.locator('.config-document .config-action').evaluateAll(buttons => buttons.map(button => {
         const range = document.createRange();
         range.selectNodeContents(button);
@@ -83,7 +90,7 @@ for (const width of [640, 960, 1280]) {
           group: group?.closest('section')?.id,
         };
       }));
-      expect(actions.length).toBeGreaterThanOrEqual(12);
+      expect(actions.length).toBeGreaterThanOrEqual(11);
       expect(actions.filter(action => action.lines !== 1 || !action.textFits || !action.buttonFits),
         `${lang} at ${width}px`).toEqual([]);
       for (const action of actions) {
