@@ -55,7 +55,8 @@
 @container (max-width: 660px) {
   .sound-pair {gap: 18px;}
   .config-card :is(.sound-pair, .language-pair) .opt-row {display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 4px; min-height: 70px;}
-  :is(.sound-pair, .language-pair) .opt-ctl {flex: none; justify-content: flex-start;}
+  :is(.sound-pair, .language-pair) .opt-ctl {flex: none;}
+  .language-pair .opt-ctl {justify-content: flex-start;}
 }
 @container (max-width: 820px) {
   .config-model-row {grid-template-columns: 36px minmax(0, 1fr) auto; gap: 8px;}

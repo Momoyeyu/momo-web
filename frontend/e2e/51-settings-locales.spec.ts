@@ -61,7 +61,6 @@ for (const width of [640, 960, 1280]) {
       expect(interfaceLanguage.width).toBeCloseTo(chatLanguage.width, 0);
       expect(interfaceLanguage.width).toBeLessThanOrEqual(144);
 
-
       const browser = page.locator('#config-browser');
       await expect(browser.locator('.opt-row')).toHaveCount(1);
       const picker = (await browser.locator('.sel-face').boundingBox())!;
@@ -97,7 +96,8 @@ for (const width of [640, 960, 1280]) {
         if (width >= 960 && !action.paired) expect([action.width, action.height], `${lang} at ${width}px, ${action.label}`).toEqual([112, 34]);
       }
       const cardActions = actions.filter(action => action.group && action.columnRight !== null);
-      expect(new Set(cardActions.map(action => action.columnRight)).size).toBeLessThanOrEqual(2);
+      expect(new Set(cardActions.map(action => action.columnRight)).size,
+        `${lang} at ${width}px, ${JSON.stringify(cardActions.map(({label, columnRight}) => ({label, columnRight})))}`).toBeLessThanOrEqual(2);
       expect(await page.locator('.config-scroll').evaluate(el=>el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
     }
   });
