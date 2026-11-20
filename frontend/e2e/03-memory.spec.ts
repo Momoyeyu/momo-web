@@ -94,7 +94,7 @@ test("检索过滤命中集，空结果显示空态", async ({ page }) => {
   await expect(page.locator(".mem-panel .muted", { hasText: "没有匹配的记忆" })).toBeVisible();
 });
 
-test("点卡片开详情弹窗（只读全文），关闭后回到列表", async ({ page }) => {
+test("点卡片开详情弹窗（只读全文），用返回图标回到列表", async ({ page }) => {
   await openTab(page, "记忆");
   await page.getByRole("button", {name:"查看记忆"}).click();
   const text = `${PREFIX}上周末她提到想去河边散步，傍晚的风很舒服`;
@@ -103,7 +103,9 @@ test("点卡片开详情弹窗（只读全文），关闭后回到列表", async
   await card(page, text).click();
   await expect(page.locator(".modal-box:not(.config-modal)")).toBeVisible();
   await expect(page.locator(".modal-body")).toHaveText(text);
-  await page.locator(".modal-foot").getByText("关闭").click();
+  const back = page.locator(".modal-foot").getByRole("button", {name:"返回",exact:true});
+  await expect(back.locator("svg")).toBeVisible();
+  await back.click();
   await expect(page.locator(".modal-box:not(.config-modal)")).toBeHidden();
   await expect(card(page, text)).toBeVisible();
 });
