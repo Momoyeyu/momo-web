@@ -98,7 +98,10 @@ export default function ModsPanel(){
       void load();
     })}</FieldRow>
     {manager&&<Modal label={code('library')} onClose={closeLibrary} className="extension-modal mod-library">
-      <header className="extension-detail-header"><h3>{code('library')}</h3></header>
+      <header className="extension-detail-header mod-dialog-heading">
+        <DialogBackButton onClick={closeLibrary} disabled={busy}/>
+        <h3>{code('library')}</h3>
+      </header>
       <div className="mod-library-header">
         <div className="mod-library-views" role="group" aria-label={code('library')}>
           {(['installed','catalog'] as const).map(section=><Button key={section} variant="ghost" size="sm"
@@ -126,11 +129,14 @@ export default function ModsPanel(){
       </div>
       {filterable&&<Pager page={paging.page} pages={paging.pages} onChange={setPage}/>}
       {!selection&&error&&<p role="alert">{code(error)} {button('retry',()=>{setError('');void load();})}</p>}
-      <div className="modal-foot"><DialogBackButton onClick={closeLibrary} disabled={busy}/></div>
     </Modal>}
     {selection&&<Modal label={selection.mode==='local'?code('import'):name} onClose={()=>open(null)} describedBy={selection.mode==='remove'?'mod-remove-hint':undefined}
       className={selection.mode==='remove'?'extension-modal mod-remove-dialog':'extension-modal'}>
-      <div className="extension-detail"><h3>{selection.mode==='local'?code('import'):name}</h3>
+      <div className="extension-detail">
+      <header className="mod-dialog-heading">
+        <DialogBackButton onClick={()=>open(null)} disabled={busy}/>
+        <h3>{selection.mode==='local'?code('import'):name}</h3>
+      </header>
       {selection.mode==='local' ? <>
         <p>{code('importHint')}</p>
         <input ref={file} type="file" hidden accept=".momomod" onChange={e=>{
@@ -155,11 +161,10 @@ export default function ModsPanel(){
         {item.kind==='content'&&item.resources.map(r=><p key={r.path}>{code(r.type)} · {r.path}</p>)}
       </>}
       {error&&<p role="alert">{code(error)}</p>}
-      <div className="modal-foot">
-        <DialogBackButton onClick={()=>open(null)} disabled={busy}/>
-        {selection.mode==='remove'&&<Button variant="ghost" className="btn-danger" disabled={busy}
-          onClick={()=>void run('/api/mods/'+selection.id,{method:'DELETE'},null)}>{code('remove')}</Button>}
-      </div>
+      {selection.mode==='remove'&&<div className="modal-foot">
+        <Button variant="ghost" className="btn-danger" disabled={busy}
+          onClick={()=>void run('/api/mods/'+selection.id,{method:'DELETE'},null)}>{code('remove')}</Button>
+      </div>}
       </div>
     </Modal>}
   </>;

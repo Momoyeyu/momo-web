@@ -16,6 +16,14 @@ for (const viewport of [{width:1280,height:720},{width:1920,height:1080}]) {
     await expect(section.getByRole('button')).toHaveCount(1);
     await expect(section).not.toContainText(/QQ|Minecraft/);
     const library=await openModLibrary(page);
+    const heading=library.locator('.mod-dialog-heading');
+    const back=heading.getByRole('button',{name:'返回',exact:true});
+    await expect(back).toBeVisible();
+    await expect(back).toHaveCSS('width','40px');
+    await expect(back).toHaveCSS('height','40px');
+    await expect(heading.getByRole('heading',{name:'模组库'})).toBeVisible();
+    await expect(library.locator('.modal-foot')).toHaveCount(0);
+
     await expect(library.getByText('还没有安装模组。')).toBeVisible();
     await expect(library.getByRole('button',{name:'安装模组'})).toHaveCount(0);
     await library.getByRole('button',{name:'获取模组'}).click();

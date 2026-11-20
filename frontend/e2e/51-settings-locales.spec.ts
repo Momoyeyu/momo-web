@@ -12,20 +12,18 @@ test('title menu hints are plain text', async ({page}) => {
   }
 });
 
-test('settings modal footer gives its action room below the divider', async ({page}) => {
+test('uninstall confirmation leaves room below its footer divider', async ({page}) => {
+  await page.route(/\/api\/mods$/, route => route.fulfill({json:{
+    mods:[{id:'demo.content', name:'Fixture mod', enabled:false, resources:[]}],
+  }}));
   await openApp(page, 'settings');
   await page.locator('#config-mods').getByRole('button',{name:'管理',exact:true}).click();
-  const library=page.getByRole('dialog',{name:'模组库',exact:true});
-  await library.getByRole('button',{name:'获取模组',exact:true}).click();
-  await library.getByRole('button',{name:'导入文件',exact:true}).click();
-  await page.getByRole('dialog',{name:'导入文件',exact:true}).locator('input[type="file"]').setInputFiles({
-    name: 'test.momomod',
-    mimeType: 'application/octet-stream',
-    buffer: Buffer.from('test'),
-  });
-  const dialog = page.getByRole('dialog').filter({has: page.locator('.extension-detail')});
+  const library = page.getByRole('dialog',{name:'模组库',exact:true});
+  await library.getByRole('button',{name:'卸载 Fixture mod',exact:true}).click();
+  const dialog = page.getByRole('dialog',{name:'Fixture mod',exact:true});
+  await expect(dialog.locator('.mod-dialog-heading').getByRole('button',{name:'返回'})).toBeVisible();
   const footer = dialog.locator('.modal-foot');
-  const action = footer.getByRole('button');
+  const action = footer.getByRole('button',{name:'卸载模组'});
   await expect(action).toBeVisible();
   await expect(footer).toHaveCSS('border-top-width', '1px');
   expect(await action.evaluate(button =>

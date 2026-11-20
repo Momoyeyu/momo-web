@@ -127,7 +127,16 @@ body:has(.config-document) .extension-modal .extension-detail > .modal-foot {
 .mod-library-rows .opt-label {white-space: normal; overflow-wrap: anywhere;}
 .mod-library-rows .opt-ctl {justify-content: flex-end; flex-wrap: wrap;}
 .mod-library-rows .opt-row + .opt-row {border-top: 1px solid var(--line-soft);}
-.mod-library > .modal-foot {padding-top: 12px; border-top: 1px solid var(--line-soft);}
+.mod-dialog-heading {display: flex; justify-content: flex-start; align-items: center; gap: 12px;}
+.mod-dialog-heading h3 {min-width: 0; margin: 0; overflow-wrap: anywhere;}
+.extension-modal .mod-dialog-heading .icon-btn {
+  width: 40px; height: 40px; padding: 9px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--text);
+}
+.extension-modal .mod-dialog-heading .icon-btn:not(:disabled):hover {
+  border-color: var(--accent); background: var(--accent-soft); color: var(--accent);
+}
+.mod-dialog-heading .icon-btn svg {width: 20px; height: 20px;}
 
 .mod-row-actions {display: flex; align-items: center; gap: 8px; flex: none;}
 .mod-row-actions > button {flex-shrink: 0;}
