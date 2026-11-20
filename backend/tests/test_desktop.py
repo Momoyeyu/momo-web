@@ -38,6 +38,36 @@ def test_desktop_http_capability_and_origin(monkeypatch):
         )
 
 
+
+def test_window_selection_and_observation_preference_do_not_need_meeting(monkeypatch):
+    from app.api.native_control import native_control
+    from app.services.computer import computer
+
+    monkeypatch.setenv("MOMO_DESKTOP_TOKEN", "a" * 64)
+    headers = {"x-momo-token": "a" * 64, "origin": "momo://app"}
+    target = {"windowId": 7, "ownerPid": 9}
+    monkeypatch.setattr(native_control, "targets", lambda plugin: {"targets": [dict(target, plugin=plugin)]})
+    with TestClient(app) as client:
+        windows = "/api/computer/native/targets"
+        observation = "/api/computer/desktop/observation"
+        assert client.post(windows, json={"plugin": "browser"}).status_code == 403
+        assert client.post(windows, headers=headers, json={"plugin": "browser"}).json() == {
+            "targets": [dict(target, plugin="browser")]
+        }
+        assert client.patch(observation, json={"enabled": False}).status_code == 403
+        before = computer.snapshot()["desktopAllowed"]
+        try:
+            response = client.patch(observation, headers=headers, json={"enabled": False})
+            assert response.status_code == 200
+            assert response.json()["desktopAllowed"] is False
+            assert client.post("/api/computer/desktop/frame", headers=headers, json={}).status_code == 422
+            assert client.post("/api/computer/native/start", headers=headers, json={
+                **target, "plugin": "browser", "permissions": ["observe", "interact"],
+            }).status_code == 422
+        finally:
+            computer.set_desktop_allowed(before)
+
+
 def test_websocket_requires_first_frame(monkeypatch):
     monkeypatch.setenv("MOMO_DESKTOP_TOKEN", "a" * 64)
     with TestClient(app) as client:

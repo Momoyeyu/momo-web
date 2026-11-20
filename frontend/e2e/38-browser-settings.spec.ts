@@ -1,13 +1,16 @@
 import {test,expect} from './fixtures';
 import {bootChat,openTab} from './helpers';
 
-test('browser settings find existing windows, start and stop the selected native target',async({page})=>{
+test('browser windows can be selected before Boot, then connected and stopped from a conversation',async({page})=>{
  let active=false;
- const target={windowId:7,ownerPid:9,bundleId:'test.browser',name:'Test browser',path:'/fixture'};
+ const target={windowId:7,ownerPid:9,bundleId:'test.browser',name:'Test browser',path:'/fixture',title:'A long fixture window title '.repeat(12).trim()};
  await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:false}}}));
  await page.route('**/api/computer/native/**',async r=>{
   const path=new URL(r.request().url()).pathname;
-  if(path.endsWith('/targets'))return r.fulfill({json:{targets:[target],screenPermission:true,inputPermission:true}});
+  if(path.endsWith('/targets')){
+   expect(r.request().postDataJSON()).toEqual({plugin:'browser'});
+   return r.fulfill({json:{targets:[target],screenPermission:true,inputPermission:true}});
+  }
   if(path.endsWith('/start')){
    expect(r.request().postDataJSON()).toMatchObject({windowId:7,ownerPid:9,plugin:'browser'});
    active=true;
@@ -15,13 +18,28 @@ test('browser settings find existing windows, start and stop the selected native
   if(path.endsWith('/stop'))active=false;
   await r.fulfill({json:{active,plugin:'browser',target:active?target:undefined}});
  });
- await bootChat(page);await openTab(page,'浏览器');
+ await openTab(page,'浏览器');
  const config=page.locator('#config-browser');
+ await expect(page.getByRole('button',{name:'返回标题'})).toBeVisible();
  await config.getByRole('button',{name:'查找窗口'}).click();
- await config.getByRole('combobox').selectOption('7');
+ const picker=config.getByRole('button',{name:/^应用窗口 ·/});
+ const emptyWidth=(await picker.boundingBox())!.width;
+ await picker.click();
+ const option=config.getByRole('option',{name:/^Test browser/});
+ await expect(option).toHaveAttribute('title', 'Test browser · '+target.title);
+ await option.click();
+ expect((await picker.boundingBox())!.width).toBeCloseTo(emptyWidth);
+ expect(emptyWidth).toBeLessThanOrEqual(230);
+ await expect(config.getByText('已选好窗口。进入对话后可以连接。')).toBeVisible();
+ await expect(config.getByRole('button',{name:'开启',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'返回标题'}).click();
+ await page.locator('.title-menu .menu-item').first().click();
+ await expect(page.locator('.chat-page')).toBeVisible();
+ await openTab(page,'浏览器');
+ await expect(picker).toHaveAccessibleName(/Test browser/);
  await config.getByRole('button',{name:'开启',exact:true}).click();
  await expect.poll(()=>active).toBe(true);
- await expect(config.getByText('Test browser · 7',{exact:true})).toBeVisible();
+ await expect(config.getByText('Test browser · '+target.title,{exact:true})).toBeVisible();
  await expect(page.getByRole('dialog')).toHaveCount(0);
  await config.getByRole('button',{name:'关闭',exact:true}).click();
  await expect.poll(()=>active).toBe(false);

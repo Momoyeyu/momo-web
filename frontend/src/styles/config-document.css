@@ -73,8 +73,6 @@
 .config-modal-head button {border: 0; background: transparent; color: var(--text-dim); font-size: 23px; padding: 0 6px;}
 .config-modal-body {padding: 15px 22px 20px;}
 .config-modal-body > .panel, .config-modal-body .extension-panel {background: transparent; padding: 0; border: none; box-shadow: none;}
-.config-modal .backlog-page {position: static; height: min(440px, 55cqh); padding: 0; background: transparent; backdrop-filter: none;}
-.config-modal .backlog-panel {width: 100%;}
 .config-modal .extension-detail {padding: 0;}
 .config-card > .builtin-resource-notice {padding: 6px 0;}
 @container (max-width: 820px) {
@@ -97,3 +95,17 @@ body:has(.config-document) .extension-modal .extension-detail > .modal-foot {
   padding-top: 12px;
   border-top: 1px solid var(--line-soft);
 }
+
+.desktop-config > .opt-row + .opt-row {border-top: 1px solid var(--line-soft);}
+.desktop-config .opt-ctl {justify-content: flex-end; flex-wrap: wrap;}
+.desktop-config .config-action {margin-inline-start: 0;}
+.native-window-picker {width: min(100%, 230px); min-width: 0;}
+.native-window-picker .sel-face > span:first-child,
+.native-window-picker .sel-opt,
+#config-browser .desktop-observed-target {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+#config-browser .opt-ctl {justify-content: flex-end; flex-wrap: wrap;}

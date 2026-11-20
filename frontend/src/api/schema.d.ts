@@ -462,7 +462,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Desktop Observation Preference */
+        patch: operations["desktop_observation_preference_api_computer_desktop_observation_patch"];
         trace?: never;
     };
     "/api/computer/frames": {
@@ -2287,6 +2288,11 @@ export interface components {
             /** Pinned */
             pinned?: boolean | null;
         };
+        /** ObservationPreference */
+        ObservationPreference: {
+            /** Enabled */
+            enabled: boolean;
+        };
         /** Open */
         Open: {
             /** Clientid */
@@ -2575,6 +2581,15 @@ export interface components {
             text: string;
             /** Voices */
             voices?: string[];
+        };
+        /** TargetQuery */
+        TargetQuery: {
+            /**
+             * Plugin
+             * @default computer
+             * @enum {string}
+             */
+            plugin: "computer" | "browser";
         };
         /** TaskCommand */
         TaskCommand: {
@@ -3620,6 +3635,39 @@ export interface operations {
             };
         };
     };
+    desktop_observation_preference_api_computer_desktop_observation_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ObservationPreference"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     frames_api_computer_frames_post: {
         parameters: {
             query?: never;
@@ -3768,7 +3816,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Owner"];
+                "application/json": components["schemas"]["TargetQuery"];
             };
         };
         responses: {

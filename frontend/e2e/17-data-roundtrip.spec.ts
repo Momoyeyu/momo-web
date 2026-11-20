@@ -51,6 +51,7 @@ test('backup round-trips imported model ZIP, YAML and SQLite through actual cont
   const savedMemory = await (await request.post('/api/memories',{data:{content:'three-store preserved memory'}})).json();
   await page.keyboard.press('Escape');
   await openTab(page,'存档');
+  await expect(page.locator('#config-archive').getByRole('button',{name:'管理存档'})).toHaveCount(0);
   const download = page.waitForEvent('download');
   await page.getByRole('button',{name:'导出文件',exact:true}).click();
   const file = await download;

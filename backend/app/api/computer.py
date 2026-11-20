@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Request
 from pydantic import BaseModel, Field
 from ..services.computer import computer, ComputerError
 from ..services.app_permissions import DesktopPermissionError
@@ -6,6 +6,7 @@ from ..services.vision import VisionError, MAX_BYTES
 from ..services.coordinator import CoordinationError, runtime
 from ..core.plugin_host import HostError
 from ..core.llm import LlmError
+from .app_permissions import require_desktop
 
 router = APIRouter(prefix='/api/computer')
 
@@ -70,4 +71,12 @@ def desktop_frame(body: DesktopFrame):
 @router.post('/desktop/observation')
 def desktop_observation(body: DesktopObservation):
     invoke(runtime.require_meeting,body.clientId,body.leaseId)
+    return computer.set_desktop_allowed(body.enabled)
+
+class ObservationPreference(BaseModel):
+    enabled: bool
+
+@router.patch('/desktop/observation')
+def desktop_observation_preference(body: ObservationPreference, request: Request):
+    require_desktop(request)
     return computer.set_desktop_allowed(body.enabled)

@@ -17,7 +17,7 @@ test('native desktop start, companionship preferences and confirmed stop remain 
  await expect(desktop.getByText('请在桌面版中打开此设置。',{exact:true})).toBeVisible();
  await desktop.getByRole('button',{name:'选择窗口'}).click();
  const modal=page.getByRole('dialog',{name:'桌面陪伴'});
- await modal.getByRole('button',{name:'查找窗口'}).click();await modal.getByRole('combobox').selectOption('7');
+ await modal.getByRole('button',{name:'查找窗口'}).click();await modal.getByRole('button',{name:/应用窗口/}).click();await modal.getByRole('option',{name:/Fixture app/}).click();
  await modal.getByRole('button',{name:'开启',exact:true}).click();
  await expect.poll(()=>active).toBe(true);
  await modal.getByRole('switch',{name:'主动发言'}).click();

@@ -39,6 +39,7 @@ test.afterEach(async ({ request }) => {
 
 test("空态 → 添加 → 出现在列表 → 删除", async ({ page }) => {
   await openTab(page, "记忆");
+  await expect(page.locator("#config-memory").getByRole("button")).toHaveCount(1);
   await page.getByRole("button", {name:"查看记忆"}).click();
   await expect(page.locator(".mem-panel")).toBeVisible();
 

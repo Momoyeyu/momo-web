@@ -16,11 +16,13 @@ export default function Select({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   label?: string;
   value: string;
   options: SelectOption[];
   onChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [hl, setHl] = useState(0);
@@ -31,7 +33,7 @@ export default function Select({
   const current = idx >= 0 ? options[idx] : undefined;
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || disabled) return;
     const onDown = (e: MouseEvent): void => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -39,7 +41,7 @@ export default function Select({
     };
     window.addEventListener("mousedown", onDown);
     return () => window.removeEventListener("mousedown", onDown);
-  }, [open]);
+  }, [open, disabled]);
 
   // 开合时高亮对齐当前值，并滚动进可视区。
   useEffect(() => {
@@ -50,11 +52,11 @@ export default function Select({
         ?.scrollIntoView({ block: "nearest" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, disabled]);
 
   // Fit within every scrolling ancestor, not just the browser viewport.
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!open || disabled) return;
     const root = rootRef.current, list = listRef.current;
     if (!root || !list) return;
     const fit = () => {
@@ -81,7 +83,7 @@ export default function Select({
       window.removeEventListener("resize", fit);
       document.removeEventListener("scroll", scroll, true);
     };
-  }, [open, options.length]);
+  }, [open, disabled, options.length]);
 
   const pick = (v: string): void => {
     onChange(v);
@@ -126,15 +128,16 @@ export default function Select({
         type="button"
         className="sel-face"
         aria-label={label ? label + ' · ' + (current?.label ?? value) : undefined}
-        aria-expanded={open}
+        aria-expanded={open && !disabled}
+        disabled={disabled}
         aria-haspopup="listbox"
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onKey}
       >
-        <span>{current?.label ?? value}</span>
+        <span title={current?.label ?? value}>{current?.label ?? value}</span>
         <span className="sel-arrow" />
       </button>
-      {open && (
+      {open && !disabled && (
         <div className="sel-list" ref={listRef} role="listbox">
           {options.map((o, i) => (
             <button
@@ -142,6 +145,7 @@ export default function Select({
               type="button"
               role="option"
               aria-selected={o.value === value}
+              title={o.label}
               className={`sel-opt${o.value === value ? " on" : ""}${
                 i === hl ? " hl" : ""
               }`}

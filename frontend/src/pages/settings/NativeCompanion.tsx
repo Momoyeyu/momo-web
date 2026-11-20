@@ -7,6 +7,7 @@ import {meetingIdentity,meetingSnapshot,subscribeMeeting} from '../../services/m
 import ExtensionCard from './ExtensionCard';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
+import Select from '../../ui/Select';
 import Icon from '../../ui/Icon';
 import FieldRow from '../../ui/FieldRow';
 import Hint from '../../ui/Hint';
@@ -15,10 +16,17 @@ import NativeWindowNotice, {type NativeWindowDiagnostics} from './NativeWindowNo
 import AppPermissions from '../../components/AppPermissions';
 
 type Target={windowId:number;ownerPid:number;bundleId:string;path:string;name?:string;title?:string};
+// A selection is a suggestion for this app window, never an activity grant.
+const selectedWindows: Partial<Record<'computer'|'browser',Target>> = {};
+const targetKey = (target: Target) => `${target.ownerPid}:${target.windowId}`;
+const targetLabel = (target: Target) => `${target.name || target.bundleId} · ${target.title || target.windowId}`;
+
 export default function NativeCompanion({plugin,mode='settings'}:{plugin:'computer'|'browser';mode?:'settings'|'activity'|'pet'|'inline'}){
  const computer=useSyncExternalStore(subscribeComputer,computerSnapshot);
  const t=useT(),enabled=useActivities()[plugin],meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
- const [open,setOpen]=useState(false),[targets,setTargets]=useState<Target[]>([]),[selected,setSelected]=useState(''),[busy,setBusy]=useState(false),[active,setActive]=useState(false);
+ const rememberSelection=mode==='inline'||mode==='activity';
+ const saved=rememberSelection?selectedWindows[plugin]:undefined;
+ const [open,setOpen]=useState(false),[targets,setTargets]=useState<Target[]>(()=>saved?[saved]:[]),[selected,setSelected]=useState(()=>saved?targetKey(saved):''),[busy,setBusy]=useState(false),[active,setActive]=useState(false);
  const [actionFailed,setActionFailed]=useState(false);
  const [statusState,setStatusState]=useState<'loading'|'ready'|'failed'>('loading');
  const [activeTarget,setActiveTarget]=useState<Target|null>(null);
@@ -54,15 +62,24 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
  const start=async(body:Record<string,unknown>)=>{await post('start',body);};
  const scanned=useRef(false);
  const findTargets=async()=>{
-  const result=await post<{targets:Target[];screenPermission?:boolean;inputPermission?:boolean}>('targets',{...meetingIdentity(),plugin});
-  if(!mounted.current)return;setDiagnostics(result);setTargets(result.targets);setSelected(old=>result.targets.some(x=>String(x.windowId)===old)?old:'');
+  const result=await post<{targets:Target[];screenPermission?:boolean;inputPermission?:boolean}>('targets',{plugin});
+  if(!mounted.current)return;
+  setDiagnostics(result);setTargets(result.targets);
+  const refreshed=result.targets.find(x=>targetKey(x)===selected);
+  if(rememberSelection)selectedWindows[plugin]=refreshed;
+  setSelected(refreshed?targetKey(refreshed):'');
  };
  useEffect(()=>{if(mode==='pet'&&enabled&&meeting.state==='active'&&!scanned.current){scanned.current=true;void run(findTargets);}},[mode,enabled,meeting.state]);
- const target=targets.find(x=>String(x.windowId)===selected);
+ const target=targets.find(x=>targetKey(x)===selected);
+ const live=meeting.state==='active';
+ const selectWindow=(value:string)=>{
+  setSelected(value);
+  if(rememberSelection)selectedWindows[plugin]=targets.find(x=>targetKey(x)===value);
+ };
  const status=t(stopUnconfirmed?'plugins.stopUnknown':active?'browser.active':'browser.inactive');
  if(mode==='pet')return <div className="pet-control">
   {active&&activeTarget?<div className="pet-current-target"><Icon name="desktop"/><div><strong>{activeTarget.name||activeTarget.bundleId}</strong><small>{activeTarget.title}</small></div><span className="pet-live-dot" aria-label={status}/></div>:<div className="pet-target-list" role="list" aria-label={t('permissions.window')}>
-   {targets.map(x=><button type="button" role="listitem" className="pet-target" key={x.windowId} aria-pressed={selected===String(x.windowId)} disabled={busy} onClick={()=>setSelected(String(x.windowId))}><Icon name="desktop"/><span><strong>{x.name||x.bundleId}</strong><small>{x.title||String(x.windowId)}</small></span>{selected===String(x.windowId)&&<Icon name="check"/>}</button>)}
+   {targets.map(x=><button type="button" role="listitem" className="pet-target" key={targetKey(x)} aria-pressed={selected===targetKey(x)} disabled={busy} onClick={()=>setSelected(targetKey(x))}><Icon name="desktop"/><span><strong>{x.name||x.bundleId}</strong><small>{x.title||String(x.windowId)}</small></span>{selected===targetKey(x)&&<Icon name="check"/>}</button>)}
    {!targets.length&&!busy&&<p className="pet-empty">{t(diagnostics?.screenPermission===false?'permissions.screenPermission':'permissions.noWindows')}</p>}
   </div>}
   {(actionFailed||statusState==='failed')&&<p role="alert" className="pet-control-status">{t(actionFailed?'permissions.error':'config.unavailable')}</p>}
@@ -72,17 +89,16 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
    {active||stopUnconfirmed?<button type="button" className="pet-icon is-primary tip" aria-label={t('browser.stop')} data-tip={t('browser.stop')} disabled={busy} onClick={()=>void run(async()=>{await post('stop',{...meetingIdentity(),plugin});})}><Icon name="stop"/></button>:<button type="button" className="pet-icon is-primary tip" aria-label={t('desktop.operate')} data-tip={t('desktop.operate')} disabled={!target||busy||!enabled||meeting.state!=='active'} onClick={()=>void run(()=>start({...meetingIdentity(),plugin,windowId:target!.windowId,ownerPid:target!.ownerPid,permissions:['observe','interact']}))}><Icon name="play"/></button>}
   </footer>
  </div>;
- const findButton = !active && <Button variant="ghost" className={mode==='inline'?'config-action':undefined} disabled={busy||meeting.state!=='active'} onClick={()=>void run(findTargets)}>{t('permissions.findWindows')}</Button>;
+ const findButton = !active && <Button variant="ghost" className={mode==='inline'?'config-action':undefined} disabled={busy} onClick={()=>void run(findTargets)}>{t('permissions.findWindows')}</Button>;
  const runButton = active||stopUnconfirmed
   ? <Button variant="ghost" className={mode==='inline'?'config-action':undefined} disabled={busy} onClick={()=>void run(async()=>{await post('stop',{...meetingIdentity(),plugin});})}>{t('browser.stop')}</Button>
-  : <Button className={mode==='inline'?'config-action':undefined} disabled={!enabled||busy||!target||meeting.state!=='active'} onClick={()=>target&&void run(()=>start({...meetingIdentity(),plugin,windowId:target.windowId,ownerPid:target.ownerPid,permissions:['observe','interact']}))}>{t('browser.start')}</Button>;
+  : live && <Button className={mode==='inline'?'config-action':undefined} disabled={!enabled||busy||!target} onClick={()=>target&&void run(()=>start({...meetingIdentity(),plugin,windowId:target.windowId,ownerPid:target.ownerPid,permissions:['observe','interact']}))}>{t('browser.start')}</Button>;
  const windowPicker = active&&activeTarget
-  ? <span className="desktop-observed-target">{activeTarget.name||activeTarget.bundleId} · {activeTarget.title||activeTarget.windowId}</span>
-  : <select className="extension-window-select" aria-label={t('permissions.window')} value={selected} disabled={busy||active||meeting.state!=='active'} onChange={e=>setSelected(e.target.value)}>
-    <option value="">{t('permissions.selectWindow')}</option>{targets.map(x=><option key={x.windowId} value={String(x.windowId)}>{x.name||x.bundleId} · {x.title||x.windowId}</option>)}
-   </select>;
+  ? <span className="desktop-observed-target" title={targetLabel(activeTarget)}>{targetLabel(activeTarget)}</span>
+  : <div className="native-window-picker"><Select label={t('permissions.window')} value={selected} disabled={busy}
+    options={[{value:'',label:t('permissions.selectWindow')},...targets.map(x=>({value:targetKey(x),label:targetLabel(x)}))]} onChange={selectWindow}/></div>;
  const notices = <>
-  {meeting.state!=='active'&&<p className="extension-detail-notice">{t('computer.requiresBoot')}</p>}
+  {!live&&target&&<p className="extension-detail-notice">{t('computer.windowReady')}</p>}
   {(actionFailed||mode!=='inline'&&statusState==='failed')&&<p role="alert" className="extension-detail-notice">{t(actionFailed?'permissions.error':'config.unavailable')}</p>}
  </>;
  if(mode==='inline')return <>

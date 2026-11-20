@@ -2,7 +2,7 @@ import {useEffect, useState, useSyncExternalStore} from 'react';
 import {useT} from '../../i18n';
 import AppPermissions, {openDesktopAccessGuide, setDesktopConsent, type SystemAccess} from '../../components/AppPermissions';
 import {computerSnapshot, configureComputer, readComputer, setDesktopObservation, subscribeComputer} from '../../services/computerClient';
-import {meetingSnapshot, subscribeMeeting} from '../../services/meetingClient';
+import Button from '../../ui/Button';
 import FieldRow from '../../ui/FieldRow';
 import Switch from '../../ui/Switch';
 import NativeCompanion from './NativeCompanion';
@@ -12,7 +12,6 @@ import ConfigAction from './ConfigAction';
 export default function DesktopSettings() {
   const t = useT();
   const {status, confirmedConsent, busy, error} = useSyncExternalStore(subscribeComputer, computerSnapshot);
-  const meeting = useSyncExternalStore(subscribeMeeting, meetingSnapshot);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
   const [system, setSystem] = useState<SystemAccess | 'error'>();
@@ -57,6 +56,11 @@ export default function DesktopSettings() {
     } catch { setFailed(true); }
     finally { setSaving(false); }
   }
+  async function openSystem(kind: 'screen' | 'input') {
+    setFailed(false);
+    try { await window.momoDesktop?.requestSystemPermission?.(kind); }
+    catch { setFailed(true); }
+  }
   async function configure(on: boolean) {
     setSaving(true);
     setFailed(false);
@@ -64,7 +68,7 @@ export default function DesktopSettings() {
     catch { setFailed(true); }
     finally { setSaving(false); }
   }
-  return <>
+  return <div className="desktop-config">
     <FieldRow label={t('desktopAccess.title')} hint={native ? t('desktopAccess.description') : undefined}>
       <span className="config-value" role="status">{t(accessStatus)}</span>
       <Switch title={t('desktopAccess.title')} on={granted} disabled={!native || (!status && consent === undefined) || saving || busy} onChange={on => void changeAccess(on)}/>
@@ -75,16 +79,17 @@ export default function DesktopSettings() {
         : system[key] ? 'desktopAccess.enabled' : 'config.grantedOff';
       return <FieldRow key={kind} label={t('desktopAccess.' + kind)}>
         <span className="config-value" role="status">{t(state)}</span>
+        <Button className="config-action" variant="ghost" onClick={() => {
+          if (window.momoDesktop?.requestSystemPermission) void openSystem(kind);
+          else openDesktopAccessGuide();
+        }}>{t('desktopAccess.systemAction')}</Button>
       </FieldRow>;
     })}
-    <FieldRow label={t('desktop.observe')} hint={t(!native ? 'config.nativeOnly' : meeting.state !== 'active' ? 'computer.requiresBoot' : 'desktop.observeHint')}>
-      <Switch title={t('desktop.observe')} on={granted && !!status?.desktopAllowed} disabled={disabled || meeting.state !== 'active'} onChange={on => {
-        if (on && !granted) openDesktopAccessGuide();
-        else void setDesktopObservation(on);
-      }}/>
+    <FieldRow label={t('desktop.observe')} hint={t(!native ? 'config.nativeOnly' : 'desktop.observeHint')}>
+      <Switch title={t('desktop.observe')} on={!!status?.desktopAllowed} disabled={disabled} onChange={on => void setDesktopObservation(on, 'settings')}/>
     </FieldRow>
     <FieldRow label={t('desktop.react')} hint={t('desktop.reactHint')}>
-      <Switch title={t('desktop.react')} on={!!(status?.proactive && status.reactions)} disabled={disabled || meeting.attention.focus} onChange={on => void configure(on)}/>
+      <Switch title={t('desktop.react')} on={!!(status?.proactive && status.reactions)} disabled={disabled} onChange={on => void configure(on)}/>
     </FieldRow>
     <ConfigAction label={t('computer.title')} action={t('config.windowAction')}>
       <NativeCompanion plugin="computer" mode="activity"/>
@@ -93,5 +98,5 @@ export default function DesktopSettings() {
       {native ? <AppPermissions manage/> : <p>{t('config.nativeOnly')}</p>}
     </ConfigAction>
     {(failed || error) && <p role="alert">{t('permissions.error')}</p>}
-  </>;
+  </div>;
 }

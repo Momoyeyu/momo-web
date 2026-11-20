@@ -1,12 +1,14 @@
 from typing import Literal
-from fastapi import APIRouter,HTTPException
+from fastapi import APIRouter,HTTPException,Request
 from pydantic import BaseModel,Field
 from ..services.native_control import native_control
+from .app_permissions import require_desktop
 router=APIRouter(prefix='/api/computer/native')
-class Owner(BaseModel):
+class TargetQuery(BaseModel):
+    plugin:Literal['computer','browser']='computer'
+class Owner(TargetQuery):
     clientId:str
     leaseId:str
-    plugin:Literal['computer','browser']='computer'
 class Start(Owner):
     windowId:int=Field(gt=0)
     ownerPid:int=Field(gt=0)
@@ -15,7 +17,9 @@ def call(fn,*args):
     try:return fn(*args)
     except Exception:raise HTTPException(409,'Application unavailable or permission denied') from None
 @router.post('/targets')
-def targets(body:Owner):return call(native_control.targets,body.clientId,body.leaseId,body.plugin)
+def targets(body:TargetQuery, request:Request):
+    require_desktop(request)
+    return call(native_control.targets,body.plugin)
 @router.get('/status')
 def status():return native_control.status()
 @router.post('/start')

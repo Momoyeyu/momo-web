@@ -7,7 +7,6 @@ import {useIntro} from '../services/introClient';
 import Button from '../ui/Button';
 import GridBackdrop, {type GridBackdropApi} from '../components/GridBackdrop';
 import BuiltinResourcesNotice from '../components/BuiltinResourcesNotice';
-import ArchivePanel from './settings/ArchivePanel';
 import AvatarPanel from './panels/Avatar';
 import MemoryPanel from './panels/Memory';
 import ConfigAction from './settings/ConfigAction';
@@ -91,8 +90,8 @@ export default function Settings() {
       </ConfigAction>
       <BuiltinResourcesNotice/>
     </>,
-    memory: guided ? <MemoryPanel/> : <>{action('memories', <MemoryPanel/>)}{action('pinned', <MemoryPanel pinnedOnly/>)}</>,
-    archive: <>{action('history', <ArchivePanel/>)}<DataTransfer/></>,
+    memory: guided ? <MemoryPanel/> : action('memories', <MemoryPanel/>),
+    archive: <DataTransfer/>,
     desktop: <DesktopSettings/>,
     browser: <NativeCompanion plugin="browser" mode="inline"/>,
     tools: <McpSettings/>,

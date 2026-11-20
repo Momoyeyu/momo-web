@@ -72,10 +72,11 @@ export async function askComputer(question:string){
  const identity=meetingIdentity(),generation=view.status?.generation,own=epoch;if(!identity||generation===undefined)return;
  publish({busy:true,error:false});try{const result=await apiJson<{text:string}>('/api/computer/ask',jsonInit('POST',{...identity,generation,question}));if(own===epoch)publish({text:result.text});}catch{if(own===epoch)publish({error:true});}finally{if(own===epoch)publish({busy:false});}
 }
-export async function setDesktopObservation(enabled:boolean){
- const identity=meetingIdentity();if(!identity)return;
+export async function setDesktopObservation(enabled:boolean, source:'settings'|'meeting'='meeting'){
+ const identity=meetingIdentity();if(source==='meeting'&&!identity)return;
+ const init=source==='settings' ? jsonInit('PATCH',{enabled}) : jsonInit('POST',{...identity,enabled});
  publish({busy:true,error:false});
- try{publish({status:await readStatus('/api/computer/desktop/observation',jsonInit('POST',{...identity,enabled}))});}
+ try{publish({status:await readStatus('/api/computer/desktop/observation',init)});}
  catch{publish({error:true});}finally{publish({busy:false});}
 }
 export async function captureDesktop(){

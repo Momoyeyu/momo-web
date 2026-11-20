@@ -35,9 +35,8 @@ class NativeControl:
         vision.require_enabled(state.load()['settings']['llm'])
         if not runtime.host: raise ValueError('Application executor unavailable')
 
-    def targets(self,client,lease,plugin='computer'):
+    def targets(self,plugin='computer'):
         if plugin not in ('computer','browser'): raise ValueError('Invalid plugin')
-        runtime.require_meeting(client,lease)
         activities.require_enabled(plugin)
         if not runtime.host: raise ValueError('Application executor unavailable')
         return self.available_targets()
