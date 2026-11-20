@@ -103,7 +103,7 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
  await page.route('**/api/computer/desktop/observation',r=>{allowed=r.request().postDataJSON().enabled;return r.fulfill({json:computerStatus()});});
  await bootChat(page);
  await expect(page.getByRole('button',{name:copy.settings.tabs.extend,exact:true})).toHaveCount(0);
- const proactive=page.getByRole('button',{name:copy.desktop.react,exact:true});
+ const proactive=page.getByRole('button',{name:copy.chat.proactive,exact:true});
  await expect(proactive).toHaveAttribute('aria-pressed','false');
  const tts=page.locator('.chat-toolbar button').filter({has:page.locator('svg path[d="M4.6 9.8h2.9L11.4 6.6v10.8L7.5 14.2H4.6z"]')});
  const ttsLabel=await tts.getAttribute('aria-label');

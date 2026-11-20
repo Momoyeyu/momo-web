@@ -46,7 +46,7 @@ for (const width of [640, 960, 1280]) {
       await page.goto('/#/settings');
       await page.reload();
       await expect(page.locator('html')).toHaveAttribute('lang', lang === 'zh' ? 'zh-CN' : lang);
-      await expect(page.locator('.config-index button')).toHaveCount(10);
+      await expect(page.locator('.config-index button')).toHaveCount(11);
       await expect(page.locator('#config-mods').getByRole('button')).toHaveCount(1);
       await expect(page.locator('#config-mods')).not.toContainText('QQ');
       await page.evaluate(() => document.fonts.ready);

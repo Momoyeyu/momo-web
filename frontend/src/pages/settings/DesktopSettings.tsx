@@ -4,7 +4,7 @@ import AppPermissions, {
   authorizeSystemPermission, DesktopPermissionAction, isSystemPermissionGranted,
   readSystemAccess, setDesktopConsent, type SystemAccess,
 } from '../../components/AppPermissions';
-import {computerSnapshot, configureComputer, readComputer, setDesktopObservation, subscribeComputer} from '../../services/computerClient';
+import {computerSnapshot, readComputer, setDesktopObservation, subscribeComputer} from '../../services/computerClient';
 import FieldRow from '../../ui/FieldRow';
 import Switch from '../../ui/Switch';
 import NativeCompanion from './NativeCompanion';
@@ -53,13 +53,6 @@ export default function DesktopSettings() {
     } catch { setFailed(true); }
     finally { setSaving(false); }
   }
-  async function configure(on: boolean) {
-    setSaving(true);
-    setFailed(false);
-    try { await configureComputer(on, on); }
-    catch { setFailed(true); }
-    finally { setSaving(false); }
-  }
   return <div className="desktop-config">
     <div className="desktop-config-groups">
       <section className="desktop-config-group" aria-labelledby="desktop-access-heading">
@@ -81,9 +74,6 @@ export default function DesktopSettings() {
         <h3 id="desktop-behavior-heading">{t('desktopAccess.behaviorGroup')}</h3>
         <FieldRow label={t('desktop.observe')} hint={t(!native ? 'config.nativeOnly' : 'desktop.observeHint')}>
           <Switch title={t('desktop.observe')} on={!!status?.desktopAllowed} disabled={disabled} onChange={on => void setDesktopObservation(on, 'settings')}/>
-        </FieldRow>
-        <FieldRow label={t('desktop.react')} hint={t('desktop.reactHint')}>
-          <Switch title={t('desktop.react')} on={!!(status?.proactive && status.reactions)} disabled={disabled} onChange={on => void configure(on)}/>
         </FieldRow>
         <ConfigAction label={t('computer.title')} action={t('config.windowAction')}>
           <NativeCompanion plugin="computer" mode="activity"/>

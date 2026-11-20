@@ -1,4 +1,3 @@
-import {configureComputer,computerSnapshot,subscribeComputer,readComputer} from '../../services/computerClient';
 import {useCallback,useEffect,useRef,useState,useSyncExternalStore} from 'react';
 import {useT} from '../../i18n';
 import {apiJson,jsonInit} from '../../services/http';
@@ -13,7 +12,6 @@ import Select from '../../ui/Select';
 import Icon from '../../ui/Icon';
 import FieldRow from '../../ui/FieldRow';
 import Hint from '../../ui/Hint';
-import Switch from '../../ui/Switch';
 import NativeWindowNotice, {type NativeWindowDiagnostics} from './NativeWindowNotice';
 import AppPermissions from '../../components/AppPermissions';
 
@@ -24,7 +22,6 @@ const targetKey = (target: Target) => `${target.ownerPid}:${target.windowId}`;
 const targetLabel = (target: Target) => `${target.name || target.bundleId} · ${target.title || target.windowId}`;
 
 export default function NativeCompanion({plugin,mode='settings'}:{plugin:'computer'|'browser';mode?:'settings'|'activity'|'pet'|'inline'}){
- const computer=useSyncExternalStore(subscribeComputer,computerSnapshot);
  const t=useT(),enabled=useActivities()[plugin],meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
  const rememberSelection=mode==='inline'||mode==='activity';
  const saved=rememberSelection?selectedWindows[plugin]:undefined;
@@ -58,7 +55,6 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
   poll();const timer=setInterval(poll,2500);
   return()=>{mounted.current=false;clearInterval(timer);request.current?.abort();request.current=null;scanRequest.current?.abort();};
  },[read]);
- useEffect(()=>{if(plugin==='computer'&&(open||mode!=='settings'))void readComputer().catch(()=>{});},[plugin,open,mode]);
  const run=async(fn:()=>Promise<void>, check?:DesktopOperation)=>{
   if(!mounted.current||operation.current)return;
   operation.current=true;setBusy(true);setActionFailed(false);request.current?.abort();
@@ -168,10 +164,6 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
 
    <div className="extension-detail-actions">{runButton}</div>
   </section>
-  {plugin==='computer'&&<details className="extension-detail-section extension-detail-advanced" open><summary>{t('computer.companionship')} <Hint text={t('computer.behaviorHint')}/></summary>
-   <FieldRow label={t('computer.proactive')}><Switch title={t('computer.proactive')} disabled={busy} on={computer.status?.proactive??false} onChange={v=>void run(async()=>{await configureComputer(v,computer.status?.reactions??false);})}/></FieldRow>
-   <FieldRow label={t('computer.reactions')}><Switch title={t('computer.reactions')} disabled={busy} on={computer.status?.reactions??false} onChange={v=>void run(async()=>{await configureComputer(computer.status?.proactive??false,v);})}/></FieldRow>
-  </details>}
   {mode==='settings'&&<details className="extension-detail-section extension-detail-advanced"><summary>{t('desktopAccess.blocklist')}</summary><AppPermissions manage/></details>}
   {notices}
  </div>;

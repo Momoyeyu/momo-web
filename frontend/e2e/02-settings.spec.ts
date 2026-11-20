@@ -18,11 +18,11 @@ import {
 const restore = useStateRestore();
 test.afterEach(restore);
 
-test("目录的十章与正文顺序一致，最后一章可以定位到阅读线", async ({ page }) => {
+test("目录章节与正文顺序一致，最后一章可以定位到阅读线", async ({ page }) => {
   await openApp(page, "settings");
   const index = page.locator(".config-index button");
   expect(await index.allTextContents()).toEqual(await page.locator(".config-scroll h2").allTextContents());
-  await expect(index).toHaveCount(10);
+  await expect(index).toHaveCount(11);
   for (const link of await index.all()) {
     await link.click();
     await expect(link).toHaveAttribute("aria-current", "location");
@@ -306,7 +306,7 @@ test("语言设置：下拉选项可见且可点", async ({ page }) => {
   await expect(page.locator(".config-index button").first()).toHaveText("语言"); // 界面语言未变
 });
 
-test("十章都不产生横向溢出", async ({ page }) => {
+test("所有章节都不产生横向溢出", async ({ page }) => {
   await openApp(page, "settings");
   for (const tab of await page.locator(".config-index button").allTextContents()) {
     await page.locator(".config-index").getByRole("button", {name:tab, exact:true}).click();

@@ -2,6 +2,7 @@
 
 export const zh = {
   config: {
+    dialogue: "对话",
     "soundAction": "试听动作",
     "soundTap": "按钮点击",
     "soundConfirm": "确认操作",
@@ -55,7 +56,7 @@ export const zh = {
     "pending": "待验证",
     "grantedOff": "未授权"
   },
-  desktop: {"startObservation": "开始观察", "stopObservation": "停止观察", "observe": "观察桌面", "observing": "观察已开启", "otherActivities": "浏览器与游戏", "halfBody": "半身", "controls": "桌宠工具栏", "expandDialog": "展开对话框", "collapseDialog": "收起对话框", "enter": "进入桌面", "return": "返回 chat", "enterHint": "让 momo 留在桌面陪伴你。看屏幕与操作应用独立，点击和输入需要授权。", "drag": "拖动 momo 的身体可移动桌宠。", "clickThrough": "鼠标穿透", "clickThroughHint": "穿透人物与空白区域；工具栏和展开的对话框仍可操作。", "error": "无法切换桌面模式。请先退出全屏后重试。", "operate": "操作应用", "operateHint": "桌面授权生效后，可以观察和操作黑名单以外的应用。", "react": "主动回应", "reactHint": "允许 momo 在画面变化时主动说话。关闭后，她仍可应你的提问查看屏幕。", "observeHint": "momo 可以直接查看你当前看到的屏幕。点击暂停或恢复；这不授予点击和输入权限。", "observationPaused": "观察已禁止", "observationUnavailable": "观察暂不可用", "screenPermissionHint": "需要 macOS 录屏许可。系统设置会在首次需要时打开；完成后点击重试。", "observationLoading": "正在读取状态", "pauseObservationHint": "点击禁止 momo 看屏幕；这不会改变应用操作的授权。", "resumeObservationHint": "点击允许 momo 看屏幕；点击、输入仍需要单独的应用授权。", "retryObservationHint": "目前无法读取画面。点击重试；这不会申请应用操作授权。"},
+  desktop: {"startObservation": "开始观察", "stopObservation": "停止观察", "observe": "观察桌面", "observing": "观察已开启", "otherActivities": "浏览器与游戏", "halfBody": "半身", "controls": "桌宠工具栏", "expandDialog": "展开对话框", "collapseDialog": "收起对话框", "enter": "进入桌面", "return": "返回 chat", "enterHint": "让 momo 留在桌面陪伴你。看屏幕与操作应用独立，点击和输入需要授权。", "drag": "拖动 momo 的身体可移动桌宠。", "clickThrough": "鼠标穿透", "clickThroughHint": "穿透人物与空白区域；工具栏和展开的对话框仍可操作。", "error": "无法切换桌面模式。请先退出全屏后重试。", "operate": "操作应用", "operateHint": "桌面授权生效后，可以观察和操作黑名单以外的应用。", "observeHint": "momo 可以直接查看你当前看到的屏幕。点击暂停或恢复；这不授予点击和输入权限。", "observationPaused": "观察已禁止", "observationUnavailable": "观察暂不可用", "screenPermissionHint": "需要 macOS 录屏许可。系统设置会在首次需要时打开；完成后点击重试。", "observationLoading": "正在读取状态", "pauseObservationHint": "点击禁止 momo 看屏幕；这不会改变应用操作的授权。", "resumeObservationHint": "点击允许 momo 看屏幕；点击、输入仍需要单独的应用授权。", "retryObservationHint": "目前无法读取画面。点击重试；这不会申请应用操作授权。"},
   activities: {
     platformUnsupported: "此平台暂不支持","title": "一起做点什么", "computerSummary": "观察与陪伴你的桌面", "browserSummary": "连接你已打开的浏览器", "minecraftSummary": "加入当前角色与世界", "disabled": "未启用", "empty": "先在设置中启用一个活动插件。"},
   plugins: {"stopUnknown": "尚未确认插件已停止，请重试停用或卸载。", "error": "操作未完成，请检查插件文件或连接后重试。"},
@@ -69,7 +70,7 @@ export const zh = {
   },
   permissions: {"openSystemSettings": "打开系统授权设置","screenPermission": "需要屏幕录制权限","screenPermissionHint": "macOS 尚未允许当前 momo 读取画面。请检查系统设置中的屏幕录制权限，再查找窗口。","inputPermission": "需要辅助功能权限","inputPermissionHint": "操作应用需要 macOS 辅助功能权限；仅观察时不需要这项权限。","noWindows": "当前没有可选窗口","noWindowsHint": "这里只显示当前桌面的可见窗口。全屏应用可能位于单独的空间（Space）；退出全屏或切换到目标应用所在桌面，再查找窗口。空列表本身不代表权限被拒绝。","existingHint": "选择已打开的窗口。应用黑名单和系统权限适用于此窗口。", "findWindows": "查找窗口", "window": "应用窗口", "selectWindow": "选择一个窗口", "waiting": "等待应用授权…", "title": "应用授权", "allowed": "允许的应用", "empty": "尚未授权任何应用", "revoke": "撤销", "observe": "观察画面", "interact": "操作应用", "deny": "拒绝", "once": "仅允许本次", "always": "始终允许", "error": "授权操作失败，请重试。", "interactHint": "关闭时仅观察；开启后仍需批准目标应用的操作权限。"},
   browser: {"connected": "已连接", "disconnected": "未连接", "dismiss":"关闭配置","title": "浏览器", "hint": "在隔离环境中读取你指定的网站。画面交给当前视觉模型，momo 可通过对话观察和操作。", "active": "已开启", "inactive": "已关闭", "configure": "配置", "readOnly": "首版为只读网页快照：不使用你的浏览器登录状态，不支持登录、提交表单或跨站资源。", "interact": "页面内操作", "interactHint": "允许 momo 点击、输入和滚动隔离快照；不会向网站提交内容。", "hosts": "允许访问的网站", "add": "添加", "removeHost": "移除网站", "start": "开启", "stop": "关闭", "url": "网页地址", "visit": "打开", "preview": "隔离浏览器画面", "invalidHost": "请输入完整域名，不含 https://、路径或通配符，最多 20 个。", "error": "浏览器操作未完成。请确认已开启视觉、环境资源就绪，并且网页及跳转域名在许可范围内。"},
-  computer: {"chatHint": "现在可以回到对话，询问 momo 画面里的内容。", "title": "桌面陪伴", "hint": "选择一个窗口或屏幕让 momo 观察。只有启动后可用；图像会发给已验证的视觉模型。", "start": "选择共享画面", "stop": "停止观察", "proactive": "主动发言", "reactions": "回应画面变化", "ask": "询问", "question": "关于画面的问题", "error": "观察已暂停，请检查视觉配置、共享权限或重新启动。", "windowReady": "已选好窗口。进入对话后可以连接。", "requiresBoot": "请先从标题页启动 momo。", "controlUnavailable": "电脑操作暂不可用：隔离执行环境尚未准备完成。", "companionship": "陪伴方式", "behaviorHint": "主动发言与画面回应均开启时，momo 才会主动评论授权画面的变化；关闭后仍可主动询问她。"},
+  computer: {"chatHint": "现在可以回到对话，询问 momo 画面里的内容。", "title": "桌面陪伴", "hint": "选择一个窗口或屏幕让 momo 观察。只有启动后可用；图像会发给已验证的视觉模型。", "start": "选择共享画面", "stop": "停止观察", "ask": "询问", "question": "关于画面的问题", "error": "观察已暂停，请检查视觉配置、共享权限或重新启动。", "windowReady": "已选好窗口。进入对话后可以连接。", "requiresBoot": "请先从标题页启动 momo。", "controlUnavailable": "电脑操作暂不可用：隔离执行环境尚未准备完成。"},
   vision: {"delete": "删除图片", "deleteConfirm": "删除本机保存的这张图片？对话中的文字会保留，图片将无法再查看或识别。", "label": "识图", "hint": "验证模型能读取图片后可开启。测试仅发送程序生成的数字图。Chat 可粘贴图片，QQ 按附件权限识图；更换地址、密钥或模型需重新验证。", "verify": "验证识图能力", "verified": "模型已通过识图验证，可以开启。", "notVerified": "未能确认模型正确读取了图片，暂不能开启。", "checkFailed": "验证失败，请检查图片支持与连接配置后重试。", "disabled": "请先在模型设置中验证并开启识图。", "changed": "识图配置已变化，请重新发送图片。", "size": "单张图片不能超过 10 MiB。", "count": "每次最多添加 4 张图片。", "format": "无法读取图片。支持 PNG、JPEG、WebP 和 GIF，最多 2000 万像素。", "libraryFull": "图片存储空间已满，请先清理图片记录。", "unavailable": "图片不可用，或没有访问权限。", "uploadFailed": "图片准备失败，请重试。", "historyDenied": "尚未开放历史图片的读取权限。", "preview": "查看图片", "image": "图片", "draft": "待发送图片", "loading": "处理中…", "remove": "移除图片", "retry": "重试", "still": "静态帧", "close": "关闭图片"},
   phone: {"typing": "momo 正在输入", "returnChat": "回到对话","title": "手机", "back": "返回", "close": "收起手机", "home": "手机桌面", "group": "群聊", "earlier": "更早消息", "delivered": "已送达", "processing": "处理中", "pending": "待处理", "received": "已收到", "failed": "失败", "unknown": "结果未知", "standby": "待机", "focus": "专注对话", "empty": "这里还没有 App", "noMessages": "还没有消息", "unavailable": "暂时无法读取手机，稍后会自动重试"},
   intro: {"label": "初次启动引导", "settings": "先打开设置，让我们做好相遇的准备。", "language": "选择你喜欢的界面语言，然后继续。", "models": "接下来，打开模型设置。", "llm": "填写对话模型的 API 地址、密钥和模型名称，再点击「测试」。", "back": "模型已准备好。请返回标题。", "boot": "准备好了，点击启动，和 momo 打个招呼吧。", "name": "momo 想知道该怎么称呼你。在下方告诉她一个喜欢的昵称吧。", "finish": "这条记忆已经置顶。现在回到标题，开始你们的日常吧。", "loading": "正在读取引导进度……", "continue": "继续", "checking": "正在检查……", "error": "未能完成这一步，请检查配置或网络后重试。模型需要支持工具调用。", "tts": "也可以为 momo 配置声音。填写语音服务、上传参考音频后继续；暂时没有的话，可以跳过。", "skip": "暂时跳过", "ttsError": "语音尚未就绪，请检查配置，或暂时跳过。", "memorySettings": "momo 已记下你的称呼。打开设置，一起看看她的长期记忆。", "memoryTab": "打开「记忆」，看看刚刚留下的第一条记忆。", "pin": "点击这条称呼记忆旁的图钉。置顶后，momo 每次聊天都会带着它，不必重新回忆。", "celebrate": "初次相遇，已经成为记忆。\n准备都做好了，接下来可以自由和 momo 相处。", "confirm": "开始我们的日常"},
@@ -397,6 +398,9 @@ export const zh = {
     config: "设置",
   },
   chat: {
+    proactive: "主动回应",
+    proactiveHint: "允许 momo 在观察的画面变化时主动回应。普通对话和桌宠共用此设置。",
+    proactiveError: "无法更改主动回应，请重试。",
     idle: "空闲",
     listening: "聆听中",
     thinking: "思考中",

@@ -7,6 +7,7 @@ import {useIntro} from '../services/introClient';
 import Button from '../ui/Button';
 import GridBackdrop, {type GridBackdropApi} from '../components/GridBackdrop';
 import BuiltinResourcesNotice from '../components/BuiltinResourcesNotice';
+import ProactiveResponseToggle from '../components/ProactiveResponseToggle';
 import AvatarPanel from './panels/Avatar';
 import MemoryPanel from './panels/Memory';
 import ConfigAction from './settings/ConfigAction';
@@ -21,7 +22,7 @@ import VisionSettings from './settings/VisionSettings';
 import '../styles/settings.css';
 import '../styles/config-document.css';
 
-const chapters = ['language', 'display', 'sound', 'models', 'memory', 'archive', 'desktop', 'browser', 'tools', 'mods'] as const;
+const chapters = ['language', 'display', 'dialogue', 'sound', 'models', 'memory', 'archive', 'desktop', 'browser', 'tools', 'mods'] as const;
 type Chapter = (typeof chapters)[number];
 const inset = 24;
 const canResumeMeeting = () => meetingSnapshot().state === 'active' || !!storedMeetingIdentity();
@@ -77,6 +78,7 @@ export default function Settings() {
         <h3 id="config-dialog-preview">{t('config.preview')}</h3>
         <GeneralTab section="preview"/>
       </section></>,
+    dialogue: <ProactiveResponseToggle placement="settings"/>,
     sound: <GeneralTab section="sound"/>,
     models: guided ? <>
       <ModelsTab section={intro.phase === 'tts' && intro.configurationValid ? 'tts' : 'llm'}/>
