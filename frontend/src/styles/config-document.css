@@ -107,7 +107,22 @@ body:has(.config-document) .extension-modal .extension-detail > .modal-foot {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-#config-browser .opt-ctl {justify-content: flex-end; flex-wrap: wrap;}
+#config-browser .opt-row {grid-template-columns: minmax(0, auto) minmax(0, 1fr);}
+#config-browser .opt-ctl {justify-content: flex-end; gap: 8px; flex-wrap: nowrap;}
+#config-browser .native-window-picker {flex: 0 1 230px;}
+#config-browser .config-action {margin-inline-start: 0; width: auto; flex: none; padding-inline: 10px;}
+.browser-connection {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 104px;
+  padding: 2px 8px; border: 1px solid var(--line-soft); border-radius: 999px;
+  color: var(--text-dim); font-size: 12px; white-space: nowrap;
+}
+.browser-connection > :first-child {width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none;}
+.browser-connection > :last-child {overflow: hidden; text-overflow: ellipsis;}
+.browser-connection[data-state="on"] {color: var(--accent);}
+.browser-connection[data-state="error"] {color: var(--warn, var(--accent));}
+.window-scan-feedback:empty {display: none;}
+.window-scan-feedback {padding: 4px 8px; color: var(--text-dim); font-size: 12px; white-space: normal;}
+.window-scan-feedback .extension-detail-notice {margin: 0; padding: 4px 0; border: 0;}
 
 .mod-library {width: min(570px, 92cqw);}
 .mod-library-header, .mod-library-views {display: flex; align-items: center; gap: 8px;}

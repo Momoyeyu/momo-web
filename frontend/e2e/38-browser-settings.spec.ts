@@ -2,13 +2,14 @@ import {test,expect} from './fixtures';
 import {bootChat,openTab} from './helpers';
 
 test('browser windows can be selected before Boot, then connected and stopped from a conversation',async({page})=>{
- let active=false;
+ let active=false, scans=0;
  const target={windowId:7,ownerPid:9,bundleId:'test.browser',name:'Test browser',path:'/fixture',title:'A long fixture window title '.repeat(12).trim()};
  await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:false}}}));
  await page.route('**/api/computer/native/**',async r=>{
   const path=new URL(r.request().url()).pathname;
   if(path.endsWith('/targets')){
    expect(r.request().postDataJSON()).toEqual({plugin:'browser'});
+   scans++;
    return r.fulfill({json:{targets:[target],screenPermission:true,inputPermission:true}});
   }
   if(path.endsWith('/start')){
@@ -21,7 +22,8 @@ test('browser windows can be selected before Boot, then connected and stopped fr
  await openTab(page,'浏览器');
  const config=page.locator('#config-browser');
  await expect(page.getByRole('button',{name:'返回标题'})).toBeVisible();
- await config.getByRole('button',{name:'查找窗口'}).click();
+ await expect(config.getByRole('button',{name:'查找窗口'})).toHaveCount(0);
+ await expect(config.locator('.opt-row')).toHaveCount(1);
  const picker=config.getByRole('button',{name:/^应用窗口 ·/});
  const emptyWidth=(await picker.boundingBox())!.width;
  await picker.click();
@@ -30,7 +32,13 @@ test('browser windows can be selected before Boot, then connected and stopped fr
  await option.click();
  expect((await picker.boundingBox())!.width).toBeCloseTo(emptyWidth);
  expect(emptyWidth).toBeLessThanOrEqual(230);
- await expect(config.getByText('已选好窗口。进入对话后可以连接。')).toBeVisible();
+ await expect(config.getByText('未连接',{exact:true})).toBeVisible();
+ expect(scans).toBe(1);
+ await picker.press('ArrowDown');
+ await expect.poll(()=>scans).toBe(2);
+ await expect(option).toBeVisible();
+ await picker.press('Escape');
+ await expect(config).not.toContainText('已选好窗口');
  await expect(config.getByRole('button',{name:'开启',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'返回标题'}).click();
  await page.locator('.title-menu .menu-item').first().click();
@@ -40,6 +48,7 @@ test('browser windows can be selected before Boot, then connected and stopped fr
  await config.getByRole('button',{name:'开启',exact:true}).click();
  await expect.poll(()=>active).toBe(true);
  await expect(config.getByText('Test browser · '+target.title,{exact:true})).toBeVisible();
+ await expect(config.getByText('已连接',{exact:true})).toBeVisible();
  await expect(page.getByRole('dialog')).toHaveCount(0);
  await config.getByRole('button',{name:'关闭',exact:true}).click();
  await expect.poll(()=>active).toBe(false);
@@ -49,8 +58,8 @@ test('missing screen permission explains how to find the window',async({page})=>
  await page.route('**/api/computer/native/targets',r=>r.fulfill({json:{targets:[],screenPermission:false,inputPermission:true}}));
  await bootChat(page);await openTab(page,'浏览器');
  const config=page.locator('#config-browser');
- await config.getByRole('button',{name:'查找窗口'}).click();
- await expect(config).toContainText('需要屏幕录制权限');
+ await config.getByRole('button',{name:/^应用窗口 ·/}).click();
+ await expect(config.locator('.sel-list')).toContainText('需要屏幕录制权限');
  await expect(config.getByRole('button',{name:'开启',exact:true})).toBeDisabled();
 });
 
@@ -69,16 +78,19 @@ test('browser status recovers after a failed poll and keeps separate action erro
  const config=page.locator('#config-browser');
  await expect(config.getByText('读取失败，请重试。',{exact:true})).toBeVisible();
  statusUnavailable=false;
- await expect(config.getByText('已关闭',{exact:true})).toBeVisible();
+ await expect(config.getByText('未连接',{exact:true})).toBeVisible();
  await expect(config.getByRole('alert')).toHaveCount(0);
 
- await config.getByRole('button',{name:'查找窗口'}).click();
- const error=config.getByRole('alert');
+ const picker=config.getByRole('button',{name:/^应用窗口 ·/});
+ await picker.click();
+ const error=config.locator('.sel-list').getByRole('alert');
  await expect(error).toHaveText('授权操作失败，请重试。');
  const previous=successfulPolls;
  await expect.poll(()=>successfulPolls).toBeGreaterThan(previous);
  await expect(error).toBeVisible();
  scanUnavailable=false;
- await config.getByRole('button',{name:'查找窗口'}).click();
+ await picker.press('Escape');
+ await picker.click();
+ await expect(config.locator('.sel-list')).toContainText('当前没有可选窗口');
  await expect(error).toHaveCount(0);
 });

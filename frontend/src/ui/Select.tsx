@@ -3,7 +3,7 @@ import {ambient} from '../audio/ambient';
 // 结构 = 值框（描边圆角 + 右端箭头）+ 浮层选项列（选中左侧金条、悬停浅金底）。
 // 交互：点击开合；外点/Esc 关；↑↓ 移动高亮，Enter 选定。
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import "../styles/controls.css";
 
 export interface SelectOption {
@@ -17,12 +17,18 @@ export default function Select({
   options,
   onChange,
   disabled = false,
+  onOpen,
+  popupNotice,
+  hideOptions = false,
 }: {
   label?: string;
   value: string;
   options: SelectOption[];
   onChange: (v: string) => void;
   disabled?: boolean;
+  onOpen?: () => void;
+  popupNotice?: ReactNode;
+  hideOptions?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [hl, setHl] = useState(0);
@@ -51,8 +57,7 @@ export default function Select({
         ?.querySelector(".sel-opt.on")
         ?.scrollIntoView({ block: "nearest" });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, disabled]);
+  }, [open, disabled, idx]);
 
   // Fit within every scrolling ancestor, not just the browser viewport.
   useLayoutEffect(() => {
@@ -83,7 +88,7 @@ export default function Select({
       window.removeEventListener("resize", fit);
       document.removeEventListener("scroll", scroll, true);
     };
-  }, [open, disabled, options.length]);
+  }, [open, disabled, hideOptions, options.length, popupNotice]);
 
   const pick = (v: string): void => {
     onChange(v);
@@ -91,11 +96,16 @@ export default function Select({
     setOpen(false);
   };
 
+  const show = () => {
+    onOpen?.();
+    setOpen(true);
+  };
+
   const onKey = (e: React.KeyboardEvent): void => {
     if (!open) {
       if (e.key === "Enter" || e.key === " " || e.key === "ArrowDown") {
         e.preventDefault();
-        setOpen(true);
+        show();
       }
       return;
     }
@@ -103,7 +113,7 @@ export default function Select({
       e.preventDefault();
       e.stopPropagation();
       setOpen(false);
-    } else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    } else if (!hideOptions && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
       e.preventDefault();
       setHl((h) => {
         const n =
@@ -118,7 +128,7 @@ export default function Select({
     } else if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       const o = options[hl];
-      if (o) pick(o.value);
+      if (o && !hideOptions) pick(o.value);
     }
   };
 
@@ -131,15 +141,15 @@ export default function Select({
         aria-expanded={open && !disabled}
         disabled={disabled}
         aria-haspopup="listbox"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => open ? setOpen(false) : show()}
         onKeyDown={onKey}
       >
         <span title={current?.label ?? value}>{current?.label ?? value}</span>
         <span className="sel-arrow" />
       </button>
       {open && !disabled && (
-        <div className="sel-list" ref={listRef} role="listbox">
-          {options.map((o, i) => (
+        <div className="sel-list" ref={listRef}>
+          <div role="listbox">{!hideOptions && options.map((o, i) => (
             <button
               key={o.value}
               type="button"
@@ -154,7 +164,8 @@ export default function Select({
             >
               {o.label}
             </button>
-          ))}
+          ))}</div>
+          {popupNotice}
         </div>
       )}
     </div>
