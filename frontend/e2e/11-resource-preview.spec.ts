@@ -53,7 +53,7 @@ test('resource dialog owns the live canvas and returns it when closed', async ({
   const bounds = await canvas.boundingBox();
   const modal = await dialog.boundingBox();
   expect(bounds!.x).toBeGreaterThan(modal!.x + modal!.width / 2);
-  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await dialog.getByRole('button', { name: '返回', exact: true }).click();
   await expect(page.locator('.live2d-home canvas')).toHaveCount(1);
   expect(await originalCanvas!.evaluate(node => node.parentElement?.classList.contains('live2d-home'))).toBe(true);
   await page.keyboard.press('Escape');
@@ -98,10 +98,10 @@ test('previewing an imported model keeps the active avatar and restores it on cl
   await expect(dialog.locator('[data-resource-id="happy"] .resource-play')).toBeEnabled();
   const ids = async () => ({ active: await activeAvatar(page), rendered: (await presentation(page, true))?.avatarId });
   await expect.poll(ids).toEqual({ active: 'builtin', rendered: 'preview-import' });
-  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await dialog.getByRole('button', { name: '返回', exact: true }).click();
   await expect.poll(ids).toEqual({ active: 'builtin', rendered: 'builtin' });
   await page.locator('.avatar-row', { hasText: 'Preview imported' }).click();
-  await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+  await dialog.getByRole('button', { name: '返回', exact: true }).click();
   await expect.poll(ids).toEqual({ active: 'builtin', rendered: 'builtin' });
   await expect(page.locator('canvas.live2d-canvas')).toHaveCount(1);
 });

@@ -4,7 +4,7 @@ import {DEFAULT_PROACTIVE_POLICY,socialPreferenceWriter,socialRecords,type Socia
 import type {SocialPreferencePatch} from '../../services/socialPreferences';
 import type {QQLoginErrorCode,QQRuntimeAction,QQRuntimeState} from '../../services/qqRuntimeClient';
 import Modal from '../../ui/Modal';
-import Button from '../../ui/Button';
+import DialogBackButton from '../../ui/DialogBackButton';
 import FieldRow from '../../ui/FieldRow';
 import Hint from '../../ui/Hint';
 import Switch from '../../ui/Switch';
@@ -116,6 +116,6 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
         </article>)}
       </section>
     </div></div>
-    <footer className="social-modal-footer"><span className={`social-save-state${saveError?' is-error':''}`} role="status">{t(saveError?'social.saveError':saving?'social.saving':saved?'social.saved':'social.autoSave')}</span><Button variant="ghost" onClick={close}>{t('common.close')}</Button></footer>
+    <footer className="social-modal-footer"><span className={`social-save-state${saveError?' is-error':''}`} role="status">{t(saveError?'social.saveError':saving?'social.saving':saved?'social.saved':'social.autoSave')}</span><DialogBackButton onClick={close}/></footer>
   </Modal>;
 }

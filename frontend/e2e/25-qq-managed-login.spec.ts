@@ -32,7 +32,7 @@ test('closing and reopening preferences keeps old and new editor writes in one o
   let dialog=await openQQ(page);await dialog.getByRole('tab',{name:'权限',exact:true}).click();
   await dialog.getByRole('switch',{name:'回复文字',exact:true}).click();
   await expect.poll(()=>writes.length).toBe(1);
-  await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+  await dialog.getByRole('button',{name:'返回',exact:true}).click();
   dialog=await openQQ(page);await dialog.getByRole('tab',{name:'权限',exact:true}).click();
   const reply=dialog.getByRole('switch',{name:'回复文字',exact:true});
   await expect(reply).toHaveAttribute('aria-checked','true');await reply.click();await reply.click();
@@ -112,7 +112,7 @@ test('QR automatically updates through one shared observer; tabs and Close never
   const before=reads;await page.waitForTimeout(1500);expect(reads-before).toBeLessThanOrEqual(2);
   await dialog.getByRole('tab',{name:'账号',exact:true}).click();
   await expect(dialog.locator('.qq-login-expiry')).toContainText(/8\d 秒后过期/);
-  await dialog.getByRole('button',{name:'关闭',exact:true}).click();await expect(dialog).toHaveCount(0);
+  await dialog.getByRole('button',{name:'返回',exact:true}).click();await expect(dialog).toHaveCount(0);
   dialog=await openQQ(page);await expect(dialog.locator('.qq-login img')).toBeVisible();
   expect(maxInFlight).toBe(1);expect(actions).toEqual(['begin']);
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
@@ -207,7 +207,7 @@ test('permissions autosave only changed fields, serialize newer edits and never 
   expect(account.enabled).toBe(false);expect(connects).toBe(0);await expect(page.locator('.social-card [role=switch]')).toHaveAttribute('aria-checked','false');
   await dialog.getByRole('tab',{name:'权限',exact:true}).click();await expect(reply).toHaveAttribute('aria-checked','true');
   await expect(dialog.getByRole('switch',{name:'收取私聊',exact:true})).toHaveAttribute('aria-checked','false');
-  await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+  await dialog.getByRole('button',{name:'返回',exact:true}).click();
 });
 
 test('a rejected preference save reads actual settings and rolls back only the failed edit',async({page,request})=>{

@@ -1,9 +1,8 @@
 import Modal from "../ui/Modal";
-import Button from "../ui/Button";
-import { t } from "../i18n";
+import DialogBackButton from "../ui/DialogBackButton";
 
 /**
- * 详情弹窗：聚焦遮罩（Modal）+ 居中弹窗 + 只读全文 + [关闭]。
+ * 详情弹窗：聚焦遮罩（Modal）+ 居中弹窗 + 只读全文 + 返回上一层。
  * meta 可选（时间等），text 必填。
  */
 export default function DetailModal({
@@ -20,7 +19,7 @@ export default function DetailModal({
       {meta && <div className="modal-meta muted">{meta}</div>}
       <div className="modal-body">{text}</div>
       <div className="modal-foot">
-        <Button onClick={onClose}>{t("common.close")}</Button>
+        <DialogBackButton onClick={onClose}/>
       </div>
     </Modal>
   );

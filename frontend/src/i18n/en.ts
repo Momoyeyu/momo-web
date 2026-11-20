@@ -332,6 +332,7 @@ export const en: Dict = {
   },
 
   common: {
+    back: "Back",
     backTitle: "Back to Title",
     backChat: "Back to Chat",
     save: "Save",
@@ -342,6 +343,10 @@ export const en: Dict = {
     pageOf: "{cur} / {total}",
   },
   modManager: {
+    configureName: "Configure {name}",
+    removeName: "Uninstall {name}",
+    configure: "Configure",
+    removeIcon: "Uninstall",
     library: "Mod library",
     installed: "Installed",
     catalog: "Get mods",
@@ -350,7 +355,6 @@ export const en: Dict = {
     noMatches: "No matching mods.",
     catalogError: "Could not load the official catalog.",
     platformUnavailable: "Unsupported platform",
-    backToLibrary: "Back to list",
     manageLocal: "Manage",
     officialSource: "Signed official package", localSource: "Local content package", allPlatforms: "All platforms",
     "search": "Search mods",
@@ -361,7 +365,6 @@ export const en: Dict = {
 
     "local": "Local mods",
     "import": "Import file",
-    "manage": "Configure",
     "install": "Install mod",
     "remove": "Uninstall",
     "enabled": "Enabled",
@@ -369,7 +372,6 @@ export const en: Dict = {
     "enable": "Enable",
     "disable": "Disable",
     "absent": "Not installed",
-    "close": "Back",
     "retry": "Reload",
     "bgm": "Music",
     "background": "Background",

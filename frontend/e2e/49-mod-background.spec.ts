@@ -23,7 +23,7 @@ test('room restores built-in lighting as soon as a background is disabled and a 
     }else await route.fulfill({contentType:'image/png',body:png});
   });
   const library=await openModLibrary(page);
-  await library.locator('.opt-row').filter({hasText:'Fixture room'}).getByRole('button',{name:'配置模组'}).click();
+  await library.locator('.opt-row').filter({hasText:'Fixture room'}).getByRole('button',{name:'配置 Fixture room'}).click();
   const dialog=page.getByRole('dialog',{name:'Fixture room'});
   const art=page.locator('[data-mod-background]');
   const enable=dialog.getByRole('button',{name:'启用模组'});
@@ -53,7 +53,7 @@ test('a confirmed disable withdraws the background even if the following catalog
   const library=await openModLibrary(page);
   const art=page.locator('[data-mod-background]');
   await expect(art).toHaveCount(1);
-  await library.locator('.opt-row').filter({hasText:'Fixture room'}).getByRole('button',{name:'配置模组'}).click();
+  await library.locator('.opt-row').filter({hasText:'Fixture room'}).getByRole('button',{name:'配置 Fixture room'}).click();
   await page.getByRole('dialog',{name:'Fixture room'}).getByRole('button',{name:'停用模组'}).click();
   await expect(library.getByRole('alert')).toBeVisible();
   await expect(art).toHaveCount(0);
@@ -73,7 +73,7 @@ test('an open companion window follows a confirmed background change in settings
     const art=companion.locator('[data-mod-background]');
     await expect(art).toHaveCount(1);
     const library=await openModLibrary(page);
-    await library.locator('.opt-row').filter({hasText:'Fixture room'}).getByRole('button',{name:'配置模组'}).click();
+    await library.locator('.opt-row').filter({hasText:'Fixture room'}).getByRole('button',{name:'配置 Fixture room'}).click();
     await page.getByRole('dialog',{name:'Fixture room'}).getByRole('button',{name:'停用模组'}).click();
     await expect(art).toHaveCount(0);
   }finally{await companion.close();}

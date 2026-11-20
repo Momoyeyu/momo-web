@@ -24,9 +24,9 @@ for (const viewport of [{width:1280,height:720},{width:1920,height:1080}]) {
       await row.getByRole('button',{name:'安装模组'}).click();
       const modal=page.getByRole('dialog',{name,exact:true});
       await expect(modal).toContainText('签名包');
-      await modal.getByRole('button',{name:'返回列表'}).click();
+      await modal.getByRole('button',{name:'返回'}).click();
     }
-    await library.getByRole('button',{name:'返回设置'}).click();
+    await library.getByRole('button',{name:'返回'}).click();
     await openTab(page,'桌面');
     await expect(page.locator('#config-desktop')).toBeInViewport();
     await openTab(page,'浏览器');

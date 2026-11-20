@@ -69,9 +69,8 @@
 .config-preview h3 {margin: 0; font: inherit; font-weight: 600;}
 .config-preview .dialog-preview {margin-block: 10px;}
 .config-modal {box-sizing: border-box; width: min(620px, 92cqw); max-height: 86cqh; overflow: auto; padding: 0;}
-.config-modal-head {display: flex; justify-content: space-between; align-items: center; padding: 14px 22px; border-bottom: 1px solid var(--line);}
+.config-modal-head {display: flex; gap: 12px; align-items: center; padding: 14px 22px; border-bottom: 1px solid var(--line);}
 .config-modal-head h2 {font-size: 19px; margin: 0;}
-.config-modal-head button {border: 0; background: transparent; color: var(--text-dim); font-size: 23px; padding: 0 6px;}
 .config-modal-body {padding: 15px 22px 20px;}
 .config-modal-body > .panel, .config-modal-body .extension-panel {background: transparent; padding: 0; border: none; box-shadow: none;}
 .config-modal .extension-detail {padding: 0;}
@@ -132,3 +131,7 @@ body:has(.config-document) .extension-modal .extension-detail > .modal-foot {
 .mod-library-rows .opt-ctl {justify-content: flex-end; flex-wrap: wrap;}
 .mod-library-rows .opt-row + .opt-row {border-top: 1px solid var(--line-soft);}
 .mod-library > .modal-foot {padding-top: 12px; border-top: 1px solid var(--line-soft);}
+
+.mod-row-actions {display: flex; align-items: center; gap: 8px; flex: none;}
+.mod-row-actions > button {flex-shrink: 0;}
+.mod-remove-dialog {width: min(420px, 92cqw);}

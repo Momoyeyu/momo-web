@@ -332,6 +332,7 @@ export const ja: Dict = {
   },
 
   common: {
+    back: "戻る",
     backTitle: "タイトルへ戻る",
     backChat: "会話へ戻る",
     save: "保存",
@@ -342,6 +343,10 @@ export const ja: Dict = {
     pageOf: "{cur} / {total}",
   },
   modManager: {
+    configureName: "{name} を設定",
+    removeName: "{name} をアンインストール",
+    configure: "設定",
+    removeIcon: "アンインストール",
     library: "Mod ライブラリ",
     installed: "インストール済み",
     catalog: "Mod を入手",
@@ -350,7 +355,6 @@ export const ja: Dict = {
     noMatches: "該当する Mod はありません。",
     catalogError: "公式一覧を読み込めません。",
     platformUnavailable: "対応外の環境",
-    backToLibrary: "一覧へ戻る",
     manageLocal: "管理",
     officialSource: "署名済み公式パッケージ", localSource: "ローカルコンテンツ", allPlatforms: "全プラットフォーム",
     "search": "Mod を検索",
@@ -361,7 +365,6 @@ export const ja: Dict = {
 
     "local": "ローカル Mod",
     "import": "ファイル読込",
-    "manage": "設定する",
     "install": "導入する",
     "remove": "削除する",
     "enabled": "有効",
@@ -369,7 +372,6 @@ export const ja: Dict = {
     "enable": "有効にする",
     "disable": "無効にする",
     "absent": "未導入",
-    "close": "設定に戻る",
     "retry": "再読み込み",
     "bgm": "BGM",
     "background": "背景",

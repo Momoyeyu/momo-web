@@ -7,6 +7,7 @@ import {meetingIdentity,meetingSnapshot,subscribeMeeting} from '../../services/m
 import ExtensionCard from './ExtensionCard';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
+import DialogBackButton from '../../ui/DialogBackButton';
 import Select from '../../ui/Select';
 import Icon from '../../ui/Icon';
 import FieldRow from '../../ui/FieldRow';
@@ -135,7 +136,7 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
   </FieldRow>;
  }
  const body=<div className="extension-detail">
-  <header className="extension-detail-header"><div>{mode==='settings'&&<h3>{t(plugin+'.title')}</h3>}<span className={`extension-detail-status${active?' is-active':''}`}>{status}</span></div>{mode==='settings'&&<button type="button" className="icon-btn" aria-label={t('browser.dismiss')} onClick={()=>setOpen(false)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>}</header>
+  <header className="extension-detail-header"><div>{mode==='settings'&&<h3>{t(plugin+'.title')}</h3>}<span className={`extension-detail-status${active?' is-active':''}`}>{status}</span></div>{mode==='settings'&&<DialogBackButton onClick={()=>setOpen(false)}/>}</header>
   <section className="extension-detail-section">
    <FieldRow label={t('permissions.window')} hint={t('permissions.existingHint')}>
     {windowPicker}

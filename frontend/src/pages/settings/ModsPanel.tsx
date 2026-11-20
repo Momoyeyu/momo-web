@@ -8,6 +8,8 @@ import Pager from '../../ui/Pager';
 import {clampPage} from '../../lib/paging';
 import FieldRow from '../../ui/FieldRow';
 import Button from '../../ui/Button';
+import IconButton from '../../ui/IconButton';
+import DialogBackButton from '../../ui/DialogBackButton';
 import Modal from '../../ui/Modal';
 import Switch from '../../ui/Switch';
 import OfficialPlugins from './OfficialPlugins';
@@ -46,6 +48,7 @@ export default function ModsPanel(){
     setPage(0);
     setQuery('');
   }
+  function closeLibrary(){if(!working.current)setManager(false);}
   function open(next:Selection|null){if(!working.current){setError('');select(next);}}
   async function run(url:string, init:RequestInit, next:Selection|null){
     if(working.current)return;
@@ -94,7 +97,7 @@ export default function ModsPanel(){
       setManager(true);
       void load();
     })}</FieldRow>
-    {manager&&<Modal label={code('library')} onClose={()=>{if(!working.current)setManager(false);}} className="extension-modal mod-library">
+    {manager&&<Modal label={code('library')} onClose={closeLibrary} className="extension-modal mod-library">
       <header className="extension-detail-header"><h3>{code('library')}</h3></header>
       <div className="mod-library-header">
         <div className="mod-library-views" role="group" aria-label={code('library')}>
@@ -109,10 +112,13 @@ export default function ModsPanel(){
       : !matches.length && <p className="muted">{code(entries.length?'noMatches':view==='installed'?'empty':'catalogEmpty')}</p>}
       <div className="mod-library-rows">
         {matches.slice(paging.page*5,paging.page*5+5).map(mod=><FieldRow key={mod.id} label={mod.name}>
-          {'enabled' in mod ? <>
+          {'enabled' in mod ? <div className="mod-row-actions">
             <Switch title={mod.name} on={mod.enabled} disabled={busy} onChange={enabled=>setEnabled(mod,enabled)}/>
-            {button('manage',()=>open({id:mod.id,mode:'manage'}))}
-          </> : <>
+            <IconButton icon="gear" label={t('modManager.configureName',{name:mod.name})}
+              tip={code('configure')} disabled={busy} onClick={()=>open({id:mod.id,mode:'manage'})}/>
+            <IconButton icon="trash" label={t('modManager.removeName',{name:mod.name})}
+              tip={code('removeIcon')} danger disabled={busy} onClick={()=>open({id:mod.id,mode:'remove'})}/>
+          </div> : <>
             {!mod.compatible&&<span className="config-value">{code('platformUnavailable')}</span>}
             {button('install',()=>open({id:mod.id,mode:'install'}),!mod.compatible)}
           </>}
@@ -120,9 +126,10 @@ export default function ModsPanel(){
       </div>
       {filterable&&<Pager page={paging.page} pages={paging.pages} onChange={setPage}/>}
       {!selection&&error&&<p role="alert">{code(error)} {button('retry',()=>{setError('');void load();})}</p>}
-      <div className="modal-foot">{button('close',()=>setManager(false))}</div>
+      <div className="modal-foot"><DialogBackButton onClick={closeLibrary} disabled={busy}/></div>
     </Modal>}
-    {selection&&<Modal label={selection.mode==='local'?code('import'):name} onClose={()=>open(null)} className="extension-modal">
+    {selection&&<Modal label={selection.mode==='local'?code('import'):name} onClose={()=>open(null)} describedBy={selection.mode==='remove'?'mod-remove-hint':undefined}
+      className={selection.mode==='remove'?'extension-modal mod-remove-dialog':'extension-modal'}>
       <div className="extension-detail"><h3>{selection.mode==='local'?code('import'):name}</h3>
       {selection.mode==='local' ? <>
         <p>{code('importHint')}</p>
@@ -138,19 +145,21 @@ export default function ModsPanel(){
       </>
       : selection.mode==='install' ? <><p>{code('officialHint')}</p>
         {button('install',()=>void run('/api/mods/official/'+selection.id,{method:'POST'},{id:selection.id,mode:'manage'}))}</>
-      : selection.mode==='remove' ? <><p>{code('removeHint')}</p>
-        {button('remove',()=>void run('/api/mods/'+selection.id,{method:'DELETE'},null))}</>
+      : selection.mode==='remove' ? <p id="mod-remove-hint">{code('removeHint')}</p>
       : item && <><p>{item.version} · {code(item.enabled?'enabled':'disabled')}</p>
         <p>{code(item.source==='official'?'officialSource':'localSource')} · {(item.platforms??[]).map(platform=>platform==='*'?code('allPlatforms'):platform).join(', ')}</p>
-        <div className="extension-detail-actions">{button(item.enabled?'disable':'enable',()=>setEnabled(item,!item.enabled))}
-        {button('remove',()=>open({id:item.id,mode:'remove'}))}</div>
+        <div className="extension-detail-actions">{button(item.enabled?'disable':'enable',()=>setEnabled(item,!item.enabled))}</div>
         {item.runtimeError && <p role="alert">{code('runtimeError')} {button('retry',()=>void run('/api/mods/'+item.id,jsonInit('PATCH',{enabled:false}),selection))}</p>}
         {item.enabled&&item.id==='momo.qq'&&<OfficialPlugins/>}
         {item.enabled&&item.id==='momo.minecraft'&&<MinecraftCompanion/>}
         {item.kind==='content'&&item.resources.map(r=><p key={r.path}>{code(r.type)} · {r.path}</p>)}
       </>}
       {error&&<p role="alert">{code(error)}</p>}
-      <div className="modal-foot">{button('backToLibrary',()=>open(null))}</div>
+      <div className="modal-foot">
+        <DialogBackButton onClick={()=>open(null)} disabled={busy}/>
+        {selection.mode==='remove'&&<Button variant="ghost" className="btn-danger" disabled={busy}
+          onClick={()=>void run('/api/mods/'+selection.id,{method:'DELETE'},null)}>{code('remove')}</Button>}
+      </div>
       </div>
     </Modal>}
   </>;

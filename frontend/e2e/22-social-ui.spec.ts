@@ -76,7 +76,7 @@ test('QQ account settings offer managed sign-in only and enforce an empty allowl
     await expect(list.getByRole('listitem')).toHaveCount(0);
     await expect.poll(async()=>((await (await request.get('/api/social/accounts')).json()).accounts[0].allowlist)).toEqual([]);
     await page.screenshot({path:info.outputPath('qq-allowlist-validated.png')});
-    await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+    await dialog.getByRole('button',{name:'返回',exact:true}).click();
     await expect(dialog).toHaveCount(0);
     const saved=(await (await request.get('/api/social/accounts')).json()).accounts;
     expect(saved.find((item:{provider:string})=>item.provider==='qq').allowlistEnabled).toBe(true);

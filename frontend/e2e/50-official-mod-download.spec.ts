@@ -16,6 +16,8 @@ for(const [name,id] of [['QQ','momo.qq'],['Minecraft','momo.minecraft']])test('r
  await expect(cfg).toBeVisible({timeout:15000});
  await dialog.getByRole('button',{name:'停用模组'}).click();
  await expect(dialog.getByRole('button',{name:'启用模组'})).toBeVisible();
- await dialog.getByRole('button',{name:'卸载模组'}).click();await dialog.getByRole('button',{name:'卸载模组'}).click();
+ await dialog.getByRole('button',{name:'返回',exact:true}).click();
+ await library.getByRole('button',{name:'卸载 '+name,exact:true}).click();
+ await dialog.getByRole('button',{name:'卸载模组',exact:true}).click();
  await expect.poll(async()=> (await(await request.get('/api/mods')).json()).mods.some((m:{id:string})=>m.id===id)).toBe(false);
 });

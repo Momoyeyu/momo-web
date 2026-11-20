@@ -21,7 +21,7 @@ test('local content mod installs disabled, serves audio only when enabled and ca
   const row=library.locator('.opt-row').filter({has:page.getByText(pack.name,{exact:true})});
   try {
     expect((await request.get(pack.resources[0].url)).ok()).toBe(false);
-    await row.getByRole('button',{name:'配置模组'}).click();
+    await row.getByRole('button',{name:'配置 '+pack.name}).click();
     await dialog.getByRole('button',{name:'启用模组'}).click();
     await expect(dialog.getByRole('button',{name:'停用模组'})).toBeVisible();
     const file=await request.get(pack.resources[0].url);
@@ -30,12 +30,26 @@ test('local content mod installs disabled, serves audio only when enabled and ca
     await page.reload();
     await openModLibrary(page);
     await expect(row.getByRole('switch')).toHaveAttribute('aria-checked','true');
-    await row.getByRole('button',{name:'配置模组'}).click();
+    await row.getByRole('button',{name:'配置 '+pack.name}).click();
     await dialog.getByRole('button',{name:'停用模组'}).click();
     await expect(dialog.getByRole('button',{name:'启用模组'})).toBeVisible();
     expect((await request.get(pack.resources[0].url)).ok()).toBe(false);
-    await dialog.getByRole('button',{name:'卸载模组'}).click();
-    await dialog.getByRole('button',{name:'卸载模组'}).click();
+    await dialog.getByRole('button',{name:'返回',exact:true}).click();
+    const controls=row.locator('.mod-row-actions > button');
+    await expect(controls.nth(0)).toHaveRole('switch');
+    await expect(controls.nth(1)).toHaveAccessibleName('配置 '+pack.name);
+    await expect(controls.nth(2)).toHaveAccessibleName('卸载 '+pack.name);
+    for(const icon of [controls.nth(1),controls.nth(2)]){
+      await expect(icon.locator('svg')).toBeVisible();
+      await expect(icon).toHaveText('');
+    }
+    const uninstall=row.getByRole('button',{name:'卸载 '+pack.name,exact:true});
+    await uninstall.click();
+    await expect(dialog).toHaveAccessibleDescription('确认卸载这个模组？');
+    await dialog.getByRole('button',{name:'返回',exact:true}).click();
+    await expect(uninstall).toBeFocused();
+    await uninstall.click();
+    await dialog.getByRole('button',{name:'卸载模组',exact:true}).click();
     await expect(row).toHaveCount(0);
   } finally {await request.delete('/api/mods/'+pack.id);}
 });

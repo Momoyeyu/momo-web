@@ -1,13 +1,12 @@
 import {useState, type ReactNode} from 'react';
-import {useT} from '../../i18n';
 import Modal from '../../ui/Modal';
 import Button from '../../ui/Button';
 import FieldRow from '../../ui/FieldRow';
+import DialogBackButton from '../../ui/DialogBackButton';
 
 export default function ConfigAction({label, action, value, model, children}: {
   label: string; action: string; value?: string; model?: 'LLM' | 'TTS'; children?: ReactNode;
 }) {
-  const t = useT();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
   const trigger = <Button variant="ghost" className="config-action" onClick={() => setOpen(true)}>{action}</Button>;
@@ -19,7 +18,7 @@ export default function ConfigAction({label, action, value, model, children}: {
       {trigger}
     </FieldRow>}
     {open && <Modal label={label} className="config-modal" onClose={close}>
-      <header className="config-modal-head"><h2>{label}</h2><button type="button" aria-label={t('common.close')} onClick={close}>×</button></header>
+      <header className="config-modal-head"><DialogBackButton onClick={close}/><h2>{label}</h2></header>
       <div className="config-modal-body">{children}</div>
     </Modal>}
   </>;

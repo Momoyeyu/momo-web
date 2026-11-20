@@ -10,6 +10,7 @@ import {desktopWindowAvailable} from '../../services/desktopWindow';
 import {navigate} from '../../router';
 import ExtensionCard from './ExtensionCard';
 import Button from '../../ui/Button';
+import DialogBackButton from '../../ui/DialogBackButton';
 import FieldRow from '../../ui/FieldRow';
 import Hint from '../../ui/Hint';
 import Modal from '../../ui/Modal';
@@ -70,7 +71,7 @@ export default function MinecraftCompanion({mode='settings',onDismiss}:{mode?:'s
  const body=<div className="extension-detail">
   <header className="extension-detail-header">
    <div><h3>{t('minecraft.title')}</h3><span className="extension-detail-status">{t(active?'minecraft.running':'minecraft.stopped')}</span></div>
-   {(mode==='settings'||onDismiss)&&<button type="button" className="icon-btn" aria-label={t('minecraft.dismiss')} onClick={mode==='settings'?()=>setOpen(false):onDismiss}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>}
+   {mode==='settings'?<DialogBackButton onClick={()=>setOpen(false)}/>:onDismiss&&<button type="button" className="icon-btn" aria-label={t('minecraft.dismiss')} onClick={onDismiss}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>}
   </header>
   <section className="extension-detail-section">
    <FieldRow label={t('minecraft.session')} hint={t('minecraft.existingHint')}>

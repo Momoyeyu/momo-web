@@ -57,14 +57,14 @@ test('QQ full permissions autosave explicit scopes and limits; explanations stay
   await groups.getByRole('textbox',{name:'添加群号',exact:true}).fill('45678');await groups.getByRole('textbox',{name:'添加群号',exact:true}).press('Enter');
   await expect.poll(()=>account.groupAllowlist).toEqual([{peerId:'45678'}]);
   await expect(dialog.locator('.social-save-state')).toContainText('已保存');
-  await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+  await dialog.getByRole('button',{name:'返回',exact:true}).click();
   await page.locator('.official-plugins').getByRole('button',{name:'配置',exact:true}).click();
   await dialog.getByRole('tab',{name:'权限',exact:true}).click();
   await expect(proactive.getByRole('listitem')).toHaveCount(2);
   await expect(proactive.locator('.opt-row').filter({hasText:'每小时上限'}).getByRole('button').first()).toContainText('3 条 / 小时');
   await expect(proactive.locator('.opt-row').filter({hasText:'最短间隔'}).getByRole('button').first()).toContainText('300 秒');
   await expect(groups.getByText('45678',{exact:true})).toBeVisible();
-  await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+  await dialog.getByRole('button',{name:'返回',exact:true}).click();
   expect(writes.length).toBeGreaterThan(0);
   for(const write of writes){expect(write).not.toHaveProperty('enabled');expect(write).not.toHaveProperty('expectedSelfId');}
 });
@@ -94,7 +94,7 @@ test('attachment library waits for the actual saved grant before its first autho
     const library=dialog.getByRole('region',{name:'可发送的附件',exact:true});
     await expect(library.getByRole('button',{name:'添加附件',exact:true})).toBeEnabled();
     await expect(library.getByRole('alert')).toHaveCount(0);expect(mediaReads).toBe(1);
-    await dialog.getByRole('button',{name:'关闭',exact:true}).click();
+    await dialog.getByRole('button',{name:'返回',exact:true}).click();
   }finally{
     release?.();
     await request.put('/api/social/accounts/qq',{data:{enabled:false,expectedSelfId:saved.expectedSelfId,permissions:{media:saved.permissions.media}}});
@@ -139,7 +139,7 @@ for(const viewport of [{width:1280,height:720},{width:1100,height:700}])test(`QQ
     const bottom=tab==='权限'?panel.locator('.social-group-policy'):panel.getByText('scroll-record-34',{exact:true});
     const target=await bottom.boundingBox();const clip=await dialog.locator('.social-viewport').boundingBox();
     expect(target!.y+target!.height).toBeLessThanOrEqual(clip!.y+clip!.height+1);
-    await expect(dialog.getByRole('button',{name:'关闭',exact:true})).toBeInViewport();
+    await expect(dialog.getByRole('button',{name:'返回',exact:true})).toBeInViewport();
     await page.screenshot({path:info.outputPath(`qq-${tab==='权限'?'permissions':'records'}-bottom.png`)});
   }
 });

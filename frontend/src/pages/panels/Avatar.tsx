@@ -26,6 +26,7 @@ import { checkManifest, listManifests } from "../../live2d/avatarZip";
 import { getStage } from "../../live2d/stage";
 import { useT } from "../../i18n";
 import Button from "../../ui/Button";
+import DialogBackButton from "../../ui/DialogBackButton";
 import IconButton from "../../ui/IconButton";
 import Modal from "../../ui/Modal";
 import Pager from "../../ui/Pager";
@@ -565,7 +566,7 @@ export default function AvatarPanel() {
           <ResourcePreview key={resAvatar.id} avatarId={resAvatar.id} selection={selection} onReady={onPreviewReady} />
           </div>
           <div className="modal-foot">
-            <Button onClick={() => setResId(null)}>{t("common.close")}</Button>
+            <DialogBackButton onClick={() => setResId(null)}/>
           </div>
         </Modal>
       )}

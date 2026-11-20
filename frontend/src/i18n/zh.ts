@@ -334,6 +334,7 @@ export const zh = {
 
 
   common: {
+    back: "返回",
     backTitle: "返回标题",
     backChat: "返回对话",
     save: "保存",
@@ -344,6 +345,10 @@ export const zh = {
     pageOf: "{cur} / {total}",
   },
   modManager: {
+    configureName: "配置 {name}",
+    removeName: "卸载 {name}",
+    configure: "配置",
+    removeIcon: "卸载",
     library: "模组库",
     installed: "已安装",
     catalog: "获取模组",
@@ -352,7 +357,6 @@ export const zh = {
     noMatches: "没有匹配的模组。",
     catalogError: "无法读取官方模组目录。",
     platformUnavailable: "当前平台不支持",
-    backToLibrary: "返回列表",
     manageLocal: "管理",
     officialSource: "官方签名包", localSource: "本地内容包", allPlatforms: "所有平台",
     "search": "搜索模组",
@@ -363,7 +367,6 @@ export const zh = {
 
     "local": "本地模组",
     "import": "导入文件",
-    "manage": "配置模组",
     "install": "安装模组",
     "remove": "卸载模组",
     "enabled": "已启用",
@@ -371,7 +374,6 @@ export const zh = {
     "enable": "启用模组",
     "disable": "停用模组",
     "absent": "未安装",
-    "close": "返回设置",
     "retry": "重新加载",
     "bgm": "背景音乐",
     "background": "房间背景",

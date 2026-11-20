@@ -23,7 +23,7 @@ export async function openModManager(page: Page, name: 'QQ'|'Minecraft') {
   if (!await dialog.isVisible()) {
     const library=await openModLibrary(page);
     const row = library.locator('.opt-row').filter({has:page.getByText(name, {exact:true})});
-    await row.getByRole('button', {name:'配置模组', exact:true}).click();
+    await row.getByRole('button', {name:'配置 '+name, exact:true}).click();
   }
   await expect(dialog.getByRole('button', {name:'停用模组', exact:true})).toBeVisible();
   return dialog;
