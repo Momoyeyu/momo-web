@@ -86,6 +86,9 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
   };
  },{base:baseURL!});
  await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:true}}}));
+ await page.route('**/api/computer/access',r=>r.fulfill({json:{available:true,granted:true,blocked:[]}}));
+ await page.route('**/api/computer/access/system',r=>r.fulfill({json:{screenPermission:true,inputPermission:true,applications:[]}}));
+ await page.route('**/api/computer/access/precheck',r=>r.fulfill({json:{missing:[]}}));
  let observing=false,allowed=true,desktopError='',reacting=false;let requests=0,frames=0;
  const computerStatus=()=>({observing:false,desktopAllowed:allowed,desktopAccessGranted:true,desktopError,proactive:reacting,reactions:reacting});
  await page.route('**/api/computer/settings',r=>{const data=r.request().postDataJSON();expect(data.proactive).toBe(data.reactions);reacting=data.proactive;return r.fulfill({json:computerStatus()});});
@@ -170,7 +173,7 @@ for(const lang of ['zh','en','ja'] as const)test(`desktop framing, folding, hit 
  await page.mouse.move(1,1);await sight.screenshot({path:info.outputPath('observation-off.png')});
  await expect(page.getByRole('dialog')).toHaveCount(0);
  await page.getByRole('button',{name:copy.desktop.observe,exact:true}).click();
- expect(allowed).toBe(true);expect(requests).toBe(0);
+ await expect.poll(()=>allowed).toBe(true);expect(requests).toBe(0);
  desktopError='screen-permission';
  await expect(sight).toHaveAttribute('data-observation-state','error');
  expect(await sight.locator('svg').innerHTML()).not.toBe(onShape);
