@@ -22,7 +22,7 @@ import VisionSettings from './settings/VisionSettings';
 import '../styles/settings.css';
 import '../styles/config-document.css';
 
-const chapters = ['language', 'display', 'dialogue', 'sound', 'models', 'memory', 'archive', 'desktop', 'browser', 'tools', 'mods'] as const;
+const chapters = ['language', 'dialogue', 'sound', 'models', 'memory', 'archive', 'desktop', 'browser', 'tools', 'mods'] as const;
 type Chapter = (typeof chapters)[number];
 const inset = 24;
 const canResumeMeeting = () => meetingSnapshot().state === 'active' || !!storedMeetingIdentity();
@@ -69,16 +69,20 @@ export default function Settings() {
     const smooth = !guided && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     el.scrollTo({top: section.offsetTop - inset, behavior: smooth ? 'smooth' : 'instant'});
   }
-  const action = (id: string, children: ReactNode, value?: string) =>
-    <ConfigAction label={t('config.' + id)} action={t('config.' + id + 'Action')} value={value}>{children}</ConfigAction>;
   const content: Record<Chapter, ReactNode> = {
     language: <GeneralTab section="language"/>,
-    display: <><GeneralTab section="display"/>{action('avatar', <AvatarPanel/>, state.avatars.find(a => a.id === state.avatarId)?.name)}
+    dialogue: <>
+      <GeneralTab section="display"/>
+      <ProactiveResponseToggle placement="settings"/>
       <section className="config-preview" aria-labelledby="config-dialog-preview">
         <h3 id="config-dialog-preview">{t('config.preview')}</h3>
         <GeneralTab section="preview"/>
-      </section></>,
-    dialogue: <ProactiveResponseToggle placement="settings"/>,
+      </section>
+      <ConfigAction label={t('config.avatar')} action={t('common.manage')} actionLabel={t('config.avatarAction')}
+        value={state.avatars.find(a => a.id === state.avatarId)?.name}>
+        <AvatarPanel/>
+      </ConfigAction>
+    </>,
     sound: <GeneralTab section="sound"/>,
     models: guided ? <>
       <ModelsTab section={intro.phase === 'tts' && intro.configurationValid ? 'tts' : 'llm'}/>
@@ -92,7 +96,7 @@ export default function Settings() {
       </ConfigAction>
       <BuiltinResourcesNotice/>
     </>,
-    memory: guided ? <MemoryPanel/> : action('memories', <MemoryPanel/>),
+    memory: guided ? <MemoryPanel/> : <ConfigAction label={t('config.memories')} action={t('config.memoriesAction')}><MemoryPanel/></ConfigAction>,
     archive: <DataTransfer/>,
     desktop: <DesktopSettings/>,
     browser: <NativeCompanion plugin="browser" mode="inline"/>,

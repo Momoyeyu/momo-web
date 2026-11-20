@@ -22,7 +22,7 @@ test("目录章节与正文顺序一致，最后一章可以定位到阅读线",
   await openApp(page, "settings");
   const index = page.locator(".config-index button");
   expect(await index.allTextContents()).toEqual(await page.locator(".config-scroll h2").allTextContents());
-  await expect(index).toHaveCount(11);
+  await expect(index).toHaveCount(10);
   for (const link of await index.all()) {
     await link.click();
     await expect(link).toHaveAttribute("aria-current", "location");
@@ -64,7 +64,7 @@ test("滑块拖动即时反映数值并写盘", async ({ page, request }) => {
 
 test("开关点击切换并写盘", async ({ page, request }) => {
   await openTab(page, "语言");
-  await openTab(page, "显示");
+  await openTab(page, "对话");
   const read = async () =>
     (await readState(request)).settings as { general: { showStatus: boolean } };
   const sw = fieldRow(page, "显示对话状态").locator(".switch");
@@ -138,19 +138,19 @@ test('adapter permission policy survives JSON import, metadata edit and document
   const persisted=async()=>((await readState(request)).settings as {extensions:{name:string}[]}).extensions.find(ext=>ext.name==='e2e-scoped-renamed');
   await expect.poll(persisted).toMatchObject(policy);
   await page.reload();
-  await openTab(page,'显示'); // An unrelated update sends the complete normalized state.
+  await openTab(page,'对话'); // An unrelated update sends the complete normalized state.
   const saved=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/state'&&response.request().method()==='PUT'&&response.status()===204);
   await fieldRow(page,'显示对话状态').locator('.switch').click();
   await saved;
   await expect.poll(persisted).toMatchObject(policy);
 });
 
-test("显示设置：预览默认可见并跟随对话状态开关", async ({
+test("对话设置：预览默认可见并跟随对话状态开关", async ({
   page,
 }) => {
-  await openTab(page, "显示");
+  await openTab(page, "对话");
   await expect(page.getByRole("region", {name: "对话框预览"}).locator(".dialog-box")).toBeVisible();
-  const dialogPanel = page.locator("#config-display");
+  const dialogPanel = page.locator("#config-dialogue");
   await expect(page.getByText("语义检索", {exact:true})).toHaveCount(0);
   const preview = page.locator(".dialog-preview .chat-status");
   const sw = dialogPanel.locator(".opt-row", { hasText: "显示对话状态" }).locator(".switch");

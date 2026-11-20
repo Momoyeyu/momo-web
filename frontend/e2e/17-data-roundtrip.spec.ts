@@ -33,7 +33,7 @@ async function blobs(page: import('@playwright/test').Page) {
 test('backup round-trips imported model ZIP, YAML and SQLite through actual controls', async ({page,request}, info) => {
   test.setTimeout(120_000);
   const model = await publicModelZip();
-  await openTab(page,'显示');
+  await openTab(page,'对话');
   await page.getByRole('button',{name:'管理形象'}).click();
   await page.getByRole('button',{name:'导入模型',exact:true}).click();
   await page.locator('input[type=file][accept=".zip,application/zip"]').setInputFiles({name:'public-Hiyori.zip',mimeType:'application/zip',buffer:model});

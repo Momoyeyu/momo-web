@@ -9,7 +9,6 @@ export const ja: Dict = {
     "soundCancel": "戻る",
     "soundPlay": "効果音を再生",
     "language": "言語",
-    "display": "表示",
     "sound": "サウンド",
     "models": "モデル",
     "memory": "記憶",
@@ -340,6 +339,7 @@ export const ja: Dict = {
   },
 
   common: {
+    manage: "管理",
     back: "戻る",
     backTitle: "タイトルへ戻る",
     backChat: "会話へ戻る",
@@ -363,7 +363,6 @@ export const ja: Dict = {
     noMatches: "該当する Mod はありません。",
     catalogError: "公式一覧を読み込めません。",
     platformUnavailable: "対応外の環境",
-    manageLocal: "管理",
     officialSource: "署名済み公式パッケージ", localSource: "ローカルコンテンツ", allPlatforms: "全プラットフォーム",
     "search": "Mod を検索",
     "integrity": "署名またはチェックサムが無効です。パッケージを取得し直してください。",

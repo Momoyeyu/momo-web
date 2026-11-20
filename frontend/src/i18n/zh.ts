@@ -9,7 +9,6 @@ export const zh = {
     "soundCancel": "返回上级",
     "soundPlay": "播放音效",
     "language": "语言",
-    "display": "显示",
     "sound": "声音",
     "models": "模型",
     "memory": "记忆",
@@ -342,6 +341,7 @@ export const zh = {
 
 
   common: {
+    manage: "管理",
     back: "返回",
     backTitle: "返回标题",
     backChat: "返回对话",
@@ -365,7 +365,6 @@ export const zh = {
     noMatches: "没有匹配的模组。",
     catalogError: "无法读取官方模组目录。",
     platformUnavailable: "当前平台不支持",
-    manageLocal: "管理",
     officialSource: "官方签名包", localSource: "本地内容包", allPlatforms: "所有平台",
     "search": "搜索模组",
     "integrity": "签名或校验值无效，请重新获取模组。",

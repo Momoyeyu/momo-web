@@ -4,12 +4,12 @@ import Button from '../../ui/Button';
 import FieldRow from '../../ui/FieldRow';
 import DialogBackButton from '../../ui/DialogBackButton';
 
-export default function ConfigAction({label, action, value, model, children}: {
-  label: string; action: string; value?: string; model?: 'LLM' | 'TTS'; children?: ReactNode;
+export default function ConfigAction({label, action, actionLabel, value, model, children}: {
+  label: string; action: string; actionLabel?: string; value?: string; model?: 'LLM' | 'TTS'; children?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
-  const trigger = <Button variant="ghost" className="config-action" onClick={() => setOpen(true)}>{action}</Button>;
+  const trigger = <Button variant="ghost" className="config-action" aria-label={actionLabel} onClick={() => setOpen(true)}>{action}</Button>;
   return <>
     {model ? <div className="config-model-row">
       <b>{model}</b><span>{label}</span><span className="config-value" title={value}>{value}</span>{trigger}

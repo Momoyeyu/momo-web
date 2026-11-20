@@ -9,7 +9,6 @@ export const en: Dict = {
     "soundCancel": "Go back",
     "soundPlay": "Play sound",
     "language": "Language",
-    "display": "Display",
     "sound": "Sound",
     "models": "Models",
     "memory": "Memory",
@@ -19,7 +18,7 @@ export const en: Dict = {
     "tools": "Tools",
     "mods": "Mods",
     "avatar": "Character",
-    "avatarAction": "Manage",
+    "avatarAction": "Manage avatar",
     "preview": "Dialogue preview",
     "previewAction": "Preview",
     "sampleSound": "Sound preview",
@@ -340,6 +339,7 @@ export const en: Dict = {
   },
 
   common: {
+    manage: "Manage",
     back: "Back",
     backTitle: "Back to Title",
     backChat: "Back to Chat",
@@ -363,7 +363,6 @@ export const en: Dict = {
     noMatches: "No matching mods.",
     catalogError: "Could not load the official catalog.",
     platformUnavailable: "Unsupported platform",
-    manageLocal: "Manage",
     officialSource: "Signed official package", localSource: "Local content package", allPlatforms: "All platforms",
     "search": "Search mods",
     "integrity": "Invalid signature or checksum. Get a fresh package.",
