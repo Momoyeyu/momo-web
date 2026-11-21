@@ -71,7 +71,7 @@ export default function SoundSettings({general, tts}: Pick<Settings, 'general' |
       const previewLabel = t(playing === channel.id ? 'settings.audioStop' : 'settings.audioPlay', {channel:label});
       const muteLabel = t('settings.audioMute', {channel:label});
       return <FieldRow key={channel.id} label={label} hint={channel.id === 'voice' && !voiceReady ? t('settings.voiceNeedTts') : undefined}>
-        <Slider label={label} value={muted ? 0 : volume} disabled={muted}
+        <Slider label={label} value={volume} disabled={muted}
           onChange={value => updateGeneral({[channel.volume]:value})}/>
         <IconButton icon={playing === channel.id ? 'stop' : 'play'} label={previewLabel} tip={previewLabel}
           disabled={muted || volume === 0 || (channel.id === 'voice' && !voiceReady)} onClick={() => void play(channel)}/>

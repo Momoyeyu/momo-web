@@ -15,12 +15,19 @@ for(const lang of ['zh','en','ja'])test(`environment audio controls ${lang}`,asy
  const mute=panel.locator('button[aria-pressed]');
  await expect(mute).toHaveCount(3);
  for(const button of await mute.all())await button.click();
- for(const slider of await sliders.all()){await expect(slider).toHaveValue('0');await expect(slider).toBeDisabled();}
+ for(const [index,volume] of ['71','43','29'].entries()){
+  const slider=sliders.nth(index);
+  await expect(slider).toBeDisabled();
+  await expect(slider).toHaveValue(volume);
+  await expect(slider).toHaveCSS('opacity','0.4');
+  await expect(panel.locator('.slider-val').nth(index)).toHaveText(volume+'%');
+ }
  const saved=async()=> (await(await request.get('/api/state')).json()).settings.general;
  await expect.poll(saved).toMatchObject({voiceVolume:71,sfxVolume:43,musicVolume:29,voiceMuted:true,sfxMuted:true,musicMuted:true});
  await page.screenshot({path:info.outputPath('audio-settings-muted.png')});
  await page.reload();
  await expect(mute.first()).toHaveAttribute('aria-pressed','true');
+ await expect(sliders.first()).toHaveValue('71');
  for(const button of await mute.all())await button.click();
  for(const [index,volume] of ['71','43','29'].entries()){
   await expect(sliders.nth(index)).toBeEnabled();

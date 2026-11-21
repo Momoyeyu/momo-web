@@ -109,6 +109,7 @@ for (const width of [640, 960, 1280]) {
 
       const dataRows = page.locator('#config-data > .config-card > .opt-row');
       await expect(dataRows).toHaveCount(2);
+      await expect(dataRows.first().locator('.opt-label')).toHaveText({zh:'记忆',en:'Memory',ja:'記憶'}[lang]!);
       const transferActions = dataRows.last().getByRole('button');
       await expect(transferActions).toHaveCount(2);
       const [exportTip, importTip] = {zh:['导出','导入'],en:['Export','Import'],ja:['書き出し','読み込み']}[lang]!;
