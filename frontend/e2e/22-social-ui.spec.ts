@@ -146,7 +146,10 @@ test('retired unknown operations require confirming the old executor stopped bef
   await expect.poll(()=>closedBodies.length).toBe(2);
   await expect(confirm.getByRole('alert')).toBeVisible();
   await endWait.click();
-  await expect(archive).toHaveCount(0);
+  await expect(confirm).toHaveCount(0);
+  await expect(archive.getByText('还没有执行记录。')).toBeVisible();
+  await archive.getByRole('button',{name:'返回',exact:true}).click();
+  await expect(library).toBeVisible();
   await expect(library.getByRole('button',{name:'历史待处理',exact:true})).toHaveCount(0);
   expect(closedBodies).toEqual([{commandId:'retired-unknown-command',executorStopped:true},{commandId:'retired-unknown-command',executorStopped:true},{commandId:'retired-unknown-command',executorStopped:true}]);
   await openModManager(page,'QQ');

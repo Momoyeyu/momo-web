@@ -148,10 +148,7 @@ export default function ModsPanel(){
       {filterable&&<Pager page={paging.page} pages={paging.pages} onChange={setPage}/>}
       {!selection&&error&&<p role="alert">{code(error)} {button('retry',()=>{setError('');void load();})}</p>}
     </Modal>}
-    {history && <RetiredSocialRecords records={retired} onClose={() => setHistory(false)} onChanged={records => {
-      setRetired(records);
-      if (!records.length) setHistory(false);
-    }}/>}
+    {history && <RetiredSocialRecords records={retired} onClose={() => setHistory(false)} onChanged={setRetired}/>}
     {selection?.mode === 'remove' && <Confirm title={code('remove')} subject={name}
       message={code('removeHint')} error={error ? code(error) : undefined} danger busy={busy}
       confirmLabel={code('remove')} onCancel={() => open(null)}

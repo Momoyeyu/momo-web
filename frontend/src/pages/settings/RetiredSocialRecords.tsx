@@ -53,7 +53,7 @@ export default function RetiredSocialRecords({records, onChanged, onClose}: {
         <DialogBackButton onClick={onClose} disabled={pending}/>
         <h2>{t('social.retiredLibrary')}</h2>
       </header>
-      <p className="social-help muted">{t('social.retiredHint')}</p>
+      <p className="social-help muted">{t(records.length ? 'social.retiredHint' : 'social.noRecords')}</p>
       {records.map(record => <article className="social-record" key={record.commandId}>
         <div className="social-record-top">
           <strong>{t('social.retiredSource')}</strong><span>{t('social.delivery.unknown')}</span>

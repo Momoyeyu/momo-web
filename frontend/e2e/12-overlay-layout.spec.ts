@@ -38,7 +38,7 @@ test('explanatory tooltips stay inside the stage and dismiss on scroll', async (
 
 test('settings overlays and resource controls remain reachable in a small window', async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 450 });
-  await page.getByRole('button', { name: '记忆', exact: true }).click();
+  await page.getByRole('button', {name:'数据',exact:true}).click();
   await page.getByRole('button', {name:'查看记忆'}).click();
   await page.locator('.mem-panel .list-item').first().click();
   await insideStage(page.getByRole('dialog').last());
@@ -51,7 +51,7 @@ test('settings overlays and resource controls remain reachable in a small window
   await insideStage(page.getByRole('dialog').last());
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '工具', exact: true }).click();
+  await page.getByRole('button', {name:'定制',exact:true}).click();
   await page.locator('.ext-panel .mcp-heading .icon-btn').click();
   await insideStage(page.getByRole('dialog').last());
   const mcp = page.getByRole('dialog').last();
@@ -74,8 +74,7 @@ test('settings overlays and resource controls remain reachable in a small window
   await expect(page.getByRole('dialog').last()).toBeVisible();
   await expect(page.getByRole('listbox')).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '显示', exact: true }).click();
+
   await page.getByRole('button', { name: '管理形象' }).click();
   await page.locator('.config-modal .list-toolbar .icon-btn').click();
   await insideStage(page.getByRole('dialog').last());
@@ -95,5 +94,5 @@ test('settings overlays and resource controls remain reachable in a small window
   const last=await dialog.locator('.avatar-res-row').last().boundingBox();
   const clip=await scroll.boundingBox();
   expect(last!.y+last!.height).toBeLessThanOrEqual(clip!.y+clip!.height+1);
-  await expect(dialog.getByRole('button', { name: '关闭', exact: true })).toBeInViewport();
+  await expect(dialog.getByRole('button', {name:'返回',exact:true})).toBeInViewport();
 });

@@ -263,7 +263,7 @@ test("设置弹窗：点模型卡片弹出「表情与动作」，并可按名�
   await expect(desc).toHaveValue("e2e-描述");
   await desc.fill(before); // 还原
 
-  await page.locator(".modal-foot").getByRole("button",{name:"返回",exact:true}).click();
+  await page.locator(".avatar-res-modal .settings-dialog-heading").getByRole("button",{name:"返回",exact:true}).click();
   await expect(page.locator(".modal-box:not(.config-modal)")).toBeHidden();
 });
 
