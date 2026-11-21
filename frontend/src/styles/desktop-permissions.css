@@ -1,20 +1,7 @@
-#config-desktop > .config-card {
-  padding: 0;
-  background: transparent;
-  border: 0;
-}
 .desktop-config {container-type: inline-size;}
-.desktop-config-groups {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-}
 .desktop-config-group {
   min-width: 0;
-  padding: 12px 22px;
-  background: rgba(var(--panel-rgb), .96);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  padding-block: 10px;
 }
 .desktop-config-group h3 {
   margin: 0 0 4px;
@@ -30,11 +17,10 @@
 .desktop-config-group > .opt-row + .opt-row {border-top: 1px solid var(--line-soft);}
 .desktop-config .desktop-config-group > .opt-row > .opt-ctl {justify-content: flex-end;}
 .desktop-config-status {position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);}
-@container (max-width: 820px) {
-  .desktop-config-group {padding-inline: 12px;}
-}
 @container (max-width: 570px) {
-  .desktop-config-groups {grid-template-columns: 1fr; gap: 12px;}
+  .config-split.desktop-config-groups {grid-template-columns: 1fr;}
+  .desktop-config-groups::before {display: none;}
+  .desktop-config-group + .desktop-config-group {border-block-start: 1px solid var(--line-soft);}
 }
 
 .desktop-permission-action {
@@ -51,6 +37,7 @@
   border-color: var(--line-soft);
   opacity: 1;
 }
+.desktop-config .desktop-permission-action {width: var(--action-width); padding-inline: 6px;}
 .desktop-permission-modal {
   box-sizing: border-box;
   width: min(500px, 92cqw);

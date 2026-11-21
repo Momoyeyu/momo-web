@@ -44,3 +44,39 @@ test('sound controls remain paired and model details occupy two full rows',async
   })).toBe(true);
  }
 });
+
+test('sound and desktop share an inset divider and one card border', async ({page}) => {
+ await page.setViewportSize({width:1280,height:720});
+ await openApp(page,'settings');
+ for (const section of ['sound','desktop']) {
+  const card = page.locator('#config-'+section+' > .config-card');
+  await expect(card).toHaveCSS('border-top-width','1px');
+  const split = card.locator('.config-split');
+  await expect(split).toHaveCount(1, {timeout:2000});
+  const line = await split.evaluate(el => {
+   const style = getComputedStyle(el,'::before');
+   return {content:style.content, width:style.width, start:style.insetInlineStart,
+    center:el.clientWidth / 2, pointerEvents:style.pointerEvents};
+  });
+  expect(line.content).toBe('""');
+  expect(line.width).toBe('1px');
+  expect(parseFloat(line.start)).toBeCloseTo(line.center,0);
+  expect(line.pointerEvents).toBe('none');
+ }
+ const desktop = page.locator('#config-desktop .desktop-config-group');
+ await expect(desktop.first()).toHaveCSS('border-top-width','0px');
+ await expect(desktop.last()).toHaveCSS('border-top-width','0px');
+ const [left, right] = await Promise.all([desktop.first().boundingBox(),desktop.last().boundingBox()]);
+ expect(left!.y).toBeCloseTo(right!.y,0);
+ expect(left!.width).toBeCloseTo(right!.width,0);
+ const soundRows = page.locator('#config-sound .sound-pair');
+ await expect(soundRows.nth(1)).toHaveCSS('border-top-width','0px');
+ for (const row of await soundRows.nth(1).locator('.opt-row').all()) {
+  await expect(row).toHaveCSS('border-top-width','1px');
+ }
+ await page.setViewportSize({width:640,height:360});
+ const [first, second] = await Promise.all([desktop.first().boundingBox(),desktop.last().boundingBox()]);
+ expect(first!.x).toBeCloseTo(second!.x,0);
+ expect(first!.y + first!.height).toBeLessThanOrEqual(second!.y);
+ await expect(desktop.last()).toHaveCSS('border-top-width','1px');
+});

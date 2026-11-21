@@ -59,7 +59,7 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
   );
   const voiceReady = ttsConfigured(settings.tts);
   const voiceOn = voiceReady && !general.voiceMuted;
-  return <div className="sound-pairs">
+  return <div className="config-split">
     <div className="sound-pair">
       <FieldRow label={t('settings.voiceInput')}><Switch title={t('settings.voiceInput')} on={general.voiceInput} onChange={voiceInput => {
         patch({voiceInput});

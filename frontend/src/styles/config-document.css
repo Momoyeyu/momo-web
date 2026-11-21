@@ -36,11 +36,21 @@
 .config-card > .opt-row:not(:first-child) {border-top: 1px solid var(--line-soft);}
 .config-card .opt-label {width: auto; white-space: normal;}
 .config-card .opt-ctl {justify-content: flex-start;}
-.sound-pairs, .language-pair {container-type: inline-size;}
-.sound-pair, .language-pair {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px;}
+#config-sound > .config-card, .language-pair {container-type: inline-size;}
+.config-split, .language-pair {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));}
+.config-split {position: relative; column-gap: clamp(18px, 4cqw, 32px);}
+.config-split::before {
+  content: "";
+  position: absolute;
+  inset-block: 10px;
+  inset-inline-start: 50%;
+  width: 1px;
+  background: var(--line-soft);
+  pointer-events: none;
+}
 .language-pair {--select-width: 144px; gap: clamp(16px, 2.5cqw, 32px);}
-.sound-pair {--select-width: 168px;}
-.sound-pair + .sound-pair {border-top: 1px solid var(--line-soft);}
+.sound-pair {--select-width: 168px; display: grid; grid-column: 1 / -1; grid-template-columns: subgrid;}
+.sound-pair + .sound-pair > .opt-row {border-top: 1px solid var(--line-soft);}
 .config-card :is(.sound-pair, .language-pair) .opt-row {grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 10px; min-height: 48px;}
 .config-card .sound-pair .config-action {
   width: min(100%, var(--select-width));
@@ -53,7 +63,6 @@
 .config-model-row b {color: var(--accent); font: 600 14px ui-monospace, monospace;}
 .config-model-row .config-value {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 @container (max-width: 660px) {
-  .sound-pair {gap: 18px;}
   .config-card :is(.sound-pair, .language-pair) .opt-row {display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 4px; min-height: 70px;}
   :is(.sound-pair, .language-pair) .opt-ctl {flex: none;}
   .language-pair .opt-ctl {justify-content: flex-start;}
