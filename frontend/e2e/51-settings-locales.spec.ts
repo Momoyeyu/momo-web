@@ -126,7 +126,7 @@ for (const width of [640, 960, 1280]) {
         '#config-operations .opt-ctl > .icon-btn',
         '#config-sound .opt-ctl > button:not(.sel-face, [role="switch"])',
       ].join(', '));
-      await expect(actions).toHaveCount(7);
+      await expect(actions).toHaveCount(12);
       expect(await actions.evaluateAll(buttons => buttons.filter(button => {
         const bounds = button.getBoundingClientRect();
         const row = button.closest('.opt-row, .config-model-row')!.getBoundingClientRect();

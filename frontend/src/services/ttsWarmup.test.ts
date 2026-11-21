@@ -6,7 +6,7 @@ const { settings } = vi.hoisted(() => ({ settings: {
   general: { lang: "en", chatLang: "auto", voiceVolume: 80 },
   tts: { url: "http://voice", key: "", voice: "ref.wav", prompt: "" },
 } }));
-vi.mock("../lib/store", () => ({ getState: () => ({ settings }), getSettings: () => settings, flushPendingState: async () => {} }));
+vi.mock("../lib/store", () => ({ getState: () => ({ settings }), getSettings: () => settings, flushPendingState: async () => {}, subscribe: () => () => {} }));
 vi.mock("../lib/asr", () => ({ ttsConfigured: () => true }));
 vi.mock("./ttsClient", () => ({ streamSpeech: vi.fn() }));
 afterEach(() => { invalidateWarmup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });

@@ -55,9 +55,6 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   const preferences=useSyncExternalStore(subscribe, getState).settings.general;
   const name = speakerName();
   const showStatus = getState().settings.general.showStatus;
-  // 内置语音输入与设置页「通用」共用同一个开关。
-  const micAllowed =
-    getState().settings.general.voiceInput;
   const ttsReady = ttsConfigured(getState().settings.tts);
   const [status, setStatus] = useState<ChatStatus>(getChatEngine().status);
   const [micOn, setMicOn] = useState(getChatEngine().listening);
@@ -258,15 +255,8 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
               variant={micOn ? "solid" : "ghost"}
               className={`mic-btn${micOn ? " mic-on" : ""}`}
               onClick={toggleMic}
-              disabled={!micAllowed}
               aria-label={t("chat.mic")}
-              title={
-                !micAllowed
-                  ? t("chat.micNeedCfg")
-                  : micOn
-                    ? t("chat.micTitleOn")
-                    : t("chat.micTitleOff")
-              }
+              title={t(micOn ? "chat.micTitleOn" : "chat.micTitleOff")}
             >
               <Icon name="mic" />
             </Button>
@@ -286,7 +276,7 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
 
       </DialogDrawer>
 
-      <DesktopPetControls closeUp={closeUp} onFrame={toggleFrame} collapsed={petCollapsed} onDialog={()=>updateGeneral({petDialogCollapsed:!petCollapsed})} micOn={micOn} micAllowed={micAllowed} onMic={toggleMic}/>
+      <DesktopPetControls closeUp={closeUp} onFrame={toggleFrame} collapsed={petCollapsed} onDialog={()=>updateGeneral({petDialogCollapsed:!petCollapsed})} micOn={micOn} onMic={toggleMic}/>
       {/* 固定右侧竖轨，与对话框及手机的显隐独立。 */}
       <div className="chat-toolbar">
         <div className="tb-side">

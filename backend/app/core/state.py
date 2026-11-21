@@ -54,6 +54,8 @@ DEFAULT_STATE: dict[str, Any] = {
             "voiceVolume": 100,
             "sfxVolume": 35,
             "musicVolume": 22,
+            "sfxMuted": False,
+            "musicMuted": False,
             "soundPalette": "warm",
             "showStatus": True,
             "voiceInput": True,

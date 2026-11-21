@@ -43,6 +43,8 @@ const DEFAULT_SETTINGS: Settings = {
     voiceVolume: 100,
     sfxVolume: 35,
     musicVolume: 22,
+    sfxMuted: false,
+    musicMuted: false,
     soundPalette: "warm",
     showStatus: true,
     voiceInput: true,

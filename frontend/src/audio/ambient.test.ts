@@ -18,6 +18,16 @@ beforeEach(()=>{
 });
 afterEach(()=>vi.unstubAllGlobals());
 describe('ambient audio',()=>{
+ it('applies independent mute flags while retaining channel levels',async()=>{
+  const a=new AmbientAudio();await a.unlock();await tick();
+  a.configure({musicVolume:47,sfxVolume:63,musicMuted:true,sfxMuted:true});
+  expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(0,0,.18/3);
+  expect(gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(0,0,.18/3);
+  a.sound('confirm');expect(sources.filter(s=>!s.loop)).toHaveLength(0);
+  a.configure({musicVolume:47,sfxVolume:63});await tick();
+  expect(gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(.47,0,.18/3);
+  expect(gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(.63,0,.18/3);
+ });
  it('does not queue pre-gesture sound and starts only one loop',async()=>{
   const a=new AmbientAudio();a.sound('confirm');expect(sources).toHaveLength(0);await a.unlock();await tick();
   expect(sources.filter(s=>s.loop)).toHaveLength(1);a.scene('title');a.configure({musicVolume:22});await tick();expect(sources.filter(s=>s.loop)).toHaveLength(1);

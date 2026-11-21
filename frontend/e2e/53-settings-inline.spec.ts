@@ -1,8 +1,14 @@
 import {openModLibrary} from './mod-fixtures';
 import {expect, test} from './fixtures';
-import {openTab, pickSelect} from './helpers';
+import {openTab} from './helpers';
 
-test('sound preview offers the existing palette and plays the selected action inline', async ({page}) => {
+test('all three previews play through the inline controls', async ({page,request}) => {
+  const state = await (await request.get('/api/state')).json();
+  Object.assign(state.settings.tts,{url:'http://tts.test',voice:'ref.wav'});
+  await request.put('/api/state',{data:state});
+  await page.route('**/api/tts/speech', route => route.fulfill({
+    contentType:'audio/pcm', headers:{'X-Sample-Rate':'32000'}, body:Buffer.alloc(6400),
+  }));
   await page.addInitScript(() => {
     const start = AudioBufferSourceNode.prototype.start;
     AudioBufferSourceNode.prototype.start = function (...args) {
@@ -14,14 +20,13 @@ test('sound preview offers the existing palette and plays the selected action in
   });
   await openTab(page, '声音');
   const sound = page.locator('#config-sound');
-  await expect(sound.getByRole('button', {name:'音效风格'})).toHaveCount(1);
-  await pickSelect(page, '试听动作', '确认操作', '#config-sound');
-  await expect(sound.getByRole('button', {name:'播放音效', exact:true})).toBeEnabled();
-  // Begin watching after the select’s own UI sound has started.
+  await expect(sound.locator('.sel-face')).toHaveCount(0);
   const played = async () => Number(await page.locator('html').getAttribute('data-sound-starts') || 0);
-  const previous = await played();
-  await sound.getByRole('button', {name:'播放音效', exact:true}).click();
-  await expect.poll(played).toBeGreaterThan(previous);
+  for (const name of ['试听语音','试听音效','试听音乐']) {
+    const before = await played();
+    await sound.getByRole('button', {name, exact:true}).click();
+    await expect.poll(played).toBeGreaterThan(before);
+  }
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
@@ -46,7 +51,7 @@ test('vision verification gates the LLM switch and built-in ASR has no settings 
   await expect(models.locator('.config-model-row b')).toHaveText(['LLM', 'TTS']);
   await expect(page.locator('.config-document')).not.toContainText(/ASR|SenseVoice|内置语音资源不可用/);
   await openTab(page, '声音');
-  await expect(page.locator('#config-sound').getByRole('switch', {name:'语音输入'})).toBeVisible();
+  await expect(page.locator('#config-sound').getByRole('switch')).toHaveCount(0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 

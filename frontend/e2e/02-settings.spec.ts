@@ -42,16 +42,8 @@ test("界面语言即时生效，且写回后端", async ({ page, request }) => 
 });
 
 test("滑块拖动即时反映数值并写盘", async ({ page, request }) => {
-  // 音量滑杆受 TTS 可用性门控：先配好 url 与参考音频，否则它是禁用的
-  const st = await readState(request);
-  const tts = (st.settings as { tts: { url: string; voice: string } }).tts;
-  tts.url = "http://tts.test";
-  tts.voice = "ref.wav";
-  await writeState(request, st);
-  await page.reload();
-  await openTab(page, "语言");
   await openTab(page, "声音");
-  const field = fieldRow(page, "语音音量");
+  const field = fieldRow(page, "语音");
   await field.locator("input.ux-range").fill("42");
   await expect(field.locator(".slider-val")).toHaveText("42%");
   await waitSaved(page);

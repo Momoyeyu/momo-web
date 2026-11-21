@@ -60,6 +60,8 @@ export interface GeneralConfig {
   voiceVolume: number;
   sfxVolume?: number;
   musicVolume?: number;
+  sfxMuted?: boolean;
+  musicMuted?: boolean;
   soundPalette?: "warm"|"glass";
   /** chat 页左上角是否显示对话状态条（空闲/聆听/思考/回应）。 */
   showStatus: boolean;

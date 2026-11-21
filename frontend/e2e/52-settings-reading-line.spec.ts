@@ -16,26 +16,17 @@ test('settings directory selects the last chapter at the scroll limit',async({pa
  }
 });
 
-test('sound controls remain paired and model details occupy two full rows',async({page})=>{
+test('sound controls align in three full rows and model details occupy two full rows',async({page})=>{
  await page.route('**/api/intro',route=>route.fulfill({json:{phase:'completed',configurationValid:true}}));
  await openApp(page,'settings');
  for(const [width,height] of [[1280,720],[960,540],[1280,360]]){
   await page.setViewportSize({width,height});
-  const pairs=page.locator('#config-sound .sound-pair');
-  await expect(pairs).toHaveCount(4);
-  for(const pair of await pairs.all()){
-   expect(await pair.locator('.opt-row').evaluateAll(nodes=>{
-    const [a,b]=nodes.map(el=>el.getBoundingClientRect());
-    return a.right<=b.left && Math.abs(a.top-b.top)<1;
-   })).toBe(true);
-  }
-  const preview=await page.locator('#config-sound .icon-btn').boundingBox();
-  expect(preview!.width).toBe(34);
-  for(const select of await page.locator('#config-sound .sel-face').all()){
-   const box=(await select.boundingBox())!;
-   expect(box.width).toBeLessThanOrEqual(168);
-   expect(box.x + box.width).toBeCloseTo(preview!.x + preview!.width,0);
-  }
+  const sound=page.locator('#config-sound .opt-row');
+  await expect(sound).toHaveCount(3);
+  const actionEdges=await sound.evaluateAll(rows=>rows.map(row=>[...row.querySelectorAll('.icon-btn')].map(button=>button.getBoundingClientRect().right)));
+  expect(actionEdges[0]).toHaveLength(2);
+  expect(actionEdges[1]).toEqual(actionEdges[0]);
+  expect(actionEdges[2]).toEqual(actionEdges[0]);
   const rows=page.locator('#config-models .config-model-row');
   await expect(rows.locator('b')).toHaveText(['LLM','TTS']);
   expect(await rows.evaluateAll(nodes=>{
@@ -45,10 +36,10 @@ test('sound controls remain paired and model details occupy two full rows',async
  }
 });
 
-test('sound and desktop share an inset divider and one card border', async ({page}) => {
+test('customize and operations share an inset divider and one card border', async ({page}) => {
  await page.setViewportSize({width:1280,height:720});
  await openApp(page,'settings');
- for (const section of ['sound','operations']) {
+ for (const section of ['customize','operations']) {
   const card = page.locator('#config-'+section+' > .config-card');
   await expect(card).toHaveCSS('border-top-width','1px');
   const split = card.locator('.config-split').first();
@@ -69,11 +60,6 @@ test('sound and desktop share an inset divider and one card border', async ({pag
  const [left, right] = await Promise.all([desktop.first().boundingBox(),desktop.last().boundingBox()]);
  expect(left!.y).toBeCloseTo(right!.y,0);
  expect(left!.width).toBeCloseTo(right!.width,0);
- const soundRows = page.locator('#config-sound .sound-pair');
- await expect(soundRows.nth(1)).toHaveCSS('border-top-width','0px');
- for (const row of await soundRows.nth(1).locator('.opt-row').all()) {
-  await expect(row).toHaveCSS('border-top-width','1px');
- }
  await page.setViewportSize({width:640,height:360});
  const [first, second] = await Promise.all([desktop.first().boundingBox(),desktop.last().boundingBox()]);
  expect(first!.x).toBeCloseTo(second!.x,0);

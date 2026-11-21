@@ -3,10 +3,11 @@ import {runtimeFetch} from '../services/runtime';
 export type Sound = 'tap'|'confirm'|'cancel'|'on'|'off'|'phone-in'|'phone-out'|'boot'|'home'|'complete'|'notify';
 export type Music = 'title'|'connection'|'daily'|'night'|'uplift'|'comfort';
 const tempo:Record<Music,number>={title:76,connection:76,daily:84,night:64,uplift:96,comfort:68};
-type Config = {sfxVolume?:number;musicVolume?:number;soundPalette?:'warm'|'glass'};
+type Config = {sfxVolume?:number;musicVolume?:number;sfxMuted?:boolean;musicMuted?:boolean};
 export class AmbientAudio {
  private ctx:AudioContext|null=null;
  private musicBus:GainNode|null=null;
+ private backgroundBus:GainNode|null=null;
  private sfxBus:GainNode|null=null;
  private cache=new Map<string,AudioBuffer>();
  private loads=new Map<string,Promise<AudioBuffer>>();
@@ -26,10 +27,12 @@ export class AmbientAudio {
  private owned=false;
  private lockPending=false;
  private release:(()=>void)|null=null;
- configure(config:Config){this.config=config;this.mix();if((config.musicVolume??22)===0){this.revision++;this.stopMusic();}else void this.syncMusic();}
+ configure(config:Config){this.config=config;this.mix();if(!this.musicLevel()){this.revision++;this.stopMusic();}else void this.syncMusic();}
  private level(value:number|undefined,fallback:number){return Math.min(100,Math.max(0,Number.isFinite(value)?value!:fallback))/100;}
+ private musicLevel(){return this.config.musicMuted ? 0 : this.level(this.config.musicVolume,22);}
+ private effectsLevel(){return this.config.sfxMuted ? 0 : this.level(this.config.sfxVolume,35);}
  private ramp(node:GainNode|null,value:number,time=.18){if(!node||!this.ctx)return;node.gain.cancelScheduledValues(this.ctx.currentTime);node.gain.setTargetAtTime(value,this.ctx.currentTime,time/3);}
- private mix(){const mic=this.mics.size>0;const voice=this.voices.size>0;this.ramp(this.sfxBus,mic?0:this.level(this.config.sfxVolume,35)*(voice?.4:1));this.ramp(this.musicBus,mic?0:this.level(this.config.musicVolume,22)*(voice?.25:1));}
+ private mix(){const mic=this.mics.size>0;const voice=this.voices.size>0;this.ramp(this.sfxBus,mic?0:this.effectsLevel()*(voice?.4:1));this.ramp(this.musicBus,mic?0:this.musicLevel()*(voice?.25:1));}
  speech(key:object,active:boolean){
   if(active){clearTimeout(this.voiceRelease.get(key));this.voiceRelease.delete(key);this.voices.add(key);this.mix();}
   else if(this.voices.has(key)&&!this.voiceRelease.has(key))this.voiceRelease.set(key,setTimeout(()=>{this.voiceRelease.delete(key);this.voices.delete(key);this.mix();},350));
@@ -76,7 +79,7 @@ export class AmbientAudio {
  }
  async unlock(){
   try{
-   if(!this.ctx){this.ctx=new AudioContext();this.musicBus=this.ctx.createGain();this.sfxBus=this.ctx.createGain();this.musicBus.connect(this.ctx.destination);this.sfxBus.connect(this.ctx.destination);this.mix();}
+   if(!this.ctx){this.ctx=new AudioContext();this.musicBus=this.ctx.createGain();this.sfxBus=this.ctx.createGain();this.backgroundBus=this.ctx.createGain();this.backgroundBus.connect(this.musicBus);this.musicBus.connect(this.ctx.destination);this.sfxBus.connect(this.ctx.destination);this.mix();}
    if(document.hidden||!document.hasFocus())return;
    if(!this.owned&&!this.lockPending){
     if(navigator.locks){this.lockPending=true;void navigator.locks.request('momo-environment-audio',{ifAvailable:true},async lock=>{this.lockPending=false;if(!lock||document.hidden||!document.hasFocus())return;this.owned=true;const held=new Promise<void>(resolve=>{this.release=resolve;});try{await this.ctx?.resume();if(!this.owned||document.hidden||!document.hasFocus()){this.release?.();await this.ctx?.suspend();}else void this.syncMusic();await held;}finally{this.owned=false;this.release=null;}}).catch(()=>{this.lockPending=false;});}
@@ -84,22 +87,49 @@ export class AmbientAudio {
    }
    if(this.owned){await this.ctx.resume();void this.syncMusic();}
    // Preload only common UI sounds. A missing sound is skipped, never queued.
-   for(const id of ['tap','confirm','cancel','on','off','phone-in','phone-out','boot','home','complete','notify'])void this.load(`${this.config.soundPalette??'warm'}-${id}`).catch(()=>{});
+   for(const id of ['tap','confirm','cancel','on','off','phone-in','phone-out','boot','home','complete','notify'])void this.load(`warm-${id}`).catch(()=>{});
   }catch{/* Autoplay denial never blocks interaction. */}
  }
  sound(id:Sound){
-  const ctx=this.ctx;const now=performance.now();if(!ctx||ctx.state!=='running'||!this.owned||this.mics.size||!this.level(this.config.sfxVolume,35)||this.effects.size>=4||now-(this.cooldown.get(id)??-Infinity)<90)return;
+  const ctx=this.ctx;const now=performance.now();if(!ctx||ctx.state!=='running'||!this.owned||this.mics.size||!this.effectsLevel()||this.effects.size>=4||now-(this.cooldown.get(id)??-Infinity)<90)return;
   if(id==='tap'&&now-this.lastSound<50)return;
-  const name=`${this.config.soundPalette??'warm'}-${id}`;const buffer=this.cache.get(name);
+  const name=`warm-${id}`;const buffer=this.cache.get(name);
   if(!buffer){void this.load(name).catch(()=>{});return;}
   this.cooldown.set(id,now);this.lastSound=now;const source=ctx.createBufferSource();source.buffer=buffer;source.connect(this.sfxBus!);this.effects.add(source);source.onended=()=>{source.disconnect();this.effects.delete(source);};source.start();
  }
+ /** A short sample through the same mixer buses as normal playback. */
+ async preview(channel:'sfx'|'music',signal:AbortSignal){
+  await this.unlock();
+  signal.throwIfAborted();
+  const ctx=this.ctx;
+  const music=channel==='music';
+  const buffer=await this.load(music ? this.desired : 'warm-tap');
+  signal.throwIfAborted();
+  if(!ctx||ctx.state!=='running'||!this.owned||!(music?this.musicLevel():this.effectsLevel()))return;
+  const source=ctx.createBufferSource();
+  source.buffer=buffer;
+  source.connect(music?this.musicBus!:this.sfxBus!);
+  if(music)this.ramp(this.backgroundBus,0,.05);
+  await new Promise<void>(resolve=>{
+   const finish=()=>{
+    signal.removeEventListener('abort',abort);
+    source.onended=null;
+    source.disconnect();
+    if(music)this.ramp(this.backgroundBus,1);
+    resolve();
+   };
+   const abort=()=>{source.stop();finish();};
+   source.onended=finish;
+   signal.addEventListener('abort',abort,{once:true});
+   source.start(0,0,music?Math.min(buffer.duration,4):buffer.duration);
+  });
+ }
  private async syncMusic(){
-  const ctx=this.ctx;if(!ctx||ctx.state!=='running'||!this.owned||!this.level(this.config.musicVolume,22)||this.music?.id===this.desired)return;
+  const ctx=this.ctx;if(!ctx||ctx.state!=='running'||!this.owned||!this.musicLevel()||this.music?.id===this.desired)return;
   const revision=this.revision;const id=this.desired;
-  try{const buffer=await this.load(id);if(revision!==this.revision||!this.owned||ctx.state!=='running'||!this.level(this.config.musicVolume,22)||this.music?.id===id)return;
+  try{const buffer=await this.load(id);if(revision!==this.revision||!this.owned||ctx.state!=='running'||!this.musicLevel()||this.music?.id===id)return;
    const source=ctx.createBufferSource();source.buffer=buffer;source.loop=true;source.loopStart=0;source.loopEnd=buffer.duration;
-   const gain=ctx.createGain();gain.gain.value=0;source.connect(gain);gain.connect(this.musicBus!);
+   const gain=ctx.createGain();gain.gain.value=0;source.connect(gain);gain.connect(this.backgroundBus!);
    const previous=this.music;
    const bar=previous?240/tempo[previous.id]:0;
    const untilBar=previous?(bar-((ctx.currentTime-previous.started)%bar))%bar:0;

@@ -66,6 +66,9 @@ class GeneralSettings(TypedDict):
     voiceVolume: int
     sfxVolume: NotRequired[int]
     musicVolume: NotRequired[int]
+    voiceMuted: NotRequired[bool]
+    sfxMuted: NotRequired[bool]
+    musicMuted: NotRequired[bool]
     soundPalette: NotRequired[Literal["warm", "glass"]]
     showStatus: bool
     voiceInput: bool

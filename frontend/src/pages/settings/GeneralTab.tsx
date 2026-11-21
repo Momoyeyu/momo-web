@@ -1,10 +1,6 @@
-import {useState, useSyncExternalStore} from 'react';
-import {ambient} from '../../audio/ambient';
-import IconButton from '../../ui/IconButton';
+import {useSyncExternalStore} from 'react';
 import ProactiveResponseToggle from '../../components/ProactiveResponseToggle';
-import {getChatEngine} from '../../chat/engineInstance';
 import {LANGS, resolveChatLang, tFor, useT} from '../../i18n';
-import {ttsConfigured} from '../../lib/asr';
 import {getState, speakerName, subscribe, update} from '../../lib/store';
 import type {GeneralConfig, Lang} from '../../lib/types';
 import {useIntro} from '../../services/introClient';
@@ -13,11 +9,11 @@ import Select from '../../ui/Select';
 import Slider from '../../ui/Slider';
 import Switch from '../../ui/Switch';
 import DialogPreview from './DialogPreview';
+import SoundSettings from './SoundSettings';
 
 export default function GeneralTab({section}: {section: 'language' | 'sound' | 'display' | 'preview'}) {
   const t = useT();
   const intro = useIntro();
-  const [sample, setSample] = useState<'tap' | 'confirm' | 'cancel'>('tap');
   const guided = !!intro.data && intro.data.phase !== 'completed';
   const {settings} = useSyncExternalStore(subscribe, getState);
   const general = settings.general;
@@ -42,9 +38,9 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
     return <DialogPreview lang={lang} name={speakerName()} sample={tFor(lang, 'settings.previewSample')}
       opacity={general.dialogOpacity} textSpeed={general.textSpeed} sentenceSpeed={general.sentenceSpeed} showStatus={general.showStatus}/>;
   }
-  const slider = (key: 'dialogOpacity' | 'textSpeed' | 'sentenceSpeed' | 'voiceVolume' | 'sfxVolume' | 'musicVolume', disabled = false) => {
+  const slider = (key: 'dialogOpacity' | 'textSpeed' | 'sentenceSpeed') => {
     const label = t('settings.' + key);
-    return <FieldRow label={label}><Slider label={label} value={general[key] ?? (key === 'sfxVolume' ? 35 : 22)} disabled={disabled} onChange={v => patch({[key]: v})}/></FieldRow>;
+    return <FieldRow label={label}><Slider label={label} value={general[key]} onChange={v => patch({[key]: v})}/></FieldRow>;
   };
   if (section === 'display') return <>
     {slider('dialogOpacity')}{slider('textSpeed')}{slider('sentenceSpeed')}
@@ -56,38 +52,5 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
     </div>
   </>;
 
-  const palette = (
-    <FieldRow label={t('settings.soundPalette')}>
-      <Select label={t('settings.soundPalette')} value={general.soundPalette ?? 'warm'} options={[
-        {value: 'warm', label: t('settings.soundWarm')}, {value: 'glass', label: t('settings.soundGlass')},
-      ]} onChange={v => patch({soundPalette: v as GeneralConfig['soundPalette']})}/>
-    </FieldRow>
-  );
-  const voiceReady = ttsConfigured(settings.tts);
-  const voiceOn = voiceReady && !general.voiceMuted;
-  const playSound = t('config.soundPlay');
-  return <div className="config-split">
-    <div className="sound-pair">
-      <FieldRow label={t('settings.voiceInput')}><Switch title={t('settings.voiceInput')} on={general.voiceInput} onChange={voiceInput => {
-        patch({voiceInput});
-        if (!voiceInput) getChatEngine().stopListening();
-      }}/></FieldRow>
-      <FieldRow label={t('settings.voiceOut')} hint={!voiceReady ? t('settings.voiceNeedTts') : undefined}>
-        <Switch title={t('settings.voiceOut')} on={voiceOn} disabled={!voiceReady} onChange={v => getChatEngine().setMuted(!v)}/>
-      </FieldRow>
-    </div>
-    <div className="sound-pair">{slider('voiceVolume', !voiceOn)}{palette}</div>
-    <div className="sound-pair">{slider('sfxVolume')}
-      <FieldRow label={t('config.soundAction')}>
-        <Select label={t('config.soundAction')} value={sample} options={[
-          {value:'tap', label:t('config.soundTap')}, {value:'confirm', label:t('config.soundConfirm')}, {value:'cancel', label:t('config.soundCancel')},
-        ]} onChange={v => setSample(v as typeof sample)}/>
-      </FieldRow>
-    </div>
-    <div className="sound-pair">{slider('musicVolume')}
-      <FieldRow label={t('config.sampleSound')}>
-        <IconButton icon="play" label={playSound} tip={playSound} disabled={general.sfxVolume === 0} onClick={() => ambient.sound(sample)}/>
-      </FieldRow>
-    </div>
-  </div>;
+  return <SoundSettings general={general} tts={settings.tts}/>;
 }

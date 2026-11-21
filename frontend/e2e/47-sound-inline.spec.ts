@@ -7,10 +7,8 @@ for(const lang of ['zh','en','ja'])test(`sound preview is available from the sou
  await page.goto('/#/settings');
  await page.locator('[data-intro=tab-sound]').click();
  const preview=page.locator('#config-sound');
- await expect(preview.locator('.sel-face')).toHaveCount(2);
- await preview.locator('.sel-face').last().click();
- await preview.getByRole('option').nth(1).click();
- const play=preview.locator('button.icon-btn');
+ await expect(preview.locator('.sel-face')).toHaveCount(0);
+ const play=preview.locator('.opt-row').nth(1).locator('button.icon-btn').first();
  await expect(play).toBeEnabled();
  await play.click();
  await expect(page.getByRole('dialog')).toHaveCount(0);

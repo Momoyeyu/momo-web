@@ -446,12 +446,6 @@ export class ChatEngine {
   async startListening(): Promise<void> {
     if (this.disposed || this.micOn || this.micStarting) return;
     this.micIntended = true;
-    const cfg = getSettings();
-    if (!cfg.general.voiceInput) {
-      // 语音输入总开关关着：清掉意向静默返回（按钮侧已置灰，这是兜底门）。
-      this.micIntended = false;
-      return;
-    }
     this.micStarting = true;
     const attempt = ++this.micAttempt;
     const mic = new MicStreamer();
@@ -510,13 +504,12 @@ export class ChatEngine {
     this.micIntended = intended;
   }
 
-  /** 回到 chat 页：挂起前麦是开着的 → 恢复监听。幂等。
-   *  前置校验语音输入开关与 ASR 配置——挂起期间可能在设置页被关掉。 */
+  /** 回到 chat 页时恢复之前明确开启的麦克风。 */
   resumeMic(): void {
     if (!this.micSuspended && !getSettings().general.microphoneEnabled) return;
     this.micSuspended = false;
     const cfg = getSettings();
-    if ((this.micIntended || cfg.general.microphoneEnabled) && cfg.general.voiceInput) {
+    if (this.micIntended || cfg.general.microphoneEnabled) {
       void this.startListening();
     }
   }

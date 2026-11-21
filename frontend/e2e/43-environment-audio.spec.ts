@@ -1,7 +1,9 @@
 import {test,expect} from './fixtures';
+import {useStateRestore} from './helpers';
+test.afterEach(useStateRestore());
 for(const lang of ['zh','en','ja'])test(`environment audio controls ${lang}`,async({page,request},info)=>{
  await page.setViewportSize({width:1280,height:720});
- const state=await(await request.get('/api/state')).json();state.settings.general.lang=lang;
+ const state=await(await request.get('/api/state')).json();Object.assign(state.settings.general,{lang,voiceVolume:71,sfxVolume:43,musicVolume:29,voiceMuted:false,sfxMuted:false,musicMuted:false});
  await request.put('/api/state',{data:state});
  await page.goto('/#/settings');
  await page.locator('[data-intro=tab-sound]').click();
@@ -9,12 +11,23 @@ for(const lang of ['zh','en','ja'])test(`environment audio controls ${lang}`,asy
  await expect.poll(()=>panel.evaluate(el=>Math.abs(el.getBoundingClientRect().top-el.parentElement!.getBoundingClientRect().top-24))).toBeLessThan(2);
  await expect(panel).toBeVisible();await expect(page.getByRole('dialog')).toHaveCount(0);
  const sliders=panel.locator('input[type=range]');await expect(sliders).toHaveCount(3);
- await sliders.nth(1).fill('0');await sliders.nth(2).fill('0');
- await page.screenshot({path:info.outputPath('audio-settings.png')});
- const b=(await panel.boundingBox())!,viewport=(await page.locator('.config-scroll').boundingBox())!;
- expect(b.y).toBeGreaterThan(viewport.y);expect(b.y+b.height).toBeLessThanOrEqual(viewport.y+viewport.height);
- await expect.poll(async()=>{const s=await(await request.get('/api/state')).json();return [s.settings.general.sfxVolume,s.settings.general.musicVolume];}).toEqual([0,0]);
- await page.reload();await expect(panel.locator('input[type=range]').nth(1)).toHaveValue('0');
+ await expect(panel.getByRole('switch')).toHaveCount(0);
+ const mute=panel.locator('button[aria-pressed]');
+ await expect(mute).toHaveCount(3);
+ for(const button of await mute.all())await button.click();
+ for(const slider of await sliders.all()){await expect(slider).toHaveValue('0');await expect(slider).toBeDisabled();}
+ const saved=async()=> (await(await request.get('/api/state')).json()).settings.general;
+ await expect.poll(saved).toMatchObject({voiceVolume:71,sfxVolume:43,musicVolume:29,voiceMuted:true,sfxMuted:true,musicMuted:true});
+ await page.screenshot({path:info.outputPath('audio-settings-muted.png')});
+ await page.reload();
+ await expect(mute.first()).toHaveAttribute('aria-pressed','true');
+ for(const button of await mute.all())await button.click();
+ for(const [index,volume] of ['71','43','29'].entries()){
+  await expect(sliders.nth(index)).toBeEnabled();
+  await expect(sliders.nth(index)).toHaveValue(volume);
+ }
+ await expect.poll(saved).toMatchObject({voiceMuted:false,sfxMuted:false,musicMuted:false});
+
 });
 test('original audio assets decode and loop in real Web Audio',async({page})=>{
  await page.goto('/#/title');

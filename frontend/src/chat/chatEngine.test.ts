@@ -229,21 +229,6 @@ describe("麦克风开关语义", () => {
     eng.dispose();
   });
 
-  it("挂起期间设置页关掉 voiceInput，回来不恢复", async () => {
-    const { eng } = makeEngine();
-    await eng.startListening();
-    eng.suspendMic();
-    setVoiceInput(false);
-    try {
-      eng.resumeMic();
-      await tick();
-      expect(eng.listening).toBe(false);
-    } finally {
-      setVoiceInput(true);
-      eng.dispose();
-    }
-  });
-
   it("stop during pending builtin connection never reopens the microphone", async () => {
     let ready!: () => void;
     const connect = new Promise<void>(resolve => { ready = resolve; });
@@ -285,12 +270,12 @@ describe("麦克风开关语义", () => {
     start.mockRestore();cancel.mockRestore();
   });
 
-  it("voiceInput 关着时 startListening 不启动", async () => {
+  it("legacy voiceInput=false does not block a manual microphone request", async () => {
     const { eng } = makeEngine();
     setVoiceInput(false);
     try {
       await eng.startListening();
-      expect(eng.listening).toBe(false);
+      expect(eng.listening).toBe(true);
     } finally {
       setVoiceInput(true);
       eng.dispose();

@@ -3,7 +3,7 @@ import {ambient} from '../audio/ambient';
 // waiting: a silent warmup never enters playback, history or persistent state.
 import { s16leToFloat32 } from "../audio/pcm";
 import { resolveChatLang, tFor } from "../i18n";
-import { getState, flushPendingState } from "../lib/store";
+import { getState, flushPendingState, subscribe } from "../lib/store";
 import { ttsConfigured } from "../lib/asr";
 import { streamSpeech } from "./ttsClient";
 
@@ -68,11 +68,20 @@ export function warmVoice() {
 }
 
 export async function auditionVoice(signal: AbortSignal) {
-  const { tts, general } = getState().settings;
+  const { tts } = getState().settings;
   if (!tts.url.trim()) return { ok: false, detail: "unconfigured" };
   if (!tts.voice) return { ok: false, detail: "未上传参考音频" };
   signal.throwIfAborted();
   const audio = new AudioContext();
+  const gain = audio.createGain();
+  gain.connect(audio.destination);
+  const syncVolume = () => {
+    const preferences = getState().settings.general;
+    gain.gain.value = preferences.voiceMuted ? 0 : preferences.voiceVolume / 100;
+    if (!gain.gain.value) ambient.speech(audio,false);
+  };
+  syncVolume();
+  const unsubscribe = subscribe(syncVolume);
   let ownedFlight: typeof flight;
   let rejectAbort: (reason: unknown) => void = () => {};
   const aborted = new Promise<never>((_, reject) => { rejectAbort = reject; });
@@ -87,9 +96,6 @@ export async function auditionVoice(signal: AbortSignal) {
   };
   signal.addEventListener("abort", onAbort, { once: true });
   try {
-    const gain = audio.createGain();
-    gain.gain.value = general.voiceVolume / 100;
-    gain.connect(audio.destination);
     let endAt = 0;
     let lastSource: AudioBufferSourceNode | undefined;
     const play = (chunk: Uint8Array, rate: number) => {
@@ -101,7 +107,7 @@ export async function auditionVoice(signal: AbortSignal) {
       source.connect(gain);
       const start = Math.max(audio.currentTime, endAt);
       source.start(start);
-      if(audio.state==="running" && general.voiceVolume>0)ambient.speech(audio,true);
+      if(audio.state==="running" && gain.gain.value>0)ambient.speech(audio,true);
       endAt = start + buffer.duration;
       lastSource = source;
     };
@@ -119,6 +125,7 @@ export async function auditionVoice(signal: AbortSignal) {
     }
     return { ok: !signal.aborted, detail: "" };
   } finally {
+    unsubscribe();
     signal.removeEventListener("abort", onAbort);
     if (ownedFlight) ownedFlight.sample.listener = undefined;
     stop();
