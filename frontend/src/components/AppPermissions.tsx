@@ -10,25 +10,18 @@ import {
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
-import '../styles/plugin-library.css';
 import '../styles/desktop-permissions.css';
 
-type Application = {bundleId: string; name: string};
-type Policy = {available: boolean; granted: boolean | null; browserGranted?: boolean; blocked: Application[]; stopUnconfirmed?: boolean};
+type Policy = {available: boolean; granted: boolean | null; browserGranted?: boolean; stopUnconfirmed?: boolean};
 export type ApplicationScope = 'computer' | 'browser';
-export type SystemAccess = {screenPermission: boolean; inputPermission: boolean; applications: Application[]};
+export type SystemAccess = {screenPermission: boolean; inputPermission: boolean};
 type SystemGuideRequest = {kind: SystemPermission; onError?: () => void};
 type PermissionProgress = {request: PermissionRequest; shown: PermissionKind[]; missing: PermissionKind[]};
 const endpoint = '/api/computer/access';
-const guideEvent = 'momo:desktop-access-guide';
 const systemGuideEvent = 'momo:desktop-system-guide';
 const accessChanged = 'momo:desktop-access-changed';
 const systemPermissions = ['screen', 'input'] as const;
 const kinds = ['access', ...systemPermissions] as const;
-
-export function openDesktopAccessGuide() {
-  window.dispatchEvent(new Event(guideEvent));
-}
 
 export function authorizeSystemPermission(kind: SystemPermission, onError?: () => void) {
   window.dispatchEvent(new CustomEvent<SystemGuideRequest>(systemGuideEvent, {detail: {kind, onError}}));
@@ -68,71 +61,7 @@ export async function setDesktopConsent(granted: boolean, plugin: ApplicationSco
   return policy;
 }
 
-function ApplicationBlocklist() {
-  const t = useT();
-  const [policy, setPolicy] = useState<Policy | null>(null);
-  const [system, setSystem] = useState<SystemAccess | null>(null);
-  const [selected, setSelected] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
-  useEffect(() => {
-    if (!window.momoDesktop) return;
-    const controller = new AbortController();
-    const {signal} = controller;
-    const showError = () => { if (!signal.aborted) setError(true); };
-    const loadPolicy = () => { void apiJson<Policy>(endpoint, {signal}).then(setPolicy).catch(showError); };
-    const loadSystem = () => { void readSystemAccess(signal).then(setSystem).catch(showError); };
-    loadPolicy();
-    loadSystem();
-    window.addEventListener('focus', loadSystem);
-    window.addEventListener(accessChanged, loadPolicy);
-    return () => {
-      controller.abort();
-      window.removeEventListener('focus', loadSystem);
-      window.removeEventListener(accessChanged, loadPolicy);
-    };
-  }, []);
-
-  async function changeBlock(app: Application, blocked: boolean) {
-    setBusy(true);
-    setError(false);
-    try {
-      const updated = await apiJson<Policy>(endpoint + '/blocklist', jsonInit('PUT', {...app, blocked}));
-      setPolicy(previous => previous && {...previous, ...updated});
-      setSelected('');
-    } catch { setError(true); }
-    finally { setBusy(false); }
-  }
-
-  if (!policy?.available) {
-    return <p role={error ? 'alert' : 'status'}>{t(error ? 'permissions.error' : policy ? 'activities.platformUnsupported' : 'config.loading')}</p>;
-  }
-  const blocked = new Set(policy.blocked.map(app => app.bundleId.toLowerCase()));
-  const candidates = [...new Map((system?.applications ?? []).filter(app => !blocked.has(app.bundleId.toLowerCase()))
-    .map(app => [app.bundleId, app])).values()];
-  const app = candidates.find(candidate => candidate.bundleId === selected);
-  return <section>
-    <p className="muted">{t('desktopAccess.blockHint')}</p>
-    <div className="plugin-library-actions">
-      <Button variant="ghost" onClick={openDesktopAccessGuide}>{t('desktopAccess.open')}</Button>
-    </div>
-    {policy.blocked.map(app => <div className="permission-app" key={app.bundleId}>
-      <div><strong>{app.name}</strong><small>{app.bundleId}</small></div>
-      <Button variant="ghost" disabled={busy} onClick={() => void changeBlock(app, false)}>{t('desktopAccess.unblock')}</Button>
-    </div>)}
-    <div className="permission-app">
-      <select className="extension-window-select" aria-label={t('desktopAccess.select')} value={selected}
-        onChange={event => setSelected(event.target.value)}>
-        <option value="">{t('desktopAccess.select')}</option>
-        {candidates.map(app => <option key={app.bundleId} value={app.bundleId}>{app.name}</option>)}
-      </select>
-      <Button disabled={!app || busy} onClick={() => app && void changeBlock(app, true)}>{t('desktopAccess.block')}</Button>
-    </div>
-    {(error || policy.stopUnconfirmed) && <p role="alert">{t(policy.stopUnconfirmed ? 'plugins.stopUnknown' : 'permissions.error')}</p>}
-  </section>;
-}
-
-function PermissionDialogs({ready, onGuideVisibility}: {
+export default function AppPermissions({ready, onGuideVisibility}: {
   ready: boolean; onGuideVisibility?: (visible: boolean) => void;
 }) {
   const t = useT();
@@ -172,16 +101,6 @@ function PermissionDialogs({ready, onGuideVisibility}: {
     const controller = new AbortController();
     const {signal} = controller;
     const showError = () => { if (!signal.aborted) setError(true); };
-    const open = () => {
-      setError(false);
-      void apiJson<Policy>(endpoint, {signal}).then(value => {
-        if (signal.aborted) return;
-        setPolicy(value);
-        setGuide(value.available);
-        if (value.available) void refreshSystem(signal).catch(showError);
-      }).catch(showError);
-    };
-    window.addEventListener(guideEvent, open);
     void apiJson<Policy>(endpoint, {signal}).then(async value => {
       if (signal.aborted) return;
       setPolicy(value);
@@ -190,10 +109,7 @@ function PermissionDialogs({ready, onGuideVisibility}: {
       const current = await refreshSystem(signal);
       if (!signal.aborted && (!current.screenPermission || !current.inputPermission)) setGuide(true);
     }).catch(showError);
-    return () => {
-      controller.abort();
-      window.removeEventListener(guideEvent, open);
-    };
+    return () => controller.abort();
   }, [ready, refreshSystem]);
 
   useEffect(() => {
@@ -380,10 +296,4 @@ function PermissionDialogs({ready, onGuideVisibility}: {
       </div>}
     </footer>
   </Modal>;
-}
-
-export default function AppPermissions({manage = false, ready = false, onGuideVisibility}: {
-  manage?: boolean; ready?: boolean; onGuideVisibility?: (visible: boolean) => void;
-}) {
-  return manage ? <ApplicationBlocklist/> : <PermissionDialogs ready={ready} onGuideVisibility={onGuideVisibility}/>;
 }

@@ -2,6 +2,7 @@ import {test,expect} from './fixtures';
 import {bootChat,openTab} from './helpers';
 
 test('desktop and browser have independent consent switches without window setup or background capture',async({page,baseURL})=>{
+ await page.setViewportSize({width:1280,height:720});
  await page.addInitScript(base=>{
   window.momoDesktop={getRuntime:async()=>({baseUrl:base,token:'operations-fixture'})};
  },baseURL!);
@@ -24,6 +25,15 @@ test('desktop and browser have independent consent switches without window setup
  const panel=page.locator('#config-operations');
  const desktop=panel.getByRole('switch',{name:'桌面访问',exact:true});
  const browser=panel.getByRole('switch',{name:'浏览器访问',exact:true});
+ const rows=panel.locator('.opt-row');
+ await expect(rows).toHaveCount(4,{timeout:2000});
+ await expect(panel.getByText('应用黑名单',{exact:true})).toHaveCount(0);
+ const [desktopRow,browserRow,recordingRow,accessibilityRow]=await Promise.all((await rows.all()).map(row=>row.boundingBox()));
+ expect(desktopRow!.x).toBeCloseTo(browserRow!.x,0);
+ expect(recordingRow!.x).toBeCloseTo(accessibilityRow!.x,0);
+ expect(desktopRow!.x+desktopRow!.width).toBeLessThan(recordingRow!.x);
+ expect(desktopRow!.y).toBeCloseTo(recordingRow!.y,0);
+ expect(browserRow!.y).toBeCloseTo(accessibilityRow!.y,0);
  await expect(panel.getByRole('switch')).toHaveCount(2);
  await expect(panel.locator('.sel-face')).toHaveCount(0);
  await expect(panel.getByRole('button',{name:'桌面陪伴'})).toHaveCount(0);

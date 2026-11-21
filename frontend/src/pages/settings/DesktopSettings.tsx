@@ -1,12 +1,11 @@
 import {useEffect, useState} from 'react';
 import {useT} from '../../i18n';
-import AppPermissions, {
+import {
   authorizeSystemPermission, DesktopPermissionAction, isSystemPermissionGranted,
   readDesktopAccess, readSystemAccess, setDesktopConsent, type ApplicationScope, type SystemAccess,
 } from '../../components/AppPermissions';
 import FieldRow from '../../ui/FieldRow';
 import Switch from '../../ui/Switch';
-import ConfigAction from './ConfigAction';
 
 export default function DesktopSettings() {
   const t = useT();
@@ -55,27 +54,26 @@ export default function DesktopSettings() {
   const browser = t('desktopAccess.browserAccess');
   const disabled = !native || !policy?.available || saving;
   return <div className="desktop-config">
-    <div className="config-split config-split-stack">
-      <FieldRow label={desktop} hint={t(native ? 'desktopAccess.description' : 'config.nativeOnly')}>
-        <Switch title={desktop} on={policy?.granted === true} disabled={disabled} onChange={on => void changeAccess('computer', on)}/>
-      </FieldRow>
-      <FieldRow label={browser} hint={t(native ? 'desktopAccess.browserHint' : 'config.nativeOnly')}>
-        <Switch title={browser} on={policy?.browserGranted === true} disabled={disabled} onChange={on => void changeAccess('browser', on)}/>
-      </FieldRow>
+    <div className={native ? 'config-split config-split-stack' : undefined}>
+      <div className="desktop-config-column" role="group" aria-label={t('desktopAccess.accessGroup')}>
+        <FieldRow label={desktop} hint={t(native ? 'desktopAccess.description' : 'config.nativeOnly')}>
+          <Switch title={desktop} on={policy?.granted === true} disabled={disabled} onChange={on => void changeAccess('computer', on)}/>
+        </FieldRow>
+        <FieldRow label={browser} hint={t(native ? 'desktopAccess.browserHint' : 'config.nativeOnly')}>
+          <Switch title={browser} on={policy?.browserGranted === true} disabled={disabled} onChange={on => void changeAccess('browser', on)}/>
+        </FieldRow>
+      </div>
+      {native && <div className="desktop-config-column" role="group" aria-label={t('desktopAccess.system')}>
+        {(['screen', 'input'] as const).map(kind => <FieldRow key={kind} label={t('desktopAccess.' + kind)}>
+          {!system || system === 'error'
+            ? <span className="config-value" role="status">{t(system === 'error' ? 'config.unavailable' : 'config.loading')}</span>
+            : <DesktopPermissionAction kind={kind} granted={isSystemPermissionGranted(system, kind)} onClick={() => {
+              setFailed(false);
+              authorizeSystemPermission(kind, () => setFailed(true));
+            }}/>}
+        </FieldRow>)}
+      </div>}
     </div>
-    {native && <div className="config-split config-split-stack">
-      {(['screen', 'input'] as const).map(kind => <FieldRow key={kind} label={t('desktopAccess.' + kind)}>
-        {!system || system === 'error'
-          ? <span className="config-value" role="status">{t(system === 'error' ? 'config.unavailable' : 'config.loading')}</span>
-          : <DesktopPermissionAction kind={kind} granted={isSystemPermissionGranted(system, kind)} onClick={() => {
-            setFailed(false);
-            authorizeSystemPermission(kind, () => setFailed(true));
-          }}/>}
-      </FieldRow>)}
-    </div>}
-    <ConfigAction label={t('desktopAccess.blocklist')} action={t('config.blockAction')}>
-      {native ? <AppPermissions manage/> : <p>{t('config.nativeOnly')}</p>}
-    </ConfigAction>
     {failed && <p role="alert">{t('permissions.error')}</p>}
   </div>;
 }

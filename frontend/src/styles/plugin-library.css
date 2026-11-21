@@ -51,8 +51,6 @@
  .extension-panel .avatar-thumb{width:36px;height:36px}
  .extension-panel .list-body{min-height:290px}
 }
-.permission-app{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-bottom:1px solid var(--line)}
-.permission-app>div{min-width:0;display:grid;gap:6px}.permission-app small{color:var(--text-dim);overflow-wrap:anywhere}.permission-app span{font-size:12px}
 /* Shared official-plugin hierarchy: identity, short purpose, state + configure. */
 .extension-card-heading h4{font-size:16px;margin:0;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .extension-card-summary{color:var(--text-dim);font-size:12px;line-height:1.4;margin:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}

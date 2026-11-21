@@ -39,20 +39,6 @@
   flex-wrap: wrap;
 }
 
-.permission-app .extension-window-select {
-  flex: 0 1 192px;
-  width: min(100%, 192px);
-  text-overflow: ellipsis;
-  min-width: 0;
-  height: 34px;
-  box-sizing: border-box;
-  padding: 4px 8px;
-  font: inherit;
-  color: var(--text);
-  background: var(--input-bg);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-}
 .settings-col {
   display: flex;
   flex-direction: column;

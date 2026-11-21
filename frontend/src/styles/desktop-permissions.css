@@ -5,6 +5,7 @@
   gap: 8px;
   min-height: 50px;
 }
+.config-card .desktop-config-column > .opt-row + .opt-row {border-top: 1px solid var(--line-soft);}
 .desktop-permission-action {
   min-width: 86px;
   min-height: 34px;

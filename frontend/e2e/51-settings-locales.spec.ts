@@ -123,10 +123,9 @@ for (const width of [640, 960, 1280]) {
       const actions = page.locator([
         '#config-models .config-model-row > button',
         '#config-data .opt-ctl > button',
-        '#config-operations .opt-ctl > .icon-btn',
         '#config-sound .opt-ctl > button:not(.sel-face, [role="switch"])',
       ].join(', '));
-      await expect(actions).toHaveCount(12);
+      await expect(actions).toHaveCount(11);
       expect(await actions.evaluateAll(buttons => buttons.filter(button => {
         const bounds = button.getBoundingClientRect();
         const row = button.closest('.opt-row, .config-model-row')!.getBoundingClientRect();

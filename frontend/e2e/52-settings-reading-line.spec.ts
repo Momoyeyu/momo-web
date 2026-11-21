@@ -36,8 +36,13 @@ test('sound controls align in three full rows and model details occupy two full 
  }
 });
 
-test('customize and operations share an inset divider and one card border', async ({page}) => {
+test('customize and operations share an inset divider and one card border', async ({page,baseURL}) => {
  await page.setViewportSize({width:1280,height:720});
+ await page.addInitScript(baseUrl=>{
+  window.momoDesktop={getRuntime:async()=>({baseUrl,token:'operations-layout'})};
+ },baseURL!);
+ await page.route('**/api/computer/access',r=>r.fulfill({json:{available:true,granted:false,browserGranted:false}}));
+ await page.route('**/api/computer/access/system',r=>r.fulfill({json:{screenPermission:true,inputPermission:true}}));
  await openApp(page,'settings');
  for (const section of ['customize','operations']) {
   const card = page.locator('#config-'+section+' > .config-card');
@@ -54,7 +59,8 @@ test('customize and operations share an inset divider and one card border', asyn
   expect(parseFloat(line.start)).toBeCloseTo(line.center,0);
   expect(line.pointerEvents).toBe('none');
  }
- const desktop = page.locator('#config-operations .config-split > .opt-row');
+ const desktop = page.locator('#config-operations .desktop-config-column');
+ await expect(desktop).toHaveCount(2);
  await expect(desktop.first()).toHaveCSS('border-top-width','0px');
  await expect(desktop.last()).toHaveCSS('border-top-width','0px');
  const [left, right] = await Promise.all([desktop.first().boundingBox(),desktop.last().boundingBox()]);
