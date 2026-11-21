@@ -9,6 +9,7 @@ import {useMinecraftDecisions} from './services/useMinecraftDecisions';
 import {useMinecraftControlGeneration} from './services/minecraftClient';
 import {useActivities} from './services/extensionActivities';
 import {ambient} from './audio/ambient';
+import DesktopStageMatte from "./components/DesktopStageMatte";
 import AppPermissions from './components/AppPermissions';
 import {enterMeeting,leaveMeeting,meetingSnapshot,subscribeMeeting,storedMeetingIdentity,refreshAttention,type AttentionState} from "./services/meetingClient";
 import {getChatEngine,loadTranscript} from "./chat/engineInstance";
@@ -295,6 +296,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
 
   // 全部内容锁在 16:9 舞台内（.app-stage）：窗口比例任意，画面比例恒定。
   return (<>
+    {desktopWindowAvailable() && <DesktopStageMatte/>}
     <div className="desktop-window-titlebar" aria-hidden="true">
       <div className="desktop-window-grip"/>
     </div>

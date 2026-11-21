@@ -1,15 +1,72 @@
 /* One renderer, one avatar and one voice. Only the host frame changes. */
-.desktop-window-titlebar {display: none;}
+.desktop-window-titlebar, .desktop-stage-matte {display: none;}
 .desktop-shell:not(.desktop-pet) {
   --desktop-titlebar-height: 32px;
-  --desktop-stage-height: min(calc(100vh - var(--desktop-titlebar-height)), calc(100vw * 9 / 16));
+  --desktop-content-height: calc(100vh - var(--desktop-titlebar-height));
+  --desktop-stage-height: min(var(--desktop-content-height), calc(100vw * 9 / 16));
+  --desktop-stage-width: min(100vw, calc(var(--desktop-content-height) * 16 / 9));
+  --desktop-stage-top: calc(var(--desktop-titlebar-height) + (var(--desktop-content-height) - var(--desktop-stage-height)) / 2);
 }
 .desktop-shell:not(.desktop-pet) :is(.app-stage, .modal-overlay) {
-  /* Reuse existing letterbox room before making the 16:9 stage smaller. */
-  inset: max(var(--desktop-titlebar-height), calc((100vh - var(--desktop-stage-height)) / 2)) 0 auto;
+  inset: var(--desktop-stage-top) 0 auto;
   margin: 0 auto;
   height: var(--desktop-stage-height);
-  width: min(100vw, calc((100vh - var(--desktop-titlebar-height)) * 16 / 9));
+  width: var(--desktop-stage-width);
+}
+.desktop-shell:not(.desktop-pet) .desktop-stage-matte {
+  position: fixed;
+  inset: var(--desktop-titlebar-height) 0 0;
+  display: grid;
+  grid-template:
+    "top top top" minmax(0, 1fr)
+    "left stage right" var(--desktop-stage-height)
+    "bottom bottom bottom" minmax(0, 1fr)
+    / minmax(0, 1fr) var(--desktop-stage-width) minmax(0, 1fr);
+  overflow: hidden;
+  background: color-mix(in srgb, var(--bg) 98%, var(--text) 2%);
+  pointer-events: none;
+  user-select: none;
+}
+.desktop-stage-matte-outline {
+  grid-area: stage;
+  outline: 1px solid color-mix(in srgb, var(--line-strong) 52%, transparent);
+}
+.stage-matte-edge {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  overflow: hidden;
+  container: matte-edge / size;
+}
+.stage-matte-edge[data-edge="top"] {grid-area: top;}
+.stage-matte-edge[data-edge="left"] {grid-area: left;}
+.stage-matte-edge[data-edge="bottom"] {grid-area: bottom;}
+.stage-matte-edge[data-edge="right"] {grid-area: right;}
+.stage-matte-mark {
+  width: 14px;
+  height: 14px;
+  opacity: .27;
+}
+.stage-matte-motif {
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  color: color-mix(in srgb, var(--accent) 54%, var(--bg));
+  white-space: nowrap;
+}
+.stage-matte-motif code {font: 11px/1.2 ui-monospace, "SFMono-Regular", Menlo, monospace;}
+.stage-matte-pulse {width: 162px; height: 18px;}
+.stage-matte-lead, .stage-matte-rule {opacity: .64;}
+.stage-matte-rule {width: 22px; height: 1px; background: currentColor;}
+.stage-matte-edge[data-edge="right"] .stage-matte-motif {transform: rotate(90deg);}
+.stage-matte-mark, .stage-matte-motif {display: none;}
+@container matte-edge (min-height: 28px) and (min-width: 250px) {
+  .stage-matte-edge[data-edge="top"] .stage-matte-mark {display: block;}
+  .stage-matte-edge[data-edge="bottom"] .stage-matte-motif {display: flex;}
+}
+@container matte-edge (min-width: 48px) and (min-height: 250px) {
+  .stage-matte-edge[data-edge="left"] .stage-matte-mark {display: block;}
+  .stage-matte-edge[data-edge="right"] .stage-matte-motif {display: flex;}
 }
 .desktop-shell:not(.desktop-pet) .desktop-window-titlebar {
   display: block;
