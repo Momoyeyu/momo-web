@@ -27,6 +27,7 @@
   top: 7cqh;
   left: 4cqw;
   animation: brand-in 0.5s ease both;
+  user-select: none;
 }
 
 @keyframes brand-in {
@@ -178,6 +179,7 @@
   object-fit: contain;
   object-position: center bottom;
   pointer-events: none;
+  user-select: none;
   opacity: .2;
 }
 @media (prefers-reduced-motion: reduce) {

@@ -1,11 +1,51 @@
 /* One renderer, one avatar and one voice. Only the host frame changes. */
-.desktop-window-grip{display:none}
-.desktop-shell .desktop-window-grip{display:block;position:fixed;z-index:15;top:0;left:80px;right:0;height:18px;app-region:drag;-webkit-app-region:drag}
+.desktop-window-titlebar {display: none;}
+.desktop-shell:not(.desktop-pet) {
+  --desktop-titlebar-height: 32px;
+  --desktop-stage-height: min(calc(100vh - var(--desktop-titlebar-height)), calc(100vw * 9 / 16));
+}
+.desktop-shell:not(.desktop-pet) :is(.app-stage, .modal-overlay) {
+  /* Reuse existing letterbox room before making the 16:9 stage smaller. */
+  inset: max(var(--desktop-titlebar-height), calc((100vh - var(--desktop-stage-height)) / 2)) 0 auto;
+  margin: 0 auto;
+  height: var(--desktop-stage-height);
+  width: min(100vw, calc((100vh - var(--desktop-titlebar-height)) * 16 / 9));
+}
+.desktop-shell:not(.desktop-pet) .desktop-window-titlebar {
+  display: block;
+  position: fixed;
+  z-index: 110;
+  inset: 0 0 auto;
+  height: var(--desktop-titlebar-height);
+  background: var(--bg);
+  box-shadow: inset 0 -1px var(--line-soft);
+  user-select: none;
+}
+.desktop-window-titlebar::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 30px;
+  height: 8px;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--text-dim) 1px, transparent 1.5px) 0 0 / 5px 4px;
+  opacity: .65;
+  pointer-events: none;
+}
+.desktop-window-grip {
+  position: absolute;
+  inset: 0 max(0px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw))) 0 max(80px, env(titlebar-area-x, 0px));
+  -webkit-app-region: drag;
+  app-region: drag;
+  cursor: grab;
+  user-select: none;
+}
 html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transparent!important;--dialog-zone-h:24px;--model-side-reserve:56px;--model-height-frac:.95;--model-close-scale:2.2;--model-close-anchor:.5;--dialog-bottom-gap:0px}
 .desktop-pet .app-stage{width:100vw;height:100vh;background:transparent}
 .desktop-pet .grid-backdrop,.desktop-pet .room-background,.desktop-pet .scene-ambient,.desktop-pet .scene-reading-shade{display:none}
 .desktop-pet .stage-scene{background:none!important}
-.desktop-pet .chat-toolbar,.desktop-pet .phone-surface,.desktop-pet .desktop-window-grip{display:none}
+.desktop-pet .chat-toolbar,.desktop-pet .phone-surface{display:none}
 .desktop-pet .dialog-drawer{width:calc(100% - 20px);left:10px;right:10px;bottom:10px}
 .desktop-pet .dialog-zone{padding:0}
 .desktop-pet .chat-page .dialog-box{width:100%;min-height:0;padding:10px 12px}

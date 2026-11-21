@@ -294,7 +294,10 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   } as CSSProperties;
 
   // 全部内容锁在 16:9 舞台内（.app-stage）：窗口比例任意，画面比例恒定。
-  return (
+  return (<>
+    <div className="desktop-window-titlebar" aria-hidden="true">
+      <div className="desktop-window-grip"/>
+    </div>
     <div ref={stageRef} className={`app-stage${fx ? " tx-active" : ""}`} style={stageStyle} inert={capturing||exitFrame!==null} data-home-phase={capturing?'preparing':exitFrame?'shattering':undefined}>
       {/* 舞台级网格：常驻、不参与页面变换、随页面坐标系旋转（RoPE） */}
       {/* sweep 放长到 900ms：遮幕/漫开盖住的时段之外仍能看到旋转 */}
@@ -350,7 +353,6 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
           {(meeting.state === "failed" || historyFailed || attentionFault) && <div className="meeting-gate-actions">{attentionFault?<Button size="sm" variant="ghost" onClick={()=>{location.hash='#/settings';}}>{t('settings.title')}</Button>:<Button size="sm" variant="ghost" onClick={() => historyFailed ? setHistoryRetry(value=>value+1) : void enterMeeting().catch(() => {})}>{t("meeting.retry")}</Button>}<Button size="sm" variant="ghost" onClick={() => {location.hash="#/title";}}>{t("common.backTitle")}</Button></div>}
         </div>
       </div>}
-      <div className="desktop-window-grip" aria-hidden="true"/>
       <div id="desktop-controls-host"/>
       <TooltipLayer />
       <IntroGuide ready={ready && !desktopGuideVisible} />
@@ -362,5 +364,5 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
         <i className="tx-drop" />
       </div>
     </div>
-  );
+  </>);
 }

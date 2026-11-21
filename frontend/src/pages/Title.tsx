@@ -62,9 +62,9 @@ export default function Title({active}: {active:boolean}) {
   return (
     <div data-intro="celebration" className="title-screen">
       <EcgCanvas />
-      <img className="title-presence" src={PRESENCE_URL} style={{left:`${TITLE_PRESENCE.left*100}%`,top:`${TITLE_PRESENCE.top*100}%`,width:`${TITLE_PRESENCE.width*100}%`}} width="1024" height="1536" alt="" aria-hidden="true" decoding="async" />
+      <img className="title-presence" src={PRESENCE_URL} style={{left:`${TITLE_PRESENCE.left*100}%`,top:`${TITLE_PRESENCE.top*100}%`,width:`${TITLE_PRESENCE.width*100}%`}} width="1024" height="1536" alt="" aria-hidden="true" decoding="async" draggable={false} />
       <header className="title-brand">
-        <h1 className="title-logo" aria-label="momo"><img className="title-brand-mark" src="/brand/momo-mark.svg" alt="" /><img className="title-brand-wordmark" src="/brand/momo-wordmark.svg" alt="momo" /></h1>
+        <h1 className="title-logo" aria-label="momo"><img className="title-brand-mark" src="/brand/momo-mark.svg" alt="" draggable={false} /><img className="title-brand-wordmark" src="/brand/momo-wordmark.svg" alt="momo" draggable={false} /></h1>
         <div className="title-rule" />
         <TerminalTagline key={t("title.tagline")} text={t("title.tagline")} active={active}/>
       </header>
