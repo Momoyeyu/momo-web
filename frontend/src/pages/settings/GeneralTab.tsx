@@ -1,6 +1,7 @@
 import {useState, useSyncExternalStore} from 'react';
 import {ambient} from '../../audio/ambient';
 import IconButton from '../../ui/IconButton';
+import ProactiveResponseToggle from '../../components/ProactiveResponseToggle';
 import {getChatEngine} from '../../chat/engineInstance';
 import {LANGS, resolveChatLang, tFor, useT} from '../../i18n';
 import {ttsConfigured} from '../../lib/asr';
@@ -47,7 +48,12 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
   };
   if (section === 'display') return <>
     {slider('dialogOpacity')}{slider('textSpeed')}{slider('sentenceSpeed')}
-    <FieldRow label={t('settings.showStatus')}><Switch title={t('settings.showStatus')} on={general.showStatus} onChange={showStatus => patch({showStatus})}/></FieldRow>
+    <div className="config-split config-split-stack dialogue-switches">
+      <FieldRow label={t('settings.showStatus')}>
+        <Switch title={t('settings.showStatus')} on={general.showStatus} onChange={showStatus => patch({showStatus})}/>
+      </FieldRow>
+      <ProactiveResponseToggle placement="settings"/>
+    </div>
   </>;
 
   const palette = (

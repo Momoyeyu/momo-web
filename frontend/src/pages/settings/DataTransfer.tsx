@@ -63,7 +63,7 @@ export default function DataTransfer() {
 
   return <>
     <FieldRow label={t('config.backup')} hint={t('config.backupHint')}>
-      <IconButton icon="save" label={exportLabel} tip={exportLabel} sound="tap" disabled={busy !== null} onClick={() => void runTransfer('export', async () => {
+      <IconButton icon="save" label={exportLabel} tip={t('config.backupTip')} sound="tap" disabled={busy !== null} onClick={() => void runTransfer('export', async () => {
         const url = URL.createObjectURL(await exportData());
         const a = document.createElement('a');
         a.href = url;
@@ -71,9 +71,7 @@ export default function DataTransfer() {
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 60000);
       })}/>
-    </FieldRow>
-    <FieldRow label={t('config.restore')}>
-      <IconButton icon="load" label={importLabel} tip={importLabel} sound="tap" disabled={busy !== null} onClick={() => input.current?.click()}/>
+      <IconButton icon="load" label={importLabel} tip={t('config.restoreTip')} sound="tap" disabled={busy !== null} onClick={() => input.current?.click()}/>
       <input ref={input} hidden type="file" accept=".zip" onChange={event => {
         const file = event.target.files?.[0];
         event.target.value = '';

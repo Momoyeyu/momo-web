@@ -17,7 +17,7 @@ export default function IntroGuide({ready}:{ready:boolean}){
  const [box,setBox]=useState<Box|null>(null);
  const [helpOpen,setHelpOpen]=useState(false);
  const [models,setModels]=useState(false);
- const [memoryTab,setMemoryTab]=useState(false);
+ const [dataTab,setDataTab]=useState(false);
  const [ttsError,setTtsError]=useState(false);
  const [ttsBusy,setTtsBusy]=useState(false);
  const panel=useRef<HTMLDivElement>(null),target=useRef<HTMLElement|null>(null);
@@ -46,7 +46,7 @@ export default function IntroGuide({ready}:{ready:boolean}){
  }else if(phase==='memory'){
    if(route==='chat'){anchor='chat-settings';message='memorySettings';}
    else if(route==='title'){anchor='settings';message='memorySettings';}
-   else if(!memoryTab){anchor='tab-memory';message='memoryTab';}
+   else if(!dataTab){anchor='tab-data';message='memoryTab';}
    else{anchor='name-pin';message='pin';}
  }else if(phase==='celebration'){anchor='celebration';message='celebrate';
  }else if(phase==='await_boot'||phase==='naming'){
@@ -78,7 +78,7 @@ export default function IntroGuide({ready}:{ready:boolean}){
    if(!ready||!restricted)return;
    let previous:HTMLElement|null=null;
    const fit=()=>{
-     setMemoryTab(!!document.querySelector('.page-wrap:not([aria-hidden]) [data-intro="tab-memory"].active'));
+     setDataTab(!!document.querySelector('.page-wrap:not([aria-hidden]) [data-intro="tab-data"].active'));
      setModels(!!document.querySelector('.page-wrap:not([aria-hidden]) [data-intro="tab-models"].active'));
      const stage=document.querySelector('.app-stage')?.getBoundingClientRect();
      const el=document.querySelector<HTMLElement>(`.page-wrap:not([aria-hidden]) [data-intro="${anchor}"]`);

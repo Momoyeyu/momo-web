@@ -158,8 +158,8 @@ test('an in-progress export stays locked across browser history navigation', asy
   try {
     await page.goto('/#/title');
     await expect(page.locator('.title-screen')).toBeVisible();
-    await openTab(page,'存档');
-    await page.getByRole('button',{name:'导出文件',exact:true}).click();
+    await openTab(page,'数据');
+    await page.getByRole('button',{name:'导出备份',exact:true}).click();
     const progress=page.getByRole('dialog',{name:'备份',exact:true});
     await expect(progress).toBeVisible();
 
@@ -167,12 +167,12 @@ test('an in-progress export stays locked across browser history navigation', asy
     await expect(page.locator('.settings-page')).toHaveCount(0);
     await page.goForward();
     await expect(progress).toBeVisible();
-    await expect(page.locator('#config-archive button[aria-label="选择文件"]')).toBeDisabled();
+    await expect(page.locator('#config-data button[aria-label="导入备份"]')).toBeDisabled();
 
     finishExport();
     await expect(progress).toHaveCount(0);
-    await expect(page.locator('#config-archive').getByRole('alert')).toHaveText('导出失败，请重试。');
-    await expect(page.getByRole('button',{name:'导出文件',exact:true})).toBeEnabled();
+    await expect(page.locator('#config-data').getByRole('alert')).toHaveText('导出失败，请重试。');
+    await expect(page.getByRole('button',{name:'导出备份',exact:true})).toBeEnabled();
   } finally {
     finishExport();
   }

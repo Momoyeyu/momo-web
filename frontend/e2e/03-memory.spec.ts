@@ -38,8 +38,8 @@ test.afterEach(async ({ request }) => {
 });
 
 test("空态 → 添加 → 出现在列表 → 删除", async ({ page }) => {
-  await openTab(page, "记忆");
-  await expect(page.locator("#config-memory").getByRole("button")).toHaveCount(1);
+  await openTab(page, "数据");
+  await expect(page.locator("#config-data").getByRole("button", {name:"查看记忆",exact:true})).toHaveCount(1);
   await page.getByRole("button", {name:"查看记忆"}).click();
   await expect(page.locator(".mem-panel")).toBeVisible();
 
@@ -55,7 +55,7 @@ test("空态 → 添加 → 出现在列表 → 删除", async ({ page }) => {
 });
 
 test("PIN 图钉：切换后后端 pinned 变化", async ({ page, request }) => {
-  await openTab(page, "记忆");
+  await openTab(page, "数据");
   await page.getByRole("button", {name:"查看记忆"}).click();
   await addViaUi(page, `${PREFIX}用户的名称是夜羽`);
 
@@ -77,7 +77,7 @@ test("PIN 图钉：切换后后端 pinned 变化", async ({ page, request }) => 
 });
 
 test("检索过滤命中集，空结果显示空态", async ({ page }) => {
-  await openTab(page, "记忆");
+  await openTab(page, "数据");
   await page.getByRole("button", {name:"查看记忆"}).click();
   // 用唯一 token 做内容与检索词：真实库里已有「夜羽喜欢吃拉面」这类数据，
   // 拿普通词做子串过滤会撞上（strict mode violation）。
@@ -95,7 +95,7 @@ test("检索过滤命中集，空结果显示空态", async ({ page }) => {
 });
 
 test("点卡片开详情弹窗（只读全文），用返回图标回到列表", async ({ page }) => {
-  await openTab(page, "记忆");
+  await openTab(page, "数据");
   await page.getByRole("button", {name:"查看记忆"}).click();
   const text = `${PREFIX}上周末她提到想去河边散步，傍晚的风很舒服`;
   await addViaUi(page, text);
@@ -111,7 +111,7 @@ test("点卡片开详情弹窗（只读全文），用返回图标回到列表",
 });
 
 test("卡片内联编辑：改内容后列表与后端都更新", async ({ page, request }) => {
-  await openTab(page, "记忆");
+  await openTab(page, "数据");
   await page.getByRole("button", {name:"查看记忆"}).click();
   await addViaUi(page, `${PREFIX}旧事实`);
 
@@ -131,7 +131,7 @@ test("卡片内联编辑：改内容后列表与后端都更新", async ({ page,
 });
 
 test("分页器始终渲染（单页也显示 1/1）", async ({ page }) => {
-  await openTab(page, "记忆");
+  await openTab(page, "数据");
   await page.getByRole("button", {name:"查看记忆"}).click();
   await expect(page.locator(".mem-panel .list-pager .pager-text")).toHaveText("1 / 1");
 });

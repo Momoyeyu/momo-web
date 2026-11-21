@@ -7,7 +7,6 @@ import {useIntro} from '../services/introClient';
 import Button from '../ui/Button';
 import GridBackdrop, {type GridBackdropApi} from '../components/GridBackdrop';
 import BuiltinResourcesNotice from '../components/BuiltinResourcesNotice';
-import ProactiveResponseToggle from '../components/ProactiveResponseToggle';
 import AvatarPanel from './panels/Avatar';
 import MemoryPanel from './panels/Memory';
 import ConfigAction from './settings/ConfigAction';
@@ -22,7 +21,7 @@ import VisionSettings from './settings/VisionSettings';
 import '../styles/settings.css';
 import '../styles/config-document.css';
 
-const chapters = ['language', 'dialogue', 'sound', 'models', 'memory', 'archive', 'desktop', 'browser', 'customize'] as const;
+const chapters = ['language', 'dialogue', 'sound', 'models', 'data', 'desktop', 'browser', 'customize'] as const;
 type Chapter = (typeof chapters)[number];
 const inset = 24;
 const canResumeMeeting = () => meetingSnapshot().state === 'active' || !!storedMeetingIdentity();
@@ -73,7 +72,6 @@ export default function Settings() {
     language: <GeneralTab section="language"/>,
     dialogue: <>
       <GeneralTab section="display"/>
-      <ProactiveResponseToggle placement="settings"/>
       <section className="config-preview" aria-labelledby="config-dialog-preview">
         <h3 id="config-dialog-preview">{t('config.preview')}</h3>
         <GeneralTab section="preview"/>
@@ -92,8 +90,10 @@ export default function Settings() {
       </ConfigAction>
       <BuiltinResourcesNotice/>
     </>,
-    memory: guided ? <MemoryPanel/> : <ConfigAction label={t('config.memories')} action={t('config.memoriesAction')} icon="backlog"><MemoryPanel/></ConfigAction>,
-    archive: <DataTransfer/>,
+    data: <>
+      {guided ? <MemoryPanel/> : <ConfigAction label={t('config.memories')} action={t('config.memoriesAction')} icon="backlog"><MemoryPanel/></ConfigAction>}
+      <DataTransfer/>
+    </>,
     desktop: <DesktopSettings/>,
     browser: <NativeCompanion plugin="browser" mode="inline"/>,
     customize: <div className="config-split config-split-stack">

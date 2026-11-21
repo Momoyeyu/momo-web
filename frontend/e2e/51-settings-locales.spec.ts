@@ -46,7 +46,7 @@ for (const width of [640, 960, 1280]) {
       await page.goto('/#/settings');
       await page.reload();
       await expect(page.locator('html')).toHaveAttribute('lang', lang === 'zh' ? 'zh-CN' : lang);
-      await expect(page.locator('.config-index button')).toHaveCount(9, {timeout: 2000});
+      await expect(page.locator('.config-index button')).toHaveCount(8, {timeout: 2000});
       const customize = page.locator('#config-customize');
       await expect(customize.getByRole('heading', {level: 2})).toHaveText(
         {zh:'定制',en:'Customize',ja:'カスタム'}[lang]!,
@@ -62,7 +62,18 @@ for (const width of [640, 960, 1280]) {
         await expect(button.locator('svg')).toBeVisible();
       }
       const dialogue = page.locator('#config-dialogue > .config-card');
-      await expect(dialogue.locator('.switch')).toHaveCount(2);
+      const switches = dialogue.locator('.dialogue-switches').getByRole('switch');
+      await expect(switches).toHaveCount(2);
+      const [statusToggle, proactiveToggle] = await Promise.all(
+        (await switches.all()).map(toggle => toggle.boundingBox()),
+      );
+      if (width >= 960) {
+        expect(statusToggle!.y).toBeCloseTo(proactiveToggle!.y, 0);
+        expect(statusToggle!.x + statusToggle!.width).toBeLessThan(proactiveToggle!.x);
+      } else {
+        expect(statusToggle!.x).toBeCloseTo(proactiveToggle!.x, 0);
+        expect(statusToggle!.y + statusToggle!.height).toBeLessThan(proactiveToggle!.y);
+      }
       await expect(dialogue.locator('.config-preview')).toBeVisible();
       await expect(dialogue.getByRole('button')).toHaveCount(0);
       const avatarBox = (await avatar.boundingBox())!;
@@ -100,10 +111,22 @@ for (const width of [640, 960, 1280]) {
       expect(picker.width).toBeLessThanOrEqual(200);
       expect(picker.y + picker.height / 2).toBeCloseTo(status.y + status.height / 2, 0);
 
+      const dataRows = page.locator('#config-data > .config-card > .opt-row');
+      await expect(dataRows).toHaveCount(2);
+      const transferActions = dataRows.last().getByRole('button');
+      await expect(transferActions).toHaveCount(2);
+      const [exportTip, importTip] = {zh:['导出','导入'],en:['Export','Import'],ja:['書き出し','読み込み']}[lang]!;
+      await expect(transferActions.first()).toHaveAttribute('data-tip', exportTip);
+      await expect(transferActions.last()).toHaveAttribute('data-tip', importTip);
+      const [exportBox, importBox] = await Promise.all(
+        (await transferActions.all()).map(action => action.boundingBox()),
+      );
+      expect(exportBox!.y).toBeCloseTo(importBox!.y, 0);
+      expect(exportBox!.x + exportBox!.width).toBeLessThan(importBox!.x);
+
       const actions = page.locator([
         '#config-models .config-model-row > button',
-        '#config-memory .opt-ctl > button',
-        '#config-archive .opt-ctl > button',
+        '#config-data .opt-ctl > button',
         '#config-desktop .desktop-config-group + .desktop-config-group .opt-ctl > button:not([role="switch"])',
         '#config-sound .opt-ctl > button:not(.sel-face, [role="switch"])',
       ].join(', '));
@@ -112,10 +135,11 @@ for (const width of [640, 960, 1280]) {
         const bounds = button.getBoundingClientRect();
         const row = button.closest('.opt-row, .config-model-row')!.getBoundingClientRect();
         const label = button.getAttribute('aria-label');
+        const leadsGroup = button.nextElementSibling?.matches('button');
         return bounds.width !== 34 || bounds.height !== 34
-          || Math.abs(bounds.right - row.right) > 1
+          || (leadsGroup ? bounds.right > row.right : Math.abs(bounds.right - row.right) > 1)
           || button.textContent !== '' || !button.querySelector('svg')
-          || !label || button.getAttribute('data-tip') !== label;
+          || !label || !button.getAttribute('data-tip');
       }).map(button => button.getAttribute('aria-label'))), `${lang} at ${width}px`).toEqual([]);
       expect(await page.locator('.config-scroll').evaluate(el=>el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
     }

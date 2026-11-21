@@ -97,7 +97,7 @@ test('settings spotlight persists CP1 and naming memory completes only after ret
  const guideEnd=await page.locator('.intro-guide').boundingBox(),dialogEnd=await page.locator('.dialog-box').boundingBox();
  expect(guideEnd!.y+guideEnd!.height).toBeLessThanOrEqual(dialogEnd!.y-8);
  await page.locator('[data-intro=chat-settings]').click();
- await page.locator('[data-intro=tab-memory]').click();
+ await page.locator('[data-intro=tab-data]').click();
  await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','name-pin');
  await page.locator('[data-intro=name-pin]').click();
  await page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true}).click();
@@ -179,7 +179,7 @@ test('refresh after naming resumes memory pinning and celebration requires confi
  await page.locator('.input-row input').fill('叫我小星');await page.locator('.input-row input').press('Enter');
  await expect.poll(async()=>JSON.parse((await call(directory,'/api/intro')).body).phase).toBe('memory');
  await page.reload();await expect(page.locator('.title-screen')).toBeVisible();
- await page.locator('[data-intro=settings]').click();await page.locator('[data-intro=tab-memory]').click();
+ await page.locator('[data-intro=settings]').click();await page.locator('[data-intro=tab-data]').click();
  await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','name-pin');
  await expect(page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true})).toBeDisabled();
  await page.locator('[data-intro=name-pin]').click();
@@ -221,7 +221,7 @@ test('real configured model completes settings health and durable first-name mem
  await expect(page.locator('.intro-guide')).toHaveAttribute('data-step','chat-settings',{timeout:90000});
  await expect(page.locator('.intro-guide')).toHaveAttribute('data-ready','true',{timeout:90000});
  await page.locator('[data-intro=chat-settings]').click();
- await page.locator('[data-intro=tab-memory]').click();await page.locator('[data-intro=name-pin]').click();
+ await page.locator('[data-intro=tab-data]').click();await page.locator('[data-intro=name-pin]').click();
  await page.locator('.intro-guide').getByRole('button',{name:'继续',exact:true}).click();await page.locator('[data-intro=settings-back]').click();
  await page.locator('.intro-guide').getByRole('button',{name:'开始我们的日常'}).click();await expect.poll(async()=>JSON.parse((await call(directory,'/api/intro')).body).phase).toBe('completed');
  expect(JSON.stringify(JSON.parse((await call(directory,'/api/memories')).body))).toContain('小星');

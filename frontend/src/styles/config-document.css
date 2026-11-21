@@ -36,7 +36,7 @@
 .config-card > .opt-row:not(:first-child) {border-top: 1px solid var(--line-soft);}
 .config-card .opt-label {width: auto; white-space: normal;}
 .config-card .opt-ctl {justify-content: flex-start;}
-:is(#config-sound, #config-customize) > .config-card, .language-pair {container-type: inline-size;}
+:is(#config-dialogue, #config-sound, #config-customize) > .config-card, .language-pair {container-type: inline-size;}
 .config-split, .language-pair {display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));}
 .config-split {position: relative; column-gap: clamp(18px, 4cqw, 32px);}
 .config-split::before {
@@ -51,8 +51,9 @@
 @container (max-width: 570px) {
   .config-split.config-split-stack {grid-template-columns: minmax(0, 1fr);}
   .config-split-stack::before {display: none;}
-  .config-split-stack > * + * {border-block-start: 1px solid var(--line-soft);}
+  .config-card .config-split-stack > * + * {border-block-start: 1px solid var(--line-soft);}
 }
+.config-card .dialogue-switches > .opt-row {grid-template-columns: minmax(0, 1fr) auto; gap: 8px;}
 .language-pair {--select-width: 144px; gap: clamp(16px, 2.5cqw, 32px);}
 .sound-pair {--select-width: 168px; display: grid; grid-column: 1 / -1; grid-template-columns: subgrid;}
 .sound-pair + .sound-pair > .opt-row {border-top: 1px solid var(--line-soft);}
@@ -78,7 +79,7 @@
   display: inline-flex; justify-content: center; align-items: center; text-align: center;
   white-space: nowrap; line-height: 1.2; font-size: 14px; letter-spacing: normal;
 }
-:is(#config-memory, #config-archive) .config-card > .opt-row > .opt-ctl {justify-content: flex-end;}
+#config-data .config-card > .opt-row > .opt-ctl {justify-content: flex-end;}
 .config-preview {padding: 9px 0; font-size: 13px; color: var(--text-dim);}
 .config-preview h3 {margin: 0; font: inherit; font-weight: 600;}
 .config-preview .dialog-preview {margin-block: 10px;}

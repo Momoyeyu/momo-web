@@ -22,7 +22,7 @@ test("目录章节与正文顺序一致，最后一章可以定位到阅读线",
   await openApp(page, "settings");
   const index = page.locator(".config-index button");
   expect(await index.allTextContents()).toEqual(await page.locator(".config-scroll h2").allTextContents());
-  await expect(index).toHaveCount(9);
+  await expect(index).toHaveCount(8);
   for (const link of await index.all()) {
     await link.click();
     await expect(link).toHaveAttribute("aria-current", "location");
