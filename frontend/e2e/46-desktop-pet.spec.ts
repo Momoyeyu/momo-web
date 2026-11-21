@@ -217,7 +217,7 @@ test('pet mode and its return control work with desktop access declined',async({
  await page.getByRole('button',{name:zh.desktop.enter,exact:true}).click();
  await expect(page.locator('html')).toHaveClass(/desktop-pet/);
  const rail=page.locator('.desktop-pet-controls');
- await expect(rail.getByRole('button',{name:zh.desktop.observe})).toHaveAttribute('aria-pressed','false');
+ await expect(rail.getByRole('button',{name:zh.desktop.observe,exact:true})).toHaveCount(0);
  await rail.getByRole('button',{name:zh.desktop.return,exact:true}).click();
  await expect(page.locator('html')).not.toHaveClass(/desktop-pet/);
  expect(frames).toEqual([]);
