@@ -13,6 +13,7 @@ export interface PermissionGuideCopy {
  revealLabel?:string;
 }
 export interface DesktopWindowBridge {
+ chooseMinecraftInstance?(): Promise<string | null>;
  requestSystemPermission?(kind:"screen"|"input"):Promise<void>;
  openPermissionGuide?(kind:"screen"|"input",copy:PermissionGuideCopy):Promise<void>;
  closePermissionGuide?():Promise<void>;

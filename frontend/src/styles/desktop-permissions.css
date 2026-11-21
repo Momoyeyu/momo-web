@@ -7,7 +7,7 @@
 }
 .config-card .desktop-config-column > .opt-row + .opt-row {border-top: 1px solid var(--line-soft);}
 .desktop-permission-action {
-  min-width: 86px;
+  width: var(--action-width, 112px);
   min-height: 34px;
   padding: 5px 10px;
   font-size: 14px;
@@ -20,7 +20,7 @@
   border-color: var(--line-soft);
   opacity: 1;
 }
-.desktop-config .desktop-permission-action {width: var(--action-width); padding-inline: 6px;}
+.desktop-config .desktop-permission-action {padding-inline: 6px;}
 .desktop-permission-modal {
   box-sizing: border-box;
   width: min(500px, 92cqw);

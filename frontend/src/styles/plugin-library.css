@@ -71,8 +71,11 @@
 .extension-detail select,.extension-detail input{width:100%;min-width:0;box-sizing:border-box;padding:10px 12px;font:inherit;color:var(--text);background:var(--input-bg);border:1px solid var(--line);border-radius:var(--r-md,10px)}
 .extension-detail select:disabled{opacity:.6}
 .extension-detail-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;padding-top:12px}
-.extension-detail-advanced{border-top:1px solid var(--line);padding-top:16px}
-.extension-detail-advanced summary{font-size:13px;color:var(--text-dim);cursor:pointer}
+.minecraft-install{border-top:1px solid var(--line)}
+.minecraft-install .opt-ctl{justify-content:flex-end;gap:8px;}
+.minecraft-install-confirm .opt-row{display:flex;flex-direction:column;align-items:stretch;gap:6px;}
+.minecraft-install-confirm .opt-label{width:auto;}
+.minecraft-install-confirm input{width:100%;}
 .extension-detail-notice{margin:0;font-size:13px;line-height:1.5;color:var(--text-dim)}
 .extension-detail-notice[role=alert]{color:var(--danger-text)}
 .activity-tabs{display:flex;gap:4px;padding:4px;border-radius:12px;background:var(--input-bg)}

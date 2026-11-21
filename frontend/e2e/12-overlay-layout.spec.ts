@@ -61,7 +61,9 @@ test('settings overlays and resource controls remain reachable in a small window
   await expect.poll(() => mcp.evaluate(el => Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop))).toBeLessThan(2);
   const mcpLast = await mcp.getByRole('button').last().boundingBox();
   expect(mcpLast!.y + mcpLast!.height).toBeLessThanOrEqual(mcpBounds!.y + mcpBounds!.height + 1);
-  await page.getByRole('button', { name: /从 JSON 填入/ }).click();
+  await mcp.getByRole('button', {name:'导入 JSON',exact:true}).click();
+  await expect(mcp.getByRole('button',{name:'选择文件'})).toBeVisible();
+  await mcp.getByRole('button', {name:'手动填写',exact:true}).click();
   await page.getByRole('dialog').last().locator('.sel-face').scrollIntoViewIfNeeded();
   await page.getByRole('dialog').last().locator('.sel-face').click();
   const modalBounds = await page.getByRole('dialog').last().boundingBox();

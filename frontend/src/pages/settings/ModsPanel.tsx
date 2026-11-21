@@ -4,6 +4,8 @@ import {apiJson,jsonInit} from '../../services/http';
 import {runtimeFetch} from '../../services/runtime';
 import {refreshActivities} from '../../services/extensionActivities';
 import {applyModChange,refreshMods,useMods,type InstalledMod} from '../../services/mods';
+import {retiredSocialRecords, type RetiredSocialRecord} from '../../services/socialClient';
+import Confirm from '../../ui/Confirm';
 import Pager from '../../ui/Pager';
 import {clampPage} from '../../lib/paging';
 import FieldRow from '../../ui/FieldRow';
@@ -14,6 +16,7 @@ import Modal from '../../ui/Modal';
 import Switch from '../../ui/Switch';
 import OfficialPlugins from './OfficialPlugins';
 import MinecraftCompanion from './MinecraftCompanion';
+import RetiredSocialRecords from './RetiredSocialRecords';
 
 type OfficialMod = {id:string; name:string; version:string; compatible:boolean};
 type LibraryView = 'installed' | 'catalog';
@@ -22,6 +25,16 @@ type Selection = {id:string; mode:'manage'|'install'|'remove'} | {mode:'local'; 
 export default function ModsPanel(){
   const t=useT(), mods=useMods(), file=useRef<HTMLInputElement>(null);
   const [manager,setManager]=useState(false);
+  const [history,setHistory]=useState(false);
+  const [retired,setRetired]=useState<RetiredSocialRecord[]>([]);
+  useEffect(() => {
+    if (!manager) return;
+    const controller = new AbortController();
+    void retiredSocialRecords(controller.signal).then(records => {
+      if (!controller.signal.aborted) setRetired(records);
+    }).catch(() => {});
+    return () => controller.abort();
+  }, [manager]);
   const [view,setView]=useState<LibraryView>('installed');
   const [catalog,setCatalog]=useState<OfficialMod[]|null>(null);
   const [catalogFailed,setCatalogFailed]=useState(false);
@@ -114,6 +127,11 @@ export default function ModsPanel(){
       : view==='catalog' && catalog===null ? <p role="status">{t('config.loading')}</p>
       : !matches.length && <p className="muted">{code(entries.length?'noMatches':view==='installed'?'empty':'catalogEmpty')}</p>}
       <div className="mod-library-rows">
+        {!!retired.length && <FieldRow label={t('social.retiredLibrary')}>
+          <span className="config-value">{t('social.retiredCount',{count: String(retired.length)})}</span>
+          <IconButton icon="backlog" label={t('social.retiredLibrary')} tip={t('social.retiredLibrary')}
+            disabled={busy} onClick={() => setHistory(true)}/>
+        </FieldRow>}
         {matches.slice(paging.page*5,paging.page*5+5).map(mod=><FieldRow key={mod.id} label={mod.name}>
           {'enabled' in mod ? <div className="mod-row-actions">
             <Switch title={mod.name} on={mod.enabled} disabled={busy} onChange={enabled=>setEnabled(mod,enabled)}/>
@@ -130,8 +148,15 @@ export default function ModsPanel(){
       {filterable&&<Pager page={paging.page} pages={paging.pages} onChange={setPage}/>}
       {!selection&&error&&<p role="alert">{code(error)} {button('retry',()=>{setError('');void load();})}</p>}
     </Modal>}
-    {selection&&<Modal label={selection.mode==='local'?code('import'):name} onClose={()=>open(null)} describedBy={selection.mode==='remove'?'mod-remove-hint':undefined}
-      className={selection.mode==='remove'?'extension-modal mod-remove-dialog':'extension-modal'}>
+    {history && <RetiredSocialRecords records={retired} onClose={() => setHistory(false)} onChanged={records => {
+      setRetired(records);
+      if (!records.length) setHistory(false);
+    }}/>}
+    {selection?.mode === 'remove' && <Confirm title={code('remove')} subject={name}
+      message={code('removeHint')} error={error ? code(error) : undefined} danger busy={busy}
+      confirmLabel={code('remove')} onCancel={() => open(null)}
+      onConfirm={() => void run('/api/mods/' + selection.id, {method:'DELETE'}, null)}/>}
+    {selection&&selection.mode!=='remove'&&<Modal label={selection.mode==='local'?code('import'):name} onClose={()=>open(null)} className="extension-modal">
       <div className="extension-detail">
       <header className="settings-dialog-heading mod-dialog-heading">
         <DialogBackButton onClick={()=>open(null)} disabled={busy}/>
@@ -151,20 +176,15 @@ export default function ModsPanel(){
       </>
       : selection.mode==='install' ? <><p>{code('officialHint')}</p>
         {button('install',()=>void run('/api/mods/official/'+selection.id,{method:'POST'},{id:selection.id,mode:'manage'}))}</>
-      : selection.mode==='remove' ? <p id="mod-remove-hint">{code('removeHint')}</p>
       : item && <><p>{item.version} · {code(item.enabled?'enabled':'disabled')}</p>
         <p>{code(item.source==='official'?'officialSource':'localSource')} · {(item.platforms??[]).map(platform=>platform==='*'?code('allPlatforms'):platform).join(', ')}</p>
         <div className="extension-detail-actions">{button(item.enabled?'disable':'enable',()=>setEnabled(item,!item.enabled))}</div>
         {item.runtimeError && <p role="alert">{code('runtimeError')} {button('retry',()=>void run('/api/mods/'+item.id,jsonInit('PATCH',{enabled:false}),selection))}</p>}
         {item.enabled&&item.id==='momo.qq'&&<OfficialPlugins/>}
-        {item.enabled&&item.id==='momo.minecraft'&&<MinecraftCompanion/>}
+        {item.enabled&&item.id==='momo.minecraft'&&<MinecraftCompanion packageVersion={item.version}/>}
         {item.kind==='content'&&item.resources.map(r=><p key={r.path}>{code(r.type)} · {r.path}</p>)}
       </>}
       {error&&<p role="alert">{code(error)}</p>}
-      {selection.mode==='remove'&&<div className="modal-foot">
-        <Button variant="ghost" className="btn-danger" disabled={busy}
-          onClick={()=>void run('/api/mods/'+selection.id,{method:'DELETE'},null)}>{code('remove')}</Button>
-      </div>}
       </div>
     </Modal>}
   </>;

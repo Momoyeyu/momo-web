@@ -30,7 +30,7 @@
 .mcp-section .pager-text {padding: 0;}
 .mcp-remove {margin-inline-end: auto;}
 
-.vision-settings > p, .asr-status > p {
+.asr-status > p {
   margin: 0;
   padding-bottom: 8px;
   font-size: 12px;
@@ -278,14 +278,6 @@
   font-size: 12px;
 }
 
-/* 模型页同一列的行内动作按钮（「测试」与「显示」）**共用同一个定宽**：
-   各自调宽度就会像之前那样按下一个又忘了另一个，同列按钮始终对不齐。
-   70px = 最坏一档的自然宽度 + 余量。实测（12px 字体）：
-     ✓ 999ms 66.5   ✗ 未入力 60.9   ✗ failed 57.9   ✗ no URL 68.5   ✗ 404 46.5
-   失败/未配置文案已按「只留值」精简（失败/失敗/fail、未填/なし/none），
-   故最坏一档是 ✓ 999ms = 66.5px；70px 保证结果出现时宽度不变。
-   注意别用 scrollWidth 判定是否溢出：<button> 溢出时内容被居中裁掉，scrollWidth 不变大；
-   要量得把 width 设 auto 量自然宽度。 */
 .row-btn {
   flex: none;
   width: 70px;
@@ -295,24 +287,31 @@
   white-space: nowrap;
 }
 
-/* .probe-btn 只作标记（状态色见 .probe-ok / .probe-err，宽度走 .row-btn），
-   同时供选择器与用例定位「探测按钮」。 */
-
-.probe-ok,
-.probe-err,
-.probe-info {
+.probe-err {
   flex: none;
   font-size: 12px;
-  white-space: nowrap;
-}
-.probe-ok {
-  color: var(--ok);
-}
-.probe-err {
   color: var(--danger);
 }
-.probe-info {
-  opacity: 0.6;
+.probe-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+button.probe-btn[data-probe-state="passed"] {--probe-result: var(--ok);}
+button.probe-btn:is([data-probe-state="failed"], [data-probe-state="unavailable"]) {--probe-result: var(--danger-text);}
+button.probe-btn[aria-disabled="true"] {cursor: default;}
+button.probe-btn[data-probe-state="running"] {--probe-result: var(--accent);}
+button.probe-btn:not([data-probe-state="idle"]),
+button.probe-btn:not([data-probe-state="idle"]):hover {color: var(--probe-result);}
+button.probe-btn[data-probe-state="running"] svg {animation: model-probe-spin .85s linear infinite;}
+@keyframes model-probe-spin {to {transform: rotate(360deg);}}
+@media (prefers-reduced-motion: reduce) {
+  button.probe-btn[data-probe-state="running"] svg {animation: none;}
 }
 
 /* --- 对话框透明度预览（复用 chat 的 dialog-box 外观） --- */
@@ -395,18 +394,14 @@
   font-size: 13px;
 }
 
-.ext-modal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 8px;
-}
+.ext-modal-head {margin-bottom: 8px;}
 
 .ext-modal-head .opt-group {
   margin: 0 4px;
 }
 
+.ext-json {min-width: 0;}
+.ext-json-preview {overflow-wrap: anywhere;}
 .ext-json textarea {
   width: 100%;
   resize: vertical;
@@ -456,16 +451,6 @@
   min-width: 0;
   font-family: monospace;
   font-size: 12px;
-}
-
-/* URL 有问题时，测试按钮变成警示图标：禁用态默认会降到 45% 透明，
-   那样图标几乎看不见——这里保持不透明并用警示色。 */
-.probe-btn.probe-warn,
-.probe-btn.probe-warn:disabled {
-  opacity: 1;
-  color: var(--danger-text, #e8756a);
-  border-color: var(--danger-line, rgba(232, 117, 106, 0.45));
-  cursor: default;
 }
 
 /* 参考音频：文件名占一行（超长省略），右侧上传按钮 */

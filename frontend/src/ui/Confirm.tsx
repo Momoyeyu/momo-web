@@ -11,7 +11,9 @@ import "../styles/modal.css";
 
 export default function Confirm({
   title,
+  subject,
   message,
+  error,
   confirmLabel,
   danger = false,
   busy = false,
@@ -19,7 +21,9 @@ export default function Confirm({
   onCancel,
 }: {
   title: string;
+  subject?: string;
   message: string;
+  error?: string;
   /** 确认键文案：写清楚会发生什么（「覆盖」「读取」「删除」），不用「确定」。 */
   confirmLabel: string;
   danger?: boolean;
@@ -28,12 +32,15 @@ export default function Confirm({
   onCancel: () => void;
 }) {
   const descriptionId = useId();
+  const close = () => {if (!busy) onCancel();};
   return (
-    <Modal onClose={onCancel} label={title} describedBy={descriptionId} className="confirm-box">
+    <Modal onClose={close} label={title} describedBy={subject ? descriptionId + "-subject " + descriptionId : descriptionId} className="confirm-box">
       <h2 className="confirm-title">{title}</h2>
+      {subject && <p id={descriptionId + "-subject"} className="confirm-subject">{subject}</p>}
       <p id={descriptionId} className="confirm-text">{message}</p>
+      {error && <p className="probe-err" role="alert">{error}</p>}
       <div className="modal-foot">
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant="ghost" disabled={busy} onClick={close}>
           {t("common.cancel")}
         </Button>
         <Button

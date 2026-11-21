@@ -155,7 +155,9 @@ export const en: Dict = {
   "saveError": "Could not save. Check the current settings and try again.",
   "unknownHold": "QQ messaging is paused while a delivery result is unknown. Records retain the actual outcome; messages are never resent automatically.",
   "recordsError": "Records are unavailable.",
-  "retiredTitle": "Unresolved archived operations ({count})",
+  "retiredLibrary": "History to review",
+  "retiredCount": "{count} pending",
+  "retiredHandle": "Review…",
   "retiredHint": "These records came from the retired WeChat bridge.",
   "retiredSource": "Retired WeChat operation",
   "retiredAccount": "Old account",
@@ -377,7 +379,7 @@ export const en: Dict = {
     "incompatible": "Check the version and current mod state.",
     "officialHint": "Download and verify the signed official package, then enable it.",
     "importHint": "The manifest and assets are checked before installation.",
-    "removeHint": "Remove this mod from the current profile?"
+    "removeHint": "This uninstalls the mod and stops its active integrations."
 },
   title: {
     tagline: "Can you feel my heart?",
@@ -510,6 +512,7 @@ export const en: Dict = {
     showKey: "Show",
     hideKey: "Hide",
     test: "Test",
+    probe: {running: "Testing", passed: "Test passed", failed: "Test failed", unavailable: "Enter the service URL and model first", latency: "Test passed · {ms} ms", http: "Test failed · {code}"},
     testNeedUrl: "none",
     testFail: "fail",
     extHint:
@@ -525,7 +528,7 @@ export const en: Dict = {
     extNamePh: "e.g. tavily",
     extTransport: "Transport",
     extConnections: "MCP",
-    extImportFile: "Import file",
+    extImportFile: "Choose file",
     extTransports: {
       http: "Streamable HTTP",
       stdio: "stdio · local command",
@@ -543,10 +546,12 @@ export const en: Dict = {
     extHeaders: "Headers",
     extHeaderAdd: "＋ Add header",
     extEnabled: "Enabled",
-    extJsonBtn: "⇩ Fill from JSON",
+    extManual: "Manual",
+    extJsonBtn: "Import JSON",
+    extJsonBatch: "Import {count} connections",
     extJsonPh:
       '{"mcpServers": {"tavily": {"command": "npx", "args": ["-y", "tavily-mcp@latest"], "env": {"TAVILY_API_KEY": "…"}}}}',
-    extJsonApply: "Apply",
+    extJsonApply: "Fill form",
     extJsonErr:
       "Failed to parse JSON: need an mcpServers map or a single config with command / url",
     extKvKey: "KEY",
@@ -591,5 +596,7 @@ export const en: Dict = {
     dropHint: "Drop a .zip here, or click to choose",
     empty: "No matching model.",
   },
-  minecraft: {"reason": {"target": "The target is no longer visible. Observe again.", "source": "No suitable source is visible nearby. Explore another area.", "path": "No usable route was found.", "tool": "A suitable tool must first be crafted or obtained.", "materials": "Required materials, food or trade items are missing.", "station": "Check the current station, recipe or screen.", "inventory": "Make space in the inventory or clear the cursor.", "connection": "The activity or connection expired. Recheck the scene.", "timeout": "The action took too long. Momo will reconsider.", "build": "Construction is blocked. Momo will adjust her position or plan.", "retreat": "Health was low. Withdrew to a safe distance.", "condition": "The condition cannot be confirmed here. Momo needs to check the scene."}, "pausePlay": "Pause play", "resumePlay": "Resume play", "currentGoal": "Current goal", "blockedHint": "This action was blocked. Momo will consider the actual scene and her goal before choosing another step.", "skill": {"wait": "Wait", "gather": "Collect resources", "pickup": "Pick up", "waitFor": "Wait for output", "trade": "Trade", "navigate": "Navigate", "follow": "Follow", "mine": "Gather", "place": "Place", "interactBlock": "Use block", "interactEntity": "Interact", "attack": "Combat", "eat": "Eat", "useItem": "Use item", "inventory": "Inventory", "craft": "Craft", "workstation": "Workstation", "closeScreen": "Close screen", "respawn": "Respawn", "plan": "Follow plan", "rename": "Rename item", "selectItem": "Prepare item", "placeNearby": "Place nearby", "build": "Build", "waitUntil": "Wait for condition"}, "taskState": {"queued": "Queued", "running": "Running", "paused": "Paused", "succeeded": "Complete", "failed": "Blocked", "cancelled": "Cancelled", "retreated": "Withdrew"}, "play": "Control player and interact with the world", "existingHint": "Connect to your open Minecraft game. Install the momo mod in that instance and enter a world. Stopping companionship keeps your game open.", "session": "Current game", "selectSession": "Select an open world", "install": "Install / update connection mod", "instancePath": "Existing game instance folder", "remembered": "Remembered account. Sign-in and Minecraft ownership will be checked again when starting.", "advancedResources": "Advanced: import local resource folder", "waitingLogin": "Waiting for Microsoft sign-in…", "loginExpired": "The sign-in code expired. Start sign-in again.", "joinHint": "Launch opens the game menu. Join the exact allowed server yourself; the world field is its dimension ID, for example minecraft:overworld. No action is authorized in other worlds.", "title": "Minecraft companion", "description": "Connect to your open game and current character.", "running": "Running", "stopped": "Stopped", "configure": "Configure", "dismiss": "Close", "requirements": "Requires Java 21, verified local resources, your Microsoft account with Minecraft ownership, Boot and vision.", "resourcesReady": "Resources verified", "resourcesMissing": "Resources need preparation", "resources": "Prepared resource folder", "prepare": "Prepare resources", "signedOut": "Signed out", "clientId": "Microsoft public client ID", "clientHint": "Use your own registered public client ID. Do not paste passwords or access tokens.", "login": "Sign in with Microsoft", "deviceHint": "Open Microsoft’s page and enter this code.", "checkLogin": "Check sign-in", "logout": "Sign out", "server": "Allowed server (host:port)", "world": "Allowed world identifier", "observe": "Observe is required. Grants apply only to this account, server and world.", "chat": "Allow chat", "move": "Allow movement", "start": "Start companion", "stop": "Stop companion", "error": "Could not connect. Check the mod, current world and permission.", "refresh": "Find game", "permissions": "Play permissions", "permissionsHint": "Applies only to this character and world. Click Stop companion or explicitly ask in your local chat to stop Minecraft companionship to revoke this connection. The game stays open.", "installHint": "Select your existing Fabric instance folder, then restart that game. No new client or account is required.", "actualProgress": "Verified progress"},
+  minecraft: {
+    installLabel: "Connection mod", chooseInstall: "Install…", chooseUpdate: "Update…", bridgeDetected: "Installed mod detected", installDone: "Installed. Restart the game.", packageVersion: "Mod package version {version}", installConfirm: "Install", installError: "Could not install the connection mod. Check the instance folder and Fabric dependency.",
+   "reason": {"target": "The target is no longer visible. Observe again.", "source": "No suitable source is visible nearby. Explore another area.", "path": "No usable route was found.", "tool": "A suitable tool must first be crafted or obtained.", "materials": "Required materials, food or trade items are missing.", "station": "Check the current station, recipe or screen.", "inventory": "Make space in the inventory or clear the cursor.", "connection": "The activity or connection expired. Recheck the scene.", "timeout": "The action took too long. Momo will reconsider.", "build": "Construction is blocked. Momo will adjust her position or plan.", "retreat": "Health was low. Withdrew to a safe distance.", "condition": "The condition cannot be confirmed here. Momo needs to check the scene."}, "pausePlay": "Pause play", "resumePlay": "Resume play", "currentGoal": "Current goal", "blockedHint": "This action was blocked. Momo will consider the actual scene and her goal before choosing another step.", "skill": {"wait": "Wait", "gather": "Collect resources", "pickup": "Pick up", "waitFor": "Wait for output", "trade": "Trade", "navigate": "Navigate", "follow": "Follow", "mine": "Gather", "place": "Place", "interactBlock": "Use block", "interactEntity": "Interact", "attack": "Combat", "eat": "Eat", "useItem": "Use item", "inventory": "Inventory", "craft": "Craft", "workstation": "Workstation", "closeScreen": "Close screen", "respawn": "Respawn", "plan": "Follow plan", "rename": "Rename item", "selectItem": "Prepare item", "placeNearby": "Place nearby", "build": "Build", "waitUntil": "Wait for condition"}, "taskState": {"queued": "Queued", "running": "Running", "paused": "Paused", "succeeded": "Complete", "failed": "Blocked", "cancelled": "Cancelled", "retreated": "Withdrew"}, "play": "Control player and interact with the world", "existingHint": "Connect to your open Minecraft game. Install the momo mod in that instance and enter a world. Stopping companionship keeps your game open.", "session": "Current game", "selectSession": "Select an open world", "install": "Install / update connection mod", "instancePath": "Existing game instance folder", "remembered": "Remembered account. Sign-in and Minecraft ownership will be checked again when starting.", "advancedResources": "Advanced: import local resource folder", "waitingLogin": "Waiting for Microsoft sign-in…", "loginExpired": "The sign-in code expired. Start sign-in again.", "joinHint": "Launch opens the game menu. Join the exact allowed server yourself; the world field is its dimension ID, for example minecraft:overworld. No action is authorized in other worlds.", "title": "Minecraft companion", "description": "Connect to your open game and current character.", "running": "Running", "stopped": "Stopped", "configure": "Configure", "dismiss": "Close", "requirements": "Requires Java 21, verified local resources, your Microsoft account with Minecraft ownership, Boot and vision.", "resourcesReady": "Resources verified", "resourcesMissing": "Resources need preparation", "resources": "Prepared resource folder", "prepare": "Prepare resources", "signedOut": "Signed out", "clientId": "Microsoft public client ID", "clientHint": "Use your own registered public client ID. Do not paste passwords or access tokens.", "login": "Sign in with Microsoft", "deviceHint": "Open Microsoft’s page and enter this code.", "checkLogin": "Check sign-in", "logout": "Sign out", "server": "Allowed server (host:port)", "world": "Allowed world identifier", "observe": "Observe is required. Grants apply only to this account, server and world.", "chat": "Allow chat", "move": "Allow movement", "start": "Start companion", "stop": "Stop companion", "error": "Could not connect. Check the mod, current world and permission.", "refresh": "Find game", "permissions": "Play permissions", "permissionsHint": "Applies only to this character and world. Click Stop companion or explicitly ask in your local chat to stop Minecraft companionship to revoke this connection. The game stays open.", "installHint": "Select your existing Fabric instance folder, then restart that game. No new client or account is required.", "actualProgress": "Verified progress"},
 };

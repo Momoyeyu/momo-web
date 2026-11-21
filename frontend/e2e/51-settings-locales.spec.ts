@@ -20,8 +20,8 @@ test('uninstall confirmation leaves room below its footer divider', async ({page
   await page.locator('#config-customize').getByRole('button',{name:'管理模组',exact:true}).click();
   const library = page.getByRole('dialog',{name:'模组库',exact:true});
   await library.getByRole('button',{name:'卸载 Fixture mod',exact:true}).click();
-  const dialog = page.getByRole('dialog',{name:'Fixture mod',exact:true});
-  await expect(dialog.locator('.mod-dialog-heading').getByRole('button',{name:'返回'})).toBeVisible();
+  const dialog = page.getByRole('dialog',{name:'卸载模组',exact:true});
+  await expect(dialog.getByText('Fixture mod',{exact:true})).toBeVisible();
   const footer = dialog.locator('.modal-foot');
   const action = footer.getByRole('button',{name:'卸载模组'});
   await expect(action).toBeVisible();

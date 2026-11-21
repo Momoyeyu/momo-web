@@ -4,13 +4,14 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { useT } from "../../i18n";
 import { getState, subscribe, update } from "../../lib/store";
-import type { Settings as SettingsData } from "../../lib/types";
 import { probeLlm } from "../../services/probe";
 import { uploadRefAudio } from "../../services/ttsClient";
 import { auditionVoice, invalidateWarmup, warmVoice } from "../../services/ttsWarmup";
 import { useRoute } from "../../router";
 import type { ProbeResult } from "../../services/probe";
 import Button from "../../ui/Button";
+import IconButton from "../../ui/IconButton";
+import ProbeButton from "./ProbeButton";
 import FieldRow from "../../ui/FieldRow";
 import Hint from "../../ui/Hint";
 import Switch from "../../ui/Switch";
@@ -44,100 +45,61 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
   const firstSetup = section === "llm" && intro.data?.phase === "setup";
   const settings = firstSetup ? {...saved, llm: draft} : saved;
 
-  const audition = useRef<AbortController | null>(null);
+  const request = useRef<AbortController | null>(null);
   const voiceEdited = useRef(false);
   const route = useRoute();
-  useEffect(() => () => audition.current?.abort(), [route, section]);
+  const signature = section === "llm"
+    ? JSON.stringify([section, settings.llm.url, settings.llm.key, settings.llm.model, settings.llm.thinking])
+    : JSON.stringify([section, settings.tts.url, settings.tts.key, settings.tts.voice, settings.tts.prompt, settings.general.chatLang, settings.general.lang]);
+  const [showKey, setShowKey] = useState(false);
+  const [probe, setProbe] = useState<{signature: string; result: ProbeResult | "running"}>();
+  const result = probe?.signature === signature ? probe.result : undefined;
+  const running = result === "running";
 
-  const [showKey, setShowKey] = useState<Record<EndpointSection, boolean>>({
-    llm: false,
-    tts: false,
-  });
-  const [probes, setProbes] = useState<
-    Partial<Record<EndpointSection, ProbeResult | "running">>
-  >({});
-  // 拓展：null=无弹窗，-1=新增，>=0=编辑第 i 条；表单草稿归弹窗组件管。
-  // 语音输出开关：与 chat 工具条同一个开关（引擎运行时态）。
+  useEffect(() => {
+    setProbe(current => current?.signature === signature ? current : undefined);
+    return () => {
+      request.current?.abort();
+      request.current = null;
+    };
+  }, [route, signature]);
 
-  const PROBES: Record<
-    EndpointSection,
-    (s: SettingsData) => Promise<ProbeResult | undefined>
-  > = {
-    llm: async (s) => {
-      if(!introRestricted())return probeLlm(s.llm);
-      const started = performance.now();
-      try{await verifyIntro(firstSetup ? s.llm : undefined);return {ok:true,detail:Math.round(performance.now()-started)+"ms"};}catch{return {ok:false,detail:"invalid response"};}
-    },
-    tts: () => {
-      audition.current?.abort();
-      const controller = new AbortController();
-      audition.current = controller;
-      return auditionVoice(controller.signal)
-        .then(result => controller.signal.aborted ? undefined : result)
-        .catch(() => controller.signal.aborted ? undefined : { ok: false, detail: "failed" });
-    },
-  };
-
-  // 探测结果直接显示在按钮上，固定展示 PROBE_HOLD_MS 后复原；期间不可再点。
-  const PROBE_HOLD_MS = 2500;
-  const probeTimers = useRef<Partial<Record<EndpointSection, number>>>({});
-  useEffect(
-    () => () => {
-      for (const id of Object.values(probeTimers.current)) clearTimeout(id);
-    },
-    [],
-  );
-
-  const runProbe = (sec: EndpointSection): void => {
-    if (probes[sec] !== undefined) return;
-    setProbes((p) => ({ ...p, [sec]: "running" }));
-    void PROBES[sec](settings).then((r) => {
-      setProbes((p) => ({ ...p, [sec]: r }));
-      if (!r) return;
-      clearTimeout(probeTimers.current[sec]);
-      probeTimers.current[sec] = window.setTimeout(() => {
-        setProbes((p) => {
-          const n = { ...p };
-          delete n[sec];
-          return n;
-        });
-      }, PROBE_HOLD_MS);
-    });
-  };
-
-  /**
-   * 按钮内联文案：running→「…」，否则 ✓/✗ + 简短结果。
-   *
-   * 只显示「值」不带说明，好让定宽按钮容得下最坏一档：
-   *   延迟 ≥1s 记成 1.2s（否则 1234ms 会把按钮撑破）
-   *   HTTP 状态码只留数字（✗ 404 比 ✗ HTTP 404 短，且与 ✓ 122ms 对称）
-   */
-  /** 探测按钮的文案：**封闭短词汇表**，永不透传后端的原始错误串。
-      定宽按钮里只能放这类短词（测试/…/0.8s/失败/未填/缺参考音/缺模型）；
-      具体原因（HTTP 400、backend unreachable 之类）属于内部实现，留在日志里即可。 */
-  /** 探测按钮的文案：**封闭短词汇表**（✓ / ✓ 122ms / ✗ 失败 / ✗ 未填 …），
-      既不透传后端的原始错误串，也不显示 provider 名（"gpt-sovits" 之类属于内部实现）。 */
-  const probeLabel = (sec: EndpointSection): { text: string; cls: string } => {
-    const r = probes[sec];
-    if (!r) return { text: t(sec === "tts" ? "settings.audition" : "settings.test"), cls: "" };
-    if (r === "running") return { text: "…", cls: "probe-info" };
-    if (r.ok) {
-      const ms = /^(\d+)ms$/.exec(r.detail);
-      if (!ms) return { text: "✓", cls: "probe-ok" };
-      const n = Number(ms[1]);
-      return { text: n >= 1000 ? `✓ ${(n / 1000).toFixed(1)}s` : `✓ ${r.detail}`, cls: "probe-ok" };
+  async function runProbe() {
+    if (request.current) return;
+    const controller = new AbortController();
+    request.current = controller;
+    setProbe({signature, result: "running"});
+    try {
+      let response: ProbeResult;
+      if (section === "tts") {
+        response = await auditionVoice(controller.signal);
+      } else if (introRestricted()) {
+        await verifyIntro(firstSetup ? settings.llm : undefined);
+        response = {ok: true, detail: ""};
+      } else {
+        response = await probeLlm(settings.llm, controller.signal);
+      }
+      if (!controller.signal.aborted) setProbe({signature, result: response});
+    } catch {
+      if (!controller.signal.aborted) setProbe({signature, result: {ok: false, detail: ""}});
+    } finally {
+      if (request.current === controller) request.current = null;
     }
-    const fail = (key: string): { text: string; cls: string } => ({
-      text: `✗ ${t(key)}`,
-      cls: "probe-err",
-    });
-    if (r.detail === "unconfigured" || r.detail.startsWith("未配置服务地址")) {
-      return fail("settings.testNeedUrl");
+  }
+
+  function resultDetail(): string | undefined {
+    if (!result || result === "running") return;
+    if (result.ok) {
+      const ms = /^(\d+)ms$/.exec(result.detail)?.[1];
+      return ms ? t("settings.probe.latency", {ms}) : undefined;
     }
-    if (r.detail === "未上传参考音频") return fail("settings.ttsNeedRef");
-    if (r.detail.startsWith("缺少模型")) return fail("settings.asrNeedModel");
-    return fail("settings.testFail");
-  };
+    if (result.detail === "unconfigured" || result.detail.startsWith("未配置服务地址")) return t("settings.testNeedUrl");
+    if (result.detail === "未上传参考音频") return t("settings.ttsNeedRef");
+    if (result.detail === "timeout") return t("config.timeout");
+    if (["unreachable", "backend unreachable"].includes(result.detail)) return t("config.unreachable");
+    if (result.detail === "invalid response") return t("config.invalidResponse");
+    if (/^HTTP \d{3}$/.test(result.detail)) return t("settings.probe.http", {code: result.detail});
+  }
 
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -153,7 +115,8 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
     try {
       const res = await uploadRefAudio(file);
       const current = getState().settings;
-      audition.current?.abort();
+      request.current?.abort();
+      request.current = null;
       invalidateWarmup();
       update({settings: { ...current, tts: { ...current.tts, voice: res.name } }});
       warmVoice();
@@ -184,20 +147,14 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
           className={warn ? "invalid" : undefined}
           value={settings[sec].url}
           placeholder={disabled ? "—" : t(phKey)}
-          disabled={disabled || (firstSetup && probes.llm === "running")}
+          disabled={disabled || (firstSetup && running)}
           onChange={(e) => patchEndpoint(sec, "url", e.target.value)}
         />
-        <Button
-          variant="ghost"
-          className={`key-toggle row-btn probe-btn ${
-            warn ? "probe-warn" : probeLabel(sec).cls
-          }`}
-          title={warn ? t(badUrl ? "settings.invalidUrl" : "settings.required") : undefined}
-          onClick={() => runProbe(sec)}
-          disabled={disabled || warn || probes[sec] !== undefined}
-        >
-          {warn ? "⚠" : probeLabel(sec).text}
-        </Button>
+        <ProbeButton label={t(sec === "tts" ? "settings.audition" : "settings.test")}
+          idleIcon={sec === "tts" ? "play" : "focus"}
+          state={warn || disabled ? "unavailable" : running ? "running" : result ? result.ok ? "passed" : "failed" : "idle"}
+          detail={warn ? t(badUrl ? "settings.invalidUrl" : "settings.testNeedUrl") : resultDetail()}
+          onClick={() => void runProbe()}/>
       </FieldRow>
     );
   };
@@ -205,7 +162,8 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
   // 返回目标与来源页一致：chat 进来回 chat，其余回 title。
   const patchEndpoint = (sec: EndpointSection, key: string, v: string): void => {
     if (sec === "tts") {
-      audition.current?.abort();
+      request.current?.abort();
+      request.current = null;
       invalidateWarmup();
       voiceEdited.current = true;
     }
@@ -221,19 +179,15 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
   const keyRow = (sec: EndpointSection, disabled = false) => (
     <FieldRow label={t("settings.apiKey")}>
       <input
-        type={showKey[sec] ? "text" : "password"}
+        type={showKey ? "text" : "password"}
         value={settings[sec].key}
-        disabled={disabled || (firstSetup && probes.llm === "running")}
+        disabled={disabled || (firstSetup && running)}
         onChange={(e) => patchEndpoint(sec, "key", e.target.value)}
       />
-      <Button
-        variant="ghost"
-        className="key-toggle row-btn"
-        disabled={disabled}
-        onClick={() => setShowKey((s) => ({ ...s, [sec]: !s[sec] }))}
-      >
-        {showKey[sec] ? t("settings.hideKey") : t("settings.showKey")}
-      </Button>
+      <IconButton icon={showKey ? "eyeOff" : "eye"}
+        label={t(showKey ? "settings.hideKey" : "settings.showKey")}
+        tip={t(showKey ? "settings.hideKey" : "settings.showKey")}
+        disabled={disabled} onClick={() => setShowKey(value => !value)}/>
     </FieldRow>
   );
   return (
@@ -250,7 +204,7 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
       className={
         settings.llm.model.trim() ? undefined : "invalid"
       }
-      disabled={firstSetup && probes.llm === "running"}
+      disabled={firstSetup && running}
       value={settings.llm.model}
       placeholder={t("settings.llmModelPh")}
       onChange={(e) => patchEndpoint("llm", "model", e.target.value)}
@@ -288,7 +242,6 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
       hidden
       onChange={onPickRef}
     />
-    {/* 与「显示/测试」同一套紧凑尺寸（key-toggle 提供字号与内边距） */}
     <Button
       variant="ghost"
       className="key-toggle row-btn"

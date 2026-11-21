@@ -1,7 +1,6 @@
 import {lazy,Suspense,useCallback,useEffect,useRef,useState} from 'react';
 import {useT} from '../../i18n';
-import {connectSocialAccount,retiredSocialRecords,socialAccounts,SOCIAL_PROVIDERS,type RetiredSocialRecord,type SocialAccount,type SocialProvider} from '../../services/socialClient';
-import RetiredSocialRecords from './RetiredSocialRecords';
+import {connectSocialAccount,socialAccounts,SOCIAL_PROVIDERS,type SocialAccount,type SocialProvider} from '../../services/socialClient';
 import {observeQQRuntime,type QQLoginErrorCode,type QQRuntimeAction,type QQRuntimeState} from '../../services/qqRuntimeClient';
 import IconButton from '../../ui/IconButton';
 import Hint from '../../ui/Hint';
@@ -12,7 +11,6 @@ import '../../styles/social.css';
 const SocialConfigModal=lazy(()=>import('./SocialConfigModal'));
 export default function OfficialPlugins({active=true}:{active?:boolean}){
   const t=useT();const [accounts,setAccounts]=useState<SocialAccount[]>([]);
-  const [retired,setRetired]=useState<RetiredSocialRecord[]>([]);
   const [editing,setEditing]=useState<SocialProvider|null>(null);
   const [error,setError]=useState(false);const [actionError,setActionError]=useState(false);const [pending,setPending]=useState(false);
   const [runtime,setRuntime]=useState<QQRuntimeState|null>(null);
@@ -32,7 +30,7 @@ export default function OfficialPlugins({active=true}:{active?:boolean}){
     const poll=async()=>{
       try{
         if(document.visibilityState==='hidden'||actionLock.current||readingAccounts.current>0)return;
-        await Promise.all([refresh(),retiredSocialRecords(request.signal).then(records=>{if(!request.signal.aborted)setRetired(records);})]);
+        await refresh();
         if(!request.signal.aborted)setError(false);
       }catch{if(!request.signal.aborted)setError(true);}
       finally{if(!request.signal.aborted)timer=setTimeout(()=>void poll(),2500);}
@@ -88,7 +86,6 @@ export default function OfficialPlugins({active=true}:{active?:boolean}){
         <div className="social-card-bottom"><span className={`social-state${account?.status==='connected'?' is-connected':''}`}><i/>{t(`social.status.${account?.status??'loading'}`)===`social.status.${account?.status??'loading'}`?t('social.status.disconnected'):t(`social.status.${account?.status??'loading'}`)}</span><IconButton icon="gear" label={t('social.configure')} tip={t('social.configure')} disabled={!account} onClick={()=>setEditing(provider)}/></div>
       </article>;
     })}</div>
-    {retired.length>0 && <RetiredSocialRecords records={retired} onChanged={setRetired}/>}
     {active&&editing&&accounts.find(item=>item.provider===editing)?<Suspense fallback={<div role="status" className="social-loading">{t('social.loading')}</div>}><SocialConfigModal account={accounts.find(item=>item.provider===editing)!} runtime={runtime} runtimeError={runtimeError} busy={busy} pendingAction={pendingAction} onLogin={()=>void run('begin')} onLogout={()=>void run('forget')} onClose={()=>setEditing(null)} onAccountChanged={updatePreferences}/></Suspense>:null}
   </section>;
 }

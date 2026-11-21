@@ -18,10 +18,15 @@ import Select from '../../ui/Select';
 import Switch from '../../ui/Switch';
 
 type Session={id:string;pid:number;world:string;account:string;playerName:string;worldName?:string;ready:boolean};
-export default function MinecraftCompanion({mode='settings',onDismiss}:{mode?:'settings'|'activity';onDismiss?:()=>void}){
+export default function MinecraftCompanion({mode='settings',onDismiss,packageVersion}:{mode?:'settings'|'activity';onDismiss?:()=>void;packageVersion?:string}){
  const t=useT(),enabled=useActivities().minecraft,meeting=useSyncExternalStore(subscribeMeeting,meetingSnapshot);
  const [open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(false),[active,setActive]=useState(false);
  const [sessions,setSessions]=useState<Session[]>([]),[selected,setSelected]=useState(''),[path,setPath]=useState('');
+ const [installOpen,setInstallOpen]=useState(false),[choosing,setChoosing]=useState(false);
+ const [installState,setInstallState]=useState<'idle'|'working'|'failed'>('idle');
+ const [installed,setInstalled]=useState(false);
+ const installLock=useRef(false);
+ const pickFolder=window.momoDesktop?.chooseMinecraftInstance;
  const preferences=useSyncExternalStore(subscribe,getSettings).general;
  const game=useSyncExternalStore(subscribeMinecraft,minecraftSnapshot);
  const gameplay=preferences.minecraftPlay===true;
@@ -64,13 +69,39 @@ export default function MinecraftCompanion({mode='settings',onDismiss}:{mode?:'s
   onDismiss?.();
   if(mode==='settings')navigate('chat');
  };
+ async function openInstaller() {
+  if(installLock.current)return;
+  setInstallState('idle');
+  if(!pickFolder){setPath('');setInstallOpen(true);return;}
+  installLock.current=true;setChoosing(true);
+  try {
+   const selectedPath=await pickFolder();
+   if(!selectedPath||!mounted.current)return;
+   setPath(selectedPath);setInstallOpen(true);
+  } catch {
+   if(mounted.current){setPath('');setInstallState('failed');setInstallOpen(true);}
+  } finally {
+   installLock.current=false;
+   if(mounted.current)setChoosing(false);
+  }
+ }
+ async function installCompanion() {
+  if(installLock.current||!path.trim())return;
+  installLock.current=true;setInstallState('working');
+  try {
+   await apiJson('/api/minecraft/install',jsonInit('POST',{instancePath:path.trim()}));
+   if(mounted.current){setInstallOpen(false);setInstallState('idle');setInstalled(true);}
+  } catch {if(mounted.current)setInstallState('failed');}
+  finally {installLock.current=false;}
+ }
+ function closeInstaller() {if(!installLock.current)setInstallOpen(false);}
  const evidence=game?.goalEvidence?.at(-1);
  const evidenceSkill=evidence?.placed?.length?'build':evidence?.gains?.length?(evidence.skill==='craft'?'craft':'gather'):evidence?.mined?.length?'mine':'attack';
  const evidenceRows=evidence?.placed?.length?evidence.placed:evidence?.gains?.length?evidence.gains:evidence?.mined||[];
  const evidenceCount=evidenceRows.reduce((total,item)=>total+item.count,0)||(evidence?.defeated||0);
  const body=<div className="extension-detail">
   <header className={`extension-detail-header${mode==='settings'?' settings-dialog-heading':''}`}>
-   {mode==='settings'&&<DialogBackButton onClick={()=>setOpen(false)}/>}
+   {mode==='settings'&&<DialogBackButton disabled={choosing} onClick={()=>{if(!installLock.current)setOpen(false);}}/>}
    <div><h3>{t('minecraft.title')}</h3><span className="extension-detail-status">{t(active?'minecraft.running':'minecraft.stopped')}</span></div>
    {mode!=='settings'&&onDismiss&&<button type="button" className="icon-btn" aria-label={t('minecraft.dismiss')} onClick={onDismiss}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>}
   </header>
@@ -94,10 +125,34 @@ export default function MinecraftCompanion({mode='settings',onDismiss}:{mode?:'s
    {evidence&&evidenceCount>0&&Number.isFinite(evidenceCount)&&<div className="game-task"><span>{t('minecraft.actualProgress')}</span><span>{t(`minecraft.skill.${evidenceSkill}`)} · {evidenceCount}</span></div>}
    {game.tasks.filter(task=>minecraftTaskVisible(task.state,task.reason,task.skill)).slice(-3).map(task=><div className="game-task" key={task.taskId}><span>{t(`minecraft.skill.${task.progress?.action?.skill||task.progress?.skill||task.skill}`)}</span><span>{t(minecraftTaskStateKey(task.state,task.reason))}</span>{['failed','cancelled'].includes(task.state)&&<Hint text={t(minecraftFailureKey(task.reason))}/>}</div>)}
   </section>}
-  {mode==='settings'&&<details className="extension-detail-section extension-detail-advanced"><summary>{t('minecraft.install')}</summary><FieldRow label={t('minecraft.instancePath')} hint={t('minecraft.installHint')}><input type="text" value={path} onChange={e=>setPath(e.target.value)} disabled={busy}/></FieldRow><div className="extension-detail-actions"><Button disabled={busy||!path.trim()} onClick={()=>void run(()=>apiJson('/api/minecraft/install',jsonInit('POST',{instancePath:path.trim()})))}>{t('minecraft.install')}</Button></div></details>}
+  {mode==='settings'&&<section className="extension-detail-section minecraft-install">
+   <FieldRow label={t('minecraft.installLabel')} hint={t('minecraft.installHint')}>
+    {(installed||sessions.length>0)&&<span className="extension-detail-status" role="status">
+     {t(installed?'minecraft.installDone':'minecraft.bridgeDetected')}
+    </span>}
+    <Button variant="ghost" disabled={busy||choosing} onClick={()=>void openInstaller()}>
+     {t(sessions.length||installed?'minecraft.chooseUpdate':'minecraft.chooseInstall')}
+    </Button>
+   </FieldRow>
+  </section>}
   {meeting.state!=='active'&&<p className="extension-detail-notice">{t('computer.requiresBoot')}</p>}
   {error&&<p role="alert" className="extension-detail-notice">{t('minecraft.error')}</p>}
  </div>;
  if(mode==='activity')return body;
- return <ExtensionCard id="minecraft" title={t('minecraft.title')} status={t(active?'minecraft.running':'minecraft.stopped')} onConfigure={()=>setOpen(true)}>{open&&<Modal className="extension-modal" label={t('minecraft.title')} onClose={()=>setOpen(false)}>{body}</Modal>}</ExtensionCard>;
+ return <ExtensionCard id="minecraft" title={t('minecraft.title')} status={t(active?'minecraft.running':'minecraft.stopped')} onConfigure={()=>setOpen(true)}>
+  {open&&<Modal className="extension-modal" label={t('minecraft.title')} onClose={()=>{if(!installLock.current)setOpen(false);}}>{body}</Modal>}
+  {open&&installOpen&&<Modal className="confirm-box minecraft-install-confirm" label={t('minecraft.install')} onClose={closeInstaller}>
+   <h2 className="confirm-title">{t('minecraft.install')}</h2>
+   {pickFolder&&path ? <p className="confirm-subject">{path}</p> :
+    <FieldRow label={t('minecraft.instancePath')}><input value={path} aria-label={t('minecraft.instancePath')}
+     onChange={event=>setPath(event.target.value)} disabled={installState==='working'}/></FieldRow>}
+   {packageVersion&&<p className="confirm-text">{t('minecraft.packageVersion',{version:packageVersion})}</p>}
+   <p className="confirm-text">{t('minecraft.installHint')}</p>
+   {installState==='failed'&&<p className="probe-err" role="alert">{t('minecraft.installError')}</p>}
+   <div className="modal-foot">
+    <Button variant="ghost" disabled={installState==='working'} onClick={closeInstaller}>{t('common.cancel')}</Button>
+    <Button disabled={!path.trim()||installState==='working'} onClick={()=>void installCompanion()}>{t(installState==='working'?'config.loading':'minecraft.installConfirm')}</Button>
+   </div>
+  </Modal>}
+ </ExtensionCard>;
 }

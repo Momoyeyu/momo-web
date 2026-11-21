@@ -96,6 +96,6 @@ test("保存音色配置后静默预热，点击试听复用在途音频", async
     await expect.poll(() => requests).toBe(1);
     await card.getByRole("button",{name:"试听",exact:true}).click();
   } finally {release();}
-  await expect(card.locator(".probe-btn")).toHaveText("✓");
+  await expect(card.locator(".probe-btn")).toHaveAttribute("data-probe-state", "passed");
   expect(requests).toBe(1);
 });

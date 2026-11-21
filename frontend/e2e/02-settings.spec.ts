@@ -69,14 +69,47 @@ test("开关点击切换并写盘", async ({ page, request }) => {
   expect((await read()).general.showStatus).toBe(!before);
 });
 
-test("端点探测：可点、出结果、2.5s 后自动复原", async ({ page }) => {
+test("端点探测在原位显示等待、失败和成功，修改地址清除结果", async ({page}) => {
+  const reply = Promise.withResolvers<void>();
+  let calls = 0;
+  await page.route('**/api/probe/llm', async route => {
+    if (++calls === 1) {
+      await reply.promise;
+      await route.fulfill({json: {ok:false, detail:'HTTP 503'}});
+    } else {
+      await route.fulfill({json: {ok:true, detail:'1234ms'}});
+    }
+  });
   await openTab(page, "模型");
-  await page.getByRole("button", {name: "配置模型"}).click();
-  const btn = page.locator(".probe-btn").first(); // 首行是 LLM
-  await expect(btn).toHaveText("测试");
-  await btn.click();
-  await expect(btn).toHaveClass(/probe-ok|probe-err/, { timeout: 25_000 });
-  await expect(btn).toHaveText("测试", { timeout: 10_000 });
+  await page.getByRole("button", {name:"配置模型"}).click();
+  const dialog = page.getByRole("dialog");
+  const testButton = dialog.getByRole('button', {name:'测试', exact:true});
+  const eye = dialog.getByRole('button', {name:'显示', exact:true});
+  const geometry = async () => {
+    const button = await testButton.boundingBox();
+    const row = await testButton.locator('xpath=ancestor::*[contains(@class,"opt-row")]').boundingBox();
+    return {button,row};
+  };
+  await expect(testButton).toHaveAttribute('data-probe-state','idle');
+  await expect(testButton).toHaveText('');
+  const before = await geometry();
+  expect(before.button).toMatchObject({width:34,height:34});
+  expect((await eye.boundingBox())?.x).toBe(before.button?.x);
+  await testButton.press('Enter');
+  await expect(testButton).toHaveAttribute('data-probe-state','running');
+  await expect(testButton).toBeFocused();
+  expect(await geometry()).toEqual(before);
+  reply.resolve();
+  await expect(testButton).toHaveAttribute('data-probe-state','failed');
+  await expect(testButton).toHaveAttribute('data-tip', /HTTP 503/);
+  expect(await geometry()).toEqual(before);
+  await testButton.click();
+  await expect(testButton).toHaveAttribute('data-probe-state','passed');
+  await expect(testButton).toHaveText('');
+  await expect(testButton).toHaveAttribute('data-tip', /1234 ms/);
+  expect(await geometry()).toEqual(before);
+  await dialog.locator('[data-intro=llm] input').nth(2).fill('different-model');
+  await expect(testButton).toHaveAttribute('data-probe-state','idle');
 });
 
 test("工具章节：登记、停用并删除一条 MCP 连接", async ({ page }) => {
@@ -115,16 +148,16 @@ test("工具章节：登记、停用并删除一条 MCP 连接", async ({ page }
 test('adapter permission policy survives JSON import, metadata edit and document reload',async({page,request})=>{
   await openExtensionTab(page,'MCP');
   await page.locator('.ext-panel .mcp-heading .icon-btn').click();
-  await page.locator('.ext-modal-head').getByRole('button',{name:'⇩ 从 JSON 填入',exact:true}).click();
+  await page.getByRole('button',{name:'导入 JSON',exact:true}).click();
   const policy={declaredPermissions:['mcp.tools','activities.game'],grantedPermissions:['mcp.tools','activities.game']};
   await page.locator('.ext-json textarea').fill(JSON.stringify({name:'e2e-scoped-game',command:'echo',enabled:false,...policy}));
-  await page.locator('.ext-json-ops').getByRole('button',{name:'填入',exact:true}).click();
+  await page.locator('.ext-json-ops').getByRole('button',{name:'填入表单',exact:true}).click();
   await page.locator('.ext-actions').getByText('保存',{exact:true}).click();
   const row=page.locator('.ext-row').filter({hasText:'e2e-scoped-game'});
   await row.getByRole('button',{name:'编辑',exact:true}).click();
-  await page.locator('.ext-modal-head').getByRole('button',{name:'⇩ 从 JSON 填入',exact:true}).click();
+  await page.getByRole('button',{name:'导入 JSON',exact:true}).click();
   await page.locator('.ext-json textarea').fill(JSON.stringify({command:'echo',enabled:false}));
-  await page.locator('.ext-json-ops').getByRole('button',{name:'填入',exact:true}).click();
+  await page.locator('.ext-json-ops').getByRole('button',{name:'填入表单',exact:true}).click();
   await fieldRow(page,'名称','.ext-modal').locator('input').fill('e2e-scoped-renamed');
   await page.locator('.ext-actions').getByText('保存',{exact:true}).click();
   const persisted=async()=>((await readState(request)).settings as {extensions:{name:string}[]}).extensions.find(ext=>ext.name==='e2e-scoped-renamed');
@@ -175,51 +208,6 @@ test("模型配置图标对齐，键盘关闭后焦点回到入口", async ({pag
   await entry.focus(); await entry.press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape"); await expect(entry).toBeFocused();
-});
-
-test("探测按钮定宽：出结果不变宽，且与同列「显示」同宽", async ({ page }) => {
-  await openTab(page, "模型");
-  await page.getByRole("button", {name: "配置模型"}).click();
-  const probe = page.locator(".probe-btn").first();
-  // 同列的「显示」按钮：两者共用 .row-btn 的定宽，必须完全等宽
-  const show = page.locator(".key-toggle.row-btn:not(.probe-btn)").first();
-
-  const idle = await probe.boundingBox();
-  const showBox = await show.boundingBox();
-  expect(Math.abs((idle?.width ?? 0) - (showBox?.width ?? 0))).toBeLessThan(0.5);
-
-  // 定宽的直接证据：把文案换成长度超过空闲态的结果，宽度必须纹丝不动。
-  // （用 min-width + 自适应就会在这里变宽 → 同列输入框缩放、上下行按钮错位）
-  const forced = await probe.evaluate((el) => {
-    const prev = el.textContent;
-    el.textContent = "✗ 999ms";
-    const w = el.getBoundingClientRect().width;
-    el.textContent = prev;
-    return w;
-  });
-  expect(Math.abs(forced - (idle?.width ?? 0))).toBeLessThan(0.5);
-
-  await probe.click();
-  await expect(probe).toHaveClass(/probe-ok|probe-err/, { timeout: 25_000 });
-
-  // 真跑一轮后：宽度仍与空闲态一致，且结果文字放得下（Range 实测）
-  const m = await probe.evaluate((el) => {
-    const range = document.createRange();
-    range.selectNodeContents(el);
-    return {
-      text: range.getBoundingClientRect().width,
-      client: el.clientWidth,
-      box: el.getBoundingClientRect().width,
-    };
-  });
-  expect(Math.abs(m.box - (idle?.width ?? 0))).toBeLessThan(0.5);
-  // 出结果后仍与「显示」等宽（这正是之前「改了测试忘了显示」的地方）
-  expect(Math.abs(m.box - (showBox?.width ?? 0))).toBeLessThan(0.5);
-  expect(m.text).toBeLessThanOrEqual(m.client + 0.5);
-  expect(m.box).toBeGreaterThanOrEqual(60);
-  expect(m.box).toBeLessThan(90);
-
-  await expect(probe).toHaveText("测试", { timeout: 10_000 });
 });
 
 test("设置弹窗：Live2D 与「记忆」同构（检索 + 加号 + 翻页），加号开导入弹窗", async ({

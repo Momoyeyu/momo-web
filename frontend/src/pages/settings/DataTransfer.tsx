@@ -24,7 +24,7 @@ function publishTransfer(next: TransferState) {
 }
 
 async function runTransfer(operation: Operation, action: () => Promise<void>) {
-  if (transfer.busy) return;
+  if (transfer.busy) return false;
   publishTransfer({busy: operation, error: null});
   let resume: (() => void) | undefined;
   let reloading = false;
@@ -44,6 +44,7 @@ async function runTransfer(operation: Operation, action: () => Promise<void>) {
       publishTransfer({busy: null, error});
     }
   }
+  return error === null;
 }
 
 export default function DataTransfer() {
@@ -51,6 +52,7 @@ export default function DataTransfer() {
   const exportLabel = t('config.backupAction');
   const importLabel = t('config.restoreAction');
   const [pendingRestore, setPendingRestore] = useState<File | null>(null);
+  const [restoreFailed, setRestoreFailed] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const busyDialog = useRef<HTMLDialogElement>(null);
   const {busy, error} = useSyncExternalStore(subscribeTransfer, getTransfer);
@@ -75,18 +77,19 @@ export default function DataTransfer() {
       <input ref={input} hidden type="file" accept=".zip" onChange={event => {
         const file = event.target.files?.[0];
         event.target.value = '';
-        if (file && !transfer.busy) setPendingRestore(file);
+        if (file && !transfer.busy) {setPendingRestore(file);setRestoreFailed(false);}
       }}/>
     </FieldRow>
-    {pendingRestore && <Confirm title={t('config.restore')} message={pendingRestore.name + ' · ' + t('config.restoreConfirm')}
+    {pendingRestore && busy !== 'restore' && <Confirm title={t('config.restore')} subject={pendingRestore.name}
+      message={t('config.restoreConfirm')} error={restoreFailed ? t('config.restoreError') : undefined}
       confirmLabel={t('config.restore')} danger onCancel={() => setPendingRestore(null)} onConfirm={() => {
-        setPendingRestore(null);
-        void runTransfer('restore', () => importData(pendingRestore));
+        setRestoreFailed(false);
+        void runTransfer('restore', () => importData(pendingRestore)).then(ok => setRestoreFailed(!ok));
       }}/>}
     {busy && <dialog ref={busyDialog} className="modal-box data-transfer-busy" aria-label={t(busy === 'restore' ? 'config.restore' : 'config.backup')}
       onCancel={event => event.preventDefault()}>
       <p role="status" aria-live="polite">{t('config.backupWorking')}</p>
     </dialog>}
-    {error && <p className="data-transfer-error" role="alert">{t(error === 'restore' ? 'config.restoreError' : 'config.backupError')}</p>}
+    {error && !(error === 'restore' && pendingRestore) && <p className="data-transfer-error" role="alert">{t(error === 'restore' ? 'config.restoreError' : 'config.backupError')}</p>}
   </>;
 }

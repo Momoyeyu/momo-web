@@ -155,7 +155,9 @@ export const ja: Dict = {
   "saveError": "保存できませんでした。現在の設定を確認して再度お試しください。",
   "unknownHold": "結果が不明な操作があるため、QQの送受信を一時停止しています。実際の結果を記録し、自動で再送することはありません。",
   "recordsError": "記録を取得できません。",
-  "retiredTitle": "未確認の過去の操作（{count}）",
+  "retiredLibrary": "要確認の履歴",
+  "retiredCount": "{count} 件",
+  "retiredHandle": "確認…",
   "retiredHint": "これらは廃止済みの WeChat ブリッジによる記録です。",
   "retiredSource": "廃止済みの WeChat 操作",
   "retiredAccount": "旧アカウント",
@@ -377,7 +379,7 @@ export const ja: Dict = {
     "incompatible": "バージョンと現在の状態を確認してください。",
     "officialHint": "公式の署名済みパッケージを検証して導入します。",
     "importHint": "マニフェストと素材を検証して導入します。",
-    "removeHint": "この Mod を削除しますか？"
+    "removeHint": "MOD を削除し、実行中の連携を停止します。"
 },
   title: {
     tagline: "私の心、感じる？",
@@ -510,6 +512,7 @@ export const ja: Dict = {
     showKey: "表示",
     hideKey: "隠す",
     test: "テスト",
+    probe: {running: "テスト中", passed: "テスト成功", failed: "テスト失敗", unavailable: "先に URL とモデルを入力してください", latency: "テスト成功 · {ms} ms", http: "テスト失敗 · {code}"},
     testNeedUrl: "なし",
     testFail: "失敗",
     extHint:
@@ -525,7 +528,7 @@ export const ja: Dict = {
     extNamePh: "例：tavily",
     extTransport: "接続方式",
     extConnections: "MCP",
-    extImportFile: "ファイルから読み込む",
+    extImportFile: "ファイルを選択",
     extTransports: {
       http: "Streamable HTTP",
       stdio: "stdio · ローカルコマンド",
@@ -543,10 +546,12 @@ export const ja: Dict = {
     extHeaders: "リクエストヘッダー",
     extHeaderAdd: "＋ ヘッダーを追加",
     extEnabled: "有効",
-    extJsonBtn: "⇩ JSON から入力",
+    extManual: "手動入力",
+    extJsonBtn: "JSON を読み込む",
+    extJsonBatch: "接続を {count} 件追加",
     extJsonPh:
       '{"mcpServers": {"tavily": {"command": "npx", "args": ["-y", "tavily-mcp@latest"], "env": {"TAVILY_API_KEY": "…"}}}}',
-    extJsonApply: "反映",
+    extJsonApply: "フォームに反映",
     extJsonErr:
       "JSON の解析に失敗：mcpServers 表または command / url を含む単一設定が必要です",
     extKvKey: "KEY",
@@ -591,5 +596,7 @@ export const ja: Dict = {
     dropHint: "zip をドロップ、またはクリックで選択",
     empty: "一致するモデルがありません。",
   },
-  minecraft: {"reason": {"target": "対象が見えなくなりました。もう一度確認します。", "source": "近くに必要な資源が見えません。別の場所を探索します。", "path": "通れる経路が見つかりません。", "tool": "適切な道具を作るか手に入れる必要があります。", "materials": "素材、食料、または取引アイテムが足りません。", "station": "作業台、レシピ、現在の画面を確認します。", "inventory": "持ち物を整理するかカーソルを空にしてください。", "connection": "活動または接続が切れました。状況を確認してください。", "timeout": "時間がかかりすぎたため、momo が方針を見直します。", "build": "建築が行き詰まりました。momo が立ち位置や計画を見直します。", "retreat": "体力が少ないため、安全な距離まで退きました。", "condition": "ここでは待機条件を確認できません。先に周囲を確認します。"}, "pausePlay": "プレイを一時停止", "resumePlay": "プレイを再開", "currentGoal": "現在の目標", "blockedHint": "操作が行き詰まりました。momo が実際の状況と目標から次の行動を考えます。", "skill": {"wait": "待機", "gather": "資源を集める", "pickup": "拾う", "waitFor": "加工を待つ", "trade": "取引", "navigate": "移動", "follow": "追従", "mine": "採集", "place": "設置", "interactBlock": "ブロックを使う", "interactEntity": "交流", "attack": "戦闘", "eat": "食事", "useItem": "アイテムを使う", "inventory": "持ち物を整理", "craft": "クラフト", "workstation": "作業台", "closeScreen": "画面を閉じる", "respawn": "リスポーン", "plan": "計画を実行", "rename": "名前を変更", "selectItem": "アイテムを準備", "placeNearby": "近くに設置", "build": "建築", "waitUntil": "条件を待つ"}, "taskState": {"queued": "待機", "running": "実行中", "paused": "一時停止", "succeeded": "完了", "failed": "行き詰まり", "cancelled": "キャンセル", "retreated": "退避済み"}, "play": "プレイヤー操作とワールドへの干渉", "existingHint": "起動中の Minecraft に接続します。そのインスタンスに momo MOD を導入してワールドに入ってください。停止してもゲームは終了しません。", "session": "現在のゲーム", "selectSession": "開いているワールドを選択", "install": "接続 MOD を導入・更新", "instancePath": "既存のゲームインスタンスフォルダー", "remembered": "アカウントを記憶しています。起動時にログインと Minecraft の所有権を再確認します。", "advancedResources": "詳細：ローカル資源をインポート", "waitingLogin": "Microsoft ログインを待っています…", "loginExpired": "ログインコードの有効期限が切れました。再度ログインしてください。", "joinHint": "起動後はゲームメニューが開きます。指定サーバーへ手動で参加してください。ワールド欄は minecraft:overworld などのディメンション ID です。他のワールドでは操作できません。", "title": "Minecraft コンパニオン", "description": "開いているゲームと現在のキャラクターに接続します。", "running": "実行中", "stopped": "停止中", "configure": "設定", "dismiss": "閉じる", "requirements": "Java 21、検証済みローカル資源、Minecraft を所有する Microsoft アカウント、Boot と視覚機能が必要です。", "resourcesReady": "資源を検証済み", "resourcesMissing": "資源の準備が必要", "resources": "準備済み資源フォルダー", "prepare": "資源を準備", "signedOut": "未ログイン", "clientId": "Microsoft 公開クライアント ID", "clientHint": "自身で登録した公開クライアント ID を使用してください。パスワードやトークンを貼り付けないでください。", "login": "Microsoft でログイン", "deviceHint": "Microsoft のページを開き、このコードを入力します。", "checkLogin": "ログインを確認", "logout": "ログアウト", "server": "許可するサーバー（ホスト:ポート）", "world": "許可するワールド ID", "observe": "観察は必須です。許可はこのアカウント、サーバー、ワールドに限定されます。", "chat": "チャットを許可", "move": "移動を許可", "start": "コンパニオンを起動", "stop": "コンパニオンを停止", "error": "接続できませんでした。MOD、現在のワールド、権限を確認してください。", "refresh": "ゲームを探す", "permissions": "プレイの権限", "permissionsHint": "このキャラクターとワールドだけが対象です。「陪伴を停止」を押すか、ローカルの会話で Minecraft の陪伴停止を明示的に頼むと接続を解除します。ゲームは終了しません。", "installHint": "既存の Fabric インスタンスのフォルダーを選び、ゲームを再起動してください。新しいクライアントやアカウントは不要です。", "actualProgress": "確認できた進展"},
+  minecraft: {
+    installLabel: "接続 MOD", chooseInstall: "導入…", chooseUpdate: "更新…", bridgeDetected: "導入済み MOD を検出", installDone: "導入済み。ゲームを再起動してください。", packageVersion: "MOD パッケージ版 {version}", installConfirm: "導入", installError: "接続 MOD を導入できませんでした。インスタンスのフォルダーと Fabric の依存関係を確認してください。",
+   "reason": {"target": "対象が見えなくなりました。もう一度確認します。", "source": "近くに必要な資源が見えません。別の場所を探索します。", "path": "通れる経路が見つかりません。", "tool": "適切な道具を作るか手に入れる必要があります。", "materials": "素材、食料、または取引アイテムが足りません。", "station": "作業台、レシピ、現在の画面を確認します。", "inventory": "持ち物を整理するかカーソルを空にしてください。", "connection": "活動または接続が切れました。状況を確認してください。", "timeout": "時間がかかりすぎたため、momo が方針を見直します。", "build": "建築が行き詰まりました。momo が立ち位置や計画を見直します。", "retreat": "体力が少ないため、安全な距離まで退きました。", "condition": "ここでは待機条件を確認できません。先に周囲を確認します。"}, "pausePlay": "プレイを一時停止", "resumePlay": "プレイを再開", "currentGoal": "現在の目標", "blockedHint": "操作が行き詰まりました。momo が実際の状況と目標から次の行動を考えます。", "skill": {"wait": "待機", "gather": "資源を集める", "pickup": "拾う", "waitFor": "加工を待つ", "trade": "取引", "navigate": "移動", "follow": "追従", "mine": "採集", "place": "設置", "interactBlock": "ブロックを使う", "interactEntity": "交流", "attack": "戦闘", "eat": "食事", "useItem": "アイテムを使う", "inventory": "持ち物を整理", "craft": "クラフト", "workstation": "作業台", "closeScreen": "画面を閉じる", "respawn": "リスポーン", "plan": "計画を実行", "rename": "名前を変更", "selectItem": "アイテムを準備", "placeNearby": "近くに設置", "build": "建築", "waitUntil": "条件を待つ"}, "taskState": {"queued": "待機", "running": "実行中", "paused": "一時停止", "succeeded": "完了", "failed": "行き詰まり", "cancelled": "キャンセル", "retreated": "退避済み"}, "play": "プレイヤー操作とワールドへの干渉", "existingHint": "起動中の Minecraft に接続します。そのインスタンスに momo MOD を導入してワールドに入ってください。停止してもゲームは終了しません。", "session": "現在のゲーム", "selectSession": "開いているワールドを選択", "install": "接続 MOD を導入・更新", "instancePath": "既存のゲームインスタンスフォルダー", "remembered": "アカウントを記憶しています。起動時にログインと Minecraft の所有権を再確認します。", "advancedResources": "詳細：ローカル資源をインポート", "waitingLogin": "Microsoft ログインを待っています…", "loginExpired": "ログインコードの有効期限が切れました。再度ログインしてください。", "joinHint": "起動後はゲームメニューが開きます。指定サーバーへ手動で参加してください。ワールド欄は minecraft:overworld などのディメンション ID です。他のワールドでは操作できません。", "title": "Minecraft コンパニオン", "description": "開いているゲームと現在のキャラクターに接続します。", "running": "実行中", "stopped": "停止中", "configure": "設定", "dismiss": "閉じる", "requirements": "Java 21、検証済みローカル資源、Minecraft を所有する Microsoft アカウント、Boot と視覚機能が必要です。", "resourcesReady": "資源を検証済み", "resourcesMissing": "資源の準備が必要", "resources": "準備済み資源フォルダー", "prepare": "資源を準備", "signedOut": "未ログイン", "clientId": "Microsoft 公開クライアント ID", "clientHint": "自身で登録した公開クライアント ID を使用してください。パスワードやトークンを貼り付けないでください。", "login": "Microsoft でログイン", "deviceHint": "Microsoft のページを開き、このコードを入力します。", "checkLogin": "ログインを確認", "logout": "ログアウト", "server": "許可するサーバー（ホスト:ポート）", "world": "許可するワールド ID", "observe": "観察は必須です。許可はこのアカウント、サーバー、ワールドに限定されます。", "chat": "チャットを許可", "move": "移動を許可", "start": "コンパニオンを起動", "stop": "コンパニオンを停止", "error": "接続できませんでした。MOD、現在のワールド、権限を確認してください。", "refresh": "ゲームを探す", "permissions": "プレイの権限", "permissionsHint": "このキャラクターとワールドだけが対象です。「陪伴を停止」を押すか、ローカルの会話で Minecraft の陪伴停止を明示的に頼むと接続を解除します。ゲームは終了しません。", "installHint": "既存の Fabric インスタンスのフォルダーを選び、ゲームを再起動してください。新しいクライアントやアカウントは不要です。", "actualProgress": "確認できた進展"},
 };

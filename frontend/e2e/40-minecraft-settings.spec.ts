@@ -110,6 +110,42 @@ test('Minecraft attaches existing world without launcher or login',async({page})
  await expect(selection).toHaveCSS('border-top-width','0px');
 });
 
+test('connection mod folder selection requires a separate install confirmation',async({page,baseURL})=>{
+ const picked='/fixtures/minecraft/Fabric instance';
+ const writes:unknown[]=[];
+ await page.addInitScript(({baseURL,picked})=>{
+  window.momoDesktop={
+   getRuntime:async()=>({baseUrl:baseURL,token:'fixture-desktop-runtime'}),
+   chooseMinecraftInstance:async()=>picked,
+  };
+ },{baseURL:baseURL!,picked});
+ await page.route('**/api/extensions/activities',route=>route.fulfill({json:{enabled:{computer:false,browser:false,minecraft:true}}}));
+ await page.route('**/api/minecraft/**',route=>{
+  const kind=new URL(route.request().url()).pathname.split('/').at(-1);
+  if(kind==='install'){
+   writes.push(route.request().postDataJSON());
+   return route.fulfill({json:{installed:true,restartRequired:true}});
+  }
+  return route.fulfill({json:kind==='sessions'?{sessions:[]}:{active:false,tasks:[]}});
+ });
+ const detail=await openModManager(page,'Minecraft');
+ await detail.getByRole('button',{name:'配置',exact:true}).click();
+ const companion=page.getByRole('dialog',{name:'Minecraft 陪玩',exact:true});
+ const install=companion.getByRole('button',{name:'安装…',exact:true});
+ await expect(companion.locator('details')).toHaveCount(0);
+ await install.click();
+ const confirm=page.getByRole('dialog',{name:'安装／更新连接模组',exact:true});
+ await expect(confirm.getByText(picked,{exact:true})).toBeVisible();
+ await expect(confirm.getByText('模组包版本 1.0.0',{exact:true})).toBeVisible();
+ expect(writes).toEqual([]);
+ await confirm.getByRole('button',{name:'取消',exact:true}).click();
+ await expect(install).toBeFocused();
+ await install.click();
+ await confirm.getByRole('button',{name:'安装',exact:true}).click();
+ await expect(companion.getByRole('status')).toHaveText('已安装，重启游戏后生效');
+ expect(writes).toEqual([{instancePath:picked}]);
+});
+
 test('settings-owned gameplay requests subsequent decisions and discards unseen speech across reload',async({page})=>{
  let active=false,decisions=0;const discarded:Record<string,unknown>[]=[];
  await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:false,browser:false,minecraft:true}}}));

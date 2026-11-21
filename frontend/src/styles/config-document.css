@@ -164,4 +164,3 @@ body:has(.config-document) :is(.extension-modal, .social-modal) .icon-btn:hover:
 
 .mod-row-actions {display: flex; align-items: center; gap: 8px; flex: none;}
 .mod-row-actions > button {flex-shrink: 0;}
-.mod-remove-dialog {width: min(420px, 92cqw);}

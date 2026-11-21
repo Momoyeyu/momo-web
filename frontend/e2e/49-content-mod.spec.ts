@@ -45,11 +45,12 @@ test('local content mod installs disabled, serves audio only when enabled and ca
     }
     const uninstall=row.getByRole('button',{name:'卸载 '+pack.name,exact:true});
     await uninstall.click();
-    await expect(dialog).toHaveAccessibleDescription('确认卸载这个模组？');
-    await dialog.getByRole('button',{name:'返回',exact:true}).click();
+    const confirmation = page.getByRole('dialog',{name:'卸载模组',exact:true});
+    await expect(confirmation).toHaveAccessibleDescription(new RegExp(pack.name));
+    await confirmation.getByRole('button',{name:'取消',exact:true}).click();
     await expect(uninstall).toBeFocused();
     await uninstall.click();
-    await dialog.getByRole('button',{name:'卸载模组',exact:true}).click();
+    await confirmation.getByRole('button',{name:'卸载模组',exact:true}).click();
     await expect(row).toHaveCount(0);
   } finally {await request.delete('/api/mods/'+pack.id);}
 });

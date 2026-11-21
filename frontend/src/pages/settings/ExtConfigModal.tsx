@@ -1,8 +1,5 @@
 
 
-// MCP server 配置弹窗：transport 下拉切换差分字段（stdio=命令/参数/环境变量，
-// http=端点/请求头）；顶部「从 JSON 填入」粘贴标准 MCP 配置 —— 单条填表、
-// 多条直接逐个导入列表；点遮罩或取消关闭（未保存丢弃）。
 import { useRef, useState } from "react";
 import type { McpExtension } from "../../lib/types";
 import { useT } from "../../i18n";
@@ -14,6 +11,7 @@ import Modal from "../../ui/Modal";
 import Switch from "../../ui/Switch";
 import Button from "../../ui/Button";
 import IconButton from "../../ui/IconButton";
+import DialogBackButton from "../../ui/DialogBackButton";
 import Select from "../../ui/Select";
 /** http 端点合法性：空=未填（由必填另行提示），非空必须 http(s)://。 */
 function extEndpointError(url: string): boolean {
@@ -85,11 +83,6 @@ function KvEditor({
   );
 }
 
-/**
- * MCP server 配置弹窗：transport 下拉切换差分字段（stdio=命令/参数/环境变量，
- * http=端点/请求头）；顶部「从 JSON 填入」粘贴标准 MCP 配置——单条填表、
- * 多条直接逐个导入列表；点遮罩或取消关闭（未保存丢弃）。
- */
 export default function ExtConfigModal({
   initial,
   onRemove,
@@ -102,30 +95,32 @@ export default function ExtConfigModal({
   onRemove?: () => void;
   status?: string;
   onSave: (ext: McpExtension) => void;
-  /** JSON 多条导入：直接进列表并关弹窗（草稿丢弃）。 */
   onImport: (exts: McpExtension[]) => void;
   onClose: () => void;
 }) {
   const t = useT();
   const [form, setForm] = useState<ExtForm>(() => extToForm(initial));
-  const [jsonOpen, setJsonOpen] = useState(false);
+  const [view, setView] = useState<"form" | "import">("form");
+  const [batch, setBatch] = useState<McpExtension[]>([]);
   const [jsonText, setJsonText] = useState("");
   const [jsonErr, setJsonErr] = useState(false);
   const patch = (p: Partial<ExtForm>): void =>
     setForm((f) => ({ ...f, ...p }));
 
   const file = useRef<HTMLInputElement>(null);
+  const fileRead = useRef(0);
   const applyJson = (text: string): void => {
     try {
       const exts = parseMcpJson(text);
+      setJsonErr(false);
       if (exts.length === 1) {
         // A connection snippet must not silently erase an adapter's reviewed scopes.
         setForm(previous => extToForm(exts[0], previous));
         setJsonText("");
-        setJsonErr(false);
-        setJsonOpen(false);
+        setBatch([]);
+        setView("form");
       } else {
-        onImport(exts);
+        setBatch(exts);
       }
     } catch {
       setJsonErr(true); // 解析失败：表单报错，不导入不污染
@@ -133,10 +128,15 @@ export default function ExtConfigModal({
   };
 
   async function importFile(selected: File) {
+    const revision = ++fileRead.current;
     try {
-      applyJson(await selected.text());
+      const text = await selected.text();
+      if (revision !== fileRead.current) return;
+      setJsonText(text);
+      setBatch([]);
+      applyJson(text);
     } catch {
-      setJsonErr(true);
+      if (revision === fileRead.current) setJsonErr(true);
     }
   }
 
@@ -145,52 +145,39 @@ export default function ExtConfigModal({
 
   return (
     <Modal onClose={onClose} className="ext-modal" label={t("settings.extCfgTitle")}>
-        <div className="ext-modal-head">
+        <header className="ext-modal-head settings-dialog-heading">
+          <DialogBackButton onClick={onClose}/>
           <h3 className="opt-group">{t("settings.extCfgTitle")}</h3>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              setJsonOpen((o) => !o);
+        </header>
+        <div className="settings-view-tabs" role="group" aria-label={t("settings.extCfgTitle")}>
+          <Button aria-pressed={view === "form"} onClick={() => {fileRead.current++; setView("form");}}>{t("settings.extManual")}</Button>
+          <Button aria-pressed={view === "import"} onClick={() => setView("import")}>{t("settings.extJsonBtn")}</Button>
+        </div>
+        {view === "import" ? <div className="ext-json">
+          <input hidden type="file" ref={file} accept=".json,application/json" onChange={event => {
+            const selected = event.target.files?.[0];
+            event.target.value = "";
+            if (selected) void importFile(selected);
+          }}/>
+          <textarea rows={5} value={jsonText} placeholder={t("settings.extJsonPh")}
+            aria-label={t("settings.extJsonPh")} aria-invalid={jsonErr}
+            onChange={event => {
+              fileRead.current++;
+              setJsonText(event.target.value);
               setJsonErr(false);
-            }}
-          >
-            {t("settings.extJsonBtn")}
-          </Button>
-        </div>
-        <div className="ext-import-file">
-              <input hidden type="file" ref={file} accept=".json,application/json" onChange={e => {
-                const selected = e.target.files?.[0];
-                e.target.value = "";
-                if (selected) void importFile(selected);
-              }} />
-              <Button size="sm" variant="ghost" onClick={() => file.current?.click()}>
-                {t("settings.extImportFile")}
-              </Button>
-        </div>
-        {jsonErr && <p role="alert" className="probe-err">{t("settings.extJsonErr")}</p>}
-        {jsonOpen && (
-          <div className="ext-json">
-            <textarea
-              rows={5}
-              value={jsonText}
-              placeholder={t("settings.extJsonPh")}
-              onChange={(e) => {
-                setJsonText(e.target.value);
-                setJsonErr(false);
-              }}
-            />
-            <div className="ext-json-ops">
-              <Button
-                size="sm"
-                disabled={!jsonText.trim()}
-                onClick={() => applyJson(jsonText)}
-              >
+              setBatch([]);
+            }}/>
+          {jsonErr && <p role="alert" className="probe-err">{t("settings.extJsonErr")}</p>}
+          {!!batch.length && <ul className="ext-json-preview">{batch.map((ext, index) => <li key={index}>{ext.name}</li>)}</ul>}
+          <div className="ext-json-ops">
+            <Button size="sm" variant="ghost" onClick={() => file.current?.click()}>{t("settings.extImportFile")}</Button>
+            {batch.length
+              ? <Button size="sm" onClick={() => onImport(batch)}>{t("settings.extJsonBatch", {count: String(batch.length)})}</Button>
+              : <Button size="sm" disabled={!jsonText.trim()} onClick={() => {fileRead.current++; applyJson(jsonText);}}>
                 {t("settings.extJsonApply")}
-              </Button>
-            </div>
+              </Button>}
           </div>
-        )}
+        </div> : <>
         <div className="opt-list">
           <FieldRow label={t("settings.extName")} required>
             <input
@@ -301,6 +288,7 @@ export default function ExtConfigModal({
             {t("common.save")}
           </Button>
         </div>
+        </>}
       </Modal>
   );
 }

@@ -85,8 +85,7 @@
 .social-recovery-confirm .btn { margin-right:8px; }
 .social-challenge { padding:12px 0;font-size:12px;line-height:1.7; }
 .social-challenge code { display:block;padding:10px 12px;border:1px solid var(--line);border-radius:8px;color:var(--accent);margin:8px 0 12px;user-select:all;overflow-wrap:anywhere; }
-.social-retired-records { border-top:1px solid var(--line);margin-top:22px;padding:16px 4px 0; }
-.social-retired-records > summary { cursor:pointer;color:var(--text-dim);font-size:13px; }
+.social-retired-records .settings-dialog-heading h2 {font-size:19px;margin:0;}
 .social-retired-metadata { display:flex;flex-wrap:wrap;gap:10px 28px;margin:12px 0; font-size:12px; }
 .social-retired-metadata > div { display:flex;gap:8px;min-width:0; }
 .social-retired-metadata dt { color:var(--text-faint);flex:none; }
