@@ -7,12 +7,12 @@ test('settings directory selects the last chapter at the scroll limit',async({pa
   await openApp(page,'settings');
   await page.locator('.config-document').evaluate((el,scale)=>{(el as HTMLElement).style.zoom=String(scale);},zoom);
   const scroll=page.locator('.config-scroll');
-  const last=page.locator('[aria-controls=config-mods]');
+  const last=page.locator('[aria-controls=config-customize]');
   await scroll.evaluate(el=>{el.scrollTop=0;});
   await expect(page.locator('[aria-controls=config-language]')).toHaveAttribute('aria-current','location');
   await scroll.evaluate(el=>{el.scrollTop=el.scrollHeight;});
   await expect(last).toHaveAttribute('aria-current','location');
-  await expect(page.locator('#heading-mods')).toBeInViewport();
+  await expect(page.locator('#heading-customize')).toBeInViewport();
  }
 });
 

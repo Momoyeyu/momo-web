@@ -15,8 +15,7 @@ export const zh = {
     "archive": "存档",
     "desktop": "桌面",
     "browser": "浏览器",
-    "tools": "工具",
-    "mods": "模组",
+    "customize": "定制",
     "avatar": "角色形象",
     "avatarAction": "管理形象",
     "preview": "对话框预览",
@@ -341,7 +340,6 @@ export const zh = {
 
 
   common: {
-    manage: "管理",
     back: "返回",
     backTitle: "返回标题",
     backChat: "返回对话",
@@ -358,6 +356,7 @@ export const zh = {
     configure: "配置",
     removeIcon: "卸载",
     library: "模组库",
+    manageLibrary: "管理模组",
     installed: "已安装",
     catalog: "获取模组",
     empty: "还没有安装模组。",
@@ -528,7 +527,9 @@ export const zh = {
       "登记 MCP 服务后，momo 可以在对话中使用它们提供的工具。",
     extAdd: "添加 MCP server",
     extSearchPh: "检索 MCP server…",
+    extSearch: "搜索",
     extEmpty: "没有匹配的 MCP server。",
+    extNoConnections: "还没有 MCP 连接。",
     extUnnamed: "（未命名）",
     extCfgTitle: "MCP server 配置",
     extName: "名称",

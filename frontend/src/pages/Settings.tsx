@@ -22,7 +22,7 @@ import VisionSettings from './settings/VisionSettings';
 import '../styles/settings.css';
 import '../styles/config-document.css';
 
-const chapters = ['language', 'dialogue', 'sound', 'models', 'memory', 'archive', 'desktop', 'browser', 'tools', 'mods'] as const;
+const chapters = ['language', 'dialogue', 'sound', 'models', 'memory', 'archive', 'desktop', 'browser', 'customize'] as const;
 type Chapter = (typeof chapters)[number];
 const inset = 24;
 const canResumeMeeting = () => meetingSnapshot().state === 'active' || !!storedMeetingIdentity();
@@ -78,10 +78,6 @@ export default function Settings() {
         <h3 id="config-dialog-preview">{t('config.preview')}</h3>
         <GeneralTab section="preview"/>
       </section>
-      <ConfigAction label={t('config.avatar')} action={t('common.manage')} actionLabel={t('config.avatarAction')}
-        value={state.avatars.find(a => a.id === state.avatarId)?.name}>
-        <AvatarPanel/>
-      </ConfigAction>
     </>,
     sound: <GeneralTab section="sound"/>,
     models: guided ? <>
@@ -100,8 +96,16 @@ export default function Settings() {
     archive: <DataTransfer/>,
     desktop: <DesktopSettings/>,
     browser: <NativeCompanion plugin="browser" mode="inline"/>,
-    tools: <McpSettings/>,
-    mods: <ModsPanel/>,
+    customize: <div className="config-split config-split-stack">
+      <div className="customize-library">
+        <ConfigAction label={t('config.avatar')} action={t('config.avatarAction')} icon="gear"
+          value={state.avatars.find(a => a.id === state.avatarId)?.name}>
+          <AvatarPanel/>
+        </ConfigAction>
+        <ModsPanel/>
+      </div>
+      <McpSettings/>
+    </div>,
   };
   return <div className="settings-page config-document">
     <GridBackdrop angle={25} api={grid}/>

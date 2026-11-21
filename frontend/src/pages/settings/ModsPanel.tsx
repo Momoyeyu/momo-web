@@ -92,11 +92,11 @@ export default function ModsPanel(){
   const matches=filterable ? entries.filter(mod=>(mod.id+' '+mod.name).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())) : entries;
   const paging=clampPage(page,matches.length,5);
   return <>
-    <FieldRow label={code('library')}><Button className="config-action" size="sm" variant="ghost" disabled={busy} onClick={()=>{
+    <FieldRow label={code('library')}><IconButton icon="gear" label={code('manageLibrary')} tip={code('manageLibrary')} disabled={busy} onClick={()=>{
       showView('installed');
       setManager(true);
       void load();
-    }}>{t('common.manage')}</Button></FieldRow>
+    }}/></FieldRow>
     {manager&&<Modal label={code('library')} onClose={closeLibrary} className="extension-modal mod-library">
       <header className="extension-detail-header mod-dialog-heading">
         <DialogBackButton onClick={closeLibrary} disabled={busy}/>

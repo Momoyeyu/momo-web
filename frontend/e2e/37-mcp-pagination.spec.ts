@@ -11,7 +11,7 @@ test('many MCP entries page, search, and remove the original indexed record', as
   await writeState(request, seeded);
   try {
     await openExtensionTab(page, 'MCP');
-    const panel = page.locator('#config-tools .ext-panel');
+    const panel = page.locator('#config-customize .ext-panel');
     const rows = panel.locator('.ext-row');
     const firstPageNames = await rows.locator('.ext-name').allTextContents();
     expect(firstPageNames.length).toBeGreaterThan(0);
@@ -39,7 +39,7 @@ test('a connection file can populate an SSE draft and persists through reload', 
   const original = await readState(request);
   try {
     await openExtensionTab(page, 'MCP');
-    const panel = page.locator('#config-tools .ext-panel');
+    const panel = page.locator('#config-customize .ext-panel');
     await panel.locator('.mcp-heading button').click();
     const editor = page.getByRole('dialog');
     await editor.locator('input[type=file]').setInputFiles({
@@ -69,7 +69,7 @@ test('importing one stdio connection keeps each argument intact when saving the 
   const args = ["--root", "/Users/Test User/Documents", "", `"quoted" and 'single'`, "a\nb"];
   try {
     await openExtensionTab(page, 'MCP');
-    await page.locator('#config-tools .ext-panel .mcp-heading button').click();
+    await page.locator('#config-customize .ext-panel .mcp-heading button').click();
     const editor = page.getByRole('dialog');
     await editor.locator('input[type=file]').setInputFiles({
       name:'stdio.json', mimeType:'application/json',

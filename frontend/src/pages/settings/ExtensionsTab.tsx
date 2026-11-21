@@ -8,6 +8,7 @@ import type { McpExtension } from "../../lib/types";
 import { probeExtension } from "../../services/extClient";
 import type { ExtProbeResult } from "../../services/extClient";
 import Hint from "../../ui/Hint";
+import Icon from "../../ui/Icon";
 import IconButton from "../../ui/IconButton";
 import Pager from "../../ui/Pager";
 import Switch from "../../ui/Switch";
@@ -110,13 +111,16 @@ export default function McpSettings() {
         <header className="mcp-heading">
           <h3>{t("settings.extConnections")}</h3>
           <Hint text={t("settings.extHint")} side="down" />
-          <input className="list-search" type="search" aria-label={t("settings.extSearchPh")}
-            placeholder={t("settings.extSearchPh")} value={extQuery}
-            onChange={e => { setExtQuery(e.target.value); setExtPage(0); }} />
-          <IconButton icon="plus" label={t("settings.extAdd")} onClick={() => setExtEditing(-1)} />
+          <div className="mcp-search">
+            <Icon name="search" size={14}/>
+            <input className="list-search" type="search" aria-label={t("settings.extSearchPh")}
+              placeholder={t("settings.extSearch")} value={extQuery}
+              onChange={e => { setExtQuery(e.target.value); setExtPage(0); }} />
+          </div>
+          <IconButton icon="plus" label={t("settings.extAdd")} tip={t("settings.extAdd")} onClick={() => setExtEditing(-1)} />
         </header>
         <div className="list-body mcp-items">
-          {!extSlice.length && <p className="muted">{t("settings.extEmpty")}</p>}
+          {!extSlice.length && <p className="muted">{t(settings.extensions.length ? "settings.extEmpty" : "settings.extNoConnections")}</p>}
           {extSlice.map(({ ext, i }) => (
             <div className="mcp-row ext-row" key={i}>
               <strong className="ext-name" title={statusLabel(i, ext)}>{ext.name || t("settings.extUnnamed")}</strong>

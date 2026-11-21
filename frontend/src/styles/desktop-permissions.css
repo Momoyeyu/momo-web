@@ -17,12 +17,6 @@
 .desktop-config-group > .opt-row + .opt-row {border-top: 1px solid var(--line-soft);}
 .desktop-config .desktop-config-group > .opt-row > .opt-ctl {justify-content: flex-end;}
 .desktop-config-status {position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);}
-@container (max-width: 570px) {
-  .config-split.desktop-config-groups {grid-template-columns: 1fr;}
-  .desktop-config-groups::before {display: none;}
-  .desktop-config-group + .desktop-config-group {border-block-start: 1px solid var(--line-soft);}
-}
-
 .desktop-permission-action {
   min-width: 86px;
   min-height: 34px;

@@ -7,8 +7,8 @@ test('cold routes stay dormant until Boot, including settings and a direct chat 
   await expect(page.locator('.title-screen')).toBeVisible();
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
   await openExtensionTab(page,'插件');
-  await expect(page.locator('#config-mods').getByRole('button',{name:'管理',exact:true})).toBeVisible();
-  await expect(page.locator('#config-mods')).not.toContainText(/QQ|Minecraft/);
+  await expect(page.locator('#config-customize').getByRole('button',{name:'管理模组',exact:true})).toBeVisible();
+  await expect(page.locator('#config-customize .customize-library')).not.toContainText(/QQ|Minecraft/);
   await expect(page.locator('.social-card')).toHaveCount(0);
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
   await page.getByRole('button',{name:'返回标题',exact:true}).click();

@@ -11,8 +11,8 @@ export async function mockEnabledMod(page: Page, name: 'QQ'|'Minecraft') {
 export async function openModLibrary(page: Page) {
   const library = page.getByRole('dialog', {name:'模组库',exact:true});
   if (!await library.isVisible()) {
-    await openTab(page,'模组');
-    await page.locator('#config-mods').getByRole('button',{name:'管理',exact:true}).click();
+    await openTab(page,'定制');
+    await page.locator('#config-customize').getByRole('button',{name:'管理模组',exact:true}).click();
   }
   await expect(library).toBeVisible();
   return library;

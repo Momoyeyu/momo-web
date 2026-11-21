@@ -22,12 +22,12 @@ test("目录章节与正文顺序一致，最后一章可以定位到阅读线",
   await openApp(page, "settings");
   const index = page.locator(".config-index button");
   expect(await index.allTextContents()).toEqual(await page.locator(".config-scroll h2").allTextContents());
-  await expect(index).toHaveCount(10);
+  await expect(index).toHaveCount(9);
   for (const link of await index.all()) {
     await link.click();
     await expect(link).toHaveAttribute("aria-current", "location");
   }
-  await expect.poll(() => page.locator('#config-mods').evaluate(el =>
+  await expect.poll(() => page.locator('#config-customize').evaluate(el =>
     Math.abs(el.getBoundingClientRect().top - el.parentElement!.getBoundingClientRect().top - 24))).toBeLessThan(2);
 });
 
@@ -339,7 +339,7 @@ test('RoPE uses actual scroll distance and stays fixed under reduced motion', as
   await page.emulateMedia({reducedMotion:'reduce'});
   await scroll.evaluate(el => el.scrollTop = 500);
   await expect.poll(angle).toBeCloseTo(25);
-  await page.locator('[data-intro=tab-mods]').click();
-  await expect(page.locator('[data-intro=tab-mods]')).toHaveAttribute('aria-current','location');
+  await page.locator('[data-intro=tab-customize]').click();
+  await expect(page.locator('[data-intro=tab-customize]')).toHaveAttribute('aria-current','location');
   expect(await angle()).toBeCloseTo(25);
 });

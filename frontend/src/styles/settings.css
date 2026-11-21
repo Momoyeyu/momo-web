@@ -6,20 +6,25 @@
   flex-direction: column;
 }
 
-#config-tools .config-card {container-type: inline-size;}
-.extension-settings {padding-block: 14px;}
-.extension-settings .mcp-section {display: flex; flex-direction: column; min-width: 0; gap: 8px;}
-.mcp-heading {display: flex; align-items: center; gap: 8px;}
-.mcp-heading h3 {margin: 0; font-size: 16px;}
-.mcp-section .icon-btn {width: 32px; height: 30px; flex: none;}
-.mcp-heading .list-search {
-  box-sizing: border-box; width: min(260px, 52%); min-width: 0; height: 33px;
-  margin-inline-start: auto; flex: 0 1 auto; padding-inline: 10px;
+.customize-library, .extension-settings {min-width: 0;}
+.config-card .customize-library > .opt-row {
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: 12px;
+  min-height: 50px;
 }
-.mcp-section .mcp-items {min-height: 0; flex: none;}
-.mcp-row {display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; min-height: 47px;}
+.customize-library > .opt-row + .opt-row {border-block-start: 1px solid var(--line-soft);}
+.config-card .customize-library .opt-ctl {justify-content: flex-end;}
+.customize-library .config-value {overflow: hidden; white-space: nowrap; text-overflow: ellipsis;}
+.extension-settings .mcp-section {display: flex; flex-direction: column; min-width: 0;}
+.mcp-heading {display: flex; align-items: center; gap: 8px; min-height: 50px;}
+.mcp-heading h3 {margin: 0; color: var(--text-dim); font-size: 14px; font-weight: 500; letter-spacing: .06em;}
+.mcp-search {position: relative; margin-inline-start: auto; flex: 0 1 156px; min-width: 0;}
+.mcp-search svg {position: absolute; inset-inline-start: 10px; top: 50%; translate: 0 -50%; color: var(--text-dim); pointer-events: none;}
+.mcp-search .list-search {box-sizing: border-box; display: block; width: 100%; min-width: 0; height: 34px; padding-inline: 30px 8px;}
+.mcp-section .mcp-items {min-height: 0; flex: none; border-block-start: 1px solid var(--line-soft);}
+.mcp-row {display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; min-height: 50px;}
 .mcp-row + .mcp-row {border-top: 1px solid var(--line-soft);}
-.mcp-items p {margin: 8px 0; font-size: 13px;}
+.mcp-items p {display: flex; align-items: center; min-height: 50px; margin: 0; font-size: 13px;}
 .mcp-section .list-pager {align-self: flex-end; align-items: center; gap: 8px; border: none; overflow: visible; margin-top: auto;}
 .mcp-section .pager-btn {width: 32px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-sm);}
 .mcp-section .pager-text {padding: 0;}

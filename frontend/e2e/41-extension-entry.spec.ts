@@ -11,9 +11,9 @@ for (const viewport of [{width:1280,height:720},{width:1920,height:1080}]) {
       {id:'momo.minecraft',name:'Minecraft',version:'1.0.0',compatible:true},
     ]}}));
     await bootChat(page);
-    await openTab(page,'模组');
-    const section=page.locator('#config-mods');
-    await expect(section.getByRole('button')).toHaveCount(1);
+    await openTab(page,'定制');
+    const section=page.locator('#config-customize .customize-library');
+    await expect(section.getByRole('button',{name:'管理模组',exact:true})).toBeVisible();
     await expect(section).not.toContainText(/QQ|Minecraft/);
     const library=await openModLibrary(page);
     const heading=library.locator('.mod-dialog-heading');

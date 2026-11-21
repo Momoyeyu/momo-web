@@ -54,7 +54,7 @@ export default function DesktopSettings() {
     finally { setSaving(false); }
   }
   return <div className="desktop-config">
-    <div className="config-split desktop-config-groups">
+    <div className="config-split config-split-stack">
       <section className="desktop-config-group" aria-labelledby="desktop-access-heading">
         <h3 id="desktop-access-heading">{t('desktopAccess.accessGroup')}</h3>
         <FieldRow label={t('desktopAccess.title')} hint={native ? t('desktopAccess.description') : undefined}>

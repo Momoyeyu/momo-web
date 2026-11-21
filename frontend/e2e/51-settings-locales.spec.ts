@@ -17,7 +17,7 @@ test('uninstall confirmation leaves room below its footer divider', async ({page
     mods:[{id:'demo.content', name:'Fixture mod', enabled:false, resources:[]}],
   }}));
   await openApp(page, 'settings');
-  await page.locator('#config-mods').getByRole('button',{name:'管理',exact:true}).click();
+  await page.locator('#config-customize').getByRole('button',{name:'管理模组',exact:true}).click();
   const library = page.getByRole('dialog',{name:'模组库',exact:true});
   await library.getByRole('button',{name:'卸载 Fixture mod',exact:true}).click();
   const dialog = page.getByRole('dialog',{name:'Fixture mod',exact:true});
@@ -46,19 +46,40 @@ for (const width of [640, 960, 1280]) {
       await page.goto('/#/settings');
       await page.reload();
       await expect(page.locator('html')).toHaveAttribute('lang', lang === 'zh' ? 'zh-CN' : lang);
-      await expect(page.locator('.config-index button')).toHaveCount(10, {timeout: 2000});
-      await expect(page.locator('#config-mods').getByRole('button')).toHaveCount(1);
-      await expect(page.locator('#config-mods')).not.toContainText('QQ');
+      await expect(page.locator('.config-index button')).toHaveCount(9, {timeout: 2000});
+      const customize = page.locator('#config-customize');
+      await expect(customize.getByRole('heading', {level: 2})).toHaveText(
+        {zh:'定制',en:'Customize',ja:'カスタム'}[lang]!,
+      );
+      const library = customize.locator('.customize-library');
+      await expect(library.getByRole('button')).toHaveCount(2);
+      const [avatar, manageMods] = await library.getByRole('button').all();
+      await expect(library).not.toContainText(/QQ|Minecraft/);
+      for (const button of [avatar, manageMods]) {
+        await expect(button).toHaveText('');
+        await expect(button).toHaveAccessibleName(/\S/);
+        await expect(button).toHaveAttribute('data-tip', /\S/);
+        await expect(button.locator('svg')).toBeVisible();
+      }
       const dialogue = page.locator('#config-dialogue > .config-card');
       await expect(dialogue.locator('.switch')).toHaveCount(2);
       await expect(dialogue.locator('.config-preview')).toBeVisible();
-      const avatar = dialogue.locator('.opt-row:last-child > .opt-ctl > .config-action');
-      const manageMods = page.locator('#config-mods .config-action');
-      await expect(avatar).toHaveText((await manageMods.textContent())!);
+      await expect(dialogue.getByRole('button')).toHaveCount(0);
       const avatarBox = (await avatar.boundingBox())!;
       const modBox = (await manageMods.boundingBox())!;
+      const mcp = customize.locator('.mcp-heading');
+      const addBox = (await mcp.getByRole('button').boundingBox())!;
       expect(avatarBox.x).toBeCloseTo(modBox.x, 0);
       expect(avatarBox.width).toBeCloseTo(modBox.width, 0);
+      expect(avatarBox.width).toBeCloseTo(addBox.width, 0);
+      expect(avatarBox.height).toBeCloseTo(addBox.height, 0);
+      if (width >= 960) {
+        expect(avatarBox.y).toBeCloseTo(addBox.y, 0);
+        expect(avatarBox.x + avatarBox.width).toBeLessThan(addBox.x);
+      } else {
+        expect(avatarBox.x).toBeCloseTo(addBox.x, 0);
+        expect(modBox.y + modBox.height).toBeLessThan(addBox.y);
+      }
       await page.evaluate(() => document.fonts.ready);
       const languageFields = page.locator('#config-language .sel-face');
       await expect(languageFields).toHaveCount(2);
@@ -99,7 +120,7 @@ for (const width of [640, 960, 1280]) {
           group: group?.closest('section')?.id,
         };
       }));
-      expect(actions.length).toBeGreaterThanOrEqual(11);
+      expect(actions.length).toBeGreaterThanOrEqual(9);
       expect(actions.filter(action => action.lines !== 1 || !action.textFits || !action.buttonFits),
         `${lang} at ${width}px`).toEqual([]);
       for (const action of actions) {
