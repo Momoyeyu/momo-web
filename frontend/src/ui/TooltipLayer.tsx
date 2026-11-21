@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import "../styles/controls.css";
 
@@ -7,6 +7,15 @@ export default function TooltipLayer() {
   const [expanded, setExpanded] = useState(false);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const bubble = useRef<HTMLDivElement>(null);
+  const [, refreshContent] = useReducer((version: number) => version + 1, 0);
+  const tip = anchor?.dataset.tip;
+  const detail = anchor?.dataset.tipDetail;
+  useLayoutEffect(() => {
+    if (!anchor) return;
+    const observer = new MutationObserver(refreshContent);
+    observer.observe(anchor, {attributes: true, attributeFilter: ["data-tip", "data-tip-detail"]});
+    return () => observer.disconnect();
+  }, [anchor]);
   useEffect(() => {
     const trigger = (target: EventTarget | null) => target instanceof Element
       ? target.closest<HTMLElement>(".tip[data-tip],button[data-tip]") : null;
@@ -86,12 +95,12 @@ export default function TooltipLayer() {
     el.style.top = `${Math.max(bounds.top + 8, Math.min(sideRail ? railTop : top, bounds.bottom - b.height - 8))}px`;
     el.dataset.side = sideRail ? "left" : top >= a.bottom ? "bottom" : "top";
     el.style.visibility = "visible";
-  }, [anchor,expanded]);
-  return anchor?.isConnected && anchor.dataset.tip ? createPortal(
-    <div key={anchor.dataset.tip} ref={bubble} role={anchor.dataset.tipDetail?"dialog":"tooltip"} aria-label={anchor.dataset.tip} className="tooltip-bubble" style={{ visibility: "hidden" }}>
-      <span>{anchor.dataset.tip}</span>
-      {anchor.dataset.tipDetail&&<button type="button" className="tooltip-help" aria-expanded={expanded} aria-label={anchor.dataset.tip} onClick={()=>setExpanded(v=>!v)}>?</button>}
-      {expanded&&<p className="tooltip-detail">{anchor.dataset.tipDetail}</p>}
+  }, [anchor,expanded,tip,detail]);
+  return anchor?.isConnected && tip ? createPortal(
+    <div key={tip} ref={bubble} role={detail?"dialog":"tooltip"} aria-label={tip} className="tooltip-bubble" style={{ visibility: "hidden" }}>
+      <span>{tip}</span>
+      {detail&&<button type="button" className="tooltip-help" aria-expanded={expanded} aria-label={tip} onClick={()=>setExpanded(v=>!v)}>?</button>}
+      {expanded&&detail&&<p className="tooltip-detail">{detail}</p>}
     </div>, document.body,
   ) : null;
 }

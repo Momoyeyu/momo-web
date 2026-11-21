@@ -99,9 +99,12 @@ test("端点探测在原位显示等待、失败和成功，修改地址清除�
   await expect(testButton).toHaveAttribute('data-probe-state','running');
   await expect(testButton).toBeFocused();
   expect(await geometry()).toEqual(before);
+  await testButton.hover();
+  await expect(page.getByRole('tooltip')).toHaveText('测试中');
   reply.resolve();
   await expect(testButton).toHaveAttribute('data-probe-state','failed');
   await expect(testButton).toHaveAttribute('data-tip', /HTTP 503/);
+  await expect(page.getByRole('tooltip')).toContainText('HTTP 503');
   expect(await geometry()).toEqual(before);
   await testButton.click();
   await expect(testButton).toHaveAttribute('data-probe-state','passed');
