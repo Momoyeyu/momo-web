@@ -24,7 +24,6 @@ export const zh = {
     "llm": "对话模型",
     "llmAction": "配置模型",
     "vision": "视觉能力",
-    "visionAction": "验证能力",
     "tts": "语音合成",
     "ttsAction": "配置语音",
     "memories": "长期记忆",

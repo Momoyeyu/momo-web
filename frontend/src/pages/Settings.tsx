@@ -92,13 +92,13 @@ export default function Settings() {
       </ConfigAction>
       <BuiltinResourcesNotice/>
     </>,
-    memory: guided ? <MemoryPanel/> : <ConfigAction label={t('config.memories')} action={t('config.memoriesAction')}><MemoryPanel/></ConfigAction>,
+    memory: guided ? <MemoryPanel/> : <ConfigAction label={t('config.memories')} action={t('config.memoriesAction')} icon="backlog"><MemoryPanel/></ConfigAction>,
     archive: <DataTransfer/>,
     desktop: <DesktopSettings/>,
     browser: <NativeCompanion plugin="browser" mode="inline"/>,
     customize: <div className="config-split config-split-stack">
       <div className="customize-library">
-        <ConfigAction label={t('config.avatar')} action={t('config.avatarAction')} icon="gear"
+        <ConfigAction label={t('config.avatar')} action={t('config.avatarAction')}
           value={state.avatars.find(a => a.id === state.avatarId)?.name}>
           <AvatarPanel/>
         </ConfigAction>

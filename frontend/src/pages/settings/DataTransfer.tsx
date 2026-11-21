@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState, useSyncExternalStore} from 'react';
-import Button from '../../ui/Button';
+import IconButton from '../../ui/IconButton';
 import Confirm from '../../ui/Confirm';
 import FieldRow from '../../ui/FieldRow';
 import '../../styles/modal.css';
@@ -48,6 +48,8 @@ async function runTransfer(operation: Operation, action: () => Promise<void>) {
 
 export default function DataTransfer() {
   const t = useT();
+  const exportLabel = t('config.backupAction');
+  const importLabel = t('config.restoreAction');
   const [pendingRestore, setPendingRestore] = useState<File | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const busyDialog = useRef<HTMLDialogElement>(null);
@@ -61,17 +63,17 @@ export default function DataTransfer() {
 
   return <>
     <FieldRow label={t('config.backup')} hint={t('config.backupHint')}>
-      <Button className="config-action" variant="ghost" disabled={busy !== null} onClick={() => void runTransfer('export', async () => {
+      <IconButton icon="save" label={exportLabel} tip={exportLabel} sound="tap" disabled={busy !== null} onClick={() => void runTransfer('export', async () => {
         const url = URL.createObjectURL(await exportData());
         const a = document.createElement('a');
         a.href = url;
         a.download = 'momo-backup.zip';
         a.click();
         setTimeout(() => URL.revokeObjectURL(url), 60000);
-      })}>{busy === 'export' ? t('config.backupWorking') : t('config.backupAction')}</Button>
+      })}/>
     </FieldRow>
     <FieldRow label={t('config.restore')}>
-      <Button className="config-action" variant="ghost" disabled={busy !== null} onClick={() => input.current?.click()}>{t('config.restoreAction')}</Button>
+      <IconButton icon="load" label={importLabel} tip={importLabel} sound="tap" disabled={busy !== null} onClick={() => input.current?.click()}/>
       <input ref={input} hidden type="file" accept=".zip" onChange={event => {
         const file = event.target.files?.[0];
         event.target.value = '';

@@ -2,6 +2,8 @@
 // 内置 plus / edit / trash / check 四种图标。
 // 纯图标没有可见文字，可发现性靠 tip（悬停浮窗）与 label（读屏）两者都给。
 import type { MouseEvent } from "react";
+import type { Sound } from "../audio/ambient";
+import Button from "./Button";
 
 import { ICONS, type IconName } from "./icons";
 
@@ -15,6 +17,7 @@ export default function IconButton({
   tip,
   danger,
   active,
+  sound = false,
   size = "md",
   className,
 }: {
@@ -33,6 +36,7 @@ export default function IconButton({
    * 那会让同一列后面的按钮位移。
    */
   active?: boolean;
+  sound?: Sound | false;
   /** sm = 列表行内（28×28），md = 独立位置（34×34）。 */
   size?: "md" | "sm";
   /** 附加类（多为定位，如存档卡的 .slot-del）。 */
@@ -50,12 +54,12 @@ export default function IconButton({
     .filter(Boolean)
     .join(" ");
   return (
-    <button
-      type="button"
+    <Button
       className={cls}
       aria-label={label}
       {...(active === undefined ? {} : { "aria-pressed": active })}
       data-tip={tip}
+      sound={sound}
       onClick={onClick}
       disabled={disabled}
     >
@@ -72,6 +76,6 @@ export default function IconButton({
           />
         ))}
       </svg>
-    </button>
+    </Button>
   );
 }

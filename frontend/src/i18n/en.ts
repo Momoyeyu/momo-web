@@ -24,7 +24,6 @@ export const en: Dict = {
     "llm": "Chat model",
     "llmAction": "Configure",
     "vision": "Image recognition",
-    "visionAction": "Verify model",
     "tts": "Speech synthesis",
     "ttsAction": "Set up voice",
     "memories": "Long-term memory",

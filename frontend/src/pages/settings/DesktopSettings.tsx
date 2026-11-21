@@ -75,7 +75,7 @@ export default function DesktopSettings() {
         <FieldRow label={t('desktop.observe')} hint={t(!native ? 'config.nativeOnly' : 'desktop.observeHint')}>
           <Switch title={t('desktop.observe')} on={!!status?.desktopAllowed} disabled={disabled} onChange={on => void setDesktopObservation(on, 'settings')}/>
         </FieldRow>
-        <ConfigAction label={t('computer.title')} action={t('config.windowAction')}>
+        <ConfigAction label={t('computer.title')} action={t('config.windowAction')} icon="desktop">
           <NativeCompanion plugin="computer" mode="activity"/>
         </ConfigAction>
         <ConfigAction label={t('desktopAccess.blocklist')} action={t('config.blockAction')}>

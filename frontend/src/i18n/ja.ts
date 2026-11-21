@@ -24,7 +24,6 @@ export const ja: Dict = {
     "llm": "会話モデル",
     "llmAction": "モデル設定",
     "vision": "画像認識",
-    "visionAction": "能力を検証",
     "tts": "音声合成",
     "ttsAction": "音声を設定",
     "memories": "長期記憶",

@@ -167,7 +167,7 @@ test('an in-progress export stays locked across browser history navigation', asy
     await expect(page.locator('.settings-page')).toHaveCount(0);
     await page.goForward();
     await expect(progress).toBeVisible();
-    await expect(page.locator('#config-archive button').filter({hasText:'选择文件'})).toBeDisabled();
+    await expect(page.locator('#config-archive button[aria-label="选择文件"]')).toBeDisabled();
 
     finishExport();
     await expect(progress).toHaveCount(0);

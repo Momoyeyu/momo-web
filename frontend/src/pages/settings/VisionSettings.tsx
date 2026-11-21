@@ -3,7 +3,7 @@ import {useT} from '../../i18n';
 import {getState, subscribe, update} from '../../lib/store';
 import type {LlmConfig} from '../../lib/types';
 import {probeVision, visionStatus} from '../../services/visionClient';
-import Button from '../../ui/Button';
+import IconButton from '../../ui/IconButton';
 import FieldRow from '../../ui/FieldRow';
 import Switch from '../../ui/Switch';
 
@@ -55,7 +55,8 @@ export default function VisionSettings() {
     }
   }
 
-  const status = current.detail
+  const verifyLabel = t('vision.verify');
+  const status = current.running ? t('vision.loading') : current.detail
     ? /^HTTP \d{3}$/.test(current.detail)
       ? current.detail + ' · ' + t('vision.checkFailed')
       : t(resultKeys[current.detail] ?? 'vision.checkFailed')
@@ -67,9 +68,7 @@ export default function VisionSettings() {
         const settings = getState().settings;
         if (fingerprint(settings.llm) === signature) update({settings: {...settings, llm: {...settings.llm, vision}}});
       }}/>
-      <Button variant="ghost" className="config-action" disabled={current.running || !configured} onClick={() => void verify()} aria-label={t('vision.verify')}>
-        {current.running ? '…' : t('config.visionAction')}
-      </Button>
+      <IconButton icon="focus" label={verifyLabel} tip={verifyLabel} sound="tap" disabled={current.running || !configured} onClick={() => void verify()}/>
     </FieldRow>
     <p className="config-value" role="status">{status}</p>
   </div>;

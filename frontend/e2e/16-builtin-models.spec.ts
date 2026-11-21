@@ -61,7 +61,7 @@ async function models(page:Page){
 }
 test('the two model entries open details, thinking persists, four rows align, and unknown providers disable thinking',async({page})=>{
   const pane=await models(page);
-  await expect(pane.locator('.config-action')).toHaveCount(2);
+  await expect(pane.locator('.config-model-row .icon-btn')).toHaveCount(2);
   await expect(pane).not.toContainText('Embedding');
   await pane.getByRole('button',{name:'配置模型'}).click();
   await expect(page.locator('[data-intro=llm] .opt-row')).toHaveCount(4);
@@ -103,7 +103,7 @@ test('missing recall resources explain the fallback without reintroducing config
   await page.route('**/api/resources/status',route=>route.fulfill({json:{asr:{ready:false},embedding:{state:'missing'},index:{state:'pending'}}}));
   await models(page);
   await expect(page.locator('.builtin-resource-notice')).toContainText('当前使用文字匹配');
-  await expect(page.locator('#config-models .config-action')).toHaveCount(2);
+  await expect(page.locator('#config-models .config-model-row .icon-btn')).toHaveCount(2);
 });
 
 test('clicking the microphone twice during connection cancels pending activation',async({page})=>{

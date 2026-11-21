@@ -32,7 +32,7 @@ test('uninstall confirmation leaves room below its footer divider', async ({page
 });
 
 for (const width of [640, 960, 1280]) {
-  test(`settings action labels stay on one line in three languages at ${width}px`, async ({page, request}) => {
+  test(`settings action icons align in three languages at ${width}px`, async ({page, request}) => {
     const state = await (await request.get('/api/state')).json();
     await page.setViewportSize({width, height: width * 9 / 16});
     await page.route('**/api/state', route => route.fulfill({json: state}));
@@ -100,35 +100,23 @@ for (const width of [640, 960, 1280]) {
       expect(picker.width).toBeLessThanOrEqual(200);
       expect(picker.y + picker.height / 2).toBeCloseTo(status.y + status.height / 2, 0);
 
-      const actions = await page.locator('.config-document .config-action').evaluateAll(buttons => buttons.map(button => {
-        const range = document.createRange();
-        range.selectNodeContents(button);
-        const text = Array.from(range.getClientRects());
+      const actions = page.locator([
+        '#config-models .config-model-row > button',
+        '#config-memory .opt-ctl > button',
+        '#config-archive .opt-ctl > button',
+        '#config-desktop .desktop-config-group + .desktop-config-group .opt-ctl > button:not([role="switch"])',
+        '#config-sound .opt-ctl > button:not(.sel-face, [role="switch"])',
+      ].join(', '));
+      await expect(actions).toHaveCount(8);
+      expect(await actions.evaluateAll(buttons => buttons.filter(button => {
         const bounds = button.getBoundingClientRect();
-        const row = button.closest('.opt-row');
-        const group = button.closest('.config-card, .config-header');
-        const positions = [row, group].filter(el => el !== null).map(el => el.getBoundingClientRect());
-        return {
-          label: button.textContent,
-          paired: !!button.closest('.sound-pair'),
-          width: bounds.width,
-          height: bounds.height,
-          lines: new Set(text.map(rect => Math.round(rect.top))).size,
-          textFits: text.every(rect => rect.left >= bounds.left + 4 && rect.right <= bounds.right - 4),
-          buttonFits: positions.every(rect => bounds.left >= rect.left - 1 && bounds.right <= rect.right + 1),
-          columnRight: group ? Math.round(group.getBoundingClientRect().right - bounds.right) : null,
-          group: group?.closest('section')?.id,
-        };
-      }));
-      expect(actions.length).toBeGreaterThanOrEqual(9);
-      expect(actions.filter(action => action.lines !== 1 || !action.textFits || !action.buttonFits),
-        `${lang} at ${width}px`).toEqual([]);
-      for (const action of actions) {
-        if (width >= 960 && !action.paired) expect([action.width, action.height], `${lang} at ${width}px, ${action.label}`).toEqual([112, 34]);
-      }
-      const cardActions = actions.filter(action => action.group && action.columnRight !== null);
-      expect(new Set(cardActions.map(action => action.columnRight)).size,
-        `${lang} at ${width}px, ${JSON.stringify(cardActions.map(({label, columnRight}) => ({label, columnRight})))}`).toBeLessThanOrEqual(2);
+        const row = button.closest('.opt-row, .config-model-row')!.getBoundingClientRect();
+        const label = button.getAttribute('aria-label');
+        return bounds.width !== 34 || bounds.height !== 34
+          || Math.abs(bounds.right - row.right) > 1
+          || button.textContent !== '' || !button.querySelector('svg')
+          || !label || button.getAttribute('data-tip') !== label;
+      }).map(button => button.getAttribute('aria-label'))), `${lang} at ${width}px`).toEqual([]);
       expect(await page.locator('.config-scroll').evaluate(el=>el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
     }
   });

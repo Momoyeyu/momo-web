@@ -1,6 +1,6 @@
 import {useState, useSyncExternalStore} from 'react';
 import {ambient} from '../../audio/ambient';
-import Button from '../../ui/Button';
+import IconButton from '../../ui/IconButton';
 import {getChatEngine} from '../../chat/engineInstance';
 import {LANGS, resolveChatLang, tFor, useT} from '../../i18n';
 import {ttsConfigured} from '../../lib/asr';
@@ -59,6 +59,7 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
   );
   const voiceReady = ttsConfigured(settings.tts);
   const voiceOn = voiceReady && !general.voiceMuted;
+  const playSound = t('config.soundPlay');
   return <div className="config-split">
     <div className="sound-pair">
       <FieldRow label={t('settings.voiceInput')}><Switch title={t('settings.voiceInput')} on={general.voiceInput} onChange={voiceInput => {
@@ -79,7 +80,7 @@ export default function GeneralTab({section}: {section: 'language' | 'sound' | '
     </div>
     <div className="sound-pair">{slider('musicVolume')}
       <FieldRow label={t('config.sampleSound')}>
-        <Button variant="ghost" className="config-action" sound={false} disabled={general.sfxVolume === 0} onClick={() => ambient.sound(sample)}>{t('config.soundPlay')}</Button>
+        <IconButton icon="play" label={playSound} tip={playSound} disabled={general.sfxVolume === 0} onClick={() => ambient.sound(sample)}/>
       </FieldRow>
     </div>
   </div>;

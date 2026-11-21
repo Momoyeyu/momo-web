@@ -166,15 +166,20 @@ test("对话设置：预览默认可见并跟随对话状态开关", async ({
   await expect(page.locator(".dialog-preview .chat-status")).toHaveCount(0);
 });
 
-test("设置操作按钮对齐，键盘关闭后焦点回到入口", async ({page}) => {
+test("模型配置图标对齐，键盘关闭后焦点回到入口", async ({page}) => {
   await openTab(page, "模型");
   const section = page.locator("#config-models");
   const entry = section.getByRole("button", {name:"配置模型",exact:true});
   const speech = section.getByRole("button", {name:"配置语音",exact:true});
   const modelBox = await entry.boundingBox();
   const speechBox = await speech.boundingBox();
-  expect(modelBox).toMatchObject({width:112,height:34});
-  expect(speechBox).toMatchObject({x:modelBox!.x,width:112,height:34});
+  expect(modelBox).toMatchObject({width:34,height:34});
+  expect(speechBox).toMatchObject({x:modelBox!.x,width:34,height:34});
+  for (const button of [entry, speech]) {
+    await expect(button).toHaveText("");
+    await expect(button).toHaveAttribute("data-tip", /\S/);
+    await expect(button.locator("svg")).toBeVisible();
+  }
   await entry.focus(); await entry.press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape"); await expect(entry).toBeFocused();

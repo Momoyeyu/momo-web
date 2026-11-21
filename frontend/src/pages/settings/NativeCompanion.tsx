@@ -10,6 +10,7 @@ import Button from '../../ui/Button';
 import DialogBackButton from '../../ui/DialogBackButton';
 import Select from '../../ui/Select';
 import Icon from '../../ui/Icon';
+import IconButton from '../../ui/IconButton';
 import FieldRow from '../../ui/FieldRow';
 import Hint from '../../ui/Hint';
 import NativeWindowNotice, {type NativeWindowDiagnostics} from './NativeWindowNotice';
@@ -124,9 +125,13 @@ export default function NativeCompanion({plugin,mode='settings'}:{plugin:'comput
   </footer>
  </div>;
  const findButton = mode!=='inline' && !active && <Button variant="ghost" disabled={busy} onClick={()=>void run(findTargets,'targets')}>{t('permissions.findWindows')}</Button>;
- const runButton = active||stopUnconfirmed
-  ? <Button variant="ghost" className={mode==='inline'?'config-action':undefined} disabled={busy} onClick={()=>void run(async()=>{await post('stop',{...meetingIdentity(),plugin});})}>{t('browser.stop')}</Button>
-  : live && <Button className={mode==='inline'?'config-action':undefined} disabled={!enabled||busy||!target||scanState==='loading'} onClick={startSelected}>{t('browser.start')}</Button>;
+ const stopping = active || stopUnconfirmed;
+ const runLabel = t(stopping ? 'browser.stop' : 'browser.start');
+ const runDisabled = busy || (!stopping && (!enabled || !target || scanState === 'loading'));
+ const runAction = stopping ? () => void run(async()=>{await post('stop',{...meetingIdentity(),plugin});}) : startSelected;
+ const runButton = (stopping || live) && (mode === 'inline'
+  ? <IconButton icon={stopping ? 'stop' : 'play'} label={runLabel} tip={runLabel} sound="tap" disabled={runDisabled} onClick={runAction}/>
+  : <Button variant={stopping ? 'ghost' : 'solid'} disabled={runDisabled} onClick={runAction}>{runLabel}</Button>);
  const pickerNotice = mode==='inline' && <div className="window-scan-feedback">
   {scanState==='loading' ? <span role="status">{t('config.loading')}</span>
    : scanState==='failed' ? <span role="alert">{t('permissions.error')}</span>
