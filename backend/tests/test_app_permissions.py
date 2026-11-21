@@ -5,16 +5,34 @@ from app.services.app_permissions import AppPermissions, DesktopPermissionError
 EDITOR = {'bundleId': 'com.apple.TextEdit'}
 BROWSER = {'bundleId': 'com.apple.Safari'}
 
+def test_browser_consent_is_independent_and_cannot_be_bypassed_by_desktop(tmp_path):
+    path = tmp_path / 'desktop-access.json'
+    policy = AppPermissions(path)
+    policy.consent(True)
+    with pytest.raises(DesktopPermissionError):
+        policy.before_action(BROWSER)
+    assert 'com.apple.safari' in policy.before_action()[1]
+    policy.consent(False)
+    policy.consent(True, 'browser')
+    assert AppPermissions(path).granted('browser')
+    version, _ = policy.before_action(BROWSER, plugin='browser')
+    with pytest.raises(DesktopPermissionError):
+        policy.before_action(EDITOR, plugin='browser')
+    policy.consent(False, 'browser')
+    with pytest.raises(DesktopPermissionError):
+        policy.before_action(BROWSER, version, plugin='browser')
+
 
 def test_consent_enables_applications_without_individual_requests(tmp_path):
     path = tmp_path / 'desktop-access.json'
     policy = AppPermissions(path)
-    assert policy.status() == {'granted': None, 'blocked': []}
+    assert policy.status() == {'granted': None, 'browserGranted': False, 'blocked': []}
     with pytest.raises(DesktopPermissionError, match='has not been granted'):
         policy.before_action(EDITOR)
     policy.consent(False)
     assert AppPermissions(path).status()['granted'] is False
     policy.consent(True)
+    policy.consent(True, 'browser')
     assert policy.before_action(EDITOR) == policy.before_action(BROWSER)
     assert AppPermissions(path).before_action(BROWSER)[1] == []
 
@@ -22,6 +40,7 @@ def test_consent_enables_applications_without_individual_requests(tmp_path):
 def test_blocklist_is_app_scoped_and_invalidates_old_access(tmp_path):
     policy = AppPermissions(tmp_path/'desktop-access.json')
     policy.consent(True)
+    policy.consent(True, 'browser')
     version, _ = policy.before_action(EDITOR)
     assert policy.block('COM.APPLE.TEXTEDIT', 'TextEdit', True)
     assert not policy.block('com.apple.textedit', 'TextEdit', True)

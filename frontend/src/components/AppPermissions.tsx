@@ -14,7 +14,8 @@ import '../styles/plugin-library.css';
 import '../styles/desktop-permissions.css';
 
 type Application = {bundleId: string; name: string};
-type Policy = {available: boolean; granted: boolean | null; blocked: Application[]; stopUnconfirmed?: boolean};
+type Policy = {available: boolean; granted: boolean | null; browserGranted?: boolean; blocked: Application[]; stopUnconfirmed?: boolean};
+export type ApplicationScope = 'computer' | 'browser';
 export type SystemAccess = {screenPermission: boolean; inputPermission: boolean; applications: Application[]};
 type SystemGuideRequest = {kind: SystemPermission; onError?: () => void};
 type PermissionProgress = {request: PermissionRequest; shown: PermissionKind[]; missing: PermissionKind[]};
@@ -55,9 +56,13 @@ export function DesktopPermissionAction({kind, granted, disabled, onClick}: {
   >{label}</Button>;
 }
 
-export async function setDesktopConsent(granted: boolean) {
-  const policy = await apiJson<Policy>(endpoint + '/consent', jsonInit('PUT', {granted}));
-  recordDesktopConsent(policy.granted);
+export function readDesktopAccess(signal?: AbortSignal) {
+  return apiJson<Policy>(endpoint, {signal});
+}
+
+export async function setDesktopConsent(granted: boolean, plugin: ApplicationScope = 'computer') {
+  const policy = await apiJson<Policy>(endpoint + '/consent', jsonInit('PUT', plugin === 'computer' ? {granted} : {granted, plugin}));
+  if (plugin === 'computer') recordDesktopConsent(policy.granted);
   window.dispatchEvent(new Event(accessChanged));
   await Promise.allSettled([refreshActivities(), readComputer()]);
   return policy;

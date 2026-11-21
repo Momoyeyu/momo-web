@@ -15,13 +15,12 @@ import DesktopSettings from './settings/DesktopSettings';
 import McpSettings from './settings/ExtensionsTab';
 import GeneralTab from './settings/GeneralTab';
 import ModelsTab from './settings/ModelsTab';
-import NativeCompanion from './settings/NativeCompanion';
 import ModsPanel from './settings/ModsPanel';
 import VisionSettings from './settings/VisionSettings';
 import '../styles/settings.css';
 import '../styles/config-document.css';
 
-const chapters = ['language', 'dialogue', 'sound', 'models', 'data', 'desktop', 'browser', 'customize'] as const;
+const chapters = ['language', 'dialogue', 'sound', 'models', 'data', 'operations', 'customize'] as const;
 type Chapter = (typeof chapters)[number];
 const inset = 24;
 const canResumeMeeting = () => meetingSnapshot().state === 'active' || !!storedMeetingIdentity();
@@ -94,8 +93,7 @@ export default function Settings() {
       {guided ? <MemoryPanel/> : <ConfigAction label={t('config.memories')} action={t('config.memoriesAction')} icon="backlog"><MemoryPanel/></ConfigAction>}
       <DataTransfer/>
     </>,
-    desktop: <DesktopSettings/>,
-    browser: <NativeCompanion plugin="browser" mode="inline"/>,
+    operations: <DesktopSettings/>,
     customize: <div className="config-split config-split-stack">
       <div className="customize-library">
         <ConfigAction label={t('config.avatar')} action={t('config.avatarAction')}

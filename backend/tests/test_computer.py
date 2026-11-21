@@ -109,7 +109,7 @@ def test_desktop_observation_applies_blocklist_without_input_binding(tmp_path):
     with patch.object(c,'gate'), patch.object(module.runtime,'host',host), patch.object(module,'permissions',policy):
         assert c.desktop_frame()['observationAvailable']
         assert [method for method,_ in calls] == ['native.screen']
-        assert calls[0][1]['blocked']==['com.example.blocked']
+        assert {'com.example.blocked', 'com.apple.safari'} <= set(calls[0][1]['blocked'])
         c.frames=120;c.last=0
         assert c.desktop_frame()['observationAvailable']
         c.set_desktop_allowed(False)

@@ -35,10 +35,8 @@ for (const viewport of [{width:1280,height:720},{width:1920,height:1080}]) {
       await modal.getByRole('button',{name:'返回'}).click();
     }
     await library.getByRole('button',{name:'返回'}).click();
-    await openTab(page,'桌面');
-    await expect(page.locator('#config-desktop')).toBeInViewport();
-    await openTab(page,'浏览器');
-    await expect(page.locator('#config-browser')).toBeInViewport();
+    await openTab(page,'操作');
+    await expect(page.locator('#config-operations')).toBeInViewport();
     await gotoRoute(page,'chat');
     await expect(page.getByRole('button',{name:'拓展',exact:true})).toHaveCount(0);
   });

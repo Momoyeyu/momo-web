@@ -12,8 +12,7 @@ export const en: Dict = {
     "sound": "Sound",
     "models": "Models",
     "data": "Data",
-    "desktop": "Desktop",
-    "browser": "Browser",
+    "operations": "Operations",
     "customize": "Customize",
     "avatar": "Character",
     "avatarAction": "Manage avatar",
@@ -58,7 +57,7 @@ export const en: Dict = {
   activities: {
     platformUnsupported: "Not available on this platform yet","title": "Do something together", "computerSummary": "Observe and accompany your desktop", "browserSummary": "Connect to your open browser", "minecraftSummary": "Join your current character and world", "disabled": "Not enabled", "empty": "Enable an activity plugin in settings first."},
   plugins: {"stopUnknown": "Plugin shutdown is not confirmed. Retry disabling or uninstalling it.", "error": "Could not complete the action. Check the plugin file or connection and retry."},
-  desktopAccess: {"systemAction": "System settings", "title": "Desktop access", "description": "Enable momo to see your screen and control apps. Use the application blocklist in Desktop settings to exclude individual apps.", "system": "macOS permissions", "screen": "Screen Recording", "screenHint": "Lets momo see what is on screen.", "input": "Accessibility", "inputHint": "Lets momo click, type, and scroll.", "enabled": "Granted", "configure": "Grant access", "settingsHelp": "Allow the current momo app in System Settings. If macOS asks you to quit and reopen, follow the prompt.", "disable": "Revoke desktop access", "later": "Later", "enable": "Enable desktop access", "open": "Open access setup", "blocklist": "Application blocklist", "blockHint": "Blocked apps are excluded from screenshots and cannot be controlled.", "select": "Select a running app", "block": "Block app", "unblock": "Remove",
+  desktopAccess: {"browserAccess": "Browser access", "browserHint": "Let momo find, view, and use supported browsers when a task needs it.", "systemAction": "System settings", "title": "Desktop access", "description": "Enable momo to see your screen and control apps. Use the application blocklist in Operations settings to exclude individual apps.", "system": "macOS permissions", "screen": "Screen Recording", "screenHint": "Lets momo see what is on screen.", "input": "Accessibility", "inputHint": "Lets momo click, type, and scroll.", "enabled": "Granted", "configure": "Grant access", "settingsHelp": "Allow the current momo app in System Settings. If macOS asks you to quit and reopen, follow the prompt.", "disable": "Revoke desktop access", "later": "Later", "enable": "Enable desktop access", "open": "Open access setup", "blocklist": "Application blocklist", "blockHint": "Blocked apps are excluded from screenshots and cannot be controlled.", "select": "Select a running app", "block": "Block app", "unblock": "Remove",
     accessGroup: "Access permissions", behaviorGroup: "Desktop behavior", actionLabel: "{permission} {action}",
     requestTitle: "Grant access to continue", accessHint: "Allow momo to access apps outside the blocklist.", remaining: "Permissions remaining: {count}", allGranted: "All permissions granted",
     cancelOperation: "Cancel operation", continueOperation: "Continue operation", close: "Close",
@@ -395,7 +394,7 @@ export const en: Dict = {
   },
   chat: {
     proactive: "Proactive replies",
-    proactiveHint: "Let momo respond when an observed view changes. This applies to both chat and desktop pet mode.",
+    proactiveHint: "Let momo mention relevant changes she sees while working on a task.",
     proactiveError: "Could not change proactive replies. Try again.",
     idle: "Idle",
     listening: "Listening",

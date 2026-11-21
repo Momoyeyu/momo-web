@@ -32,10 +32,10 @@ def snapshot():
     from .app_permissions import native_desktop, permissions
     with _lock:
         data = _preferences()
-        core_access = not native_desktop() or permissions.granted()
         return {'enabled': {
                     key: (bool(mods.integration_root('momo.minecraft')) if key == 'minecraft'
-                          else core_access and data.get(key, True) is True) and supported(key)
+                          else permissions.granted(key) if native_desktop()
+                          else data.get(key, True) is True) and supported(key)
                     for key in IDS
                 },
                 'supported': {key: supported(key) for key in IDS}}
@@ -57,6 +57,9 @@ def set_enabled(key, enabled):
         except KeyError:
             raise ValueError('Install the Minecraft Mod first') from None
         return snapshot()
+    from .app_permissions import native_desktop
+    if native_desktop():
+        raise ValueError('Use desktop access settings to change application consent')
     with _lock:
         data = _preferences()
         data[key] = enabled

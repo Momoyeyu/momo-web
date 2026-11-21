@@ -33,7 +33,7 @@ def test_invalid_and_corrupt_state_use_core_availability(tmp_path):
     with pytest.raises(ValueError): activities.set_enabled('computer','true')
 
 
-def test_desktop_consent_supplies_defaults_without_overwriting_plugin_choices(tmp_path, monkeypatch):
+def test_native_consent_is_the_single_switch_for_each_scope(tmp_path, monkeypatch):
     from app.services import app_permissions
     policy = app_permissions.AppPermissions(tmp_path/'desktop-access.json')
     monkeypatch.setattr(app_permissions, 'permissions', policy)
@@ -42,12 +42,13 @@ def test_desktop_consent_supplies_defaults_without_overwriting_plugin_choices(tm
     monkeypatch.setattr(activities.mods, 'integration_root', lambda _: tmp_path)
     assert not activities.snapshot()['enabled']['computer']
     policy.consent(True)
-    assert activities.snapshot()['enabled'] == {'computer':True,'browser':True,'minecraft':True}
+    assert activities.snapshot()['enabled'] == {'computer':True,'browser':False,'minecraft':True}
     (tmp_path/'activity-plugins.json').write_text('{"computer":false,"minecraft":true}')
-    assert activities.snapshot()['enabled'] == {'computer':False,'browser':True,'minecraft':True}
+    assert activities.snapshot()['enabled'] == {'computer':True,'browser':False,'minecraft':True}
+    policy.consent(True, 'browser')
 
     policy.consent(False)
-    assert not activities.snapshot()['enabled']['browser']
+    assert activities.snapshot()['enabled'] == {'computer':False,'browser':True,'minecraft':True}
 
 
 def test_authenticated_vite_uses_browser_capture_consent(monkeypatch):

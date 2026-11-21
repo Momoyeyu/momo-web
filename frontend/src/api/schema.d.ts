@@ -2134,6 +2134,12 @@ export interface components {
         Consent: {
             /** Granted */
             granted: boolean;
+            /**
+             * Plugin
+             * @default computer
+             * @enum {string}
+             */
+            plugin: "computer" | "browser";
         };
         /** ContactIn */
         ContactIn: {

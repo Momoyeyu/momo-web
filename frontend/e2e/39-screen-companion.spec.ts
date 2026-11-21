@@ -1,7 +1,7 @@
 import {test,expect} from './fixtures';
 import {bootChat,openTab} from './helpers';
 
-test('chat and desktop share proactive replies while desktop window start and stop remain available',async({page})=>{
+test('chat and settings share proactive task replies',async({page})=>{
  let active=false,proactive=false,reactions=false;
  await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:false}}}));
  await page.route('**/api/computer/**',async r=>{
@@ -19,33 +19,8 @@ test('chat and desktop share proactive replies while desktop window start and st
  await expect.poll(()=>proactive&&reactions).toBe(true);
  await bootChat(page);
  await expect(page.getByRole('button',{name:'主动回应',exact:true})).toHaveAttribute('aria-pressed','true');
- await openTab(page,'桌面');
- const desktop=page.locator('#config-desktop');
- await expect(desktop.getByText('请在桌面版中打开此设置。',{exact:true})).toBeVisible();
- await expect(desktop.getByRole('switch',{name:'主动回应',exact:true})).toHaveCount(0);
- await desktop.getByRole('button',{name:'选择窗口'}).click();
- const modal=page.getByRole('dialog',{name:'桌面陪伴'});
- await modal.getByRole('button',{name:'查找窗口'}).click();await modal.getByRole('button',{name:/应用窗口/}).click();await modal.getByRole('option',{name:/Fixture app/}).click();
- await modal.getByRole('button',{name:'开启',exact:true}).click();
- await expect.poll(()=>active).toBe(true);
- await expect(modal.getByRole('switch',{name:'主动发言'})).toHaveCount(0);
- await page.keyboard.press('Escape');await page.reload();await openTab(page,'桌面');
- await expect(page.getByRole('button',{name:'返回对话'})).toBeVisible();
- await desktop.getByRole('button',{name:'选择窗口'}).click();
- await modal.locator('.extension-detail-actions').getByRole('button',{name:'关闭',exact:true}).click();
- await expect.poll(()=>active).toBe(false);
-});
-
-test('unconfirmed native stop stays retryable instead of looking idle',async({page})=>{
- let stopUnconfirmed=true,stops=0;
- await page.route('**/api/computer/native/**',async r=>{
-  if(r.request().url().endsWith('/stop')){stops++;stopUnconfirmed=false;}
-  await r.fulfill({json:{active:false,stopUnconfirmed}});
- });
- await bootChat(page);await openTab(page,'桌面');
- await page.locator('#config-desktop').getByRole('button',{name:'选择窗口'}).click();
- const modal=page.getByRole('dialog',{name:'桌面陪伴'});
- const stop=modal.locator('.extension-detail-actions').getByRole('button',{name:'关闭',exact:true});
- await expect(stop).toBeEnabled();await stop.click();
- await expect.poll(()=>stops).toBe(1);await expect(stop).toHaveCount(0);
+ await openTab(page,'操作');
+ const operations=page.locator('#config-operations');
+ await expect(operations.getByRole('switch',{name:'主动回应',exact:true})).toHaveCount(0);
+ await expect(operations.getByRole('button',{name:'选择窗口'})).toHaveCount(0);
 });

@@ -707,6 +707,15 @@
           "granted": {
             "title": "Granted",
             "type": "boolean"
+          },
+          "plugin": {
+            "default": "computer",
+            "enum": [
+              "computer",
+              "browser"
+            ],
+            "title": "Plugin",
+            "type": "string"
           }
         },
         "required": [

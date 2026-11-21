@@ -21,8 +21,8 @@ export default function ProactiveResponseToggle({placement = 'toolbar'}: {placem
   const description = t(failed ? 'chat.proactiveError' : 'chat.proactiveHint');
 
   useEffect(() => {
-    if (inSettings) void readComputer().catch(() => setFailed(true));
-  }, [inSettings]);
+    void readComputer().catch(() => setFailed(true));
+  }, []);
 
   async function setEnabled(on: boolean) {
     if (disabled) return;

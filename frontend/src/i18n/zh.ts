@@ -12,8 +12,7 @@ export const zh = {
     "sound": "声音",
     "models": "模型",
     "data": "数据",
-    "desktop": "桌面",
-    "browser": "浏览器",
+    "operations": "操作",
     "customize": "定制",
     "avatar": "角色形象",
     "avatarAction": "管理形象",
@@ -58,7 +57,7 @@ export const zh = {
   activities: {
     platformUnsupported: "此平台暂不支持","title": "一起做点什么", "computerSummary": "观察与陪伴你的桌面", "browserSummary": "连接你已打开的浏览器", "minecraftSummary": "加入当前角色与世界", "disabled": "未启用", "empty": "先在设置中启用一个活动插件。"},
   plugins: {"stopUnknown": "尚未确认插件已停止，请重试停用或卸载。", "error": "操作未完成，请检查插件文件或连接后重试。"},
-  desktopAccess: {"systemAction": "系统设置", "title": "桌面访问", "description": "开启后，momo 可以查看屏幕并操作应用。你可以在「桌面」设置的应用黑名单中排除指定软件。", "system": "macOS 权限", "screen": "屏幕录制", "screenHint": "让 momo 读取画面。", "input": "辅助功能", "inputHint": "让 momo 点击、输入和滚动。", "enabled": "已授权", "configure": "去授权", "settingsHelp": "在系统设置中允许当前 momo。若系统提示退出并重新打开，请按提示操作。", "disable": "撤回桌面访问", "later": "稍后再说", "enable": "启用桌面访问", "open": "打开授权引导", "blocklist": "应用黑名单", "blockHint": "名单中的软件会从截图中排除，也不能被 momo 操作。", "select": "选择正在运行的软件", "block": "加入黑名单", "unblock": "移除",
+  desktopAccess: {"browserAccess": "浏览器访问", "browserHint": "允许 momo 在任务需要时自行查找、查看和操作受支持的浏览器。", "systemAction": "系统设置", "title": "桌面访问", "description": "开启后，momo 可以查看屏幕并操作应用。你可以在「操作」设置的应用黑名单中排除指定软件。", "system": "macOS 权限", "screen": "屏幕录制", "screenHint": "让 momo 读取画面。", "input": "辅助功能", "inputHint": "让 momo 点击、输入和滚动。", "enabled": "已授权", "configure": "去授权", "settingsHelp": "在系统设置中允许当前 momo。若系统提示退出并重新打开，请按提示操作。", "disable": "撤回桌面访问", "later": "稍后再说", "enable": "启用桌面访问", "open": "打开授权引导", "blocklist": "应用黑名单", "blockHint": "名单中的软件会从截图中排除，也不能被 momo 操作。", "select": "选择正在运行的软件", "block": "加入黑名单", "unblock": "移除",
     accessGroup: "访问权限", behaviorGroup: "桌面行为", actionLabel: "{permission} {action}",
     requestTitle: "授权后继续", accessHint: "允许 momo 访问未列入黑名单的应用。", remaining: "剩余 {count} 项授权", allGranted: "全部已授权",
     cancelOperation: "取消操作", continueOperation: "继续操作", close: "关闭",
@@ -397,7 +396,7 @@ export const zh = {
   },
   chat: {
     proactive: "主动回应",
-    proactiveHint: "允许 momo 在观察的画面变化时主动回应。普通对话和桌宠共用此设置。",
+    proactiveHint: "momo 可以在执行任务时主动说出她留意到的变化。",
     proactiveError: "无法更改主动回应，请重试。",
     idle: "空闲",
     listening: "聆听中",

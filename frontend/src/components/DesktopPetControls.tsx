@@ -6,7 +6,7 @@ import {useActivities} from '../services/extensionActivities';
 import {useMinecraftControlGeneration} from '../services/minecraftClient';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
-import DesktopObservation from './DesktopObservation';
+import DesktopPetActivities from './DesktopPetActivities';
 
 type Props={closeUp:boolean;onFrame:()=>void;collapsed:boolean;onDialog:()=>void;micOn:boolean;micAllowed:boolean;onMic:()=>void};
 export default function DesktopPetControls({closeUp,onFrame,collapsed,onDialog,micOn,micAllowed,onMic}:Props){
@@ -41,7 +41,7 @@ export default function DesktopPetControls({closeUp,onFrame,collapsed,onDialog,m
   {host&&createPortal(<div className="chat-toolbar desktop-pet-controls" role="toolbar" aria-label={t('desktop.controls')} data-pet-interactive>
    <div className="tb-side">
     <Button className="tb tb-framing tip" aria-label={t(closeUp?'performance.fullBody':'desktop.halfBody')} data-tip={t(closeUp?'performance.fullBody':'desktop.halfBody')} data-tip-detail={t('desktop.drag')} onClick={onFrame}><Icon name={closeUp?'frameFull':'frameClose'}/></Button>
-    <DesktopObservation playing={playing}/>
+    <DesktopPetActivities playing={playing}/>
     <Button className={`tb tip${micOn?' is-active':''}`} disabled={!micAllowed} aria-pressed={micOn} aria-label={t('chat.mic')} data-tip={t('chat.mic')} onClick={onMic}><Icon name="mic"/></Button>
     <Button className={`tb tip${!collapsed?' is-active':''}`} aria-expanded={!collapsed} aria-label={t(collapsed?'desktop.expandDialog':'desktop.collapseDialog')} data-tip={t(collapsed?'desktop.expandDialog':'desktop.collapseDialog')} onClick={onDialog}><Icon name="message"/></Button>
     <Button className={`tb tip${state.clickThrough?' is-active':''}`} aria-pressed={state.clickThrough} aria-label={t('desktop.clickThrough')} data-tip={t('desktop.clickThrough')} data-tip-detail={t('desktop.clickThroughHint')} disabled={busy} onClick={()=>void run(()=>setDesktopClickThrough(!state.clickThrough))}><Icon name="pointer"/></Button>

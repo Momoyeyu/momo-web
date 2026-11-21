@@ -1,6 +1,4 @@
 import ProactiveResponseToggle from '../components/ProactiveResponseToggle';
-import {useComputerReactions} from '../services/useComputerReactions';
-import {useActivities} from '../services/extensionActivities';
 import DesktopPetControls from '../components/DesktopPetControls';
 import {useDesktopWindow} from '../services/desktopWindow';
 import ExtensionActivities from './ExtensionActivities';
@@ -53,8 +51,6 @@ export default function Chat({active,attention,onHome}: {active: boolean;attenti
   useEffect(()=>{if(desktopWindow.mode==='pet')setPhoneClose(value=>value+1);},[desktopWindow.mode]);
   const intro=useIntro();
   const introActive=!!intro.data && intro.data.phase!=="completed";
-  const activities=useActivities();
-  useComputerReactions(active&&!introActive,activities.computer);
   // 角色名/通用设置跟随 store（切换语言、改名、状态开关即时生效）。
   const preferences=useSyncExternalStore(subscribe, getState).settings.general;
   const name = speakerName();

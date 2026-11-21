@@ -48,10 +48,10 @@ test('sound controls remain paired and model details occupy two full rows',async
 test('sound and desktop share an inset divider and one card border', async ({page}) => {
  await page.setViewportSize({width:1280,height:720});
  await openApp(page,'settings');
- for (const section of ['sound','desktop']) {
+ for (const section of ['sound','operations']) {
   const card = page.locator('#config-'+section+' > .config-card');
   await expect(card).toHaveCSS('border-top-width','1px');
-  const split = card.locator('.config-split');
+  const split = card.locator('.config-split').first();
   await expect(split).toHaveCount(1, {timeout:2000});
   const line = await split.evaluate(el => {
    const style = getComputedStyle(el,'::before');
@@ -63,7 +63,7 @@ test('sound and desktop share an inset divider and one card border', async ({pag
   expect(parseFloat(line.start)).toBeCloseTo(line.center,0);
   expect(line.pointerEvents).toBe('none');
  }
- const desktop = page.locator('#config-desktop .desktop-config-group');
+ const desktop = page.locator('#config-operations .config-split > .opt-row');
  await expect(desktop.first()).toHaveCSS('border-top-width','0px');
  await expect(desktop.last()).toHaveCSS('border-top-width','0px');
  const [left, right] = await Promise.all([desktop.first().boundingBox(),desktop.last().boundingBox()]);

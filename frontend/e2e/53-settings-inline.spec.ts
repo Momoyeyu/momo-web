@@ -82,30 +82,21 @@ test('desktop access can be configured before Boot and keeps confirmed consent i
     };
   }, baseURL!);
   await page.route('**/api/intro', route => route.fulfill({json:{phase:'completed',configurationValid:true}}));
-  let granted=true, failStatus=false, observing=true, inputPermission=true;
+  let granted=true, failStatus=false, inputPermission=true;
   await page.route('**/api/computer/status', route => failStatus
     ? route.fulfill({status:503,json:{}})
-    : route.fulfill({json:{desktopAccessGranted:granted, desktopAllowed:observing}}));
+    : route.fulfill({json:{desktopAccessGranted:granted, desktopAllowed:true}}));
   await page.route('**/api/computer/access/consent',route=>{
     granted=route.request().postDataJSON().granted;
     return route.fulfill({json:{granted}});
   });
   await page.route('**/api/computer/access', route => route.fulfill({json:{available:true,granted,blocked:[]}}));
   await page.route('**/api/computer/access/system', route => route.fulfill({json:{screenPermission:true,inputPermission,applications:[]}}));
-  await page.route('**/api/computer/desktop/observation',route=>{
-    expect(route.request().method()).toBe('PATCH');
-    const payload=route.request().postDataJSON();
-    expect(payload).toEqual({enabled:false});
-    observing=payload.enabled;
-    return route.fulfill({json:{desktopAccessGranted:granted,desktopAllowed:observing}});
-  });
-  await openTab(page, '桌面');
+  await openTab(page, '操作');
   await expect(page.getByRole('button',{name:'返回标题'})).toBeVisible();
-  const access = page.locator('#config-desktop .opt-row').filter({hasText:'桌面访问'});
-  await expect(access.getByRole('status')).toHaveText('已授权');
+  const access = page.locator('#config-operations .opt-row').filter({hasText:'桌面访问'});
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  const accessGroup = page.getByRole('region',{name:'访问权限'});
-  const behaviorGroup = page.getByRole('region',{name:'桌面行为'});
+  const accessGroup = page.locator('#config-operations');
   const screen = accessGroup.locator('.opt-row').filter({hasText:'屏幕录制'});
   const input = accessGroup.locator('.opt-row').filter({hasText:'辅助功能'});
   await expect(screen.getByRole('button',{name:'已授权'})).toBeDisabled();
@@ -130,10 +121,6 @@ test('desktop access can be configured before Boot and keeps confirmed consent i
   await expect(input.getByRole('button',{name:'已授权'})).toBeDisabled();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  const observation=behaviorGroup.getByRole('switch',{name:'观察桌面'});
-  await expect(observation).toBeEnabled();
-  await observation.click();
-  await expect(observation).toHaveAttribute('aria-checked','false');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked','false');
   failStatus=true;
@@ -142,7 +129,6 @@ test('desktop access can be configured before Boot and keeps confirmed consent i
   await failedRead;
   await expect(toggle).toBeEnabled();
   await expect(toggle).toHaveAttribute('aria-checked','true');
-  await expect(access.getByRole('status')).toHaveText('已授权');
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-checked','false');
   await expect(page.getByRole('dialog')).toHaveCount(0);

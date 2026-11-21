@@ -12,8 +12,7 @@ export const ja: Dict = {
     "sound": "サウンド",
     "models": "モデル",
     "data": "データ",
-    "desktop": "デスクトップ",
-    "browser": "ブラウザ",
+    "operations": "操作",
     "customize": "カスタム",
     "avatar": "キャラクター",
     "avatarAction": "姿を管理",
@@ -58,7 +57,7 @@ export const ja: Dict = {
   activities: {
     platformUnsupported: "このプラットフォームでは未対応です","title": "一緒に何をしよう", "computerSummary": "デスクトップを見守る", "browserSummary": "開いているブラウザーに接続", "minecraftSummary": "現在のキャラクターとワールドに参加", "disabled": "無効", "empty": "設定でアクティビティのプラグインを有効にしてください。"},
   plugins: {"stopUnknown": "停止を確認できません。無効化または削除を再試行してください。", "error": "操作を完了できません。ファイルまたは接続を確認して再試行してください。"},
-  desktopAccess: {"systemAction": "システム設定", "title": "デスクトップへのアクセス", "description": "許可すると、momo が画面を見てアプリを操作できます。「デスクトップ」設定のブロックリストで対象外のアプリを指定できます。", "system": "macOS の権限", "screen": "画面収録", "screenHint": "momo が画面を読み取るために使います。", "input": "アクセシビリティ", "inputHint": "momo がクリック、入力、スクロールするために使います。", "enabled": "許可済み", "configure": "許可する", "settingsHelp": "システム設定で現在の momo を許可してください。macOS に再起動を求められた場合は、案内に従ってください。", "disable": "デスクトップアクセスを取り消す", "later": "後で", "enable": "デスクトップアクセスを有効にする", "open": "権限ガイドを開く", "blocklist": "アプリのブロックリスト", "blockHint": "ブロックしたアプリは画面収録と操作の対象から外れます。", "select": "起動中のアプリを選択", "block": "ブロックする", "unblock": "削除",
+  desktopAccess: {"browserAccess": "ブラウザへのアクセス", "browserHint": "必要に応じて、momo が対応ブラウザを見つけて確認・操作できます。", "systemAction": "システム設定", "title": "デスクトップへのアクセス", "description": "許可すると、momo が画面を見てアプリを操作できます。「操作」設定のブロックリストで対象外のアプリを指定できます。", "system": "macOS の権限", "screen": "画面収録", "screenHint": "momo が画面を読み取るために使います。", "input": "アクセシビリティ", "inputHint": "momo がクリック、入力、スクロールするために使います。", "enabled": "許可済み", "configure": "許可する", "settingsHelp": "システム設定で現在の momo を許可してください。macOS に再起動を求められた場合は、案内に従ってください。", "disable": "デスクトップアクセスを取り消す", "later": "後で", "enable": "デスクトップアクセスを有効にする", "open": "権限ガイドを開く", "blocklist": "アプリのブロックリスト", "blockHint": "ブロックしたアプリは画面収録と操作の対象から外れます。", "select": "起動中のアプリを選択", "block": "ブロックする", "unblock": "削除",
     accessGroup: "アクセス権限", behaviorGroup: "デスクトップでの動作", actionLabel: "{permission} {action}",
     requestTitle: "権限を許可して続行", accessHint: "ブロックリストの対象外のアプリへのアクセスを momo に許可します。", remaining: "残りの権限は {count} 件", allGranted: "すべて許可済み",
     cancelOperation: "操作をキャンセル", continueOperation: "操作を続ける", close: "閉じる",
@@ -395,7 +394,7 @@ export const ja: Dict = {
   },
   chat: {
     proactive: "自発的な応答",
-    proactiveHint: "観察中の画面に変化があったとき、momo が自発的に応答します。会話とデスクトップペットに共通の設定です。",
+    proactiveHint: "タスク中に気づいた変化について、momo が自分から話します。",
     proactiveError: "自発的な応答の設定を変更できませんでした。もう一度お試しください。",
     idle: "待機中",
     listening: "聞き取り中",

@@ -18,6 +18,7 @@ router = APIRouter(prefix='/api/computer/access')
 
 class Consent(BaseModel):
     granted: bool
+    plugin: Literal['computer', 'browser'] = 'computer'
 
 
 class Block(BaseModel):
@@ -66,7 +67,8 @@ def status(request: Request):
 @router.put('/consent')
 def consent(body: Consent, request: Request):
     require_desktop(request)
-    return invalidate_activity(permissions.consent(body.granted))
+    changed = permissions.consent(body.granted, body.plugin)
+    return invalidate_activity(changed or (not body.granted and native_control.stop_unconfirmed))
 
 
 @router.put('/blocklist')

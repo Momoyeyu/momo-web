@@ -4,7 +4,7 @@ import math
 import time
 from .coordinator import runtime
 from . import vision, activities
-from .app_permissions import permissions, read_system_permissions, require_system_permissions
+from .app_permissions import is_browser, permissions, read_system_permissions, require_system_permissions
 from ..core import state
 
 class NativeControl:
@@ -39,16 +39,17 @@ class NativeControl:
         if plugin not in ('computer','browser'): raise ValueError('Invalid plugin')
         activities.require_enabled(plugin)
         if not runtime.host: raise ValueError('Application executor unavailable')
-        return self.available_targets()
+        return self.available_targets(plugin)
 
-    def available_targets(self):
-        version, blocked = permissions.before_action()
+    def available_targets(self, plugin='computer'):
+        version, blocked = permissions.before_action(plugin=plugin)
         result = runtime.host.request('native.targets')
-        permissions.before_action(version=version)
+        permissions.before_action(version=version, plugin=plugin)
         require_system_permissions('targets', result)
         return {**result, 'targets': [
             row for row in result['targets']
             if row.get('bundleId') and row['bundleId'].lower() not in blocked
+            and (plugin != 'browser' or is_browser(row))
         ]}
 
     def status(self):
@@ -79,13 +80,13 @@ class NativeControl:
                 raise ValueError('Another activity owns attention')
             self.plugin=plugin
             self.gate(client,lease)
-            version,_=permissions.before_action()
+            version,_=permissions.before_action(plugin=plugin)
             result=runtime.host.request('native.targets')
             require_system_permissions(operation, result)
             target=next((row for row in result['targets'] if row.get('windowId')==window and row.get('ownerPid')==pid), None)
             if not target or not target.get('bundleId') or not target.get('path'):
                 raise ValueError('Target window no longer exists')
-            permissions.before_action(target,version)
+            permissions.before_action(target,version,plugin=plugin)
             started=runtime.host.request('native.start',{
                 'windowId':window,'ownerPid':pid,'permissions':capabilities,
                 'bundleId':target['bundleId'],'path':target['path'],
@@ -103,7 +104,7 @@ class NativeControl:
         self.gate(client,lease,allow_busy=True)
         if not self.target or generation!=self.generation or self.epoch!=runtime.epoch or self.fingerprint!=vision.fingerprint(state.load()['settings']['llm']):
             raise ValueError('Application grant changed')
-        permissions.before_action(self.target,self.grant['policyVersion'])
+        permissions.before_action(self.target,self.grant['policyVersion'],plugin=self.plugin)
 
     def bind_observation(self,generation,version,dimensions):
         """Bind provider image coordinates to this exact authorized window observation."""

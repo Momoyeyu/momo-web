@@ -47,20 +47,7 @@ html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transpa
 .pet-icon:hover,.pet-icon[aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}
 .pet-icon.is-primary{background:var(--accent);color:var(--bg);margin-left:auto}
 .pet-icon:disabled{opacity:.35;cursor:default}
-.pet-utility-tabs{display:flex;gap:4px;flex:none;border-bottom:1px solid var(--line);padding:6px 0;margin-bottom:8px}
 .pet-utility-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
-.pet-control{display:flex;flex-direction:column;gap:10px;min-width:0}
-.pet-target-list{display:flex;flex-direction:column;gap:2px;max-height:240px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
-.pet-target{width:100%;display:flex;align-items:center;gap:8px;padding:7px 5px;border:0;border-radius:6px;background:transparent;color:var(--text);text-align:left;cursor:pointer;flex-shrink:0}
-.pet-target:hover,.pet-target[aria-pressed=true]{background:var(--accent-soft)}
-.pet-target>svg,.pet-current-target>svg{flex:none;width:16px;height:16px;color:var(--text-dim)}
-.pet-target>span,.pet-current-target>div{flex:1;min-width:0;display:grid;gap:3px}
-.pet-target strong,.pet-current-target strong{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pet-target small,.pet-current-target small{font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-dim)}
-.pet-current-target{display:flex;align-items:center;gap:8px;padding:8px 0}
-.pet-control-footer{display:flex;align-items:center;gap:8px;border-top:1px solid var(--line);padding-top:8px;flex:none}
-.pet-empty,.pet-control-status{font-size:12px;line-height:1.5;margin:8px 0;color:var(--text-dim)}
-.pet-live-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);flex:none}
 .pet-utility .extension-detail{gap:10px}
 .pet-utility .extension-detail-header{display:none}
 .pet-utility .extension-detail .opt-row{grid-template-columns:1fr;gap:4px;padding:6px 0;min-height:0}
@@ -72,8 +59,3 @@ html.desktop-pet,html.desktop-pet body,html.desktop-pet #root{background:transpa
 .pet-utility .extension-detail-notice{font-size:12px}
 
 /* Persistent state, not hover, tells the player whether sight is permitted. */
-.desktop-pet .desktop-pet-controls .tb-observation{position:relative;transition:background-color .12s,color .12s,box-shadow .12s}
-.desktop-pet .desktop-pet-controls .tb-observation[data-observation-state=on]{color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
-.desktop-pet .desktop-pet-controls .tb-observation[data-observation-state=off]{color:var(--text-dim);background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
-.desktop-pet .desktop-pet-controls .tb-observation[data-observation-state=off]:hover{background:rgba(255,255,255,.05)}
-.desktop-pet .desktop-pet-controls .tb-observation[data-observation-state=error]{color:var(--danger,#ef8792);background:rgba(239,135,146,.08);box-shadow:inset 0 0 0 1px currentColor}

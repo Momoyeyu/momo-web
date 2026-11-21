@@ -46,7 +46,7 @@ for (const width of [640, 960, 1280]) {
       await page.goto('/#/settings');
       await page.reload();
       await expect(page.locator('html')).toHaveAttribute('lang', lang === 'zh' ? 'zh-CN' : lang);
-      await expect(page.locator('.config-index button')).toHaveCount(8, {timeout: 2000});
+      await expect(page.locator('.config-index button')).toHaveCount(7, {timeout: 2000});
       const customize = page.locator('#config-customize');
       await expect(customize.getByRole('heading', {level: 2})).toHaveText(
         {zh:'定制',en:'Customize',ja:'カスタム'}[lang]!,
@@ -103,13 +103,9 @@ for (const width of [640, 960, 1280]) {
       expect(interfaceLanguage.width).toBeCloseTo(chatLanguage.width, 0);
       expect(interfaceLanguage.width).toBeLessThanOrEqual(144);
 
-      const browser = page.locator('#config-browser');
-      await expect(browser.locator('.opt-row')).toHaveCount(1);
-      const picker = (await browser.locator('.sel-face').boundingBox())!;
-      const status = (await browser.locator('.browser-connection').boundingBox())!;
-      expect(picker.x + picker.width).toBeLessThan(status.x);
-      expect(picker.width).toBeLessThanOrEqual(200);
-      expect(picker.y + picker.height / 2).toBeCloseTo(status.y + status.height / 2, 0);
+      const operations = page.locator('#config-operations');
+      await expect(operations.getByRole('switch')).toHaveCount(2);
+      await expect(operations.locator('.sel-face')).toHaveCount(0);
 
       const dataRows = page.locator('#config-data > .config-card > .opt-row');
       await expect(dataRows).toHaveCount(2);
@@ -127,10 +123,10 @@ for (const width of [640, 960, 1280]) {
       const actions = page.locator([
         '#config-models .config-model-row > button',
         '#config-data .opt-ctl > button',
-        '#config-desktop .desktop-config-group + .desktop-config-group .opt-ctl > button:not([role="switch"])',
+        '#config-operations .opt-ctl > .icon-btn',
         '#config-sound .opt-ctl > button:not(.sel-face, [role="switch"])',
       ].join(', '));
-      await expect(actions).toHaveCount(8);
+      await expect(actions).toHaveCount(7);
       expect(await actions.evaluateAll(buttons => buttons.filter(button => {
         const bounds = button.getBoundingClientRect();
         const row = button.closest('.opt-row, .config-model-row')!.getBoundingClientRect();

@@ -1,96 +1,47 @@
 import {test,expect} from './fixtures';
 import {bootChat,openTab} from './helpers';
 
-test('browser windows can be selected before Boot, then connected and stopped from a conversation',async({page})=>{
- let active=false, scans=0;
- const target={windowId:7,ownerPid:9,bundleId:'test.browser',name:'Test browser',path:'/fixture',title:'A long fixture window title '.repeat(12).trim()};
- await page.route('**/api/extensions/activities',r=>r.fulfill({json:{enabled:{computer:true,browser:true,minecraft:false}}}));
- await page.route('**/api/computer/native/**',async r=>{
-  const path=new URL(r.request().url()).pathname;
-  if(path.endsWith('/targets')){
-   expect(r.request().postDataJSON()).toEqual({plugin:'browser'});
-   scans++;
-   return r.fulfill({json:{targets:[target],screenPermission:true,inputPermission:true}});
-  }
-  if(path.endsWith('/start')){
-   expect(r.request().postDataJSON()).toMatchObject({windowId:7,ownerPid:9,plugin:'browser'});
-   active=true;
-  }
-  if(path.endsWith('/stop'))active=false;
-  await r.fulfill({json:{active,plugin:'browser',target:active?target:undefined}});
+test('desktop and browser have independent consent switches without window setup or background capture',async({page,baseURL})=>{
+ await page.addInitScript(base=>{
+  window.momoDesktop={getRuntime:async()=>({baseUrl:base,token:'operations-fixture'})};
+ },baseURL!);
+ let granted=false,browserGranted=false,reads=0;
+ const policy=()=>({available:true,granted,browserGranted,blocked:[]});
+ await page.route('**/api/computer/access',r=>r.fulfill({json:policy()}));
+ await page.route('**/api/computer/access/consent',r=>{
+  const body=r.request().postDataJSON();
+  if(body.plugin==='browser')browserGranted=body.granted;
+  else granted=body.granted;
+  return r.fulfill({json:policy()});
  });
- await openTab(page,'浏览器');
- const config=page.locator('#config-browser');
- await expect(page.getByRole('button',{name:'返回标题'})).toBeVisible();
- await expect(config.getByRole('button',{name:'查找窗口'})).toHaveCount(0);
- await expect(config.locator('.opt-row')).toHaveCount(1);
- const picker=config.getByRole('button',{name:/^应用窗口 ·/});
- const emptyWidth=(await picker.boundingBox())!.width;
- await picker.click();
- const option=config.getByRole('option',{name:/^Test browser/});
- await expect(option).toHaveAttribute('title', 'Test browser · '+target.title);
- await option.click();
- expect((await picker.boundingBox())!.width).toBeCloseTo(emptyWidth);
- expect(emptyWidth).toBeLessThanOrEqual(230);
- await expect(config.getByText('未连接',{exact:true})).toBeVisible();
- expect(scans).toBe(1);
- await picker.press('ArrowDown');
- await expect.poll(()=>scans).toBe(2);
- await expect(option).toBeVisible();
- await picker.press('Escape');
- await expect(config).not.toContainText('已选好窗口');
- await expect(config.getByRole('button',{name:'开启',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'返回标题'}).click();
- await page.locator('.title-menu .menu-item').first().click();
- await expect(page.locator('.chat-page')).toBeVisible();
- await openTab(page,'浏览器');
- await expect(picker).toHaveAccessibleName(/Test browser/);
- await config.getByRole('button',{name:'开启',exact:true}).click();
- await expect.poll(()=>active).toBe(true);
- await expect(config.getByText('Test browser · '+target.title,{exact:true})).toBeVisible();
- await expect(config.getByText('已连接',{exact:true})).toBeVisible();
- await expect(page.getByRole('dialog')).toHaveCount(0);
- await config.getByRole('button',{name:'关闭',exact:true}).click();
- await expect.poll(()=>active).toBe(false);
-});
-
-test('missing screen permission explains how to find the window',async({page})=>{
- await page.route('**/api/computer/native/targets',r=>r.fulfill({json:{targets:[],screenPermission:false,inputPermission:true}}));
- await bootChat(page);await openTab(page,'浏览器');
- const config=page.locator('#config-browser');
- await config.getByRole('button',{name:/^应用窗口 ·/}).click();
- await expect(config.locator('.sel-list')).toContainText('需要屏幕录制权限');
- await expect(config.getByRole('button',{name:'开启',exact:true})).toBeDisabled();
-});
-
-test('browser status recovers after a failed poll and keeps separate action errors',async({page})=>{
- let statusUnavailable=true, scanUnavailable=true, successfulPolls=0;
- await page.route('**/api/computer/native/status',route=>{
-  if(statusUnavailable)return route.fulfill({status:503,json:{}});
-  successfulPolls++;
-  return route.fulfill({json:{active:false}});
+ await page.route('**/api/computer/access/system',r=>r.fulfill({json:{screenPermission:true,inputPermission:true,applications:[]}}));
+ await page.route('**/api/computer/status',r=>r.fulfill({json:{proactive:true,reactions:true,desktopAccessGranted:granted}}));
+ await page.route(/\/api\/computer\/(native\/(targets|start|frame)|desktop\/frame)$/,r=>{
+  reads++;
+  return r.fulfill({json:{}});
  });
- await page.route('**/api/computer/native/targets',route=>scanUnavailable
-  ? route.fulfill({status:503,json:{}})
-  : route.fulfill({json:{targets:[],screenPermission:true,inputPermission:true}}));
+ await openTab(page,'操作');
+ const panel=page.locator('#config-operations');
+ const desktop=panel.getByRole('switch',{name:'桌面访问',exact:true});
+ const browser=panel.getByRole('switch',{name:'浏览器访问',exact:true});
+ await expect(panel.getByRole('switch')).toHaveCount(2);
+ await expect(panel.locator('.sel-face')).toHaveCount(0);
+ await expect(panel.getByRole('button',{name:'桌面陪伴'})).toHaveCount(0);
+ await expect(panel).not.toContainText('未连接');
+ await expect(desktop).toHaveAttribute('aria-checked','false');
+ await browser.click();
+ await expect(browser).toHaveAttribute('aria-checked','true');
+ await expect(desktop).toHaveAttribute('aria-checked','false');
+ await desktop.click();
+ await browser.click();
+ await expect(browser).toHaveAttribute('aria-checked','false');
+ await expect(desktop).toHaveAttribute('aria-checked','true');
+ await page.reload();
+ await openTab(page,'操作');
+ await expect(desktop).toHaveAttribute('aria-checked','true');
+ await expect(browser).toHaveAttribute('aria-checked','false');
  await bootChat(page);
- await openTab(page,'浏览器');
- const config=page.locator('#config-browser');
- await expect(config.getByText('读取失败，请重试。',{exact:true})).toBeVisible();
- statusUnavailable=false;
- await expect(config.getByText('未连接',{exact:true})).toBeVisible();
- await expect(config.getByRole('alert')).toHaveCount(0);
-
- const picker=config.getByRole('button',{name:/^应用窗口 ·/});
- await picker.click();
- const error=config.locator('.sel-list').getByRole('alert');
- await expect(error).toHaveText('授权操作失败，请重试。');
- const previous=successfulPolls;
- await expect.poll(()=>successfulPolls).toBeGreaterThan(previous);
- await expect(error).toBeVisible();
- scanUnavailable=false;
- await picker.press('Escape');
- await picker.click();
- await expect(config.locator('.sel-list')).toContainText('当前没有可选窗口');
- await expect(error).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'主动回应',exact:true})).toHaveAttribute('aria-pressed','true');
+ await page.waitForTimeout(2800);
+ expect(reads).toBe(0);
 });

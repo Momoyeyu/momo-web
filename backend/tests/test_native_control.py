@@ -40,6 +40,25 @@ def test_start_requires_global_consent_and_enforces_blocklist(setup):
  assert calls[-1][1]['permissions']==['observe','interact']
 
 
+def test_browser_window_discovery_and_binding_use_the_same_scope(setup):
+ c,p,_=setup
+ safari={**TARGET,'windowId':2,'bundleId':'com.apple.Safari'}
+ original=module.runtime.host.request
+ def request(method,params=None):
+  result=original(method,params)
+  if method=='native.targets':result['targets'].append(safari)
+  return result
+ module.runtime.host.request=request
+ p.consent(True,'browser')
+ assert c.available_targets('browser')['targets']==[safari]
+ with pytest.raises(ValueError):
+  c.start(1,12,['observe'],'owner','lease','browser')
+ assert c.start(2,12,['observe'],'owner','lease','browser')['active']
+ p.consent(False,'browser')
+ with pytest.raises(ValueError):
+  c.execute({'action':'observe'})
+
+
 def test_control_requires_input_before_binding_and_observation_does_not(setup):
  from app.core.plugin_host import HostError
  c,p,calls=setup

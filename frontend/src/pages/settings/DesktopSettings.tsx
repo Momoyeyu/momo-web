@@ -1,23 +1,21 @@
-import {useEffect, useState, useSyncExternalStore} from 'react';
+import {useEffect, useState} from 'react';
 import {useT} from '../../i18n';
 import AppPermissions, {
   authorizeSystemPermission, DesktopPermissionAction, isSystemPermissionGranted,
-  readSystemAccess, setDesktopConsent, type SystemAccess,
+  readDesktopAccess, readSystemAccess, setDesktopConsent, type ApplicationScope, type SystemAccess,
 } from '../../components/AppPermissions';
-import {computerSnapshot, readComputer, setDesktopObservation, subscribeComputer} from '../../services/computerClient';
 import FieldRow from '../../ui/FieldRow';
 import Switch from '../../ui/Switch';
-import NativeCompanion from './NativeCompanion';
 import ConfigAction from './ConfigAction';
 
 export default function DesktopSettings() {
   const t = useT();
-  const {status, confirmedConsent, busy, error} = useSyncExternalStore(subscribeComputer, computerSnapshot);
+  const native = !!window.momoDesktop;
+  const [policy, setPolicy] = useState<Awaited<ReturnType<typeof readDesktopAccess>>>();
+  const [system, setSystem] = useState<SystemAccess | 'error'>();
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [system, setSystem] = useState<SystemAccess | 'error'>();
-  const native = !!window.momoDesktop;
-  useEffect(() => { void readComputer().catch(() => setFailed(true)); }, []);
+
   useEffect(() => {
     if (!native) return;
     let controller: AbortController;
@@ -25,6 +23,9 @@ export default function DesktopSettings() {
       controller?.abort();
       controller = new AbortController();
       const {signal} = controller;
+      void readDesktopAccess(signal)
+        .then(value => {if (!signal.aborted) setPolicy(value);})
+        .catch(() => {if (!signal.aborted) setFailed(true);});
       void readSystemAccess(signal)
         .then(value => {if (!signal.aborted) setSystem(value);})
         .catch(() => {if (!signal.aborted) setSystem('error');});
@@ -38,51 +39,43 @@ export default function DesktopSettings() {
       window.removeEventListener('momo:desktop-access-changed', refresh);
     };
   }, [native]);
-  const consent = status ? status.desktopAccessGranted : confirmedConsent;
-  const granted = consent === true;
-  const accessStatus = !native ? 'config.nativeOnly' : status || consent !== undefined
-    ? (granted ? 'desktopAccess.enabled' : 'config.grantedOff')
-    : (failed ? 'config.unavailable' : 'config.loading');
-  const disabled = !native || !status || saving || busy;
-  async function changeAccess(on: boolean) {
+
+  async function changeAccess(plugin: ApplicationScope, granted: boolean) {
     setSaving(true);
     setFailed(false);
     try {
-      const updated = await setDesktopConsent(on);
+      const updated = await setDesktopConsent(granted, plugin);
+      setPolicy(previous => previous && {...previous, ...updated});
       if (updated.stopUnconfirmed) setFailed(true);
     } catch { setFailed(true); }
     finally { setSaving(false); }
   }
+
+  const desktop = t('desktopAccess.title');
+  const browser = t('desktopAccess.browserAccess');
+  const disabled = !native || !policy?.available || saving;
   return <div className="desktop-config">
     <div className="config-split config-split-stack">
-      <section className="desktop-config-group" aria-labelledby="desktop-access-heading">
-        <h3 id="desktop-access-heading">{t('desktopAccess.accessGroup')}</h3>
-        <FieldRow label={t('desktopAccess.title')} hint={native ? t('desktopAccess.description') : undefined}>
-          <span className={native ? 'desktop-config-status' : 'config-value'} role="status">{t(accessStatus)}</span>
-          <Switch title={t('desktopAccess.title')} on={granted} disabled={!native || (!status && consent === undefined) || saving || busy} onChange={on => void changeAccess(on)}/>
-        </FieldRow>
-        {native && (['screen', 'input'] as const).map(kind => <FieldRow key={kind} label={t('desktopAccess.' + kind)}>
-          {!system || system === 'error'
-            ? <span className="config-value" role="status">{t(system === 'error' ? 'config.unavailable' : 'config.loading')}</span>
-            : <DesktopPermissionAction kind={kind} granted={isSystemPermissionGranted(system, kind)} onClick={() => {
-              setFailed(false);
-              authorizeSystemPermission(kind, () => setFailed(true));
-            }}/>}
-        </FieldRow>)}
-      </section>
-      <section className="desktop-config-group" aria-labelledby="desktop-behavior-heading">
-        <h3 id="desktop-behavior-heading">{t('desktopAccess.behaviorGroup')}</h3>
-        <FieldRow label={t('desktop.observe')} hint={t(!native ? 'config.nativeOnly' : 'desktop.observeHint')}>
-          <Switch title={t('desktop.observe')} on={!!status?.desktopAllowed} disabled={disabled} onChange={on => void setDesktopObservation(on, 'settings')}/>
-        </FieldRow>
-        <ConfigAction label={t('computer.title')} action={t('config.windowAction')} icon="desktop">
-          <NativeCompanion plugin="computer" mode="activity"/>
-        </ConfigAction>
-        <ConfigAction label={t('desktopAccess.blocklist')} action={t('config.blockAction')}>
-          {native ? <AppPermissions manage/> : <p>{t('config.nativeOnly')}</p>}
-        </ConfigAction>
-      </section>
+      <FieldRow label={desktop} hint={t(native ? 'desktopAccess.description' : 'config.nativeOnly')}>
+        <Switch title={desktop} on={policy?.granted === true} disabled={disabled} onChange={on => void changeAccess('computer', on)}/>
+      </FieldRow>
+      <FieldRow label={browser} hint={t(native ? 'desktopAccess.browserHint' : 'config.nativeOnly')}>
+        <Switch title={browser} on={policy?.browserGranted === true} disabled={disabled} onChange={on => void changeAccess('browser', on)}/>
+      </FieldRow>
     </div>
-    {(failed || error) && <p role="alert">{t('permissions.error')}</p>}
+    {native && <div className="config-split config-split-stack">
+      {(['screen', 'input'] as const).map(kind => <FieldRow key={kind} label={t('desktopAccess.' + kind)}>
+        {!system || system === 'error'
+          ? <span className="config-value" role="status">{t(system === 'error' ? 'config.unavailable' : 'config.loading')}</span>
+          : <DesktopPermissionAction kind={kind} granted={isSystemPermissionGranted(system, kind)} onClick={() => {
+            setFailed(false);
+            authorizeSystemPermission(kind, () => setFailed(true));
+          }}/>}
+      </FieldRow>)}
+    </div>}
+    <ConfigAction label={t('desktopAccess.blocklist')} action={t('config.blockAction')}>
+      {native ? <AppPermissions manage/> : <p>{t('config.nativeOnly')}</p>}
+    </ConfigAction>
+    {failed && <p role="alert">{t('permissions.error')}</p>}
   </div>;
 }

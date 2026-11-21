@@ -143,7 +143,7 @@ class Computer:
         with self.capture_lock:
             with self.lock:
                 self.gate()
-                if not self.desktop_allowed: raise ComputerError('computer.paused')
+                if not native_desktop() and not self.desktop_allowed: raise ComputerError('computer.paused')
                 if self.observing and self.shared_source and not native_desktop():
                     if self.frame and time.monotonic()-self.last < 15:
                         return self.snapshot()
@@ -172,7 +172,7 @@ class Computer:
                 raw = base64.b64decode(result['data'],validate=True)
                 with self.lock:
                     self.gate()
-                    if generation != self.generation or not self.desktop_allowed:
+                    if generation != self.generation or (not native_desktop() and not self.desktop_allowed):
                         raise ComputerError('computer.revoked')
                     self.capture(raw,generation,continuous=True,policy_version=policy_version)
                     self.desktop_error = ''

@@ -24,6 +24,19 @@ SYSTEM_PERMISSION_CODES = {
     'SCREEN_PERMISSION_REQUIRED': 'screen',
     'INPUT_PERMISSION_REQUIRED': 'input',
 }
+BROWSER_BUNDLES = frozenset({
+    'com.apple.safari', 'com.apple.safaritechnologypreview', 'com.google.chrome',
+    'com.google.chrome.beta', 'com.google.chrome.dev', 'com.google.chrome.canary',
+    'org.chromium.chromium', 'org.mozilla.firefox', 'org.mozilla.firefoxdeveloperedition',
+    'org.mozilla.nightly', 'com.microsoft.edgemac', 'com.microsoft.edgemac.beta',
+    'com.brave.browser', 'com.brave.browser.beta', 'company.thebrowser.browser',
+    'com.vivaldi.vivaldi', 'com.operasoftware.opera', 'com.operasoftware.operagx',
+    'com.kagi.kagimacos', 'app.zen-browser.zen', 'com.duckduckgo.macos.browser',
+})
+
+
+def is_browser(target):
+    return target['bundleId'].lower() in BROWSER_BUNDLES
 
 
 class SystemPermissionRequired(HostError):
@@ -91,7 +104,9 @@ class AppPermissions:
             if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077 or info.st_size > 65536:
                 raise DesktopPermissionError('Invalid desktop permission store')
             data = json.load(stream)
-        if not isinstance(data, dict) or type(data.get('granted')) is not bool or not isinstance(data.get('blocked'), dict):
+        if (not isinstance(data, dict) or type(data.get('granted')) not in (type(None), bool)
+                or type(data.get('browserGranted', False)) is not bool
+                or not isinstance(data.get('blocked'), dict)):
             raise DesktopPermissionError('Invalid desktop permission store')
         return data
 
@@ -115,22 +130,24 @@ class AppPermissions:
     def status(self):
         with self.lock:
             data = self._read()
-            return {'granted': data['granted'], 'blocked': [
+            return {'granted': data.get('granted'), 'browserGranted': data.get('browserGranted', False), 'blocked': [
                 {'bundleId': bundle_id, 'name': name} for bundle_id, name in sorted(data['blocked'].items())
             ]}
 
-    def granted(self):
+    def granted(self, plugin='computer'):
         try:
             with self.lock:
-                return self._read()['granted'] is True
+                return self._read().get('browserGranted' if plugin == 'browser' else 'granted') is True
         except (OSError, ValueError):
             return False
 
-    def consent(self, granted):
+    def consent(self, granted, plugin='computer'):
+        key = 'browserGranted' if plugin == 'browser' else 'granted'
+
         def change(data):
-            if data['granted'] is granted:
+            if data.get(key) is granted:
                 return False
-            data['granted'] = granted
+            data[key] = granted
             return True
         return self._update(change)
 
@@ -152,16 +169,24 @@ class AppPermissions:
             return False
         return self._update(change)
 
-    def before_action(self, target=None, version=None):
+    def before_action(self, target=None, version=None, *, plugin='computer'):
         with self.lock:
             data = self._read()
-            if not data['granted']:
-                raise DesktopPermissionError('Desktop access has not been granted')
+            browser_granted = data.get('browserGranted', False)
+            granted = browser_granted if plugin == 'browser' else data.get('granted') is True
+            if not granted:
+                raise DesktopPermissionError('Application access has not been granted')
             if version is not None and version != self.version:
                 raise DesktopPermissionError('Desktop access has changed')
             if target is not None and target['bundleId'].lower() in data['blocked']:
                 raise DesktopPermissionError('Application is on the desktop blocklist')
-            return self.version, sorted(data['blocked'])
+            if target is not None and ((plugin == 'browser' and not is_browser(target))
+                                       or (not browser_granted and is_browser(target))):
+                raise DesktopPermissionError('Application is outside the granted scope')
+            blocked = set(data['blocked'])
+            if not browser_granted:
+                blocked.update(BROWSER_BUNDLES)
+            return self.version, sorted(blocked)
 
 
 permissions = AppPermissions()

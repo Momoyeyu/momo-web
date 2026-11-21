@@ -1,5 +1,5 @@
 import {test, expect} from './fixtures';
-import {bootChat, openTab} from './helpers';
+import {bootChat} from './helpers';
 
 test('a control action waits for both permissions and continues only when confirmed', async ({page, baseURL}) => {
   await page.addInitScript(base => {
@@ -32,12 +32,14 @@ test('a control action waits for both permissions and continues only when confir
     return route.fulfill({json:{active:true,plugin:'browser',target:windowTarget}});
   });
   await bootChat(page);
-  await openTab(page,'浏览器');
-  const config = page.locator('#config-browser');
-  await config.getByRole('button',{name:/^应用窗口 ·/}).click();
-  await config.getByRole('option',{name:/Fixture browser/}).click();
   missing=['screen','input'];
-  await config.getByRole('button',{name:'开启',exact:true}).click();
+  await page.evaluate(async () => {
+    const module = '/src/services/desktopPermissionGate.ts';
+    const {withDesktopPermissions} = await import(module);
+    await withDesktopPermissions('control', async () => {
+      await fetch('/api/computer/native/start', {method:'POST', body:JSON.stringify({windowId:7,ownerPid:9,plugin:'browser'})});
+    });
+  });
   const request = page.getByRole('dialog',{name:'授权后继续',exact:true});
   await expect(request.getByRole('button',{name:/去授权$/})).toHaveCount(2);
   await expect(request.getByRole('button',{name:'继续操作',exact:true})).toBeDisabled();
@@ -65,5 +67,4 @@ test('a control action waits for both permissions and continues only when confir
   await request.getByRole('button',{name:'继续操作',exact:true}).click();
   await expect(request).toHaveCount(0);
   await expect.poll(()=>starts).toBe(1);
-  await expect(config.getByText('已连接',{exact:true})).toBeVisible();
 });
