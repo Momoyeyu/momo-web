@@ -33,7 +33,7 @@ test('blur and avatar share a 350ms clock in both directions',async({page},info)
  await toggle.click();await expect(fx).toHaveAttribute('data-phase','visible');
  await page.evaluate(()=>{const scope=window as unknown as {blurPhases:string[]};scope.blurPhases=[];new MutationObserver(records=>{for(const r of records)if(r.target instanceof HTMLElement&&r.target.matches('.blur-presence'))scope.blurPhases.push(r.target.dataset.phase??'');}).observe(document.body,{subtree:true,attributes:true,attributeFilter:['data-phase']});});
  for(const selector of ['[data-intro=chat-settings]','.chat-toolbar button[data-tip=记录]']){
-  await page.locator(selector).click();await page.getByRole('button',{name:'返回对话',exact:true}).click();
+  await page.locator(selector).click();await page.getByRole('button',{name:selector.includes('chat-settings')?'返回':'返回对话',exact:true}).click();
   await expect(page.locator('.chat-page')).not.toHaveAttribute('inert');await expect(fx).toHaveAttribute('data-phase','visible');
  }
  expect(await page.evaluate(()=>(window as unknown as {blurPhases:string[]}).blurPhases.filter(p=>p==='appearing'||p==='disappearing'))).toEqual([]);

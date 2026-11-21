@@ -57,7 +57,7 @@ test('resource dialog owns the live canvas and returns it when closed', async ({
   await expect(page.locator('.live2d-home canvas')).toHaveCount(1);
   expect(await originalCanvas!.evaluate(node => node.parentElement?.classList.contains('live2d-home'))).toBe(true);
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '返回对话', exact: true }).click();
+  await page.getByRole('button', { name: '返回', exact: true }).click();
   await expect(page.locator('.live2d-home canvas')).toBeVisible();
   await expect(page.locator('canvas.live2d-canvas')).toHaveCount(1);
   await expect(page.getByRole('button', { name: '近景', exact: true })).toBeVisible();

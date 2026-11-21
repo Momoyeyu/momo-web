@@ -38,7 +38,7 @@ test('Home fractures the actual scene, reveals live title and releases all resou
  await page.screenshot({path:info.outputPath('after-home.png')});
  await bootChat(page);await page.locator('[data-intro=chat-settings]').click();
  await expect(page.locator('.page-wrap.is-front')).toHaveCount(0);
- await page.getByRole('button',{name:'返回对话',exact:true}).click();
+ await page.getByRole('button',{name:'返回',exact:true}).click();
  await expect(page.locator('.glass-return-canvas')).toHaveCount(0);
  expect(errors).toEqual([]);
 });

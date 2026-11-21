@@ -98,13 +98,13 @@ export default function ModsPanel(){
       void load();
     }}/></FieldRow>
     {manager&&<Modal label={code('library')} onClose={closeLibrary} className="extension-modal mod-library">
-      <header className="extension-detail-header mod-dialog-heading">
+      <header className="extension-detail-header settings-dialog-heading mod-dialog-heading">
         <DialogBackButton onClick={closeLibrary} disabled={busy}/>
         <h3>{code('library')}</h3>
       </header>
       <div className="mod-library-header">
-        <div className="mod-library-views" role="group" aria-label={code('library')}>
-          {(['installed','catalog'] as const).map(section=><Button key={section} variant="ghost" size="sm"
+        <div className="settings-view-tabs mod-library-views" role="group" aria-label={code('library')}>
+          {(['installed','catalog'] as const).map(section=><Button key={section}
             aria-pressed={view===section} disabled={busy} onClick={()=>showView(section)}>{code(section)}</Button>)}
         </div>
         {view==='catalog'&&button('import',()=>open({mode:'local'}))}
@@ -133,7 +133,7 @@ export default function ModsPanel(){
     {selection&&<Modal label={selection.mode==='local'?code('import'):name} onClose={()=>open(null)} describedBy={selection.mode==='remove'?'mod-remove-hint':undefined}
       className={selection.mode==='remove'?'extension-modal mod-remove-dialog':'extension-modal'}>
       <div className="extension-detail">
-      <header className="mod-dialog-heading">
+      <header className="settings-dialog-heading mod-dialog-heading">
         <DialogBackButton onClick={()=>open(null)} disabled={busy}/>
         <h3>{selection.mode==='local'?code('import'):name}</h3>
       </header>

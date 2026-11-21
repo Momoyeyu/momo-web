@@ -16,11 +16,11 @@ export default function DetailModal({
 }) {
   return (
     <Modal onClose={onClose}>
-      {meta && <div className="modal-meta muted">{meta}</div>}
-      <div className="modal-body">{text}</div>
-      <div className="modal-foot">
+      <header className="settings-dialog-heading">
         <DialogBackButton onClick={onClose}/>
-      </div>
+        {meta && <div className="modal-meta muted">{meta}</div>}
+      </header>
+      <div className="modal-body">{text}</div>
     </Modal>
   );
 }

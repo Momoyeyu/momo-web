@@ -3,7 +3,7 @@ import {useT} from '../../i18n';
 import {connectSocialAccount,retiredSocialRecords,socialAccounts,SOCIAL_PROVIDERS,type RetiredSocialRecord,type SocialAccount,type SocialProvider} from '../../services/socialClient';
 import RetiredSocialRecords from './RetiredSocialRecords';
 import {observeQQRuntime,type QQLoginErrorCode,type QQRuntimeAction,type QQRuntimeState} from '../../services/qqRuntimeClient';
-import Button from '../../ui/Button';
+import IconButton from '../../ui/IconButton';
 import Hint from '../../ui/Hint';
 import Switch from '../../ui/Switch';
 import Icon from '../../ui/Icon';
@@ -85,7 +85,7 @@ export default function OfficialPlugins({active=true}:{active?:boolean}){
       return <article className={`social-card social-${provider}`} key={provider}>
         <div className="social-card-top"><span className="social-app-mark" aria-hidden="true"><Icon name="phone" size={24}/></span><h4>{t(`social.providers.${provider}`)}</h4><Switch title={t('social.enableProvider',{provider:t(`social.providers.${provider}`)})} on={account?.enabled??false} disabled={!account||busy||(!account.enabled&&!runtime?.connected)} onChange={enabled=>{if(account)void toggle(account,enabled);}} /></div>
         <p className="social-account-identity">{runtime?.actualSelfId||account?.actualSelfId||account?.expectedSelfId||t('social.noAccount')}</p>
-        <div className="social-card-bottom"><span className={`social-state${account?.status==='connected'?' is-connected':''}`}><i/>{t(`social.status.${account?.status??'loading'}`)===`social.status.${account?.status??'loading'}`?t('social.status.disconnected'):t(`social.status.${account?.status??'loading'}`)}</span><Button size="sm" variant="ghost" disabled={!account} onClick={()=>setEditing(provider)}>{t('social.configure')}</Button></div>
+        <div className="social-card-bottom"><span className={`social-state${account?.status==='connected'?' is-connected':''}`}><i/>{t(`social.status.${account?.status??'loading'}`)===`social.status.${account?.status??'loading'}`?t('social.status.disconnected'):t(`social.status.${account?.status??'loading'}`)}</span><IconButton icon="gear" label={t('social.configure')} tip={t('social.configure')} disabled={!account} onClick={()=>setEditing(provider)}/></div>
       </article>;
     })}</div>
     {retired.length>0 && <RetiredSocialRecords records={retired} onChanged={setRetired}/>}

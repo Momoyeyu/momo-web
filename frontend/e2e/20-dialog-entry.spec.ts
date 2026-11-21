@@ -75,7 +75,7 @@ for(const destination of ['设置','记录']){
     await page.getByRole('button',{name:destination,exact:true}).click();
     await expect(page.locator('.page-wrap')).toHaveCount(1);
     await page.evaluate(()=>(window as unknown as {__startDialogAudit:()=>void}).__startDialogAudit());
-    await page.getByRole('button',{name:'返回对话',exact:true}).click();
+    await page.getByRole('button',{name:destination==='设置'?'返回':'返回对话',exact:true}).click();
     const frames=await finishAudit(page,info);
     if(destination==='设置'){
       expect(frames.some(frame=>frame.cover)).toBe(true);
@@ -124,7 +124,7 @@ test('reduced motion releases dialogue and input without replaying the rise',asy
   await expect(page.locator('.input-row input')).toBeEditable();
   expect(await page.locator('.dialog-zone').evaluate(element=>getComputedStyle(element).animationName)).toBe('none');
   await page.getByRole('button',{name:'设置',exact:true}).click();
-  await page.getByRole('button',{name:'返回对话',exact:true}).click();
+  await page.getByRole('button',{name:'返回',exact:true}).click();
   await expect(page.locator('.input-row input')).toBeEditable();
   await expect(page.locator('.page-wrap')).toHaveCount(1);
   expect(await page.locator('.dialog-zone').evaluate(element=>getComputedStyle(element).opacity)).toBe('1');
@@ -146,7 +146,7 @@ test('cancelling during the rise cannot unlock a later page or duplicate chat',a
   await expect(page.locator('.page-wrap')).toHaveCount(1);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.evaluate(()=>(window as unknown as {__startDialogAudit:()=>void}).__startDialogAudit());
-  await page.getByRole('button',{name:'返回对话',exact:true}).click();
+  await page.getByRole('button',{name:'返回',exact:true}).click();
   const frames=await finishAudit(page,info);
   expect(frames.every(frame=>!frame.ink&&frame.animation!=='dialog-rise')).toBe(true);
   await expect(page.locator('.chat-page')).toHaveCount(1);

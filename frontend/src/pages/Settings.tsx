@@ -5,6 +5,7 @@ import {navigate} from '../router';
 import {meetingSnapshot, storedMeetingIdentity, subscribeMeeting} from '../services/meetingClient';
 import {useIntro} from '../services/introClient';
 import Button from '../ui/Button';
+import DialogBackButton from '../ui/DialogBackButton';
 import GridBackdrop, {type GridBackdropApi} from '../components/GridBackdrop';
 import BuiltinResourcesNotice from '../components/BuiltinResourcesNotice';
 import AvatarPanel from './panels/Avatar';
@@ -107,7 +108,10 @@ export default function Settings() {
   };
   return <div className="settings-page config-document">
     <GridBackdrop angle={25} api={grid}/>
-    <header className="config-header"><h1>{t('settings.title')}</h1><Button variant="ghost" className="config-action" data-intro="settings-back" onClick={() => navigate(back)}>{t(back === 'chat' ? 'common.backChat' : 'common.backTitle')}</Button></header>
+    <header className="config-header">
+      <DialogBackButton page onClick={() => navigate(back)}/>
+      <h1>{t('settings.title')}</h1>
+    </header>
     <div className="config-layout">
       <nav className="config-index" aria-label={t('settings.title')}>{chapters.map(id => <Button key={id} data-intro={'tab-' + id}
         aria-controls={'config-' + id} aria-current={active === id ? 'location' : undefined} className={active === id ? 'active' : ''} onClick={() => jump(id)}>{t('config.' + id)}</Button>)}</nav>

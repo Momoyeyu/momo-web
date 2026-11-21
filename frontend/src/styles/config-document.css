@@ -12,7 +12,7 @@
   flex: none;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 20px;
   border-bottom: 1px solid var(--line);
 }
 .config-header h1 {margin: 0; font-size: 24px; font-weight: 550; letter-spacing: .12em;}
@@ -84,7 +84,7 @@
 .config-preview h3 {margin: 0; font: inherit; font-weight: 600;}
 .config-preview .dialog-preview {margin-block: 10px;}
 .config-modal {box-sizing: border-box; width: min(620px, 92cqw); max-height: 86cqh; overflow: auto; padding: 0;}
-.config-modal-head {display: flex; gap: 12px; align-items: center; padding: 14px 22px; border-bottom: 1px solid var(--line);}
+.config-modal-head {padding: 14px 22px; border-bottom: 1px solid var(--line);}
 .config-modal-head h2 {font-size: 19px; margin: 0;}
 .config-modal-body {padding: 15px 22px 20px;}
 .config-modal-body > .panel, .config-modal-body .extension-panel {background: transparent; padding: 0; border: none; box-shadow: none;}
@@ -110,22 +110,57 @@ body:has(.config-document) .extension-modal .extension-detail > .modal-foot {
 }
 
 .mod-library {width: min(570px, 92cqw);}
-.mod-library-header, .mod-library-views {display: flex; align-items: center; gap: 8px;}
-.mod-library-header {justify-content: space-between; flex-wrap: wrap;}
-.mod-library-views button[aria-pressed="true"] {background: var(--accent-soft); border-color: var(--accent); color: var(--accent);}
+.mod-library-header {display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap;}
+.mod-library-views {flex: 1 1 auto;}
 .mod-library-rows .opt-label {white-space: normal; overflow-wrap: anywhere;}
 .mod-library-rows .opt-ctl {justify-content: flex-end; flex-wrap: wrap;}
 .mod-library-rows .opt-row + .opt-row {border-top: 1px solid var(--line-soft);}
-.mod-dialog-heading {display: flex; justify-content: flex-start; align-items: center; gap: 12px;}
+.settings-dialog-heading, .extension-detail-header.settings-dialog-heading {display: flex; justify-content: flex-start; align-items: center; gap: 12px;}
 .mod-dialog-heading h3 {min-width: 0; margin: 0; overflow-wrap: anywhere;}
-.extension-modal .mod-dialog-heading .icon-btn {
-  width: 40px; height: 40px; padding: 9px; border: 1px solid var(--line);
-  background: var(--panel); color: var(--text);
+
+button.settings-back {
+  display: grid; place-items: center; flex: none;
+  width: 40px; height: 40px; padding: 0;
+  border: 0; border-radius: 8px;
+  background: transparent; color: var(--text);
 }
-.extension-modal .mod-dialog-heading .icon-btn:not(:disabled):hover {
-  border-color: var(--accent); background: var(--accent-soft); color: var(--accent);
+button.settings-back-page {width: 44px; height: 44px; color: var(--accent);}
+.settings-back-page::after {
+  content: ""; position: absolute; inset-inline-end: -10px; inset-block: 10px;
+  width: 1px; background: var(--line-strong); pointer-events: none;
 }
-.mod-dialog-heading .icon-btn svg {width: 20px; height: 20px;}
+button.settings-back:hover:not(:disabled) {background: var(--accent-soft); color: var(--accent); box-shadow: none;}
+button.settings-back:focus-visible {outline: 2px solid var(--accent); outline-offset: 2px;}
+
+.config-document .icon-btn,
+body:has(.config-document) :is(.config-modal-body, .extension-modal, .avatar-res-modal, .social-modal, .ext-modal) .icon-btn {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.config-document .icon-btn:hover:not(:disabled),
+body:has(.config-document) :is(.config-modal-body, .extension-modal, .avatar-res-modal, .social-modal, .ext-modal) .icon-btn:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+}
+body:has(.config-document) :is(.extension-modal, .social-modal) .icon-btn:hover:not(:disabled, .danger) {color: var(--accent);}
+
+.settings-view-tabs {
+  display: flex; flex: none; align-items: stretch; flex-wrap: wrap; gap: 20px;
+  border-bottom: 1px solid var(--line);
+}
+.settings-view-tabs > button {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 38px; padding: 5px 2px 7px;
+  border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+  color: var(--text-dim); background: transparent; font: inherit; font-size: 14px;
+  box-shadow: none;
+}
+.settings-view-tabs > button:is([aria-pressed="true"], [aria-selected="true"]) {
+  color: var(--accent); border-bottom-color: var(--accent);
+}
+.settings-view-tabs > button:hover:not(:disabled) {color: var(--accent); background: transparent; box-shadow: none;}
+.settings-view-tabs > button:focus-visible {outline: 2px solid var(--accent); outline-offset: -2px;}
 
 .mod-row-actions {display: flex; align-items: center; gap: 8px; flex: none;}
 .mod-row-actions > button {flex-shrink: 0;}

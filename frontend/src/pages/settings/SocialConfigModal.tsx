@@ -77,8 +77,12 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
   };
   const index=TABS.indexOf(tab);
   return <Modal className="social-modal" label={t('social.modalTitle',{provider:t(`social.providers.${provider}`)})} onClose={close}>
-    <header className="social-modal-heading"><h2>{t(`social.providers.${provider}`)}</h2><span className="muted">{t('social.accountSettings')}</span></header>
-    <nav className="social-tabs" role="tablist" aria-label={t('social.accountSettings')}><span className="social-tab-thumb" style={{transform:`translateX(${index*100}%)`}}/>{TABS.map((id,i)=><button type="button" ref={element=>{buttons.current[i]=element;}} id={`social-tab-${id}`} key={id} role="tab" aria-selected={tab===id} aria-controls={`social-panel-${id}`} tabIndex={tab===id?0:-1} className={tab===id?'active':''} onKeyDown={event=>navigateTab(event,i)} onClick={()=>setTab(id)}>{t(`social.tabs.${id}`)}</button>)}</nav>
+    <header className="settings-dialog-heading social-modal-heading">
+      <DialogBackButton onClick={close}/>
+      <h2>{t(`social.providers.${provider}`)}</h2>
+      <span className="muted">{t('social.accountSettings')}</span>
+    </header>
+    <nav className="settings-view-tabs social-tabs" role="tablist" aria-label={t('social.accountSettings')}>{TABS.map((id,i)=><button type="button" ref={element=>{buttons.current[i]=element;}} id={`social-tab-${id}`} key={id} role="tab" aria-selected={tab===id} aria-controls={`social-panel-${id}`} tabIndex={tab===id?0:-1} onKeyDown={event=>navigateTab(event,i)} onClick={()=>setTab(id)}>{t(`social.tabs.${id}`)}</button>)}</nav>
     {saveError?<p role="alert" className="social-error">{t('social.saveError')}</p>:null}
     <div className="social-viewport"><div className="social-track" style={{transform:`translateX(${-index*100}%)`}}>
       <section id="social-panel-account" role="tabpanel" aria-labelledby="social-tab-account" aria-hidden={tab!=='account'} inert={tab!=='account'} className="social-pane">
@@ -116,6 +120,6 @@ export default function SocialConfigModal({account,runtime,runtimeError,busy,pen
         </article>)}
       </section>
     </div></div>
-    <footer className="social-modal-footer"><span className={`social-save-state${saveError?' is-error':''}`} role="status">{t(saveError?'social.saveError':saving?'social.saving':saved?'social.saved':'social.autoSave')}</span><DialogBackButton onClick={close}/></footer>
+    <footer className="social-modal-footer"><span className={`social-save-state${saveError?' is-error':''}`} role="status">{t(saveError?'social.saveError':saving?'social.saving':saved?'social.saved':'social.autoSave')}</span></footer>
   </Modal>;
 }

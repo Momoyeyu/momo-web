@@ -47,6 +47,14 @@ for (const width of [640, 960, 1280]) {
       await page.reload();
       await expect(page.locator('html')).toHaveAttribute('lang', lang === 'zh' ? 'zh-CN' : lang);
       await expect(page.locator('.config-index button')).toHaveCount(7, {timeout: 2000});
+      const back = page.locator('.config-header [data-intro=settings-back]');
+      await expect(back).toHaveText('');
+      await expect(back).toHaveAccessibleName({zh:'返回',en:'Back',ja:'戻る'}[lang]!);
+      await expect(back.locator('svg')).toBeVisible();
+      const backBox = (await back.boundingBox())!;
+      const titleBox = (await page.locator('.config-header h1').boundingBox())!;
+      expect(backBox.width).toBe(44);
+      expect(backBox.x + backBox.width).toBeLessThan(titleBox.x);
       const customize = page.locator('#config-customize');
       await expect(customize.getByRole('heading', {level: 2})).toHaveText(
         {zh:'定制',en:'Customize',ja:'カスタム'}[lang]!,
@@ -127,6 +135,9 @@ for (const width of [640, 960, 1280]) {
         '#config-sound .opt-ctl > button:not(.sel-face, [role="switch"])',
       ].join(', '));
       await expect(actions).toHaveCount(11);
+      for (const action of await actions.all()) {
+        await expect(action).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      }
       expect(await actions.evaluateAll(buttons => buttons.filter(button => {
         const bounds = button.getBoundingClientRect();
         const row = button.closest('.opt-row, .config-model-row')!.getBoundingClientRect();

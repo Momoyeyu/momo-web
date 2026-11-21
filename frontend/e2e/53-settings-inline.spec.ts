@@ -98,7 +98,7 @@ test('desktop access can be configured before Boot and keeps confirmed consent i
   await page.route('**/api/computer/access', route => route.fulfill({json:{available:true,granted,blocked:[]}}));
   await page.route('**/api/computer/access/system', route => route.fulfill({json:{screenPermission:true,inputPermission,applications:[]}}));
   await openTab(page, '操作');
-  await expect(page.getByRole('button',{name:'返回标题'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'返回',exact:true})).toBeVisible();
   const access = page.locator('#config-operations .opt-row').filter({hasText:'桌面访问'});
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const accessGroup = page.locator('#config-operations');

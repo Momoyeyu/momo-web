@@ -62,7 +62,7 @@ test('an active game stays attached across closing the panel and returning from 
  await expect(trigger).toBeFocused();
  await page.getByRole('button',{name:'设置',exact:true}).click();
  await expect(page.locator('.settings-page')).toBeVisible();
- await page.getByRole('button',{name:'返回对话',exact:true}).click();
+ await page.getByRole('button',{name:'返回',exact:true}).click();
  await waitForChatReady(page);
  await trigger.click();
  await expect(panel.getByText('momo-test · local/test',{exact:true})).toBeVisible();
@@ -92,6 +92,22 @@ test('Minecraft attaches existing world without launcher or login',async({page})
  await expect.poll(()=>attached).toMatchObject({sessionId:'fixture',permissions:['game.observe','game.chat','game.move','game.modify']});
  await modal.getByRole('button',{name:'停止陪玩'}).click();
  await expect.poll(()=>active).toBe(false);
+
+ const back = modal.getByRole('button',{name:'返回',exact:true});
+ await expect(back).toHaveCSS('width','40px');
+ await expect(back).toHaveCSS('border-top-width','0px');
+ const backBounds = (await back.boundingBox())!;
+ const titleBounds = (await modal.getByRole('heading',{name:'Minecraft 陪玩'}).boundingBox())!;
+ expect(backBounds.x + backBounds.width).toBeLessThan(titleBounds.x);
+ await back.click();
+ const detail = page.getByRole('dialog',{name:'Minecraft',exact:true});
+ await expect(detail.getByRole('button',{name:'返回',exact:true})).toHaveCSS('width','40px');
+ await detail.getByRole('button',{name:'返回',exact:true}).click();
+ const library = page.getByRole('dialog',{name:'模组库',exact:true});
+ await expect(library.getByRole('button',{name:'返回',exact:true})).toHaveCSS('width','40px');
+ const selection = library.locator('.mod-library-views button[aria-pressed=true]');
+ await expect(selection).toHaveCSS('border-bottom-width','2px');
+ await expect(selection).toHaveCSS('border-top-width','0px');
 });
 
 test('settings-owned gameplay requests subsequent decisions and discards unseen speech across reload',async({page})=>{

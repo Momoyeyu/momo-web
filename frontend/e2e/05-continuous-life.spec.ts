@@ -95,7 +95,7 @@ test('settings pauses actual presentation and ACK, then resumes that reply witho
   await page.getByRole('button',{name:'设置',exact:true}).click();await settle(page);
   const paused=seen.at(-1)!;await page.waitForTimeout(500);
   expect(seen.at(-1)).toBe(paused);
-  await page.getByRole('button',{name:'返回对话',exact:true}).click();await waitForChatReady(page);
+  await page.getByRole('button',{name:'返回',exact:true}).click();await waitForChatReady(page);
   await expect.poll(()=>seen.at(-1)?.length??0).toBeGreaterThan(paused.length);
   await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
   await page.getByRole('button',{name:'打断',exact:true}).click();
@@ -110,7 +110,7 @@ test('fresh meetings synchronize remote history while keeping the local caption 
   await expect(page.locator('.subtitle')).toHaveText('moment-250');
   const initialReads=reads;
   await page.getByRole('button',{name:'设置',exact:true}).click();await settle(page);
-  await page.getByRole('button',{name:'返回对话',exact:true}).click();await waitForChatReady(page);
+  await page.getByRole('button',{name:'返回',exact:true}).click();await waitForChatReady(page);
   expect(reads).toBe(initialReads);
   await page.getByRole('button',{name:'返回标题',exact:true}).click();
   await expect(page.locator('.title-screen')).toBeVisible();

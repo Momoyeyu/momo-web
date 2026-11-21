@@ -111,7 +111,7 @@ for (const destination of ['设置', '记录']) {
         }
       }).observe(document.querySelector('.app-stage')!, {childList:true,subtree:true,attributes:true,attributeFilter:['class']});
     });
-    await page.getByRole('button',{name:'返回对话',exact:true}).click();
+    await page.getByRole('button',{name:destination==='设置'?'返回':'返回对话',exact:true}).click();
     // Observe the brief transition at mutation time, even if the click response
     // reaches Playwright after the 560ms animation has already finished.
     await expect(page.locator('body')).toHaveAttribute('data-return-rope-seen','true');
@@ -166,13 +166,13 @@ test('Settings opened from browser history returns to Title after the meeting en
   await expect(page.locator('.input-row input')).toBeEditable();
   await page.getByRole('button',{name:'设置',exact:true}).click();
   const back = page.locator('[data-intro=settings-back]');
-  await expect(back).toHaveAccessibleName('返回对话');
+  await expect(back).toHaveAccessibleName('返回');
 
   await page.evaluate(() => {location.hash='/title';});
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem('momo.meeting-owner.v1'))).toBeNull();
   await expect(page.locator('.settings-page')).toHaveCount(0);
   await page.goBack();
-  await expect(back).toHaveAccessibleName('返回标题');
+  await expect(back).toHaveAccessibleName('返回');
   await back.click();
   await expect(page).toHaveURL(/#\/title$/);
 });
@@ -197,7 +197,7 @@ test('an abandoned Boot releases a late meeting lease without opening Chat', asy
   respond.resolve();
   await released;
   await expect(page).toHaveURL(/#\/settings$/);
-  await expect(back).toHaveAccessibleName('返回标题');
+  await expect(back).toHaveAccessibleName('返回');
   await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
   expect(await page.evaluate(() => sessionStorage.getItem('momo.meeting-owner.v1'))).toBeNull();
 

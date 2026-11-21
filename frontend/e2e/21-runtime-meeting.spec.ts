@@ -82,7 +82,7 @@ test('owned meeting survives refreshing backlog and settings without a new title
     const {leaseId}=await (await restored).json();
     const resumed={clientId:saved!.clientId,leaseId};
     await expect.poll(owner).toEqual(resumed);
-    await page.getByRole('button',{name:'返回对话',exact:true}).click();
+    await page.getByRole('button',{name:'返回',exact:true}).click();
     await expect.poll(()=>page.locator('.chat-page').evaluate(element=>!element.closest('[inert]'))).toBe(true);
     await expect(page.locator('.chat-entry-canvas')).toHaveCount(0);
     if(destination==='设置')await expect(page.locator('.dialog-zone')).toHaveCSS('animation-name','none');

@@ -69,9 +69,10 @@ export default function MinecraftCompanion({mode='settings',onDismiss}:{mode?:'s
  const evidenceRows=evidence?.placed?.length?evidence.placed:evidence?.gains?.length?evidence.gains:evidence?.mined||[];
  const evidenceCount=evidenceRows.reduce((total,item)=>total+item.count,0)||(evidence?.defeated||0);
  const body=<div className="extension-detail">
-  <header className="extension-detail-header">
+  <header className={`extension-detail-header${mode==='settings'?' settings-dialog-heading':''}`}>
+   {mode==='settings'&&<DialogBackButton onClick={()=>setOpen(false)}/>}
    <div><h3>{t('minecraft.title')}</h3><span className="extension-detail-status">{t(active?'minecraft.running':'minecraft.stopped')}</span></div>
-   {mode==='settings'?<DialogBackButton onClick={()=>setOpen(false)}/>:onDismiss&&<button type="button" className="icon-btn" aria-label={t('minecraft.dismiss')} onClick={onDismiss}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>}
+   {mode!=='settings'&&onDismiss&&<button type="button" className="icon-btn" aria-label={t('minecraft.dismiss')} onClick={onDismiss}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg></button>}
   </header>
   <section className="extension-detail-section">
    <FieldRow label={t('minecraft.session')} hint={t('minecraft.existingHint')}>

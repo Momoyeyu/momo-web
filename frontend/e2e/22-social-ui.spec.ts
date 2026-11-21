@@ -11,14 +11,14 @@ test('cold routes stay dormant until Boot, including settings and a direct chat 
   await expect(page.locator('#config-customize .customize-library')).not.toContainText(/QQ|Minecraft/);
   await expect(page.locator('.social-card')).toHaveCount(0);
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
-  await page.getByRole('button',{name:'返回标题',exact:true}).click();
+  await page.getByRole('button',{name:'返回',exact:true}).click();
   await bootChat(page);
   await waitForChatReady(page);
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('active');
   await page.getByRole('button',{name:'设置',exact:true}).click();
   await expect(page.locator('.settings-page')).toBeVisible();
   expect((await (await request.get('/api/meeting')).json()).activation).toBe('active');
-  await page.getByRole('button',{name:'返回对话',exact:true}).click();
+  await page.getByRole('button',{name:'返回',exact:true}).click();
   await page.getByRole('button',{name:'返回标题',exact:true}).click();
   await expect.poll(async()=> (await (await request.get('/api/meeting')).json()).activation).toBe('dormant');
 });

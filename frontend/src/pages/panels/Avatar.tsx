@@ -541,16 +541,19 @@ export default function AvatarPanel() {
           label={`${t("avatar.resources")} · ${resAvatar.name || BUILTIN_NAME}`}
           onClose={() => setResId(null)}
         >
-          <h2 className="modal-meta">
-            {t("avatar.resources")} · {resAvatar.name || BUILTIN_NAME}
-          </h2>
+          <header className="settings-dialog-heading">
+            <DialogBackButton onClick={() => setResId(null)}/>
+            <h2 className="modal-meta">
+              {t("avatar.resources")} · {resAvatar.name || BUILTIN_NAME}
+            </h2>
+          </header>
           <p className="muted avatar-hint">{t("avatar.resHint")}</p>
           <div className="resource-layout">
           <section className="resource-editor">
           {hasRes(resAvatar) ? (
             <>
-              <div className="resource-sections" role="group" aria-label={t("avatar.resources")}>
-                {(["expressions", "motions"] as const).map((kind) => <Button variant="ghost" key={kind} aria-pressed={resKind === kind} onClick={() => setResKind(kind)}>
+              <div className="settings-view-tabs resource-sections" role="group" aria-label={t("avatar.resources")}>
+                {(["expressions", "motions"] as const).map((kind) => <Button key={kind} aria-pressed={resKind === kind} onClick={() => setResKind(kind)}>
                   {t(kind === "expressions" ? "avatar.expList" : "avatar.motionList")}
                   <span>{resAvatar.resources?.[kind].length ?? 0}</span>
                 </Button>)}
@@ -564,9 +567,6 @@ export default function AvatarPanel() {
           )}
           </section>
           <ResourcePreview key={resAvatar.id} avatarId={resAvatar.id} selection={selection} onReady={onPreviewReady} />
-          </div>
-          <div className="modal-foot">
-            <DialogBackButton onClick={() => setResId(null)}/>
           </div>
         </Modal>
       )}

@@ -19,7 +19,7 @@ export default function ConfigAction({label, action, icon = 'gear', value, model
       {trigger}
     </FieldRow>}
     {open && <Modal label={label} className="config-modal" onClose={close}>
-      <header className="config-modal-head"><DialogBackButton onClick={close}/><h2>{label}</h2></header>
+      <header className="config-modal-head settings-dialog-heading"><DialogBackButton onClick={close}/><h2>{label}</h2></header>
       <div className="config-modal-body">{children}</div>
     </Modal>}
   </>;
