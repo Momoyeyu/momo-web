@@ -97,7 +97,7 @@ test('Minecraft attaches existing world without launcher or login',async({page})
  await expect(back).toHaveCSS('width','40px');
  await expect(back).toHaveCSS('border-top-width','0px');
  const backBounds = (await back.boundingBox())!;
- const titleBounds = (await modal.getByRole('heading',{name:'Minecraft 陪玩'}).boundingBox())!;
+ const titleBounds = (await modal.getByRole('heading',{name:'Minecraft 陪玩',exact:true}).boundingBox())!;
  expect(backBounds.x + backBounds.width).toBeLessThan(titleBounds.x);
  await back.click();
  const detail = page.getByRole('dialog',{name:'Minecraft',exact:true});
