@@ -32,14 +32,13 @@ class LlmConfig(TypedDict):
 
 
 class TtsConfig(TypedDict):
-    """TTS 端点（GPT-SoVITS api_v2 的地址）。
+    """语音引擎配置。两种端点独立保存，共用已上传的参考音频。"""
 
-    voice = 参考音频的**服务端路径**（音色来源）；prompt = 那段音频的文本，
-    留空则以 ref_free 模式合成（音色相似度会降一点）。
-    """
-
+    engine: NotRequired[Literal["gpt-sovits", "index-tts"]]
     url: str
     key: str
+    indexUrl: NotRequired[str]
+    indexKey: NotRequired[str]
     voice: str
     prompt: str
 

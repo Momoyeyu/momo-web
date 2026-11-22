@@ -13,12 +13,15 @@ export interface LlmConfig {
 
 export interface ImageRef {id:string;mime:string;width:number;height:number;animated?:boolean;unavailable?:boolean}
 
-/** TTS 端点：GPT-SoVITS api_v2 服务地址（前端统一走 backend 的 /api/tts/speech）。 */
+/** 服务协议可选，旧配置默认使用 GPT-SoVITS。 */
 export interface TtsConfig {
+  engine?: "gpt-sovits" | "index-tts";
   /** GPT-SoVITS api_v2 的服务地址（如 http://127.0.0.1:9880）。 */
   url: string;
   key: string;
-  /** 参考音频的**服务端路径**（音色来源），如 GPT-SoVITS 里的 reference/xx.wav。 */
+  indexUrl?: string;
+  indexKey?: string;
+  /** 保存在 momo 中的参考音频文件名。 */
   voice: string;
   /** 参考音频对应的文本；留空则 ref_free 合成（相似度略降）。 */
   prompt: string;

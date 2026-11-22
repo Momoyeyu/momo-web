@@ -1,3 +1,4 @@
+import { ttsEndpoint } from "../../lib/asr";
 // 「模型」tab：LLM / TTS 两个服务配置卡片（地址、密钥、模型、探测）。
 // 原先这些都挤在 Settings.tsx 里，状态与辅助一并搬过来。
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -15,6 +16,7 @@ import ProbeButton from "./ProbeButton";
 import FieldRow from "../../ui/FieldRow";
 import Hint from "../../ui/Hint";
 import Switch from "../../ui/Switch";
+import Select from "../../ui/Select";
 import {introRestricted,verifyIntro,useIntro} from "../../services/introClient";
 import { supportsThinking } from "../../lib/thinking";
 
@@ -45,12 +47,14 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
   const firstSetup = section === "llm" && intro.data?.phase === "setup";
   const settings = firstSetup ? {...saved, llm: draft} : saved;
 
+  const endpoint = {llm: settings.llm, tts: ttsEndpoint(settings.tts)};
+  const indexTts = settings.tts.engine === "index-tts";
   const request = useRef<AbortController | null>(null);
   const voiceEdited = useRef(false);
   const route = useRoute();
   const signature = section === "llm"
     ? JSON.stringify([section, settings.llm.url, settings.llm.key, settings.llm.model, settings.llm.thinking])
-    : JSON.stringify([section, settings.tts.url, settings.tts.key, settings.tts.voice, settings.tts.prompt, settings.general.chatLang, settings.general.lang]);
+    : JSON.stringify([section, settings.tts.engine, endpoint.tts, settings.tts.voice, settings.tts.prompt, settings.general.chatLang, settings.general.lang]);
   const [showKey, setShowKey] = useState(false);
   const [probe, setProbe] = useState<{signature: string; result: ProbeResult | "running"}>();
   const result = probe?.signature === signature ? probe.result : undefined;
@@ -135,8 +139,8 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
   ): React.ReactNode => {
     // 地址有问题（格式错 / 必填为空）不在行内堆文字：输入框标红，
     // 测试按钮直接变成警示图标（悬停有原因），信息密度交给图标。
-    const badUrl = !disabled && urlError(sec, settings[sec].url);
-    const missing = !disabled && required && !settings[sec].url.trim();
+    const badUrl = !disabled && urlError(sec, endpoint[sec].url);
+    const missing = !disabled && required && !endpoint[sec].url.trim();
     const warn = badUrl || missing;
     return (
       <FieldRow
@@ -145,7 +149,7 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
       >
         <input
           className={warn ? "invalid" : undefined}
-          value={settings[sec].url}
+          value={endpoint[sec].url}
           placeholder={disabled ? "—" : t(phKey)}
           disabled={disabled || (firstSetup && running)}
           onChange={(e) => patchEndpoint(sec, "url", e.target.value)}
@@ -171,8 +175,12 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
       setDraft(previous => ({...previous, [key]: v, vision: false, ...(key === "url" && !supportsThinking(v) ? {thinking: false} : {})}));
       return;
     }
+    const field = sec === "tts" && indexTts
+      ? key === "url" ? "indexUrl" : key === "key" ? "indexKey" : key
+      : key;
+    if (sec === "tts" && key === "engine") setShowKey(false);
     update({
-      settings: { ...settings, [sec]: { ...settings[sec], [key]: v, ...(sec === "llm" ? {vision:false} : {}), ...(sec === "llm" && key === "url" && !supportsThinking(v) ? { thinking: false } : {}) } },
+      settings: { ...settings, [sec]: { ...settings[sec], [field]: v, ...(sec === "llm" ? {vision:false} : {}), ...(sec === "llm" && key === "url" && !supportsThinking(v) ? { thinking: false } : {}) } },
     });
   };
 
@@ -180,7 +188,7 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
     <FieldRow label={t("settings.apiKey")}>
       <input
         type={showKey ? "text" : "password"}
-        value={settings[sec].key}
+        value={endpoint[sec].key}
         disabled={disabled || (firstSetup && running)}
         onChange={(e) => patchEndpoint(sec, "key", e.target.value)}
       />
@@ -227,9 +235,14 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
 }} data-intro="tts" className="panel settings-col opt-list">
   <h3 className="opt-group">
     {t("settings.groups.tts")}
-    <Hint text={t("settings.ttsHint")} side="down" />
+    <Hint text={t(indexTts ? "settings.indexTtsHint" : "settings.ttsHint")} side="down" />
   </h3>
-  {urlRow("tts", "settings.ttsUrlPh")}
+  <FieldRow label={t("settings.ttsEngine")}>
+    <Select label={t("settings.ttsEngine")} value={indexTts ? "index-tts" : "gpt-sovits"}
+      options={[{value:"gpt-sovits",label:"GPT-SoVITS"},{value:"index-tts",label:"IndexTTS"}]}
+      onChange={value=>patchEndpoint("tts","engine",value)}/>
+  </FieldRow>
+  {urlRow("tts", indexTts ? "settings.indexTtsUrlPh" : "settings.ttsUrlPh")}
   {keyRow("tts")}
   <FieldRow label={t("settings.ttsRefAudio")} hint={t("settings.ttsRefAudioHint")}>
     <span className={`ref-name${settings.tts.voice ? "" : " muted"}`}>
@@ -256,13 +269,13 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
     </Button>
     {uploadErr && <span className="probe-err">{uploadErr}</span>}
   </FieldRow>
-  <FieldRow label={t("settings.ttsRefText")}>
+  {!indexTts && <FieldRow label={t("settings.ttsRefText")}>
     <input
       value={settings.tts.prompt}
       placeholder={t("settings.ttsRefTextPh")}
       onChange={(e) => patchEndpoint("tts", "prompt", e.target.value)}
     />
-  </FieldRow>
+  </FieldRow>}
   {/* 合成语言不单独配置：跟随「通用」页的对话语言
       （见 i18n 的 resolveChatLang 与 services/ttsClient.ts）。 */}
 </section>}

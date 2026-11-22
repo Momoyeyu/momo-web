@@ -9,6 +9,7 @@ import {
   subscribeTranscript,
   transcriptVersion,
 } from "../chat/engineInstance";
+import {ttsConfigured} from "../lib/asr";
 import { getState, speakerName, subscribe } from "../lib/store";
 import { navigate } from "../router";
 import { useT } from "../i18n";
@@ -44,7 +45,7 @@ export default function Backlog({embedded = false}: {embedded?: boolean} = {}) {
   const name = speakerName();
   const idle = engine.status === "idle";
   // 回放可见反馈：TTS 未配置 / 语音静音时置灰 + tooltip 说明（点了也没声）。
-  const ttsConfigured = getState().settings.tts.url.trim() !== "";
+  const voiceReady = ttsConfigured(getState().settings.tts);
   const muted = engine.muted;
 
   // Fetch at settlement, never on each revealed character. Aborted pages cannot
@@ -138,9 +139,9 @@ export default function Backlog({embedded = false}: {embedded?: boolean} = {}) {
                 {m.role === "assistant" && m.source!=="qq" && (
                   <Button
                     className="bl-replay"
-                    disabled={!idle || replaying !== null || !ttsConfigured || muted || !meetingIdentity() || !m.runId || !m.eventId}
+                    disabled={!idle || replaying !== null || !voiceReady || muted || !meetingIdentity() || !m.runId || !m.eventId}
                     title={
-                      !ttsConfigured
+                      !voiceReady
                         ? t("backlog.replayNeedTts")
                         : muted
                           ? t("backlog.replayMuted")

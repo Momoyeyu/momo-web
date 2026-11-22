@@ -64,7 +64,7 @@ const DEFAULT_SETTINGS: Settings = {
   // 这里曾经预填过 deepseek / 本机端口 / 某台内网 embedding 服务器的地址 ——
   // 那些是开发者的环境，不该随仓库发给每个 clone 的人。
   llm: { url: "", key: "", model: "", thinking: false },
-  tts: { url: "", key: "", voice: "", prompt: "" },
+  tts: { engine: "gpt-sovits", url: "", key: "", voice: "", prompt: "" },
   extensions: [],
 };
 

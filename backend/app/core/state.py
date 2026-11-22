@@ -61,7 +61,7 @@ DEFAULT_STATE: dict[str, Any] = {
             "voiceInput": True,
         },
         "llm": {"url": "", "key": "", "model": "", "thinking": False},
-        "tts": {"url": "", "key": "", "voice": "", "prompt": ""},
+        "tts": {"engine": "gpt-sovits", "url": "", "key": "", "voice": "", "prompt": ""},
         # MCP 拓展清单（{name,transport,enabled} + stdio{command,args,env} / http{endpoint,headers}）
         "extensions": [],
     },

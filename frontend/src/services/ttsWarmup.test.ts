@@ -7,7 +7,6 @@ const { settings } = vi.hoisted(() => ({ settings: {
   tts: { url: "http://voice", key: "", voice: "ref.wav", prompt: "" },
 } }));
 vi.mock("../lib/store", () => ({ getState: () => ({ settings }), getSettings: () => settings, flushPendingState: async () => {}, subscribe: () => () => {} }));
-vi.mock("../lib/asr", () => ({ ttsConfigured: () => true }));
 vi.mock("./ttsClient", () => ({ streamSpeech: vi.fn() }));
 afterEach(() => { invalidateWarmup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 it("cancels a cold audition promptly even when synthesis never settles", async () => {

@@ -1,4 +1,4 @@
-"""TTS 适配层：把前端的 OpenAI 形状请求翻译成 GPT-SoVITS api_v2 调用。
+"""TTS 适配层：统一 GPT-SoVITS 和 IndexTTS 的 PCM 播放接口。
 
 为什么要有这层：GPT-SoVITS 的接口是 `POST /tts` + 一堆自描述参数（参考音频、
 参考文本、text_lang/prompt_lang、media_type、streaming_mode），不是 OpenAI 形状；
@@ -40,7 +40,8 @@ _STATUS_TIMEOUT = httpx.Timeout(3.0)
 #: 参考音频落在 data/tts/ 下；重复上传覆盖同前缀文件。
 REF_DIR = DATA_DIR / "tts"
 REF_STEM = "ref"
-MAX_REF_BYTES = 10 * 1024 * 1024  # 10MB：10 秒 32k wav 约 1.3MB，留足余量
+MAX_REF_BYTES = 10 * 1024 * 1024
+MAX_INDEX_WAV_BYTES = 32 * 1024 * 1024
 REF_EXTS = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".aac"}
 
 
@@ -107,19 +108,70 @@ def save_ref(filename: str, data: bytes) -> dict:
     return {"name": name, "size": len(data)}
 
 
+def engine(cfg: dict) -> str:
+    return "index-tts" if cfg.get("engine") == "index-tts" else "gpt-sovits"
+
+
+def endpoint(cfg: dict) -> tuple[str, dict[str, str]]:
+    if engine(cfg) == "index-tts":
+        url, key = cfg.get("indexUrl"), cfg.get("indexKey")
+    else:
+        url, key = cfg.get("url"), cfg.get("key")
+    return (url or "").strip().rstrip("/"), {"Authorization": f"Bearer {key}"} if key else {}
+
+
+async def _synthesize_index(base: str, headers: dict[str, str], text: str, language: str, ref: Path):
+    payload = {
+        "input": text, "language": language,
+        "reference_audio": base64.b64encode(ref.read_bytes()).decode("ascii"),
+        "reference_name": ref.name,
+    }
+    wav = bytearray()
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT, trust_env=False) as client:
+            async with client.stream("POST", base + "/v1/audio/speech",
+                                     json=payload, headers=headers) as response:
+                if response.status_code != 200:
+                    raise TtsError(f"IndexTTS 上游 HTTP {response.status_code}")
+                async for chunk in response.aiter_bytes():
+                    if len(wav) + len(chunk) > MAX_INDEX_WAV_BYTES:
+                        raise TtsError("IndexTTS 音频超过大小上限")
+                    wav.extend(chunk)
+    except httpx.HTTPError as error:
+        raise TtsError(f"TTS 连接失败：{type(error).__name__}") from error
+    try:
+        with wave.open(io.BytesIO(wav), "rb") as audio:
+            if audio.getnchannels() != 1 or audio.getsampwidth() != 2 or not audio.getnframes():
+                raise TtsError("IndexTTS 需要返回单声道 PCM16 WAV")
+            frame_count = audio.getnframes()
+            sample_rate, pcm = audio.getframerate(), audio.readframes(frame_count)
+        if len(pcm) != frame_count * 2:
+            raise TtsError("IndexTTS 返回的音频不完整")
+    except (wave.Error, EOFError) as error:
+        raise TtsError("IndexTTS 返回的 WAV 无效") from error
+
+    async def chunks():
+        for offset in range(0, len(pcm), 16_384):
+            yield pcm[offset:offset + 16_384]
+
+    return sample_rate, chunks()
+
+
 async def synthesize(text: str, lang: str | None = None):
     """建立合成流，返回 (采样率, 异步 PCM 迭代器)。
 
     迭代器结束时自动关闭上游连接；上游非 200 → TtsError（带响应体片段）。
     """
     cfg = _cfg()
-    base = (cfg.get("url") or "").strip()
+    base, headers = endpoint(cfg)
     if not base:
         raise TtsError("TTS 未配置")
     ref = ref_path(cfg)
     if ref is None:
         raise TtsError("未上传参考音频")
     language = lang or conversation_lang(load())
+    if engine(cfg) == "index-tts":
+        return await _synthesize_index(base, headers, text, language, ref)
 
     payload = {
         "text": text,
@@ -140,8 +192,7 @@ async def synthesize(text: str, lang: str | None = None):
     client = httpx.AsyncClient(timeout=_TIMEOUT, trust_env=False)
     try:
         req = client.build_request("POST", _endpoint(base), json=payload)
-        if cfg.get("key"):
-            req.headers["Authorization"] = f"Bearer {cfg['key']}"
+        req.headers.update(headers)
         resp = await client.send(req, stream=True)
         if resp.status_code != 200:
             detail = (await resp.aread())[:400].decode("utf-8", "replace")
@@ -184,10 +235,10 @@ async def synthesize(text: str, lang: str | None = None):
 async def status() -> dict:
     """设置页「测试」用：配置齐不齐 + 上游可达。"""
     cfg = _cfg()
-    base = (cfg.get("url") or "").strip()
+    base, headers = endpoint(cfg)
     ref = ref_path(cfg)
     out = {
-        "engine": "gpt-sovits",
+        "engine": engine(cfg),
         "configured": bool(base and ref),
         "url": base,
         "reachable": False,
@@ -203,10 +254,9 @@ async def status() -> dict:
         out["detail"] = "未上传参考音频"
         return out
     try:
-        headers = {"Authorization": f"Bearer {cfg['key']}"} if cfg.get("key") else {}
         async with httpx.AsyncClient(timeout=_STATUS_TIMEOUT, trust_env=False) as c:
             r = await c.get(base.rstrip("/") + "/readyz", headers=headers)
-            if r.status_code in (404, 405):
+            if r.status_code in (404, 405) and engine(cfg) == "gpt-sovits":
                 # External api_v2 installations may not implement our readiness
                 # contract. A missing documentation endpoint is never success.
                 r = await c.get(base.rstrip("/") + "/docs", headers=headers)

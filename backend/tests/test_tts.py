@@ -125,3 +125,46 @@ def test_payload_uses_base64_ref_audio(tmp_path, monkeypatch):
     assert "ref_audio_path" not in payload
     assert b64.b64decode(payload["ref_audio"]) == b"RIFFxxxx"
     assert payload["prompt_text"] == "参考文本"
+
+
+@pytest.mark.parametrize("valid_wav", [True, False])
+def test_index_tts_uses_its_own_endpoint_and_preserves_pcm(tmp_path, monkeypatch, valid_wav):
+    import base64
+    import io
+    import json
+    import wave
+
+    import httpx
+
+    sample = b"\x01\x02" * 100
+    wav = io.BytesIO()
+    with wave.open(wav, "wb") as audio:
+        audio.setparams((1, 2, 22050, 0, "NONE", "not compressed"))
+        audio.writeframes(sample)
+    monkeypatch.setattr(tts, "REF_DIR", tmp_path)
+    (tmp_path / "ref.wav").write_bytes(b"reference")
+    monkeypatch.setattr(tts, "_cfg", lambda: {
+        "engine": "index-tts", "indexUrl": "http://index.invalid/", "indexKey": "index-secret",
+        "url": "http://gpt.invalid", "key": "gpt-secret", "voice": "ref.wav",
+    })
+
+    def upstream(request):
+        assert str(request.url) == "http://index.invalid/v1/audio/speech"
+        assert request.headers["Authorization"] == "Bearer index-secret"
+        assert json.loads(request.content) == {
+            "input": "こんばんは", "language": "ja", "reference_name": "ref.wav",
+            "reference_audio": base64.b64encode(b"reference").decode("ascii"),
+        }
+        return httpx.Response(200, content=wav.getvalue() if valid_wav else wav.getvalue()[:-10])
+
+    original = httpx.AsyncClient
+    monkeypatch.setattr(tts.httpx, "AsyncClient", lambda **kwargs: original(
+        transport=httpx.MockTransport(upstream), **kwargs,
+    ))
+    result = TestClient(app).post("/api/tts/speech", json={"input": "こんばんは", "lang": "ja"})
+    if valid_wav:
+        assert result.status_code == 200
+        assert result.headers["X-Sample-Rate"] == "22050"
+        assert result.content == sample
+    else:
+        assert result.status_code == 503

@@ -85,7 +85,7 @@ export default function Settings() {
       <ConfigAction model="LLM" label={t('config.llm')} action={t('config.llmAction')} value={state.settings.llm.model}>
         <ModelsTab section="llm"/><VisionSettings/>
       </ConfigAction>
-      <ConfigAction model="TTS" label={t('config.tts')} action={t('config.ttsAction')} value="GPT-SoVITS">
+      <ConfigAction model="TTS" label={t('config.tts')} action={t('config.ttsAction')} value={state.settings.tts.engine === "index-tts" ? "IndexTTS" : "GPT-SoVITS"}>
         <ModelsTab section="tts"/>
       </ConfigAction>
       <BuiltinResourcesNotice/>

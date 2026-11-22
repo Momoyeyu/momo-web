@@ -6,6 +6,7 @@ import type {
   LlmConfig,
   TtsConfig,
 } from "../lib/types";
+import { ttsEndpoint } from "../lib/asr";
 import { apiJson } from "./http";
 
 export interface ProbeResult {
@@ -21,14 +22,14 @@ export async function probeLlm(cfg: LlmConfig, signal?: AbortSignal): Promise<Pr
 }
 
 export async function probeTts(cfg: TtsConfig): Promise<ProbeResult> {
-  if (!cfg.url) return { ok: false, detail: "unconfigured" };
+  if (!ttsEndpoint(cfg).url) return { ok: false, detail: "unconfigured" };
   try {
     const s = await apiJson<{
       configured: boolean;
       reachable: boolean;
       detail: string;
     }>("/api/tts/status");
-    if (s.configured && s.reachable) return { ok: true, detail: "gpt-sovits" };
+    if (s.configured && s.reachable) return { ok: true, detail: "" };
     return { ok: false, detail: s.detail || "未就绪" };
   } catch {
     return { ok: false, detail: "backend unreachable" };

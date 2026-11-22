@@ -4,7 +4,7 @@ import {ambient} from '../audio/ambient';
 import { s16leToFloat32 } from "../audio/pcm";
 import { resolveChatLang, tFor } from "../i18n";
 import { getState, flushPendingState, subscribe } from "../lib/store";
-import { ttsConfigured } from "../lib/asr";
+import { ttsConfigured, ttsEndpoint } from "../lib/asr";
 import { streamSpeech } from "./ttsClient";
 
 const freshnessMs = 5 * 60_000;
@@ -28,7 +28,7 @@ function prepareVoice(listener?: Listener): Promise<Sample | undefined> {
   const { general, tts } = getState().settings;
   if (!ttsConfigured(tts)) return Promise.resolve(undefined);
   const lang = resolveChatLang(general);
-  const key = JSON.stringify([tts.url, tts.key, tts.voice, tts.prompt, lang]);
+  const key = JSON.stringify([tts.engine, ttsEndpoint(tts), tts.voice, tts.prompt, lang]);
   if (flight?.key === key) {
     if (listener) {
       flight.sample.listener = listener;
@@ -69,7 +69,7 @@ export function warmVoice() {
 
 export async function auditionVoice(signal: AbortSignal) {
   const { tts } = getState().settings;
-  if (!tts.url.trim()) return { ok: false, detail: "unconfigured" };
+  if (!ttsEndpoint(tts).url.trim()) return { ok: false, detail: "unconfigured" };
   if (!tts.voice) return { ok: false, detail: "未上传参考音频" };
   signal.throwIfAborted();
   const audio = new AudioContext();

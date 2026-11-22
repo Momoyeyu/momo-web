@@ -99,3 +99,34 @@ test("保存音色配置后静默预热，点击试听复用在途音频", async
   await expect(card.locator(".probe-btn")).toHaveAttribute("data-probe-state", "passed");
   expect(requests).toBe(1);
 });
+
+test("切换语音引擎后各自保留地址与密钥", async ({page, request}) => {
+  const state = await readState(request);
+  const {tts} = state.settings as {tts: object};
+  Object.assign(tts, {engine:"gpt-sovits", url:"http://gpt.test", key:"gpt-key", prompt:"原有参考文本"});
+  await writeState(request, state);
+  await gotoRoute(page, "settings");
+  await page.getByRole("button", {name:"配置语音"}).click();
+  const card = page.locator('[data-intro="tts"]');
+  const engine = card.getByRole("button", {name:/合成引擎/});
+  const endpoint = card.locator("input").first();
+  const key = card.locator('input[type="password"]');
+
+  await engine.click();
+  await card.getByRole("option", {name:"IndexTTS"}).click();
+  await expect(endpoint).toHaveValue("");
+  await expect(card.getByPlaceholder("参考音频里说的话，可留空")).toHaveCount(0);
+  await endpoint.fill("http://index.test");
+  await key.fill("index-key");
+  await engine.click();
+  await card.getByRole("option", {name:"GPT-SoVITS"}).click();
+  await expect(endpoint).toHaveValue("http://gpt.test");
+  await expect(key).toHaveValue("gpt-key");
+  await engine.click();
+  await card.getByRole("option", {name:"IndexTTS"}).click();
+  await expect(endpoint).toHaveValue("http://index.test");
+  await expect(key).toHaveValue("index-key");
+  await expect.poll(async () => (await readState(request)).settings).toMatchObject({
+    tts: {engine:"index-tts", indexUrl:"http://index.test", indexKey:"index-key", url:"http://gpt.test", key:"gpt-key"},
+  });
+});

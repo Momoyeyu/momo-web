@@ -28,3 +28,26 @@ def test_status_uses_readiness_and_only_falls_back_for_missing_endpoint(monkeypa
     assert result['reachable'] is expected
     assert [request.url.path for request in requests] == paths
     assert all(request.headers['authorization'] == 'Bearer fixture-key' for request in requests)
+
+
+def test_index_requires_readyz_without_probing_gpt_docs(monkeypatch, tmp_path):
+    ref = tmp_path / "ref.wav"
+    ref.write_bytes(b"RIFFfixture")
+    monkeypatch.setattr(tts, "_cfg", lambda: {
+        "engine": "index-tts", "indexUrl": "http://index.test", "indexKey": "index-key",
+        "url": "http://legacy.test", "voice": ref.name,
+    })
+    monkeypatch.setattr(tts, "ref_path", lambda cfg: ref)
+    calls = []
+
+    def handler(request):
+        calls.append((str(request.url), request.headers["Authorization"]))
+        return httpx.Response(404)
+
+    original = httpx.AsyncClient
+    monkeypatch.setattr(tts.httpx, "AsyncClient", lambda **kwargs: original(
+        transport=httpx.MockTransport(handler), **kwargs,
+    ))
+    status = asyncio.run(tts.status())
+    assert status["engine"] == "index-tts" and not status["reachable"]
+    assert calls == [("http://index.test/readyz", "Bearer index-key")]
