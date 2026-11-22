@@ -102,3 +102,38 @@ it('revokes an old daily loop while the next scene is still loading',async()=>{
  finish({ok:true,arrayBuffer:async()=>new ArrayBuffer(8)} as Response);await tick();
  expect(sources.filter(s=>s.loop).at(-1)).not.toBe(custom);
 });
+
+it('schedules two complete effect cues and holds the preview through the last cue', async () => {
+ const a = new AmbientAudio();
+ await a.unlock(); await tick();
+ const controller = new AbortController();
+ const done = vi.fn();
+ const playing = a.preview('sfx',controller.signal).then(done);
+ await tick();
+ const cues = sources.filter(s=>!s.loop);
+ expect(cues).toHaveLength(2);
+ expect(cues[0].start).toHaveBeenCalledWith(0);
+ expect(cues[1].start).toHaveBeenCalledWith(48.16);
+ cues[0].onended?.();
+ expect(done).not.toHaveBeenCalled();
+ cues[1].onended?.();
+ await playing;
+ expect(done).toHaveBeenCalledTimes(1);
+});
+
+it('silences the background before starting music preview and restores it on stop', async () => {
+ const a = new AmbientAudio();
+ await a.unlock(); await tick();
+ const controller = new AbortController();
+ const playing = a.preview('music',controller.signal);
+ await tick();
+ const sample = sources.find(s=>!s.loop)!;
+ const background = gains[2].gain;
+ expect(background.linearRampToValueAtTime).toHaveBeenLastCalledWith(0,.06);
+ expect(sample.start).toHaveBeenCalledWith(.06,0,4);
+ expect(sources.find(s=>s.loop)?.stop).not.toHaveBeenCalled();
+ controller.abort();
+ await playing;
+ expect(sample.stop).toHaveBeenCalled();
+ expect(background.setTargetAtTime).toHaveBeenLastCalledWith(1,0,.18/3);
+});

@@ -13,6 +13,7 @@ export class AmbientAudio {
  private loads=new Map<string,Promise<AudioBuffer>>();
  private loadRequests=new Map<string,AbortController>();
  private effects=new Set<AudioBufferSourceNode>();
+ private stopPreview:(()=>void)|undefined;
  private cooldown=new Map<string,number>();
  private lastSound=-Infinity;
  private voices=new Set<object>();
@@ -97,31 +98,54 @@ export class AmbientAudio {
   if(!buffer){void this.load(name).catch(()=>{});return;}
   this.cooldown.set(id,now);this.lastSound=now;const source=ctx.createBufferSource();source.buffer=buffer;source.connect(this.sfxBus!);this.effects.add(source);source.onended=()=>{source.disconnect();this.effects.delete(source);};source.start();
  }
- /** A short sample through the same mixer buses as normal playback. */
+ /** Complete effect cues or a short excerpt of the current music. */
  async preview(channel:'sfx'|'music',signal:AbortSignal){
   await this.unlock();
   signal.throwIfAborted();
-  const ctx=this.ctx;
   const music=channel==='music';
-  const buffer=await this.load(music ? this.desired : 'warm-tap');
+  const buffers=await Promise.all((music?[this.desired]:['warm-phone-in','warm-complete']).map(name=>this.load(name)));
   signal.throwIfAborted();
-  if(!ctx||ctx.state!=='running'||!this.owned||!(music?this.musicLevel():this.effectsLevel()))return;
-  const source=ctx.createBufferSource();
-  source.buffer=buffer;
-  source.connect(music?this.musicBus!:this.sfxBus!);
-  if(music)this.ramp(this.backgroundBus,0,.05);
+  const ctx=this.ctx;
+  if(!ctx||ctx.state!=='running'||!this.owned)throw Error('Preview audio is unavailable');
+  if(!(music?this.musicLevel():this.effectsLevel()))return;
+
+  this.stopPreview?.();
+  const sources=buffers.map(buffer=>{
+   const source=ctx.createBufferSource();
+   source.buffer=buffer;
+   source.connect(music?this.musicBus!:this.sfxBus!);
+   return source;
+  });
+  let at=ctx.currentTime;
+  if(music){
+   const background=this.backgroundBus!.gain;
+   background.cancelScheduledValues(at);
+   background.setValueAtTime(background.value,at);
+   at+=.06;
+   background.linearRampToValueAtTime(0,at);
+  }
   await new Promise<void>(resolve=>{
+   const last=sources[sources.length-1];
    const finish=()=>{
-    signal.removeEventListener('abort',abort);
-    source.onended=null;
-    source.disconnect();
+    signal.removeEventListener('abort',stop);
+    last.onended=null;
+    sources.forEach(source=>source.disconnect());
+    if(this.stopPreview===stop)this.stopPreview=undefined;
     if(music)this.ramp(this.backgroundBus,1);
     resolve();
    };
-   const abort=()=>{source.stop();finish();};
-   source.onended=finish;
-   signal.addEventListener('abort',abort,{once:true});
-   source.start(0,0,music?Math.min(buffer.duration,4):buffer.duration);
+   const stop=()=>{
+    sources.forEach(source=>source.stop());
+    finish();
+   };
+   this.stopPreview=stop;
+   last.onended=finish;
+   signal.addEventListener('abort',stop,{once:true});
+   if(music)last.start(at,0,Math.min(buffers[0].duration,4));
+   else sources.forEach((source,index)=>{
+    source.start(at);
+    at+=buffers[index].duration+.16;
+   });
   });
  }
  private async syncMusic(){
@@ -142,7 +166,7 @@ export class AmbientAudio {
   }catch{/* Keep the previous track on load failure. */}
  }
  private stopMusic(){for(const source of this.musicSources.keys())source.stop();this.musicSources.clear();this.music=null;}
- private hide=()=>{if(!document.hidden&&document.hasFocus()){if(this.ctx)void this.unlock();return;}this.revision++;for(const s of this.effects)s.stop();this.effects.clear();void this.ctx?.suspend();this.release?.();this.release=null;this.owned=false;};
- install(){const gesture=()=>void this.unlock();document.addEventListener('pointerdown',gesture,{capture:true});document.addEventListener('keydown',gesture,{capture:true});document.addEventListener('visibilitychange',this.hide);window.addEventListener('blur',this.hide);window.addEventListener('focus',this.hide);return()=>{document.removeEventListener('pointerdown',gesture,true);document.removeEventListener('keydown',gesture,true);document.removeEventListener('visibilitychange',this.hide);window.removeEventListener('blur',this.hide);window.removeEventListener('focus',this.hide);this.release?.();this.release=null;this.owned=false;this.revision++;void this.ctx?.suspend();};}
+ private hide=()=>{if(!document.hidden&&document.hasFocus()){if(this.ctx)void this.unlock();return;}this.revision++;this.stopPreview?.();for(const s of this.effects)s.stop();this.effects.clear();void this.ctx?.suspend();this.release?.();this.release=null;this.owned=false;};
+ install(){const gesture=()=>void this.unlock();document.addEventListener('pointerdown',gesture,{capture:true});document.addEventListener('keydown',gesture,{capture:true});document.addEventListener('visibilitychange',this.hide);window.addEventListener('blur',this.hide);window.addEventListener('focus',this.hide);return()=>{document.removeEventListener('pointerdown',gesture,true);document.removeEventListener('keydown',gesture,true);document.removeEventListener('visibilitychange',this.hide);window.removeEventListener('blur',this.hide);window.removeEventListener('focus',this.hide);this.stopPreview?.();this.release?.();this.release=null;this.owned=false;this.revision++;void this.ctx?.suspend();};}
 }
 export const ambient=new AmbientAudio();

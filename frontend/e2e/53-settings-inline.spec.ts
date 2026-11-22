@@ -6,9 +6,10 @@ test('all three previews play through the inline controls', async ({page,request
   const state = await (await request.get('/api/state')).json();
   Object.assign(state.settings.tts,{url:'http://tts.test',voice:'ref.wav'});
   await request.put('/api/state',{data:state});
-  await page.route('**/api/tts/speech', route => route.fulfill({
+  let connected = false;
+  await page.route('**/api/tts/speech', route => connected ? route.fulfill({
     contentType:'audio/pcm', headers:{'X-Sample-Rate':'32000'}, body:Buffer.alloc(6400),
-  }));
+  }) : route.fulfill({status:503,json:{detail:'TTS 连接失败：fixture connection reset'}}));
   await page.addInitScript(() => {
     const start = AudioBufferSourceNode.prototype.start;
     AudioBufferSourceNode.prototype.start = function (...args) {
@@ -21,6 +22,12 @@ test('all three previews play through the inline controls', async ({page,request
   await openTab(page, '声音');
   const sound = page.locator('#config-sound');
   await expect(sound.locator('.sel-face')).toHaveCount(0);
+  const voice = sound.getByRole('button',{name:'试听语音',exact:true});
+  const beforeFailure = await voice.boundingBox();
+  await voice.click();
+  await expect(voice).toHaveAttribute('data-tip',/无法连接|连接失败|检查.*网络/);
+  expect(await voice.boundingBox()).toEqual(beforeFailure);
+  connected = true;
   const played = async () => Number(await page.locator('html').getAttribute('data-sound-starts') || 0);
   for (const name of ['试听语音','试听音效','试听音乐']) {
     const before = await played();

@@ -292,6 +292,8 @@
   font-size: 12px;
   color: var(--danger);
 }
+button.audio-preview-failed,
+button.audio-preview-failed:hover:not(:disabled) {color: var(--danger-text);}
 .probe-announcement {
   position: absolute;
   width: 1px;
