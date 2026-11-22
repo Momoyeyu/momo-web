@@ -3,7 +3,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from ..services.coordinator import runtime, CoordinationError
-from ..services import checkpoint, memory
+from ..services import checkpoint, memory, tts_sessions
 
 router = APIRouter()
 
@@ -24,7 +24,9 @@ def require(client, lease):
 @router.post("/api/meeting/enter")
 def enter(body: LeaseIn):
     try:
-        return runtime.enter(body.clientId, body.leaseId, restore=body.restore)
+        result = runtime.enter(body.clientId, body.leaseId, restore=body.restore)
+        tts_sessions.sessions.wake()
+        return result
     except CoordinationError as error:
         raise HTTPException(409, str(error)) from error
 
@@ -43,6 +45,8 @@ def leave(body: LeaseIn):
         runtime.leave(body.clientId, body.leaseId)
     except CoordinationError as error:
         raise HTTPException(409, str(error)) from error
+    finally:
+        tts_sessions.sessions.wake()
     return {"ok": True}
 
 

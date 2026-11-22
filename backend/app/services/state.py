@@ -22,11 +22,12 @@ def read() -> dict[str, Any]:
 
 def replace(payload: dict[str, Any]) -> None:
     """整体替换配置。"""
-    from . import vision
+    from . import tts_sessions, vision
     cfg = payload.get("settings", {}).get("llm", {})
     if cfg.get("vision") and not vision.verified(cfg):
         raise ValueError("vision.notVerified")
     config.write_state(payload)
+    tts_sessions.sessions.wake()
     from .coordinator import runtime
 
     if runtime.started:

@@ -33,6 +33,7 @@ from .api import (
 async def lifespan(app: FastAPI):
     from .core.data_lock import DataDirectoryLock
     from .core.state import DATA_DIR
+    from .services.tts_sessions import sessions
     ownership = DataDirectoryLock(DATA_DIR)
     ownership.acquire()
     try:
@@ -45,7 +46,8 @@ async def lifespan(app: FastAPI):
                 extend.configure, load_state()["settings"]["extensions"]
             )
             memory.schedule_index()
-            yield
+            async with sessions.running():
+                yield
         finally:
             await __import__("asyncio").to_thread(runtime.close)
             memory.shutdown_index()

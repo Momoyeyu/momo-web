@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useT } from "../../i18n";
 import { getState, subscribe, update } from "../../lib/store";
 import { probeLlm } from "../../services/probe";
+import { meetingIdentity } from "../../services/meetingClient";
 import { uploadRefAudio } from "../../services/ttsClient";
 import { auditionVoice, invalidateWarmup, warmVoice } from "../../services/ttsWarmup";
 import { useRoute } from "../../router";
@@ -123,7 +124,7 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
       request.current = null;
       invalidateWarmup();
       update({settings: { ...current, tts: { ...current.tts, voice: res.name } }});
-      warmVoice();
+      if (meetingIdentity()) warmVoice();
     } catch (err) {
       setUploadErr((err as Error).message || String(err));
     } finally {
@@ -231,7 +232,10 @@ export default function ModelsTab({ section }: { section: EndpointSection }) {
 </div>
 </section>}
 {section === "tts" && <section onBlur={() => {
-  if (voiceEdited.current) { voiceEdited.current = false; warmVoice(); }
+  if (voiceEdited.current) {
+    voiceEdited.current = false;
+    if (meetingIdentity()) warmVoice();
+  }
 }} data-intro="tts" className="panel settings-col opt-list">
   <h3 className="opt-group">
     {t("settings.groups.tts")}

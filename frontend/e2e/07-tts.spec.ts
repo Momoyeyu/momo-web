@@ -72,7 +72,7 @@ test("TTS 请求的 lang = 对话语言（日语/英语/auto 三种）", async (
   }
 });
 
-test("保存音色配置后静默预热，点击试听复用在途音频", async ({page,request}) => {
+test("标题页设置保持语音休眠，主动试听才请求合成", async ({page,request}) => {
   const state = await readState(request);
   const { tts } = state.settings as {tts: {url:string; voice:string}};
   Object.assign(tts, {url:"http://tts.test", voice:"ref.wav"});
@@ -90,11 +90,15 @@ test("保存音色配置后静默预热，点击试听复用在途音频", async
   await page.getByRole('button',{name:'配置语音'}).click();
   const card = page.locator('[data-intro="tts"]');
   const prompt = card.locator("input").last();
+  const automaticSpeech = page.waitForRequest("**/api/tts/speech", {timeout:900})
+    .then(() => true, () => false);
   await prompt.fill("试听参考文本");
   await prompt.press("Tab");
   try {
-    await expect.poll(() => requests).toBe(1);
+    expect(await automaticSpeech).toBe(false);
+    expect(requests).toBe(0);
     await card.getByRole("button",{name:"试听",exact:true}).click();
+    await expect.poll(() => requests).toBe(1);
   } finally {release();}
   await expect(card.locator(".probe-btn")).toHaveAttribute("data-probe-state", "passed");
   expect(requests).toBe(1);

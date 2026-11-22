@@ -790,6 +790,14 @@ class Coordinator:
                 self.mode = "paused"
             raise CoordinationError("Executor stop or permission could not be confirmed") from error
 
+    def active_meeting_id(self) -> str | None:
+        """Read active ownership without triggering an attention transition."""
+        with self.condition:
+            if (self.started and self.mode == "meeting" and not self.restoring
+                    and self.owner and self.owner["expiresAt"] > time.monotonic()):
+                return self.owner["leaseId"]
+            return None
+
     def require_meeting(self, client, lease):
         with self.condition:
             self._expire()

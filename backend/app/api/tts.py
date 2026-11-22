@@ -11,7 +11,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from ..services import tts
+from ..services import tts, tts_sessions
 from ..services.prompt import conversation_lang
 from ..core.state import load
 
@@ -50,6 +50,7 @@ async def upload_ref(file: UploadFile = File(...)) -> dict:
         info = tts.save_ref(file.filename or "", data)
     except tts.TtsError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+    tts_sessions.sessions.wake()
     return {"ok": True, **info}
 
 
