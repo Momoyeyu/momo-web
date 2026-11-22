@@ -73,10 +73,11 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   const general=useSyncExternalStore(subscribe,getSettings).general;
   useLayoutEffect(()=>{
     document.documentElement.classList.toggle('desktop-pet',desktopWindow.mode==='pet');
-    document.documentElement.classList.toggle('desktop-shell',!!window.momoDesktop?.setWindowMode);
+    document.documentElement.classList.toggle('desktop-shell',desktopWindowAvailable());
+    document.documentElement.classList.toggle('desktop-fullscreen',desktopWindow.fullscreen===true);
     getStage().setCloseUp(desktopWindow.mode==='pet'?general.petCloseUp===true:general.chatCloseUp!==false);
-    return()=>{document.documentElement.classList.remove('desktop-pet','desktop-shell');};
-  },[desktopWindow.mode,general.petCloseUp,general.chatCloseUp]);
+    return()=>{document.documentElement.classList.remove('desktop-pet','desktop-shell','desktop-fullscreen');};
+  },[desktopWindow.mode,desktopWindow.fullscreen,general.petCloseUp,general.chatCloseUp]);
   useLayoutEffect(()=>{
     const root=document.documentElement,panel=desktopWindow.panel;
     root.classList.toggle('pet-panel-open',desktopWindow.mode==='pet'&&!!panel&&panel.width>=220);

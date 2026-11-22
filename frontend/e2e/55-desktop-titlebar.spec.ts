@@ -68,3 +68,39 @@ test('web keeps the title art unselectable without a desktop drag strip',async({
  await expect(page.locator('.title-brand')).toHaveCSS('user-select','none');
  await expect(page.locator('img.title-presence')).toHaveAttribute('draggable','false');
 });
+
+test('native fullscreen removes the drag strip and its inset, then restores both',async({page,baseURL})=>{
+ await page.addInitScript(baseUrl=>{
+  const state={mode:'chat' as const,clickThrough:false,fullscreen:false};
+  window.momoDesktop={
+   getRuntime:async()=>({baseUrl,token:'isolated-titlebar'}),
+   getWindowState:async()=>({...state}),
+   setWindowMode:async mode=>({...state,mode}),
+   onWindowStateChanged:listener=>{
+    const change=(event:Event)=>{
+     state.fullscreen=(event as CustomEvent<boolean>).detail;
+     listener({...state});
+    };
+    window.addEventListener('test-native-fullscreen',change);
+    return()=>window.removeEventListener('test-native-fullscreen',change);
+   },
+  };
+ },baseURL!);
+ await page.setViewportSize({width:1280,height:720});
+ await openApp(page);
+ const bar=page.locator('.desktop-window-titlebar');
+ const grip=page.locator('.desktop-window-grip');
+ const matte=page.locator('.desktop-stage-matte');
+ const stage=page.locator('.app-stage');
+ await expect(bar).toBeVisible();
+ const setFullscreen=(fullscreen:boolean)=>page.evaluate(value=>
+  window.dispatchEvent(new CustomEvent('test-native-fullscreen',{detail:value})),fullscreen);
+ await setFullscreen(true);
+ await expect(bar).toBeHidden();
+ await expect(matte).toHaveCSS('top','0px');
+ expect(await stage.boundingBox()).toEqual({x:0,y:0,width:1280,height:720});
+ await setFullscreen(false);
+ await expect(grip).toBeVisible();
+ await expect(grip).toHaveCSS('app-region','drag');
+ await expect(matte).toHaveCSS('top','32px');
+});

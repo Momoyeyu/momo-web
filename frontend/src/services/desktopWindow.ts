@@ -1,7 +1,7 @@
 import {useEffect,useSyncExternalStore} from 'react';
 import './runtime';
 import {getSettings,updateGeneral} from '../lib/store';
-export type DesktopWindowState={mode:'chat'|'pet';clickThrough:boolean;panel?:{width:number;petWidth:number}};
+export type DesktopWindowState={mode:'chat'|'pet';clickThrough:boolean;fullscreen?:boolean;panel?:{width:number;petWidth:number}};
 export interface PermissionGuideCopy {
  title:string;
  instructions:string;

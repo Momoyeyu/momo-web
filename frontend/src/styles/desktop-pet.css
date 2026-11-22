@@ -7,6 +7,7 @@
   --desktop-stage-width: min(100vw, calc(var(--desktop-content-height) * 16 / 9));
   --desktop-stage-top: calc(var(--desktop-titlebar-height) + (var(--desktop-content-height) - var(--desktop-stage-height)) / 2);
 }
+.desktop-shell.desktop-fullscreen:not(.desktop-pet) {--desktop-titlebar-height: 0px;}
 .desktop-shell:not(.desktop-pet) :is(.app-stage, .modal-overlay) {
   inset: var(--desktop-stage-top) 0 auto;
   margin: 0 auto;
@@ -68,7 +69,7 @@
   .stage-matte-edge[data-edge="left"] .stage-matte-mark {display: block;}
   .stage-matte-edge[data-edge="right"] .stage-matte-motif {display: flex;}
 }
-.desktop-shell:not(.desktop-pet) .desktop-window-titlebar {
+.desktop-shell:not(.desktop-pet, .desktop-fullscreen) .desktop-window-titlebar {
   display: block;
   position: fixed;
   z-index: 110;
