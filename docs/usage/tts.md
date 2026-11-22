@@ -29,7 +29,7 @@
 
 ## 部署 GPT-SoVITS
 
-使用 momo 仓库的 [`deploy/tts/`](../../deploy/tts/)。
+使用独立语音仓库的 [`gpt-sovits/`](https://github.com/Momoyeyu/momo-tts/tree/main/gpt-sovits)。
 
 ## 当前验证范围
 
@@ -57,7 +57,7 @@ WSL 实测输出为 32 kHz 单声道 PCM16，三种语言均产生超过两秒�
 代码固定到 GPT-SoVITS 提交 `1d9fe63d2875238bc240bd5e7b8dacaee73f8396`，默认模型为 v2。Python / CUDA 依赖及下载文件都有版本与 SHA-256 清单，不使用运行机器原来的 venv、语言缓存或 base64 补丁。资源仅在显式准备时下载，服务启动后校验并使用本地资源。
 
 ```sh
-cd deploy/tts
+cd gpt-sovits
 cp .env.example .env
 ```
 
