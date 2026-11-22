@@ -53,7 +53,7 @@ export const ja: Dict = {
     accessGroup: "アクセス権限", actionLabel: "{permission} {action}",
     requestTitle: "権限を許可して続行", accessHint: "このタスクで momo にデスクトップへのアクセスを許可します。", remaining: "残りの権限は {count} 件", allGranted: "すべて許可済み",
     cancelOperation: "操作をキャンセル", continueOperation: "操作を続ける", close: "閉じる",
-    guideTitle: "{permission}の権限", guideInstructions: "システム設定で momo をオンにしてください。一覧にない場合は、下の momo.app を一覧にドラッグしてください。",
+    guideTitle: "{permission}の権限", guideInstructions: "momo をオンにします。一覧にない場合はドラッグして追加してください。",
     guideDone: "momo に戻る", guideGranted: "権限が許可されました。", guideClose: "権限ガイドを閉じる", guideReveal: "Finder に表示",
     operation: {"targets": "ウィンドウを探すには、デスクトップへのアクセスと画面収録が必要です。", "observe": "デスクトップを観察するには、画面収録が必要です。", "control": "選択したウィンドウを操作するには、画面の読み取りとクリック、入力、スクロールの権限が必要です。"},
   },

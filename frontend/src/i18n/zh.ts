@@ -53,7 +53,7 @@ export const zh = {
     accessGroup: "访问权限", actionLabel: "{permission} {action}",
     requestTitle: "授权后继续", accessHint: "允许 momo 使用桌面访问完成当前任务。", remaining: "剩余 {count} 项授权", allGranted: "全部已授权",
     cancelOperation: "取消操作", continueOperation: "继续操作", close: "关闭",
-    guideTitle: "{permission}授权", guideInstructions: "在系统设置里打开 momo 的开关。如果列表中没有 momo，请把下方的 momo.app 拖进去。",
+    guideTitle: "{permission}授权", guideInstructions: "打开 momo 的开关。列表中找不到时，把下方的 momo 拖进去。",
     guideDone: "返回 momo", guideGranted: "已检测到授权。", guideClose: "关闭授权引导", guideReveal: "在访达中显示",
     operation: {"targets": "查找可选窗口需要访问桌面并读取屏幕画面。", "observe": "观察桌面需要读取屏幕画面。", "control": "操作所选窗口需要读取画面，并在窗口中点击、输入和滚动。"},
   },

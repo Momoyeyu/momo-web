@@ -23,7 +23,7 @@
 .desktop-config .desktop-permission-action {padding-inline: 6px;}
 .desktop-permission-modal {
   box-sizing: border-box;
-  width: min(500px, 92cqw);
+  width: min(430px, 92cqw);
   max-height: 90cqh;
   padding: 0;
   gap: 0;
@@ -35,10 +35,9 @@
   gap: 12px;
   padding: 15px 20px;
 }
-.desktop-permission-header {align-items: flex-start; border-bottom: 1px solid var(--line-soft);}
+.desktop-permission-header {align-items: center; border-bottom: 1px solid var(--line-soft);}
 .desktop-permission-header img {flex: none;}
 .desktop-permission-header h2 {margin: 0; font-size: 19px; line-height: 1.35;}
-.desktop-permission-header p, .desktop-permission-row p {margin: 3px 0 0; color: var(--text-dim); font-size: 13px;}
 .desktop-permission-header .icon-btn {margin-inline-start: auto;}
 .desktop-permission-rows {padding: 5px 20px;}
 .desktop-permission-row {
@@ -46,7 +45,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  min-height: 64px;
+  min-height: 50px;
   padding: 8px 0;
 }
 .desktop-permission-row + .desktop-permission-row {border-top: 1px solid var(--line-soft);}

@@ -53,7 +53,7 @@ export const en: Dict = {
     accessGroup: "Access permissions", actionLabel: "{permission} {action}",
     requestTitle: "Grant access to continue", accessHint: "Allow momo to use desktop access for the current task.", remaining: "Permissions remaining: {count}", allGranted: "All permissions granted",
     cancelOperation: "Cancel operation", continueOperation: "Continue operation", close: "Close",
-    guideTitle: "{permission} permission", guideInstructions: "Turn on momo in System Settings. If momo is missing from the list, drag momo.app below into it.",
+    guideTitle: "{permission} permission", guideInstructions: "Turn on momo. If it isn’t listed, drag it in.",
     guideDone: "Return to momo", guideGranted: "Permission granted.", guideClose: "Close permission guide", guideReveal: "Show in Finder",
     operation: {"targets": "Finding windows requires desktop access and Screen Recording.", "observe": "Observing the desktop requires Screen Recording.", "control": "Controlling the selected window requires permission to see it, click, type, and scroll."},
   },

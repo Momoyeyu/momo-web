@@ -147,13 +147,12 @@ export default function AppPermissions({ready, onGuideVisibility}: {
       setFollower(entry);
       try {
         await bridge.openPermissionGuide(kind, {
-          title: t('desktopAccess.guideTitle', {permission: t('desktopAccess.' + kind)}),
+          title: t('desktopAccess.' + kind),
           instructions: t('desktopAccess.guideInstructions'),
           dragLabel: 'momo.app',
           doneLabel: t('desktopAccess.guideDone'),
           grantedLabel: t('desktopAccess.guideGranted'),
           closeLabel: t('desktopAccess.guideClose'),
-          openSettingsLabel: t('desktopAccess.systemAction'),
           revealLabel: t('desktopAccess.guideReveal'),
         });
       } catch (cause) {
@@ -205,16 +204,19 @@ export default function AppPermissions({ready, onGuideVisibility}: {
         const current = await refreshSystem(signal);
         if (signal.aborted || activeFollower.current !== follower) return;
         const next = isSystemPermissionGranted(current, follower!.kind);
-        if (next !== granted) {
-          await window.momoDesktop?.setPermissionGuideGranted?.(next);
-          granted = next;
+        if (next && !granted) {
+          const currentRequest = permissionRequestSnapshot();
+          if (currentRequest) await refreshRequest(currentRequest, signal);
+          if (signal.aborted || activeFollower.current !== follower) return;
+          await window.momoDesktop?.setPermissionGuideGranted?.(true);
+          granted = true;
         }
       } catch { /* Retry transient check and bridge failures while the guide is open. */ }
       if (!signal.aborted) timer = setTimeout(() => void poll(), 800);
     }
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [follower, refreshSystem]);
+  }, [follower, refreshRequest, refreshSystem]);
 
   async function run(action: () => Promise<void>) {
     if (working.current) return;
@@ -252,23 +254,17 @@ export default function AppPermissions({ready, onGuideVisibility}: {
     setPolicy(previous => previous && {...previous, ...updated});
     await refreshRequest(current);
   };
-  return <Modal className="desktop-permission-modal" label={title} describedBy="desktop-permission-description" onClose={dismiss}>
+  return <Modal className="desktop-permission-modal" label={title} onClose={dismiss}>
     <header className="desktop-permission-header">
       <img src="/brand/momo-icon.svg" alt="" width="32" height="32"/>
-      <div>
-        <h2>{title}</h2>
-        <p id="desktop-permission-description">{t(request ? 'desktopAccess.operation.' + request.operation : 'desktopAccess.description')}</p>
-      </div>
+      <h2>{title}</h2>
       <Button className="icon-btn" variant="ghost" aria-label={t('desktopAccess.close')} disabled={busy} onClick={dismiss}><Icon name="close"/></Button>
     </header>
     <section aria-label={t(request ? 'desktopAccess.accessGroup' : 'desktopAccess.system')} className="desktop-permission-rows">
       {shown.map(kind => {
         const granted = request ? !missing.includes(kind) : kind !== 'access' && isSystemPermissionGranted(system, kind);
         return <div className="desktop-permission-row" key={kind}>
-          <div>
-            <strong>{t(kind === 'access' ? 'desktopAccess.title' : 'desktopAccess.' + kind)}</strong>
-            <p>{t('desktopAccess.' + kind + 'Hint')}</p>
-          </div>
+          <strong>{t(kind === 'access' ? 'desktopAccess.title' : 'desktopAccess.' + kind)}</strong>
           <DesktopPermissionAction kind={kind} granted={granted} disabled={busy || (!request && !system)} onClick={() => {
             if (kind !== 'access') void run(() => openSystem({kind}));
             else if (request) void run(() => grantAccess(request));
@@ -279,7 +275,6 @@ export default function AppPermissions({ready, onGuideVisibility}: {
     {error && <p role="alert" className="desktop-permission-error">{t(request ? 'permissions.error' : 'desktopAccess.settingsHelp')}</p>}
     <footer className="desktop-permission-footer">
       {request ? <>
-        <span role="status">{missing.length ? t('desktopAccess.remaining', {count:String(missing.length)}) : t('desktopAccess.allGranted')}</span>
         <div className="desktop-permission-buttons">
           <Button variant="ghost" disabled={busy} onClick={dismiss}>{t('desktopAccess.cancelOperation')}</Button>
           <Button disabled={busy || missing.length > 0} onClick={() => void run(async () => {
