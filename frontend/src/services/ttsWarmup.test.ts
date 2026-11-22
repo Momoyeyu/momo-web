@@ -39,3 +39,26 @@ it.each(["zh", "en", "ja"] as const)("uses the title slogan for %s synthesis", a
   warmVoice();
   await vi.waitFor(() => expect(streamSpeech).toHaveBeenCalledWith(tFor(lang, "title.tagline"), expect.objectContaining({ lang })));
 });
+
+it("keeps a cold synthesis alive past the initial model load", async () => {
+  vi.useFakeTimers();
+  const timeout = vi.spyOn(AbortSignal, "timeout").mockImplementation(ms => {
+    const controller = new AbortController();
+    setTimeout(() => controller.abort(new DOMException("Timed out", "TimeoutError")), ms);
+    return controller.signal;
+  });
+  try {
+    let requestSignal: AbortSignal | undefined;
+    vi.mocked(streamSpeech).mockImplementation(async (_text, options) => {
+      requestSignal = options.signal;
+      await new Promise(resolve => setTimeout(resolve, 50_000));
+      options.onChunk(new Uint8Array([0, 0]));
+    });
+    warmVoice();
+    await vi.advanceTimersByTimeAsync(50_000);
+    expect(requestSignal?.aborted).toBe(false);
+  } finally {
+    timeout.mockRestore();
+    vi.useRealTimers();
+  }
+});

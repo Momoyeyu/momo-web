@@ -9,6 +9,8 @@ import { streamSpeech } from "./ttsClient";
 
 const freshnessMs = 5 * 60_000;
 const retryMs = 15_000;
+// Match the backend speech budget so an idle GPU has time to load the model.
+const synthesisTimeoutMs = 120_000;
 type Listener = (chunk: Uint8Array, rate: number) => void;
 type Sample = { rate: number; chunks: Uint8Array[]; listener?: Listener };
 let flight: { key: string; controller: AbortController; sample: Sample; result: Promise<Sample> } | undefined;
@@ -39,7 +41,7 @@ function prepareVoice(listener?: Listener): Promise<Sample | undefined> {
   cancelWarmup();
   if (!listener && recent.key === key && Date.now() < recent.until) return Promise.resolve(undefined);
   const controller = new AbortController();
-  const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30_000)]);
+  const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(synthesisTimeoutMs)]);
   const sample: Sample = { rate: 0, chunks: [], listener };
   const result = (async () => {
     await flushPendingState(); // speech reads the committed configuration on the server
