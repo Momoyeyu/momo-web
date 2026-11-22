@@ -165,6 +165,8 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   const [stack, setStack] = useState<PageEntry[]>([{ id: 0, route }]);
   // front = 新页正在从落点向外"漫开"（临时盖上不规则遮罩）。
   const [front, setFront] = useState(false);
+  const frontLayer = useRef<HTMLDivElement>(null);
+  const frontId = front ? stack.at(-1)?.id : undefined;
   // rev = 往回走（层级向上）：洞口收拢、涟漪向内
   const [rev, setRev] = useState(false);
   // booting = 进入 chat 的场景转场尚未完成（ASCII 或 RoPE）。
@@ -215,11 +217,11 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     return subscribe(apply);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (route === curRef.current) return;
     const prevRoute = curRef.current;
     const titleEntry = consumeBoot() && prevRoute === "title" && route === "chat";
-    const resumeChat = prevRoute === "settings" && route === "chat";
+    const resumeChat = route === "chat" && !titleEntry;
     curRef.current = route;
     captureToken.current++;capturePending.current=false;setCapturing(false);
     if(route!=='title'){setExitFrame(null);setExitScene(null);}
@@ -245,9 +247,8 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     }
     const glassExit = prevRoute === 'chat' && route === 'title' && exitFrame !== null;
     setRev(back);
-    setFx(!titleEntry&&!glassExit);
+    setFx(!titleEntry && !glassExit && !resumeChat);
 
-    let t1: number | undefined;
     const t2 = window.setTimeout(() => setFx(false), RIPPLE_MS);
 
     // 同一路由只保留最新实例：来回切换时旧的那份直接丢弃，
@@ -269,24 +270,31 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
       setEntry(seq.current++);
     } else {
       setEntry(null);
-      setBooting(route === "chat" && !resumeChat);
+      setBooting(resumeChat);
       // RoPE 页之间：新页压栈顶，盖上不规则遮罩漫开；旧页在下面等着被盖住
       setStack((prev) => [
         ...withoutSame(prev),
         { id: seq.current++, route, resumeChat },
       ]);
       setFront(true);
-      t1 = window.setTimeout(() => {
-        setFront(false);
-        setBooting(false);
-        setStack((prev) => prev.slice(-1));
-      }, BLOOM_MS);
     }
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
+    return () => window.clearTimeout(t2);
   }, [route]);
+
+  useLayoutEffect(() => {
+    if (frontId === undefined || !frontLayer.current) return;
+    const animations = frontLayer.current.getAnimations().filter(animation =>
+      animation instanceof CSSAnimation &&
+      (animation.animationName === "page-bloom" || animation.animationName === "page-bloom-rev"));
+    let cancelled = false;
+    void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
+      if (cancelled) return;
+      setFront(false);
+      setBooting(false);
+      setStack(previous => previous.slice(-1));
+    });
+    return () => { cancelled = true; };
+  }, [frontId]);
 
   const stageStyle = {
     "--tx-bloom-ms": `${BLOOM_MS}ms`,
@@ -330,6 +338,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
         return (
           <div
             key={p.id}
+            ref={top && front ? frontLayer : undefined}
             className={`page-wrap${p.route === "chat" ? " is-chat" : ""}${cls}`}
             aria-hidden={top ? undefined : true}
             inert={!top || p.route !== route || front || booting || !ready || !meetingReady}

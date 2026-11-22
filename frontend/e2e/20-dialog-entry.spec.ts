@@ -2,7 +2,7 @@ import {bootChat} from './helpers';
 import {test,expect,type Page,type TestInfo} from './fixtures';
 import {writeFile} from 'node:fs/promises';
 
-type Frame = {time:number;route:string;startup:boolean;cover:boolean;ink:boolean;opacity:number;
+type Frame = {time:number;route:string;startup:boolean;cover:boolean;ink:boolean;drop:boolean;opacity:number;
   animation:string;toolbar:number;interactive:boolean;setup:boolean};
 type Audit = {frames:Frame[];done:boolean};
 
@@ -32,6 +32,7 @@ async function fixture(page:Page, configured=true) {
           const input=zone.querySelector<HTMLInputElement>('input')!;
           const frame:Frame={time:performance.now()-start,route:location.hash,startup:!!document.querySelector('#startup'),
             cover:wrap.classList.contains('is-front'),ink:!!document.querySelector('.chat-entry-canvas'),
+            drop:!!document.querySelector('.app-stage.tx-active .tx-drop'),
             opacity:Number(getComputedStyle(zone).opacity),animation:getComputedStyle(zone).animationName,
             toolbar:Number(getComputedStyle(toolbar).opacity),interactive:!input.closest('[inert]'),
             setup:!!document.querySelector('.first-meeting-setup')};
@@ -77,13 +78,11 @@ for(const destination of ['设置','记录']){
     await page.evaluate(()=>(window as unknown as {__startDialogAudit:()=>void}).__startDialogAudit());
     await page.getByRole('button',{name:destination==='设置'?'返回':'返回对话',exact:true}).click();
     const frames=await finishAudit(page,info);
-    if(destination==='设置'){
-      expect(frames.some(frame=>frame.cover)).toBe(true);
-      expect(frames.some(frame=>frame.animation==='dialog-rise')).toBe(false);
-      expect(frames.filter(frame=>frame.cover&&(frame.interactive||frame.setup))).toEqual([]);
-      expect(frames.at(-1)?.interactive).toBe(true);
-    }else expectSequenced(frames);
-    expect(frames.some(frame=>frame.ink)).toBe(false);
+    const covered=frames.filter(frame=>frame.cover);
+    expect(covered.length).toBeGreaterThan(0);
+    expect(covered.filter(frame=>frame.opacity>.001||frame.toolbar>.001||frame.interactive||frame.setup)).toEqual([]);
+    expect(frames.filter(frame=>frame.animation==='dialog-rise'||frame.ink||frame.drop)).toEqual([]);
+    expect(frames.at(-1)?.interactive).toBe(true);
   });
 }
 
@@ -130,17 +129,14 @@ test('reduced motion releases dialogue and input without replaying the rise',asy
   expect(await page.locator('.dialog-zone').evaluate(element=>getComputedStyle(element).opacity)).toBe('1');
 });
 
-test('cancelling during the rise cannot unlock a later page or duplicate chat',async({page},info)=>{
+test('cancelling a return transition cannot unlock a later page or duplicate chat',async({page},info)=>{
   await fixture(page);
   await bootChat(page);
   await finishAudit(page,info);
   await page.getByRole('button',{name:'记录',exact:true}).click();
   await expect(page.locator('.page-wrap')).toHaveCount(1);
   await page.getByRole('button',{name:'返回对话',exact:true}).click();
-  await page.waitForFunction(()=>{
-    const zone=document.querySelector('.dialog-zone');
-    return zone && !zone.closest('.is-front') && Number(getComputedStyle(zone).opacity)>.05 && Number(getComputedStyle(zone).opacity)<.9;
-  });
+  await expect(page.locator('.page-wrap.is-chat.is-front')).toBeAttached();
   await page.evaluate(()=>{location.hash='/settings';});
   await expect(page.locator('.settings-page')).toBeVisible();
   await expect(page.locator('.page-wrap')).toHaveCount(1);
@@ -152,19 +148,25 @@ test('cancelling during the rise cannot unlock a later page or duplicate chat',a
   await expect(page.locator('.chat-page')).toHaveCount(1);
 });
 
-test('input follows a paused or cancelled visual animation instead of a timer',async({page},info)=>{
+test('a paused burning transition keeps dialogue and controls hidden until it actually completes',async({page},info)=>{
   await fixture(page);
   await bootChat(page);
   await finishAudit(page,info);
-  await page.getByRole('button',{name:'记录',exact:true}).click();
+  await page.getByRole('button',{name:'设置',exact:true}).click();
   await expect(page.locator('.page-wrap')).toHaveCount(1);
-  const style=await page.addStyleTag({content:'.dialog-zone { animation-play-state: paused !important; }'});
-  await page.getByRole('button',{name:'返回对话',exact:true}).click();
-  await expect(page.locator('.page-wrap.is-front')).toHaveCount(0);
-  await page.waitForTimeout(550); // Longer than the normal rise; the visual clock is deliberately paused.
-  expect(await page.locator('.input-row input').evaluate(element=>!!element.closest('[inert]'))).toBe(true);
+  const style=await page.addStyleTag({content:'.page-wrap.is-chat.is-front { animation-play-state: paused !important; }'});
+  await page.evaluate(()=>(window as unknown as {__startDialogAudit:()=>void}).__startDialogAudit());
+  await page.getByRole('button',{name:'返回',exact:true}).click();
+  const cover=page.locator('.page-wrap.is-chat.is-front');
+  await expect(cover).toBeAttached();
+  await page.waitForTimeout(625); // Beyond the usual burn duration while its visual clock is paused.
+  await expect(cover.locator('.dialog-zone')).toHaveCSS('opacity','0');
+  await expect(cover.locator('.chat-toolbar')).toHaveCSS('opacity','0');
+  await expect(cover).toHaveAttribute('inert','');
   await style.evaluate(element=>element.remove());
-  await page.emulateMedia({reducedMotion:'reduce'}); // Cancels the CSS rise; readiness must still resolve.
-  await expect.poll(()=>page.locator('.input-row input').evaluate(element=>!!element.closest('[inert]'))).toBe(false);
-  expect(await page.locator('.dialog-zone').evaluate(element=>getComputedStyle(element).opacity)).toBe('1');
+  const frames=await finishAudit(page,info);
+  expect(frames.filter(frame=>frame.cover&&(frame.opacity>.001||frame.toolbar>.001||frame.interactive))).toEqual([]);
+  expect(frames.filter(frame=>frame.ink||frame.drop||frame.animation==='dialog-rise')).toEqual([]);
+  await expect(page.locator('.page-wrap')).toHaveCount(1);
+  await expect(page.locator('.input-row input')).toBeEditable();
 });

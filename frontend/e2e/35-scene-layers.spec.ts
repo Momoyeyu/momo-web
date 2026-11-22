@@ -21,7 +21,7 @@ for(const destination of ['设置','记录'])test(`chat to ${destination} keeps 
  await expect(page.locator('.page-wrap.is-front')).toHaveCount(0);
  const covered=await page.evaluate(()=>{const s=window as unknown as {avatarNode:HTMLCanvasElement;hiddenFrames:number};return {hidden:s.hiddenFrames,same:s.avatarNode===document.querySelector('.live2d-canvas'),opacity:getComputedStyle(s.avatarNode).opacity,pointer:getComputedStyle(s.avatarNode).pointerEvents};});
  expect(covered.hidden).toBe(0);expect(covered.same).toBe(true);expect(covered.opacity).toBe('1');expect(covered.pointer).toBe('none');
- await page.getByRole('button',{name:'返回',exact:true}).click();
+ await page.getByRole('button',{name:destination==='设置'?'返回':'返回对话',exact:true}).click();
  await waitForChatReady(page);
  const returned=await page.evaluate(()=>{const s=window as unknown as {avatarNode:HTMLCanvasElement;hiddenFrames:number;watchLayers:boolean};s.watchLayers=false;return {hidden:s.hiddenFrames,same:s.avatarNode===document.querySelector('.live2d-canvas'),pointer:getComputedStyle(s.avatarNode).pointerEvents};});
  expect(returned.hidden).toBe(0);expect(returned.same).toBe(true);expect(returned.pointer).toBe('auto');

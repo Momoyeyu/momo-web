@@ -120,7 +120,7 @@ body {
   mask-position: center;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
-  animation: page-bloom var(--tx-fade-ms, 560ms)
+  animation: page-bloom var(--tx-bloom-ms, 560ms)
     cubic-bezier(0.33, 0.06, 0.36, 1) forwards;
 }
 
