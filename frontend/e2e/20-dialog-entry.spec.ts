@@ -3,7 +3,7 @@ import {test,expect,type Page,type TestInfo} from './fixtures';
 import {writeFile} from 'node:fs/promises';
 
 type Frame = {time:number;route:string;startup:boolean;cover:boolean;ink:boolean;drop:boolean;opacity:number;
-  animation:string;toolbar:number;interactive:boolean;setup:boolean};
+  animation:string;toolbar:number;interactive:boolean;setup:boolean;burn:string;outgoingBurn:string};
 type Audit = {frames:Frame[];done:boolean};
 
 async function fixture(page:Page, configured=true) {
@@ -35,7 +35,8 @@ async function fixture(page:Page, configured=true) {
             drop:!!document.querySelector('.app-stage.tx-active .tx-drop'),
             opacity:Number(getComputedStyle(zone).opacity),animation:getComputedStyle(zone).animationName,
             toolbar:Number(getComputedStyle(toolbar).opacity),interactive:!input.closest('[inert]'),
-            setup:!!document.querySelector('.first-meeting-setup')};
+            setup:!!document.querySelector('.first-meeting-setup'),burn:getComputedStyle(wrap).animationName,
+            outgoingBurn:[...document.querySelectorAll('.page-wrap.is-back')].map(page=>getComputedStyle(page).animationName).join(',')};
           audit.frames.push(frame);
           settled=!frame.startup&&!frame.cover&&!frame.ink&&frame.opacity>.999&&frame.interactive?settled+1:0;
           if(settled>=2){audit.done=true;return;}
@@ -80,19 +81,22 @@ for(const destination of ['设置','记录']){
     const frames=await finishAudit(page,info);
     const covered=frames.filter(frame=>frame.cover);
     expect(covered.length).toBeGreaterThan(0);
-    expect(covered.filter(frame=>frame.opacity>.001||frame.toolbar>.001||frame.interactive||frame.setup)).toEqual([]);
+    expect(covered.every(frame=>frame.burn==='page-chat-burn-in'&&frame.outgoingBurn==='page-burn-away')).toBe(true);
+    expect(covered.every(frame=>frame.opacity===1&&frame.toolbar===1)).toBe(true);
+    expect(covered.filter(frame=>frame.interactive||frame.setup)).toEqual([]);
     expect(frames.filter(frame=>frame.animation==='dialog-rise'||frame.ink||frame.drop)).toEqual([]);
     expect(frames.at(-1)?.interactive).toBe(true);
   });
 }
 
-test('reloading an owned chat waits for startup before its dialog rises',async({page},info)=>{
+test('reloading an owned chat waits for startup and restores dialogue in place',async({page},info)=>{
   await fixture(page);
   await bootChat(page);
   await page.reload();
   const frames=await finishAudit(page,info);
-  expectSequenced(frames);
-  expect(frames.some(frame=>frame.ink)).toBe(false);
+  expect(frames.filter(frame=>frame.startup&&frame.interactive)).toEqual([]);
+  expect(frames.filter(frame=>frame.ink||frame.animation==='dialog-rise')).toEqual([]);
+  expect(frames.at(-1)?.interactive).toBe(true);
 });
 
 test('title ASCII finishes before the dialog rises and input unlocks',async({page},info)=>{
@@ -148,25 +152,32 @@ test('cancelling a return transition cannot unlock a later page or duplicate cha
   await expect(page.locator('.chat-page')).toHaveCount(1);
 });
 
-test('a paused burning transition keeps dialogue and controls hidden until it actually completes',async({page},info)=>{
+test('the center-out burn reveals dialogue in place and unlocks it on completion',async({page},info)=>{
   await fixture(page);
   await bootChat(page);
   await finishAudit(page,info);
   await page.getByRole('button',{name:'设置',exact:true}).click();
   await expect(page.locator('.page-wrap')).toHaveCount(1);
-  const style=await page.addStyleTag({content:'.page-wrap.is-chat.is-front { animation-play-state: paused !important; }'});
-  await page.evaluate(()=>(window as unknown as {__startDialogAudit:()=>void}).__startDialogAudit());
+  const style=await page.addStyleTag({content:'.page-wrap.is-chat.is-front, .page-wrap.is-burning-away { animation-play-state: paused !important; }'});
   await page.getByRole('button',{name:'返回',exact:true}).click();
-  const cover=page.locator('.page-wrap.is-chat.is-front');
-  await expect(cover).toBeAttached();
-  await page.waitForTimeout(625); // Beyond the usual burn duration while its visual clock is paused.
-  await expect(cover.locator('.dialog-zone')).toHaveCSS('opacity','0');
-  await expect(cover.locator('.chat-toolbar')).toHaveCSS('opacity','0');
-  await expect(cover).toHaveAttribute('inert','');
+  const incoming=page.locator('.page-wrap.is-chat.is-front');
+  const outgoing=page.locator('.page-wrap.is-burning-away');
+  await expect(incoming).toHaveCSS('animation-name','page-chat-burn-in');
+  await expect(outgoing).toHaveCSS('animation-name','page-burn-away');
+  const initial = await incoming.evaluate(element=>getComputedStyle(element).clipPath);
+  expect(initial).toMatch(/^polygon\(/);
+  await expect(outgoing).toHaveCSS('clip-path', /^polygon\(evenodd,/);
+  await expect(incoming.locator('.dialog-zone')).toHaveCSS('opacity','1');
+  await expect(incoming.locator('.dialog-zone')).toHaveCSS('animation-name','none');
+  await page.evaluate(()=>{
+    for (const element of document.querySelectorAll('.page-wrap.is-front, .page-wrap.is-burning-away')) {
+      for (const animation of element.getAnimations()) animation.currentTime=180;
+    }
+  });
+  expect(await incoming.evaluate(element=>getComputedStyle(element).clipPath)).not.toBe(initial);
+  await page.screenshot({path:info.outputPath('return-with-burn-in-progress.png')});
+  await expect(incoming).toHaveAttribute('inert','');
   await style.evaluate(element=>element.remove());
-  const frames=await finishAudit(page,info);
-  expect(frames.filter(frame=>frame.cover&&(frame.opacity>.001||frame.toolbar>.001||frame.interactive))).toEqual([]);
-  expect(frames.filter(frame=>frame.ink||frame.drop||frame.animation==='dialog-rise')).toEqual([]);
   await expect(page.locator('.page-wrap')).toHaveCount(1);
   await expect(page.locator('.input-row input')).toBeEditable();
 });

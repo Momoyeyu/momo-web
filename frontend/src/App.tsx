@@ -28,7 +28,7 @@ import GridBackdrop from "./components/GridBackdrop";
 import ChatEntryTransition from "./components/ChatEntryTransition";
 import GlassReturn from "./effects/GlassReturn";
 import {captureStage,prepareTitle} from "./effects/captureStage";
-import { blobForward } from "./lib/blobMask";
+import { blobForward, chatBurnClips } from "./lib/blobMask";
 import { setRopeFrom } from "./lib/ropeAngle";
 import { consumeBoot,navigate,useRoute, type Route } from "./router";
 import { getSettings, subscribe } from "./lib/store";
@@ -52,6 +52,7 @@ interface PageEntry {
   route: Route;
   leaving?: boolean;
   resumeChat?: boolean;
+  titleEntry?: boolean;
 }
 
 function renderPage(route: Route, active: boolean, attention:AttentionState,onHome:()=>void) {
@@ -168,9 +169,10 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
   const [front, setFront] = useState(false);
   const frontLayer = useRef<HTMLDivElement>(null);
   const frontId = front ? stack.at(-1)?.id : undefined;
+  const returningToChat = front && stack.at(-1)?.resumeChat === true;
   // rev = 往回走（层级向上）：洞口收拢、涟漪向内
   const [rev, setRev] = useState(false);
-  // booting = 进入 chat 的场景转场尚未完成（ASCII 或 RoPE）。
+  // booting = 标题页启动的入戏转场尚未完成。
   const [booting, setBooting] = useState(false);
   const [fx, setFx] = useState(false);
   const [entry, setEntry] = useState<number | null>(null);
@@ -247,7 +249,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
       return;
     }
     const glassExit = prevRoute === 'chat' && route === 'title' && exitFrame !== null;
-    setRev(back);
+    setRev(back && !resumeChat);
     setFx(!titleEntry && !glassExit && !resumeChat);
 
     const t2 = window.setTimeout(() => setFx(false), RIPPLE_MS);
@@ -264,19 +266,23 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
       // The ink plate releases the real scene; other routes keep their RoPE.
       setStack((prev) => [
         ...withoutSame(prev).map((p) => ({ ...p, leaving: true })),
-        { id: seq.current++, route },
+        { id: seq.current++, route, titleEntry: true },
       ]);
       setBooting(true);
       setFront(false);
       setEntry(seq.current++);
     } else {
       setEntry(null);
-      setBooting(resumeChat);
-      // RoPE 页之间：新页压栈顶，盖上不规则遮罩漫开；旧页在下面等着被盖住
-      setStack((prev) => [
-        ...withoutSame(prev),
-        { id: seq.current++, route, resumeChat },
-      ]);
+      setBooting(false);
+      // Chat burns through the page it is returning from. That page recedes
+      // through the complementary edge while the dialogue is revealed in place.
+      setStack((prev) => {
+        const outgoing = withoutSame(prev);
+        return [
+          ...(resumeChat ? outgoing.slice(-1) : outgoing),
+          { id: seq.current++, route, resumeChat },
+        ];
+      });
       setFront(true);
     }
     return () => window.clearTimeout(t2);
@@ -286,7 +292,8 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     if (frontId === undefined || !frontLayer.current) return;
     const animations = frontLayer.current.getAnimations().filter(animation =>
       animation instanceof CSSAnimation &&
-      (animation.animationName === "page-bloom" || animation.animationName === "page-bloom-rev"));
+      (animation.animationName === "page-bloom" || animation.animationName === "page-bloom-rev" ||
+       animation.animationName === "page-chat-burn-in"));
     let cancelled = false;
     void Promise.allSettled(animations.map(animation => animation.finished)).then(() => {
       if (cancelled) return;
@@ -301,6 +308,7 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
     "--tx-bloom-ms": `${BLOOM_MS}ms`,
     "--tx-ms": `${RIPPLE_MS}ms`,
     "--blob-forward": blobForward,
+    ...chatBurnClips,
   } as CSSProperties;
 
   // 全部内容锁在 16:9 舞台内（.app-stage）：窗口比例任意，画面比例恒定。
@@ -327,15 +335,14 @@ export default function App({ready, onPrepared}: {ready: boolean; onPrepared: ()
         if (p.leaving) {
           cls = " is-leaving";
         } else if (!top) {
-          cls = " is-back";
+          cls = returningToChat ? " is-back is-burning-away" : " is-back";
         } else if (front) {
           cls = ` is-front${rev ? " is-rev" : ""}`;
         } else {
           cls = "";
         }
-        // 进入 chat 的化开还没结束时，压住 chat 内部的入场动画（对话框抢跑）
         if (top && p.route === "chat" && (booting || !ready || !meetingReady)) cls += " is-booting";
-        if (p.resumeChat) cls += " is-chat-resume";
+        if (p.titleEntry) cls += " is-chat-entry";
         return (
           <div
             key={p.id}

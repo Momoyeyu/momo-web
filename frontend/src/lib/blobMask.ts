@@ -23,7 +23,7 @@ function rand(seed: number): () => number {
 }
 
 /** 生成一条闭合的不规则曲线：极角均匀，半径带低频起伏（像被烧出来的边）。 */
-function blobPath(points = 19, seed = 20261018): string {
+function blobShape(points = 19, seed = 20261018) {
   const rnd = rand(seed);
   const radii: number[] = [];
   for (let i = 0; i < points; i++) {
@@ -44,18 +44,45 @@ function blobPath(points = 19, seed = 20261018): string {
   };
   const [sx, sy] = mid(points - 1);
   seg.push(`M${sx.toFixed(1)},${sy.toFixed(1)}`);
+  const outline: [number, number][] = [[sx, sy]];
+  let fromX = sx, fromY = sy;
   for (let i = 0; i < points; i++) {
     const [px, py] = pt(i);
     const [mx, my] = mid(i);
     seg.push(
       `Q${px.toFixed(1)},${py.toFixed(1)} ${mx.toFixed(1)},${my.toFixed(1)}`,
     );
+    // Sample the same rounded edge for the lightweight clip-path transition.
+    for (const t of [1 / 3, 2 / 3, 1]) {
+      const u = 1 - t;
+      outline.push([
+        u * u * fromX + 2 * u * t * px + t * t * mx,
+        u * u * fromY + 2 * u * t * py + t * t * my,
+      ]);
+    }
+    fromX = mx;
+    fromY = my;
   }
   seg.push("Z");
-  return seg.join(" ");
+  return {path: seg.join(" "), outline};
 }
 
-const path = blobPath();
+const {path, outline} = blobShape();
+
+function clipEdge(scale: number) {
+  const percent = (value: number) => `${(50 + (value - C) * scale * 100 / SIZE).toFixed(2)}%`;
+  return outline.map(([x, y]) => `${percent(x)} ${percent(y)}`).join(", ");
+}
+
+const start = clipEdge(.02);
+const end = clipEdge(3);
+const surround = "0 0, 100% 0, 100% 100%, 0 100%, 0 0";
+export const chatBurnClips = {
+  "--chat-burn-in-start": `polygon(${start})`,
+  "--chat-burn-in-end": `polygon(${end})`,
+  "--chat-burn-out-start": `polygon(evenodd, ${surround}, ${start})`,
+  "--chat-burn-out-end": `polygon(evenodd, ${surround}, ${end})`,
+};
 
 function uri(svg: string): string {
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;

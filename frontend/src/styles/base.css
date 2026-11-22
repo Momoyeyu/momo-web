@@ -152,6 +152,35 @@ body {
   }
 }
 
+/* Share the expanding edge without rasterizing two large animated masks.
+   The even/odd clip cuts a hole in the old page of exactly the same shape. */
+.page-wrap.is-front.is-chat {
+  mask-image: none;
+  animation-name: page-chat-burn-in;
+}
+
+@keyframes page-chat-burn-in {
+  from { clip-path: var(--chat-burn-in-start); }
+  to { clip-path: var(--chat-burn-in-end); }
+}
+
+.page-wrap.is-burning-away {
+  animation: page-burn-away var(--tx-bloom-ms, 560ms)
+    cubic-bezier(0.33, 0.06, 0.36, 1) forwards;
+}
+
+@keyframes page-burn-away {
+  from { clip-path: var(--chat-burn-out-start); }
+  to { clip-path: var(--chat-burn-out-end); }
+}
+
+/* Backdrop blur inside a moving mask repeatedly samples the live scene. The
+   panels keep their tint during the burn, and regain blur when uncovered. */
+.page-wrap.is-burning-away :is(.backlog-page, .backlog-panel, .dialog-box),
+.page-wrap.is-front.is-chat :is(.dialog-box, .chat-toolbar) {
+  backdrop-filter: none;
+}
+
 /* 正在化开的旧页（进入 chat 的「入戏」）：先等水滴落下（120ms 延迟），
    再整体淡出——房间从下面透出来。淡出期间关掉本层 backdrop-filter，
    否则每帧重采样会掉帧；画面正在消失，看不出来。 */
