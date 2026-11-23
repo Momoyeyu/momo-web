@@ -6,8 +6,8 @@ import type { MemoryCreated } from "../api/types";
 
 const API = "/api/memories";
 
-export function listMemories(): Promise<Memory[]> {
-  return apiJson<Memory[]>(API);
+export function listMemories(signal?: AbortSignal): Promise<Memory[]> {
+  return apiJson<Memory[]>(API, {signal});
 }
 
 /** pinned=true 即初始记忆：常驻注入 system prompt（删除与普通记忆同走 DELETE）。 */

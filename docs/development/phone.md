@@ -4,6 +4,10 @@
 
 手机属于平台，App 不负责创建外壳。当前官方 QQ 同时提供图标、只读视图与真实消息投影；玩家通过对话让 momo 操作，不能在手机里冒用 momo 发送。
 
+## 内置应用
+
+记事本通过 `/api/memories` 读取已有记忆，按日期展示。时钟默认跟随设备时区。在时钟中可以为手机单独选择时区，该选择保存在通用设置中，用于时钟、手机顶栏和记事本日期。两项由前端注册，手机服务读取失败时仍可用。
+
 ## 接入
 
 - 前端 `src/phone/registry.tsx` 的 `registerPhoneApp({id, source, icon, render?})` 返回注销函数。图标与视图由对应 App 模块提供；没有 `render` 时显示待机桌面。官方示例为 `qqApp.tsx` 和 `QQPhoneView.tsx`。
@@ -30,7 +34,7 @@
 
 运行开发服务后，在 frontend 执行 `node scripts/phone-smoke.mjs`，用独立无头浏览器与模拟 API 检查手机导航、长内容触底、手动收起、问号说明与较小 PC 窗口；不登录或发送真实 QQ 消息。
 
-回归场景可执行 `node scripts/phone-smoke.mjs auto`、`short`、`disabled`、`disabled-live`，分别覆盖较慢消息快照、已结束短任务、关闭时空桌面与打开会话时停用App。
+回归场景可执行 `node scripts/phone-smoke.mjs auto`、`short`、`disabled`、`disabled-live`，分别覆盖较慢消息快照、已结束短任务、停用 QQ 后的桌面与打开会话时停用 App。
 
 ## 手机显隐
 

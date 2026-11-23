@@ -1,7 +1,10 @@
 import type {ReactNode} from 'react';
 import type {PhoneSnapshot,PhoneMessage} from '../services/phoneClient';
-export interface PhoneViewProps {data:PhoneSnapshot|null;peer?:string;setPeer:(peer:string|undefined)=>void;setApp:(app:string|null)=>void;choosePeer:(peer:string)=>void;messages:PhoneMessage[];loading:boolean;cursor:number|null|undefined;earlier:()=>Promise<void>}
-export interface PhoneApp {id:string;source:string;icon:ReactNode;render?:(props:PhoneViewProps)=>ReactNode}
+export interface PhoneViewProps {now:Date;data:PhoneSnapshot|null;peer?:string;setPeer:(peer:string|undefined)=>void;setApp:(app:string|null)=>void;choosePeer:(peer:string)=>void;messages:PhoneMessage[];loading:boolean;cursor:number|null|undefined;earlier:()=>Promise<void>}
+// Built-ins provide their own label. Channel apps are listed by the phone API.
+export type PhoneApp = {id:string;icon:ReactNode;render?:(props:PhoneViewProps)=>ReactNode} & (
+ {labelKey:string;source?:never} | {source:string;labelKey?:never}
+);
 const apps=new Map<string,PhoneApp>();let revision=0;
 const listeners=new Set<()=>void>();
 export const phoneApps=()=>[...apps.values()];

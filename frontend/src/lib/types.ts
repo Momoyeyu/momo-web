@@ -82,6 +82,8 @@ export interface GeneralConfig {
   minecraftChat?: boolean;
   minecraftPlay?: boolean;
   minecraftMove?: boolean;
+  /** Empty means follow the local system time zone. */
+  phoneTimeZone?: string;
   phonePresentation?: "auto" | "open" | "closed";
 }
 

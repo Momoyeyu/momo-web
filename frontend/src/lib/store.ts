@@ -59,6 +59,7 @@ const DEFAULT_SETTINGS: Settings = {
     minecraftChat: false,
     minecraftMove: false,
     phonePresentation: "auto",
+    phoneTimeZone: "",
   },
   // 服务地址与模型一律留空：新用户按输入框里的灰色提示自己填。
   // 这里曾经预填过 deepseek / 本机端口 / 某台内网 embedding 服务器的地址 ——

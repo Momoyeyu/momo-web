@@ -10,7 +10,8 @@ import {mergePhoneMessages,phoneIdentityChanged} from '../phone/projection';
 import {autoPhone} from '../phone/visibility';
 import type {AttentionState} from '../services/meetingClient';
 import {meetingSnapshot} from '../services/meetingClient';
-import {useT} from '../i18n';
+import {currentLang,useT} from '../i18n';
+import {formatPhoneTime,usePhoneNow,usePhoneTimeZone} from '../phone/phoneTime';
 import Button from '../ui/Button';
 import Icon from '../ui/Icon';
 import '../styles/phone.css';
@@ -22,6 +23,8 @@ export default function PhoneSurface({active,attention,onVisibilityChange,closeS
 useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const [data,setData]=useState<PhoneSnapshot|null>(null),[failed,setFailed]=useState(false);
  const [open,setOpen]=useState(session.open),[app,setApp]=useState<string|null>(session.app),[peer,setPeer]=useState<string|undefined>(session.peer);
+ const now=usePhoneNow(active&&open);
+ const zone=usePhoneTimeZone();
  useEffect(()=>{if(closeSignal){session.open=false;session.suppressed=true;setOpen(false);}},[closeSignal]);
  useEffect(()=>{if(active&&preference()==='open'){session.open=true;setOpen(true);}},[active]);
  const [older,setOlder]=useState<PhoneMessage[]>([]),[loading,setLoading]=useState(false);
@@ -31,8 +34,12 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const changePeer=(value:string|undefined)=>{revision.current++;setPeer(value);setOlder([]);setCursor(undefined);setData(old=>old?{...old,messages:[],operations:[]}:old);};
  const changeApp=(value:string|null)=>{if(value!==app){changePeer(undefined);setData(null);}setApp(value);};
  const lease=meetingSnapshot().lease?.leaseId??'';
- const apps=phoneApps().filter(a=>data?.apps.some(p=>p.id===a.id&&p.enabled));
- const phoneAppFor=(activity:PhoneSnapshot['activity'])=>apps.find(a=>a.source===(activity?.toolSource??activity?.source));
+ const registered=phoneApps();
+ const apps=registered.filter(a=>a.labelKey||data?.apps.some(p=>p.id===a.id&&p.enabled));
+ const builtin=Boolean(registered.find(a=>a.id===app)?.labelKey);
+ const channelApp=builtin?undefined:app??undefined;
+ const channelPeer=builtin?undefined:peer;
+ const phoneAppFor=(activity:PhoneSnapshot['activity'])=>apps.find(a=>a.source&&a.source===(activity?.toolSource??activity?.source));
  // The fast attention feed must not be hidden by a slower, idle phone snapshot.
  const activity=phoneAppFor(attention.activity)?attention.activity:data?.activity;
  const busyApp=phoneAppFor(activity??null);
@@ -51,15 +58,15 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
   const poll=async()=>{
    request=new AbortController();
    const timeout=setTimeout(()=>request.abort(),8000);
-   try{const next=await phoneSnapshot(peer,undefined,request.signal,app??undefined);if(stopped)return;
-    const identity=JSON.stringify([app??'momo-qq',next.accountKey]);
+   try{const next=await phoneSnapshot(channelPeer,undefined,request.signal,channelApp);if(stopped)return;
+    const identity=JSON.stringify([channelApp??'momo-qq',next.accountKey]);
     const changed=phoneIdentityChanged(accountRef.current,identity);
     if(changed){revision.current++;setPeer(undefined);setOlder([]);setCursor(undefined);}
     accountRef.current=identity;setData(old=>({...next,messages:changed?[]:mergePhoneMessages(old?.messages??[],next.messages)}));setFailed(false);
    }catch{if(!stopped){setFailed(true);setData(null);}}
    clearTimeout(timeout);if(!stopped)timer=setTimeout(poll,session.open?300:1000);
   };void poll();return()=>{stopped=true;clearTimeout(timer);request?.abort();};
- },[active,peer,app]);
+ },[active,channelPeer,channelApp]);
  useEffect(()=>{
   if(!active)return;
   const event=lastActivity?.eventId??'';
@@ -69,8 +76,9 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
   const next=autoPhone(session.open,session.suppressed,!!target,attention.focus);
   if(next&&!session.open){session.open=true;setOpen(true);changeApp(target?.id??null);const peerId=busyApp?activity?.peerId:lastActivity?.peerId;if(peerId)changePeer(peerId);}
  },[active,busyApp?.id,attention.focus,lastActivity?.eventId,lastApp?.id]);
+ // Activity changes may select a channel, but never replace an open built-in.
  useEffect(()=>{
-  if(active&&open&&busyApp){changeApp(busyApp.id);if(activity?.peerId)changePeer(activity.peerId);}
+  if(active&&open&&!builtin&&busyApp){changeApp(busyApp.id);if(activity?.peerId)changePeer(activity.peerId);}
  },[active,open,activity?.runId,activity?.peerId,busyApp?.id]);
  useEffect(()=>{if(session.lease===lease){session.app=app;session.peer=peer;}},[lease,app,peer]);
  const present=(value:boolean)=>{onVisibilityChange?.(value);document.querySelector('.app-stage')?.setAttribute('data-phone-present',String(value));};
@@ -88,8 +96,8 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
 
  return <>{createPortal(<section className={`phone-surface ${open?'is-open':'is-closed'}${active?'':' is-suspended'}`} inert={!open||!active} aria-hidden={!open||!active} aria-label={t('phone.title')}>
   <BlurPresence visible={open} initialVisible={session.open} animate={active} onTargetChange={present}>
-  <div className="phone-glass"><div className="phone-top"><span>momo</span><span className={`phone-activity tip${busyApp?' is-busy':''}`} role="img" aria-label={attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')} data-tip={attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')}><Icon name={attention.focus?'focus':busyApp?'phone':'message'} size={14}/></span><Button variant="ghost" className="phone-nav phone-close tip" data-tip={t('phone.close')} onClick={toggle} aria-label={t('phone.close')}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></Button></div>
-   {failed?<div className="phone-empty" role="status">{t('phone.unavailable')}</div>:current?.render?current.render({data,peer,setPeer:changePeer,setApp:changeApp,choosePeer,messages,loading,cursor,earlier}):<div className="phone-home"><div className="phone-wallpaper" aria-hidden="true"><PhoneField/></div><div className="phone-apps">{apps.map(a=><button className="phone-app" key={a.id} onClick={()=>{changeApp(a.id);}}><span className="phone-app-icon">{a.icon}{(data?.apps.find(p=>p.id===a.id)?.pending??0)>0&&<i className="phone-dot"/>}</span><span>{data?.apps.find(p=>p.id===a.id)?.name}</span></button>)}</div><p className="phone-empty">{current?t('phone.standby'):apps.length?'':t('phone.empty')}</p></div>}
+  <div className="phone-glass"><div className="phone-top"><time className="phone-status-time" dateTime={now.toISOString()}>{formatPhoneTime(now,currentLang(),zone)}</time><span className={`phone-activity tip${busyApp?' is-busy':''}`} role="img" aria-label={attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')} data-tip={attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')}><Icon name={attention.focus?'focus':busyApp?'phone':'message'} size={14}/></span><Button variant="ghost" className="phone-nav phone-close tip" data-tip={t('phone.close')} onClick={toggle} aria-label={t('phone.close')}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></Button></div>
+   {failed&&app&&!builtin?<div className="phone-empty" role="status">{t('phone.unavailable')}</div>:current?.render?(open&&active&&current.render({now,data,peer,setPeer:changePeer,setApp:changeApp,choosePeer,messages,loading,cursor,earlier})):<div className="phone-home"><div className="phone-wallpaper" aria-hidden="true"><PhoneField/></div><div className="phone-apps">{apps.map(a=><button className="phone-app" key={a.id} onClick={()=>{changeApp(a.id);}}><span className="phone-app-icon">{a.icon}{(data?.apps.find(p=>p.id===a.id)?.pending??0)>0&&<i className="phone-dot"/>}</span><span>{a.labelKey?t(a.labelKey):data?.apps.find(p=>p.id===a.id)?.name}</span></button>)}</div><p className="phone-empty">{current?t('phone.standby'):apps.length?'':t('phone.empty')}</p></div>}
    <button className="phone-home-bar" aria-label={t('phone.home')} onClick={()=>{changeApp(null);}}/>
   </div></BlurPresence></section>,document.querySelector('.app-stage')??document.body)}
   <Button className={`tb phone-toggle tip${open?' is-active':''}`} data-tip={t('phone.title')} onClick={toggle} aria-label={t('phone.title')} aria-expanded={open}><Icon name="phone"/>{(data?.pending??0)>0&&<i className="phone-dot"/>}</Button></>;
