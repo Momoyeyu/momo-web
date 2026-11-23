@@ -4,16 +4,21 @@ import {bootChat,readState,writeState,useStateRestore} from './helpers';
 test.use({timezoneId:'America/New_York'});
 test.afterEach(useStateRestore());
 
-test('phone opens built-in memory notes even when the channel snapshot fails',async({page,request},info)=>{
+test('phone centers the notebook icon and keeps installed apps visible when returning home',async({page,request},info)=>{
  const state=await readState(request);
  const {general}=state.settings as {general:Record<string,unknown>};
  general.phonePresentation='closed';
  await writeState(request,state);
  let channelAvailable=false;
- await page.route('**/api/phone?**',r=>r.fulfill(channelAvailable?{json:{
-  apps:[{id:'momo-qq',provider:'qq',name:'QQ',enabled:true,pending:0}],accountKey:'qq-fixture',
+ let channelInstalled=true;
+ let snapshotGate: Promise<void> | undefined;
+ await page.route('**/api/phone?**',async r=>{
+  await snapshotGate;
+  await r.fulfill(channelAvailable?{json:{
+  apps:channelInstalled?[{id:'momo-qq',provider:'qq',name:'QQ',enabled:true,pending:1}]:[],accountKey:'qq-fixture',
   pending:0,conversations:[],messages:[],operations:[],hasMore:false,nextBefore:null,activity:null,
- }}:{status:503}));
+  }}:{status:503});
+ });
  await page.route('**/api/memories',r=>r.fulfill({json:[
   {id:'note-old',content:'上一次写下的事。',createdAt:'2026-11-20T12:00:00Z',pinned:false},
   {id:'note-new',content:'记得一起去看了海。',createdAt:'2026-11-22T12:00:00Z',pinned:false},
@@ -23,7 +28,13 @@ test('phone opens built-in memory notes even when the channel snapshot fails',as
  const phone=page.locator('.phone-surface');
  await expect(phone.getByRole('button',{name:'时钟',exact:true})).toBeVisible();
  await expect(phone.getByRole('button',{name:'QQ',exact:true})).toHaveCount(0);
- await phone.getByRole('button',{name:'记事本',exact:true}).click();
+ const notebook=phone.getByRole('button',{name:'记事本',exact:true});
+ const iconOffset=await notebook.locator('svg').evaluate(svg=>{
+  const bounds=(svg as SVGSVGElement).getBBox();
+  return [bounds.x+bounds.width/2-12,bounds.y+bounds.height/2-12];
+ });
+ expect.soft(iconOffset).toEqual([0,0]);
+ await notebook.click();
  await expect(phone.getByRole('heading',{name:'记事本'})).toBeVisible();
  await expect(phone.locator('.phone-notes p')).toHaveText(['记得一起去看了海。','上一次写下的事。']);
  await page.screenshot({path:info.outputPath('phone-notebook.png')});
@@ -31,6 +42,25 @@ test('phone opens built-in memory notes even when the channel snapshot fails',as
  await expect(phone.getByRole('button',{name:'时钟',exact:true})).toBeVisible();
  channelAvailable=true;
  await expect(phone.locator('.phone-app')).toHaveText(['记事本','时钟','QQ']);
+
+ const qq=phone.getByRole('button',{name:'QQ',exact:true});
+ let resumeSnapshot!: () => void;
+ snapshotGate=new Promise<void>(resolve=>{resumeSnapshot=resolve;});
+ try {
+  await notebook.click();
+  await phone.getByRole('button',{name:'返回',exact:true}).click();
+  await expect(qq.locator('.phone-dot')).toBeVisible({timeout:1000});
+  await phone.getByRole('button',{name:'时钟',exact:true}).click();
+  await phone.locator('.phone-home-bar').click();
+  await expect(qq).toBeVisible({timeout:1000});
+  await qq.click();
+  await phone.getByRole('button',{name:'返回',exact:true}).click();
+  await expect(qq).toBeVisible({timeout:1000});
+ } finally {
+  channelInstalled=false;
+  resumeSnapshot();
+ }
+ await expect(qq).toHaveCount(0);
 });
 
 test('phone shows system time by default and persists its selected zone',async({page,request},info)=>{

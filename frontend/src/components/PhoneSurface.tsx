@@ -22,6 +22,7 @@ export default function PhoneSurface({active,attention,onVisibilityChange,closeS
  const t=useT();
 useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const [data,setData]=useState<PhoneSnapshot|null>(null),[failed,setFailed]=useState(false);
+ const [channelApps,setChannelApps]=useState<PhoneSnapshot['apps']>([]);
  const [open,setOpen]=useState(session.open),[app,setApp]=useState<string|null>(session.app),[peer,setPeer]=useState<string|undefined>(session.peer);
  const now=usePhoneNow(active&&open);
  const zone=usePhoneTimeZone();
@@ -35,7 +36,7 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const changeApp=(value:string|null)=>{if(value!==app){changePeer(undefined);setData(null);}setApp(value);};
  const lease=meetingSnapshot().lease?.leaseId??'';
  const registered=phoneApps();
- const apps=registered.filter(a=>a.labelKey||data?.apps.some(p=>p.id===a.id&&p.enabled));
+ const apps=registered.filter(a=>a.labelKey||channelApps.some(p=>p.id===a.id&&p.enabled));
  const builtin=Boolean(registered.find(a=>a.id===app)?.labelKey);
  const channelApp=builtin?undefined:app??undefined;
  const channelPeer=builtin?undefined:peer;
@@ -50,7 +51,7 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
  const lastNotify=useRef(-Infinity);
  useEffect(()=>{if(data){if(active&&pendingSound.current!==null&&data.pending>pendingSound.current&&performance.now()-lastNotify.current>5000){ambient.sound('notify');lastNotify.current=performance.now();}pendingSound.current=data.pending;}},[data?.pending,active]);
  useEffect(()=>{
-  if(session.lease!==lease){session={lease,open:preference()==='open',suppressed:preference()==='closed',app:null};revision.current++;accountRef.current='';seenActivity.current='';setOlder([]);setCursor(undefined);setOpen(session.open);setApp(null);setPeer(undefined);setData(null);}
+  if(session.lease!==lease){session={lease,open:preference()==='open',suppressed:preference()==='closed',app:null};revision.current++;accountRef.current='';seenActivity.current='';setOlder([]);setCursor(undefined);setOpen(session.open);setApp(null);setPeer(undefined);setData(null);setChannelApps([]);}
  },[lease]);
  useEffect(()=>{
   if(!active)return;
@@ -62,11 +63,13 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
     const identity=JSON.stringify([channelApp??'momo-qq',next.accountKey]);
     const changed=phoneIdentityChanged(accountRef.current,identity);
     if(changed){revision.current++;setPeer(undefined);setOlder([]);setCursor(undefined);}
+    // The launcher list belongs to the session, independent of the selected app or peer.
+    setChannelApps(next.apps);
     accountRef.current=identity;setData(old=>({...next,messages:changed?[]:mergePhoneMessages(old?.messages??[],next.messages)}));setFailed(false);
    }catch{if(!stopped){setFailed(true);setData(null);}}
    clearTimeout(timeout);if(!stopped)timer=setTimeout(poll,session.open?300:1000);
   };void poll();return()=>{stopped=true;clearTimeout(timer);request?.abort();};
- },[active,channelPeer,channelApp]);
+ },[active,channelPeer,channelApp,lease]);
  useEffect(()=>{
   if(!active)return;
   const event=lastActivity?.eventId??'';
@@ -97,7 +100,10 @@ useSyncExternalStore(subscribePhoneApps,phoneRevision);
  return <>{createPortal(<section className={`phone-surface ${open?'is-open':'is-closed'}${active?'':' is-suspended'}`} inert={!open||!active} aria-hidden={!open||!active} aria-label={t('phone.title')}>
   <BlurPresence visible={open} initialVisible={session.open} animate={active} onTargetChange={present}>
   <div className="phone-glass"><div className="phone-top"><time className="phone-status-time" dateTime={now.toISOString()}>{formatPhoneTime(now,currentLang(),zone)}</time><span className={`phone-activity tip${busyApp?' is-busy':''}`} role="img" aria-label={attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')} data-tip={attention.focus?t('phone.focus'):busyApp?t('phone.processing'):t('phone.standby')}><Icon name={attention.focus?'focus':busyApp?'phone':'message'} size={14}/></span><Button variant="ghost" className="phone-nav phone-close tip" data-tip={t('phone.close')} onClick={toggle} aria-label={t('phone.close')}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></Button></div>
-   {failed&&app&&!builtin?<div className="phone-empty" role="status">{t('phone.unavailable')}</div>:current?.render?(open&&active&&current.render({now,data,peer,setPeer:changePeer,setApp:changeApp,choosePeer,messages,loading,cursor,earlier})):<div className="phone-home"><div className="phone-wallpaper" aria-hidden="true"><PhoneField/></div><div className="phone-apps">{apps.map(a=><button className="phone-app" key={a.id} onClick={()=>{changeApp(a.id);}}><span className="phone-app-icon">{a.icon}{(data?.apps.find(p=>p.id===a.id)?.pending??0)>0&&<i className="phone-dot"/>}</span><span>{a.labelKey?t(a.labelKey):data?.apps.find(p=>p.id===a.id)?.name}</span></button>)}</div><p className="phone-empty">{current?t('phone.standby'):apps.length?'':t('phone.empty')}</p></div>}
+   {failed&&app&&!builtin?<div className="phone-empty" role="status">{t('phone.unavailable')}</div>:current?.render?(open&&active&&current.render({now,data,peer,setPeer:changePeer,setApp:changeApp,choosePeer,messages,loading,cursor,earlier})):<div className="phone-home"><div className="phone-wallpaper" aria-hidden="true"><PhoneField/></div><div className="phone-apps">{apps.map(a=>{
+    const channel=channelApps.find(p=>p.id===a.id);
+    return <button className="phone-app" key={a.id} onClick={()=>{changeApp(a.id);}}><span className="phone-app-icon">{a.icon}{(channel?.pending??0)>0&&<i className="phone-dot"/>}</span><span>{a.labelKey?t(a.labelKey):channel?.name}</span></button>;
+   })}</div><p className="phone-empty">{current?t('phone.standby'):apps.length?'':t('phone.empty')}</p></div>}
    <button className="phone-home-bar" aria-label={t('phone.home')} onClick={()=>{changeApp(null);}}/>
   </div></BlurPresence></section>,document.querySelector('.app-stage')??document.body)}
   <Button className={`tb phone-toggle tip${open?' is-active':''}`} data-tip={t('phone.title')} onClick={toggle} aria-label={t('phone.title')} aria-expanded={open}><Icon name="phone"/>{(data?.pending??0)>0&&<i className="phone-dot"/>}</Button></>;
