@@ -94,6 +94,7 @@ def test_legacy_404_uses_one_capability_check_and_no_release(monkeypatch):
 
 
 def test_effective_endpoint_requires_live_meeting_and_reference(monkeypatch, tmp_path):
+    monkeypatch.delenv("MOMO_DESKTOP_TOKEN", raising=False)
     local_id = None
     config = {
         "engine": "index-tts",
@@ -118,4 +119,25 @@ def test_effective_endpoint_requires_live_meeting_and_reference(monkeypatch, tmp
     config["indexUrl"] = "http://index.test/private?key=secret"
     assert tts_sessions._target() is None
     config["indexUrl"] = 7
+    assert tts_sessions._target() is None
+
+
+def test_native_tts_lifetime_starts_before_boot_and_survives_return_to_title(monkeypatch, tmp_path):
+    config = {"engine": "index-tts", "indexUrl": "http://index.test", "voice": "ref.wav"}
+    (tmp_path / "ref.wav").touch()
+    monkeypatch.setenv("MOMO_DESKTOP_TOKEN", "native-capability")
+    monkeypatch.delenv("MOMO_WEB_ORIGIN", raising=False)
+    monkeypatch.setattr(tts_sessions.tts, "_cfg", lambda: config)
+    monkeypatch.setattr(tts_sessions.tts, "REF_DIR", tmp_path)
+    meeting = None
+    monkeypatch.setattr(tts_sessions.runtime, "active_meeting_id", lambda: meeting)
+
+    startup = tts_sessions._target()
+    assert startup is not None and startup.engine == "index-tts"
+    meeting = "booted"
+    assert tts_sessions._target() == startup
+    meeting = None
+    assert tts_sessions._target() == startup
+
+    monkeypatch.setenv("MOMO_WEB_ORIGIN", "http://127.0.0.1:5173")
     assert tts_sessions._target() is None

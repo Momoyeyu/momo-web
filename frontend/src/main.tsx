@@ -1,4 +1,4 @@
-import { runtime } from "./services/runtime";
+import { desktop, runtime } from "./services/runtime";
 import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
@@ -7,6 +7,7 @@ import { bootPersist, getSettings } from "./lib/store";
 import { startupPresence } from "./startup/presence";
 import { historyPage } from "./services/lifeClient";
 import { loadTranscript } from "./chat/engineInstance";
+import { warmVoice } from "./services/ttsWarmup";
 import "./styles/base.css";
 
 const startup = startupPresence();
@@ -25,7 +26,10 @@ function Game() {
 // 随后从 backend 灌 live 会话转写（momo.db 权威：backlog/字幕重启后延续）。
 void runtime()
   .then(() => { startup.stage("restoring"); return bootPersist(); })
-  .then(() => { startup.language(getSettings().general.lang); })
+  .then(() => {
+    startup.language(getSettings().general.lang);
+    if (desktop()) warmVoice();
+  })
   .then(() =>
     historyPage()
       .then((t) => {

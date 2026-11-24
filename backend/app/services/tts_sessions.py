@@ -1,8 +1,9 @@
-"""Keep an optional upstream voice session only while momo owns an active meeting."""
+"""Keep the selected voice warm for the desktop process or an active web meeting."""
 
 from __future__ import annotations
 
 import asyncio
+import os
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -11,6 +12,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from ..core import desktop_auth
 from . import tts
 from .coordinator import runtime
 
@@ -21,15 +23,17 @@ _REQUEST_SECONDS = 2
 
 @dataclass(frozen=True)
 class Target:
-    meeting_id: str
+    owner_id: str
     engine: str
     base_url: str
     authorization: str | None = field(repr=False)
 
 
 def _target() -> Target | None:
-    meeting_id = runtime.active_meeting_id()
-    if meeting_id is None:
+    # The web dev proxy also uses a capability token, but has no desktop lifetime.
+    native = desktop_auth.token() and not os.environ.get("MOMO_WEB_ORIGIN")
+    owner_id = "desktop" if native else runtime.active_meeting_id()
+    if owner_id is None:
         return None
     try:
         config = tts._cfg()
@@ -46,7 +50,7 @@ def _target() -> Target | None:
             return None
     except (AttributeError, TypeError, ValueError, OSError):
         return None
-    return Target(meeting_id, tts.engine(config), base_url, headers.get("Authorization"))
+    return Target(owner_id, tts.engine(config), base_url, headers.get("Authorization"))
 
 
 async def _request(client: httpx.AsyncClient, method: str, target: Target, session_id: str) -> int | None:
