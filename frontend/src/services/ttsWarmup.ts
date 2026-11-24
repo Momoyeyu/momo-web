@@ -2,13 +2,13 @@ import {ambient} from '../audio/ambient';
 // One short synthesis per effective voice. Keep PCM only while a listener is
 // waiting: a silent warmup never enters playback, history or persistent state.
 import { s16leToFloat32 } from "../audio/pcm";
-import { resolveChatLang, tFor } from "../i18n";
 import { getState, flushPendingState, subscribe } from "../lib/store";
 import { ttsConfigured, ttsEndpoint } from "../lib/asr";
 import { streamSpeech } from "./ttsClient";
 
 const freshnessMs = 5 * 60_000;
 const retryMs = 15_000;
+const auditionText = "Hi，我是 momo";
 // Match the backend speech budget so an idle GPU has time to load the model.
 const synthesisTimeoutMs = 120_000;
 type Listener = (chunk: Uint8Array, rate: number) => void;
@@ -27,10 +27,9 @@ export function invalidateWarmup() {
 }
 
 function prepareVoice(listener?: Listener): Promise<Sample | undefined> {
-  const { general, tts } = getState().settings;
+  const { tts } = getState().settings;
   if (!ttsConfigured(tts)) return Promise.resolve(undefined);
-  const lang = resolveChatLang(general);
-  const key = JSON.stringify([tts.engine, ttsEndpoint(tts), tts.voice, tts.prompt, lang]);
+  const key = JSON.stringify([tts.engine, ttsEndpoint(tts), tts.voice, tts.prompt]);
   if (flight?.key === key) {
     if (listener) {
       flight.sample.listener = listener;
@@ -46,8 +45,8 @@ function prepareVoice(listener?: Listener): Promise<Sample | undefined> {
   const result = (async () => {
     await flushPendingState(); // speech reads the committed configuration on the server
     signal.throwIfAborted();
-    await streamSpeech(tFor(lang, "title.tagline"), {
-      lang, signal,
+    await streamSpeech(auditionText, {
+      lang: "zh", signal,
       onSampleRate: rate => { sample.rate = rate; },
       onChunk: chunk => { sample.chunks.push(chunk); sample.listener?.(chunk, sample.rate); },
     });
