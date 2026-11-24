@@ -64,8 +64,8 @@ function prepareVoice(listener?: Listener): Promise<Sample | undefined> {
   return result;
 }
 
-export function warmVoice() {
-  void prepareVoice().catch(() => {}); // optional background work
+export function warmVoice(): Promise<void> {
+  return prepareVoice().then(() => {}, () => {}); // Voice is optional at startup.
 }
 
 export async function auditionVoice(signal: AbortSignal) {

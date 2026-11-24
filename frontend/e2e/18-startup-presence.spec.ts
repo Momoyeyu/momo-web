@@ -1,13 +1,14 @@
 import { test, expect, type Page } from './fixtures';
 
-async function fixture(page: Page, waitForState: Promise<void> = Promise.resolve(), language = 'zh', firstLaunch = false) {
+async function fixture(page: Page, waitForState: Promise<void> = Promise.resolve(), language = 'zh', firstLaunch = false, voice = false) {
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
     if(url.pathname.startsWith('/api/meeting/'))return route.fulfill(url.pathname.endsWith('/leave')?{status:204}:{json:{leaseId:'visual-lease',epoch:1,expiresIn:60}});
     let body: unknown = {};
     if (url.pathname === '/api/state') {
       if (route.request().method() === 'GET') await waitForState;
-      body = {settings:{general:{lang:language,voiceInput:false},llm:{url:'',model:'',key:''},tts:{url:'',key:'',voice:'',prompt:''}}};
+      body = {settings:{general:{lang:language,voiceInput:false},llm:{url:'',model:'',key:''},
+        tts:{url:voice?'http://tts.test':'',key:'',voice:voice?'test.wav':'',prompt:''}}};
     }
     if (url.pathname === '/api/intro') body = {phase:firstLaunch?'setup':'completed',languageConfirmed:false,configurationValid:false};
     if (url.pathname === '/api/extensions/activities') body = {enabled:{computer:false,browser:false,minecraft:false}};
@@ -171,3 +172,41 @@ test('optional mascot artwork cannot block startup or the title controls', async
   await page.locator('.menu-item').filter({hasText:'设置'}).click();
   await expect(page.locator('.settings-page')).toBeVisible();
 });
+
+for (const warmup of ['success', 'error', 'timeout'] as const) {
+  test(`desktop waits for voice warmup and releases startup after ${warmup}`, async ({page}) => {
+    await page.emulateMedia({reducedMotion:'reduce'});
+    if (warmup === 'timeout') await page.clock.install();
+    await fixture(page, Promise.resolve(), 'zh', false, true);
+    await page.addInitScript(()=>{
+      window.momoDesktop={getRuntime:async()=>({baseUrl:location.origin,token:'synthetic-startup-test'})};
+    });
+    let release!:()=>void;
+    const hold=new Promise<void>(resolve=>{release=resolve;});
+    await page.route('**/api/tts/speech', async route=>{
+      await hold;
+      await route.fulfill(warmup==='error'?{status:503,json:{detail:'test outage'}}:{
+        contentType:'audio/pcm',headers:{'X-Sample-Rate':'24000'},body:Buffer.from([0,1,0,1]),
+      });
+    });
+    const voiceRequest=page.waitForRequest('**/api/tts/speech');
+    try {
+      await page.goto('/', {waitUntil:'domcontentloaded'});
+      expect((await voiceRequest).postDataJSON()).toEqual({input:'Hi，我是 momo',lang:'zh'});
+      await expect(page.locator('#startup')).toHaveAttribute('data-stage','voice');
+      await expect(page.locator('.startup-message')).toHaveText('正在加载语音模型');
+      await expect(page.locator('#root')).toHaveAttribute('inert','');
+      if (warmup === 'timeout') await page.clock.fastForward(45_001);
+      else release();
+      await expect(page.locator('#startup')).toHaveCount(0);
+      await expect(page.getByRole('button',{name:/启动.*BOOT/i})).toBeVisible();
+      if (warmup === 'timeout') {
+        const response=page.waitForResponse('**/api/tts/speech');
+        release();
+        expect((await response).ok()).toBe(true);
+      }
+    } finally {
+      release();
+    }
+  });
+}

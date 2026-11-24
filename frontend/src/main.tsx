@@ -3,8 +3,9 @@ import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import {refreshIntro} from "./services/introClient";
+import { ttsConfigured } from "./lib/asr";
 import { bootPersist, getSettings } from "./lib/store";
-import { startupPresence } from "./startup/presence";
+import { startupPresence, waitForStartupVoice } from "./startup/presence";
 import { historyPage } from "./services/lifeClient";
 import { loadTranscript } from "./chat/engineInstance";
 import { warmVoice } from "./services/ttsWarmup";
@@ -12,6 +13,16 @@ import "./styles/base.css";
 
 const startup = startupPresence();
 startup.language(getSettings().general.lang);
+let voiceStartup: Promise<void> | undefined;
+function finishStartup() {
+  if (!voiceStartup) {
+    startup.finish();
+    return;
+  }
+  startup.stage("voice");
+  void voiceStartup.then(startup.finish);
+}
+
 function Game() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
@@ -19,7 +30,7 @@ function Game() {
     void startup.ready.then(() => { if (!cancelled) setReady(true); });
     return () => { cancelled = true; };
   }, []);
-  return <App ready={ready} onPrepared={startup.finish} />;
+  return <App ready={ready} onPrepared={finishStartup} />;
 }
 
 // 先从 backend 恢复配置（momo.yaml 权威，含 key），失败也照常启动（localStorage 兜底）。
@@ -27,8 +38,14 @@ function Game() {
 void runtime()
   .then(() => { startup.stage("restoring"); return bootPersist(); })
   .then(() => {
-    startup.language(getSettings().general.lang);
-    if (desktop()) warmVoice();
+    const { general, tts } = getSettings();
+    startup.language(general.lang);
+    if (desktop() && ttsConfigured(tts)) {
+      const warmup = warmVoice();
+      if (!general.voiceMuted && general.voiceVolume > 0) {
+        voiceStartup = waitForStartupVoice(warmup).finally(() => { voiceStartup = undefined; });
+      }
+    }
   })
   .then(() =>
     historyPage()
