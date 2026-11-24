@@ -166,6 +166,9 @@ importers:
 
   .:
     dependencies:
+      '@momoyeyu/momo-ui':
+        specifier: https://momoyeyu.github.io/momo-ui/packages/momo-ui-0.1.0.tgz
+        version: https://momoyeyu.github.io/momo-ui/packages/momo-ui-0.1.0.tgz(react@19.3.0)
       '@pixi/unsafe-eval':
         specifier: 7.4.3
         version: 7.4.3(@pixi/core@7.4.3)
@@ -228,6 +231,13 @@ packages:
 
   '@jridgewell/sourcemap-codec@1.6.0':
     resolution: {integrity: sha512-T7jf+5zgsZHwNJ4lvQ7/aezbyk0nNX+zJVWpmHA7VYsEx7a7qr5Rg5IbtJFqkgze5Y2sruq1RUY8Q837Od7iFw==}
+
+  '@momoyeyu/momo-ui@https://momoyeyu.github.io/momo-ui/packages/momo-ui-0.1.0.tgz':
+    resolution: {integrity: sha512-atz0Rzjy4Rnef6YpHA1PwN85vUV71lqfkMvsLQTJYFcO+Ban9+xto/gdWoc+96j+fJunnwEaLwP9j/GLCDK74Q==, tarball: https://momoyeyu.github.io/momo-ui/packages/momo-ui-0.1.0.tgz}
+    version: 0.1.0
+    engines: {node: '>=22.12'}
+    peerDependencies:
+      react: ^19.0.0
 
   '@oxc-project/types@0.153.0':
     resolution: {integrity: sha512-jSNrRIyvPVLL5E1z/tS5zLAprosGz/FuI1PWwEOz59j3E4TTTzSpqKb/RDGqJhhW0QHYISGXxq582wGx6T11Tw==}
@@ -1171,6 +1181,10 @@ snapshots:
   '@babel/helper-validator-identifier@7.29.7': {}
 
   '@jridgewell/sourcemap-codec@1.6.0': {}
+
+  '@momoyeyu/momo-ui@https://momoyeyu.github.io/momo-ui/packages/momo-ui-0.1.0.tgz(react@19.3.0)':
+    dependencies:
+      react: 19.3.0
 
   '@oxc-project/types@0.153.0': {}
 

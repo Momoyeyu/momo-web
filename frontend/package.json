@@ -15,6 +15,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@momoyeyu/momo-ui": "https://momoyeyu.github.io/momo-ui/packages/momo-ui-0.1.0.tgz",
     "@pixi/unsafe-eval": "7.4.3",
     "html-to-image": "1.11.13",
     "jszip": "^3.10.2",

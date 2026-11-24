@@ -1,4 +1,6 @@
 import {Fragment, useEffect, useMemo, useState} from 'react';
+import {ClockFace, Combobox} from '@momoyeyu/momo-ui';
+import '@momoyeyu/momo-ui/styles.css';
 import {currentLang, useT} from '../i18n';
 import {updateGeneral} from '../lib/store';
 import type {Memory} from '../lib/types';
@@ -74,25 +76,21 @@ function ClockView({setApp, now}: BuiltinViewProps) {
   const lang = currentLang();
   const zone = usePhoneTimeZone();
   const deviceZone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const zones = useMemo(
-    () => [...new Set(['UTC', deviceZone, ...Intl.supportedValuesOf('timeZone'), ...(zone ? [zone] : [])])].sort(),
-    [deviceZone, zone],
-  );
+  const systemLabel = t('phone.systemTimeZone', {zone:deviceZone});
+  const options = useMemo(() => {
+    const zones = [...new Set(['UTC', deviceZone, ...Intl.supportedValuesOf('timeZone'), ...(zone ? [zone] : [])])].sort();
+    return [{value:'', label:systemLabel}, ...zones.map(value => ({value, label:value.replaceAll('_',' ')}))];
+  }, [deviceZone, zone, systemLabel]);
   const date = new Intl.DateTimeFormat(lang, {dateStyle:'full', timeZone:zone || undefined}).format(now);
 
   return <>
     <AppHeader title={t('phone.clock')} goHome={() => setApp(null)}/>
     <div className="phone-scroll phone-clock">
-      <div className="phone-clock-face">
-        <time className="phone-clock-time" dateTime={now.toISOString()}>{formatPhoneTime(now,lang,zone)}</time>
-        <p>{date}</p>
-      </div>
+      <ClockFace time={formatPhoneTime(now,lang,zone)} dateTime={now.toISOString()} date={date}/>
       <label htmlFor="phone-time-zone">{t('phone.timeZone')}</label>
-      <select id="phone-time-zone" value={zone}
-        onChange={event => updateGeneral({phoneTimeZone:event.target.value})}>
-        <option value="">{t('phone.systemTimeZone', {zone:deviceZone})}</option>
-        {zones.map(option => <option key={option} value={option}>{option.replaceAll('_',' ')}</option>)}
-      </select>
+      <Combobox id="phone-time-zone" label={t('phone.timeZone')} value={zone}
+        onChange={phoneTimeZone => updateGeneral({phoneTimeZone})} options={options}
+        searchLabel={t('phone.searchTimeZone')} emptyLabel={t('phone.noTimeZones')}/>
     </div>
   </>;
 }
