@@ -1,3 +1,5 @@
+import {Surface} from '@momoyeyu/momo-ui';
+import '@momoyeyu/momo-ui/styles.css';
 import {useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode} from 'react';
 import {useT} from '../i18n';
 import {getState, subscribe} from '../lib/store';
@@ -117,7 +119,7 @@ export default function Settings() {
         aria-controls={'config-' + id} aria-current={active === id ? 'location' : undefined} className={active === id ? 'active' : ''} onClick={() => jump(id)}>{t('config.' + id)}</Button>)}</nav>
       <div className="config-scroll" ref={scroll} onScroll={track}>
         {chapters.map(id => <section key={id} data-chapter={id} id={'config-' + id} aria-labelledby={'heading-' + id}>
-          <h2 id={'heading-' + id}>{t('config.' + id)}</h2><div className="config-card">{content[id]}</div>
+          <h2 id={'heading-' + id}>{t('config.' + id)}</h2><Surface className="config-card">{content[id]}</Surface>
         </section>)}
       </div>
     </div>

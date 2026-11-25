@@ -30,7 +30,7 @@
 .config-scroll > section {margin: 0 0 24px;}
 .config-scroll > section:last-child {min-height: calc(100% - 1px); margin-bottom: 0;}
 .config-scroll h2 {margin: 0 0 10px; color: var(--accent); font-size: 18px; font-weight: 600; letter-spacing: .08em;}
-.config-card {padding: 2px 23px; background: rgba(var(--panel-rgb), .96); border: 1px solid var(--line); border-radius: 9px;}
+.config-card {--momo-surface-padding: 2px 23px; --momo-panel: rgba(var(--panel-rgb), .96); --momo-radius-lg: 9px;}
 .config-card .opt-row {display: grid; grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.14fr); gap: 20px; min-height: 46px; padding: 5px 0; border: 0;}
 .config-card > :not(:first-child) {border-top: 1px solid var(--line-soft);}
 .config-card > .opt-row:not(:first-child) {border-top: 1px solid var(--line-soft);}
@@ -162,5 +162,5 @@ body:has(.config-document) :is(.extension-modal, .social-modal) .icon-btn:hover:
 .settings-view-tabs > button:hover:not(:disabled) {color: var(--accent); background: transparent; box-shadow: none;}
 .settings-view-tabs > button:focus-visible {outline: 2px solid var(--accent); outline-offset: -2px;}
 
-.mod-row-actions {display: flex; align-items: center; gap: 8px; flex: none;}
+.mod-row-actions {flex: none;}
 .mod-row-actions > button {flex-shrink: 0;}

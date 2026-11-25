@@ -1,3 +1,4 @@
+import {Cluster} from '@momoyeyu/momo-ui';
 import {useEffect,useRef,useState} from 'react';
 import {useT} from '../../i18n';
 import {apiJson,jsonInit} from '../../services/http';
@@ -133,13 +134,13 @@ export default function ModsPanel(){
             disabled={busy} onClick={() => setHistory(true)}/>
         </FieldRow>}
         {matches.slice(paging.page*5,paging.page*5+5).map(mod=><FieldRow key={mod.id} label={mod.name}>
-          {'enabled' in mod ? <div className="mod-row-actions">
+          {'enabled' in mod ? <Cluster className="mod-row-actions" wrap={false}>
             <Switch title={mod.name} on={mod.enabled} disabled={busy} onChange={enabled=>setEnabled(mod,enabled)}/>
             <IconButton icon="gear" label={t('modManager.configureName',{name:mod.name})}
               tip={code('configure')} disabled={busy} onClick={()=>open({id:mod.id,mode:'manage'})}/>
             <IconButton icon="trash" label={t('modManager.removeName',{name:mod.name})}
               tip={code('removeIcon')} danger disabled={busy} onClick={()=>open({id:mod.id,mode:'remove'})}/>
-          </div> : <>
+          </Cluster> : <>
             {!mod.compatible&&<span className="config-value">{code('platformUnavailable')}</span>}
             {button('install',()=>open({id:mod.id,mode:'install'}),!mod.compatible)}
           </>}

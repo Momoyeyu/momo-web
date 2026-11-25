@@ -1,5 +1,5 @@
 import {Fragment, useEffect, useMemo, useState} from 'react';
-import {ClockFace, Combobox} from '@momoyeyu/momo-ui';
+import {ClockFace, Combobox, Container, EmptyState} from '@momoyeyu/momo-ui';
 import '@momoyeyu/momo-ui/styles.css';
 import {currentLang, useT} from '../i18n';
 import {updateGeneral} from '../lib/store';
@@ -56,13 +56,13 @@ function NotebookView({setApp}: BuiltinViewProps) {
   return <>
     <AppHeader title={t('phone.notebook')} goHome={() => setApp(null)}/>
     <div className="phone-scroll phone-notes">
-      {failed ? <div className="phone-empty" role="status">
+      {failed ? <EmptyState className="phone-empty" role="status">
         {t('phone.notesFailed')}
         <Button variant="ghost" size="sm" onClick={() => {setFailed(false);setAttempt(value=>value+1);}}>
           {t('phone.notesRetry')}
         </Button>
-      </div> : notes === null ? <div className="phone-empty" role="status">{t('phone.notesLoading')}</div>
-        : notes.length === 0 ? <div className="phone-empty">{t('phone.notesEmpty')}</div>
+      </EmptyState> : notes === null ? <EmptyState className="phone-empty" role="status">{t('phone.notesLoading')}</EmptyState>
+        : notes.length === 0 ? <EmptyState className="phone-empty">{t('phone.notesEmpty')}</EmptyState>
           : groups.map(([date, entries]) => <Fragment key={date}>
             {date && <h3>{date}</h3>}
             {entries.map(note => <p key={note.id}>{note.content}</p>)}
@@ -85,13 +85,13 @@ function ClockView({setApp, now}: BuiltinViewProps) {
 
   return <>
     <AppHeader title={t('phone.clock')} goHome={() => setApp(null)}/>
-    <div className="phone-scroll phone-clock">
+    <Container className="phone-scroll phone-clock" gutter="16px">
       <ClockFace time={formatPhoneTime(now,lang,zone)} dateTime={now.toISOString()} date={date}/>
       <label htmlFor="phone-time-zone">{t('phone.timeZone')}</label>
       <Combobox id="phone-time-zone" label={t('phone.timeZone')} value={zone}
         onChange={phoneTimeZone => updateGeneral({phoneTimeZone})} options={options}
         searchLabel={t('phone.searchTimeZone')} emptyLabel={t('phone.noTimeZones')}/>
-    </div>
+    </Container>
   </>;
 }
 
